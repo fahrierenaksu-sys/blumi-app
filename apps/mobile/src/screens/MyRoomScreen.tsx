@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import {
   type LayoutChangeEvent,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View
@@ -173,6 +172,8 @@ export function MyRoomScreen({
     dispatchTapMarker({ type: "faded", markerId: Number(markerId) })
   }, [])
   const [stageWidth, setStageWidth] = useState(0)
+  const [headerHeight, setHeaderHeight] = useState(0)
+  const [controlsHeight, setControlsHeight] = useState(0)
   const { roomShowcasePublic, openRoomShowcase } = useMyRoomShowcase({
     sessionActor,
     resolvedCapabilities,
@@ -208,6 +209,9 @@ export function MyRoomScreen({
     contentWidth: resolvedStageWidth,
     availableContentHeight: viewport.contentHeight,
     bottomContentInset: viewport.bottomContentInset,
+    chromeHeight: headerHeight > 0 && controlsHeight > 0
+      ? headerHeight + controlsHeight + uiTheme.spacing.sm + 2
+      : undefined,
     camera: shellCamera
   })
   const stageHeight = layoutMetrics.stageHeight
@@ -765,19 +769,30 @@ export function MyRoomScreen({
     setStageWidth((current) => current === nextWidth ? current : nextWidth)
   }, [])
 
+  const handleHeaderLayout = useCallback((event: LayoutChangeEvent): void => {
+    const height = Math.ceil(event.nativeEvent.layout.height)
+    setHeaderHeight((current) => current === height ? current : height)
+  }, [])
+
+  const handleControlsLayout = useCallback((event: LayoutChangeEvent): void => {
+    const height = Math.ceil(event.nativeEvent.layout.height)
+    setControlsHeight((current) => current === height ? current : height)
+  }, [])
+
   return (
     <SafeAreaView contentGutter={false} style={styles.myRoomRoot}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
+      <View
+        testID="my-room-fixed-page"
+        style={[
           styles.content,
           {
             paddingHorizontal: viewport.horizontalGutter,
-            paddingBottom: layoutMetrics.contentBottomPadding
+            // SafeAreaView already reserves the home-indicator inset.
+            paddingBottom: Math.max(0, viewport.bottomContentInset - viewport.safeAreaInsets.bottom)
           }
         ]}
       >
-        <View style={styles.header}>
+        <View style={styles.header} onLayout={handleHeaderLayout}>
           <View style={styles.headerText}>
             <Text style={styles.myRoomTitle}>{copy.title}</Text>
             <Text style={styles.myRoomSubtitle}>{copy.subtitle}</Text>
@@ -830,7 +845,7 @@ export function MyRoomScreen({
             ) : null}
           </View>
 
-          <View style={styles.roomControlPanel}>
+          <View style={styles.roomControlPanel} onLayout={handleControlsLayout}>
             <View style={styles.stageActionDock}>
               <Pressable
                 accessibilityRole="button"
@@ -884,7 +899,7 @@ export function MyRoomScreen({
             </View>
           </View>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   )
 }
@@ -899,6 +914,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiTheme.colors.background,
   },
   content: {
+    flex: 1,
     gap: uiTheme.spacing.sm,
   },
   header: {

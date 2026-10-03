@@ -2,8 +2,8 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { resolveMiniRoomRestCamera } from "./miniRoomLayout"
 import {
-  applyMiniRoomPoseOffset, clampMiniRoomFollow, MINI_ROOM_FOLLOW_MARGIN, MINI_ROOM_PAPER_CAP, resolveMiniRoomContentDrift,
-  resolveMiniRoomContentOpacity, resolveMiniRoomFollowTarget, resolveMiniRoomKeyboardFrame, resolveMiniRoomPaperGeometry,
+  applyMiniRoomPoseOffset, MINI_ROOM_PAPER_CAP, resolveMiniRoomContentDrift,
+  resolveMiniRoomContentOpacity, resolveMiniRoomKeyboardFrame, resolveMiniRoomPaperGeometry,
   resolveMiniRoomPose, resolveMiniRoomPoseEndpoints, resolveMiniRoomPoseOffset, resolveMiniRoomTextWidths,
   type MiniRoomPoseInput, type MiniRoomTransitionFrame
 } from "./miniRoomTransitionModel"
@@ -81,26 +81,15 @@ test("a reversal mid-way follows the keyboard back from where it is: the pose de
   assert.deepEqual(previous, endpoints.closed, "it lands exactly at rest")
 })
 
-test("floor tap while typing: the resting paper is the same whatever keyboard was open, and the room never zooms per tap", () => {
-  const closedFor = keyboards.map((height) => resolveMiniRoomPoseEndpoints(phone, height).closed)
-  for (const closed of closedFor) assert.deepEqual(closed, closedFor[0], "one stable resting pose")
-  const closed = closedFor[0]!
-  const width = phone.windowWidth
-  // A target inside the safe frame: nothing moves.
-  for (const pointX of [0.3, 0.5, 0.7]) {
-    assert.equal(resolveMiniRoomFollowTarget({ pointX, frame: closed, windowWidth: width, current: 0 }), 0)
+test("floor targets never pan the room; keyboard framing stays centered and adapts only to the keyboard", () => {
+  for (const device of devices) {
+    for (const keyboardHeight of keyboards) {
+      const { closed, open } = resolveMiniRoomPoseEndpoints(device, keyboardHeight)
+      assert.equal(closed.cameraX, 0, "resting room stays centered")
+      assert.equal(open.cameraX, 0, "keyboard framing never shifts the room sideways")
+      assert.notEqual(open.cameraY, closed.cameraY, "keyboard framing may move vertically to keep the composer clear")
+    }
   }
-  // Near the left edge: pan right just enough to bring it to the safe frame's edge.
-  const pan = resolveMiniRoomFollowTarget({ pointX: 0.12, frame: closed, windowWidth: width, current: 0 })
-  assert.ok(pan > 0)
-  const screenX = width / 2 + pan + (0.12 - 0.5) * closed.roomWidth * closed.cameraScale
-  assert.ok(near(screenX, width * MINI_ROOM_FOLLOW_MARGIN, 1e-6) || pan === clampMiniRoomFollow(1e9, closed, width))
-  // Never past the room's own edge.
-  const far = resolveMiniRoomFollowTarget({ pointX: 0, frame: closed, windowWidth: width, current: 0 })
-  assert.equal(far, clampMiniRoomFollow(far + 500, closed, width))
-  assert.ok(closed.roomWidth * closed.cameraScale / 2 - far >= width / 2 - 1e-9, "the room still covers the left edge")
-  // A second tap at the same place (already inside after the pan) changes nothing.
-  assert.equal(resolveMiniRoomFollowTarget({ pointX: 0.12, frame: closed, windowWidth: width, current: pan }), pan)
 })
 
 test("a change that is not the keyboard settles from the visible pose without a jump", () => {

@@ -178,7 +178,6 @@ function hudProps(overrides: Partial<Parameters<typeof HudModule.MiniRoomHud>[0]
     onLeave: () => calls.push("leave"), onOpenSafety: () => calls.push("safety"),
     onRetryConnect: () => calls.push("retry"), onToggleMic: () => calls.push("mic"),
     suggestionsEnabled: false, onToggleSuggestions: () => calls.push("suggestions"),
-    onCloseKeyboard: () => calls.push("closeKeyboard"),
     ...overrides
   }
   return { props, calls }
@@ -327,7 +326,7 @@ test("the chat panel's close-keyboard button presses with the spring and ticks o
   let closed = 0
   const shared = <T,>(value: T) => ({ value })
   const frame = { progress: 1, margin: 0, bottom: 0, height: 120, cameraX: 0, cameraY: 0, cameraScale: 1,
-    restHeight: 297, roomWidth: 546 }
+    restHeight: 297 }
   runtime.render(() => expand(MiniRoomChatPanel({
     copy, mode: "typing", transition: shared(frame) as never, contentProgress: shared(1) as never,
     windowWidth: 390, windowHeight: 844, historyHeight: 200, historyItems: [], historyStatus: "ready",
@@ -443,7 +442,7 @@ function panelProps(mode: "history" | "typing") {
   const shared = <T,>(value: T) => ({ value })
   return {
     copy, mode, transition: shared({ progress: mode === "typing" ? 1 : 0, margin: 0, bottom: 0, height: 120,
-      cameraX: 0, cameraY: 0, cameraScale: 1, restHeight: 297, roomWidth: 546 }) as never,
+      cameraX: 0, cameraY: 0, cameraScale: 1, restHeight: 297 }) as never,
     contentProgress: shared(mode === "typing" ? 1 : 0) as never,
     windowWidth: 390, windowHeight: 844, historyHeight: 200, historyItems: [], historyStatus: "ready" as const,
     partnerName: "Bora", onRecentHeightChange: () => undefined, onRecentRowsHeightChange: () => undefined,

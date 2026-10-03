@@ -54,6 +54,92 @@ async function flushMicrotasks(): Promise<void> {
   await Promise.resolve()
 }
 
+test("background batches yield before each native request, allowing a selected preview to win the idle gap", async () => {
+  const idleSlots: ReturnType<typeof deferred<boolean>>[] = []
+  const completed = new Set<string>()
+  const inFlight = new Map<string, Promise<boolean>>()
+  const started: string[] = []
+  const lane = createPrioritySequentialPrefetchLane(async (uri) => {
+    started.push(uri)
+    return true
+  })
+  const waitForSlot = () => {
+    const slot = deferred<boolean>()
+    idleSlots.push(slot)
+    return slot.promise
+  }
+  const background = prefetchCurrentSceneUris(["base", "top"], (uri, priority) =>
+    lane(uri, () => true, priority), () => true, completed, inFlight, "background", waitForSlot)
+  assert.deepEqual(started, [])
+
+  await prefetchCurrentSceneUris(["selected"], (uri, priority) =>
+    lane(uri, () => true, priority), () => true, completed, inFlight, "selected", waitForSlot)
+  assert.deepEqual(started, ["selected"])
+  idleSlots[0].resolve(true)
+  await flushMicrotasks()
+  await flushMicrotasks()
+  assert.deepEqual(started, ["selected", "base"])
+  assert.equal(idleSlots.length, 2)
+  idleSlots[1].resolve(true)
+  await background
+  assert.deepEqual(started, ["selected", "base", "top"])
+})
+
+test("a cancelled or deadline-expired idle gap stops background work without entering the native lane", async () => {
+  for (const cancelled of [false, true]) {
+    let current = true
+    const idle = deferred<boolean>()
+    const completed = new Set<string>()
+    const started: string[] = []
+    const run = prefetchCurrentSceneUris(["pending", "later"], async (uri) => {
+      started.push(uri)
+      return true
+    }, () => current, completed, undefined, "background", () => idle.promise)
+    if (cancelled) current = false
+    idle.resolve(cancelled)
+    await run
+    assert.deepEqual(started, [])
+    assert.equal(completed.size, 0)
+  }
+})
+
+test("selected completion during an idle gap avoids a redundant background native request", async () => {
+  const idle = deferred<boolean>()
+  const completed = new Set<string>()
+  const started: string[] = []
+  const prefetch = async (uri: string) => { started.push(uri); return true }
+  const background = prefetchCurrentSceneUris(["shared"], prefetch, () => true,
+    completed, undefined, "background", () => idle.promise)
+  await prefetchCurrentSceneUris(["shared"], prefetch, () => true, completed, undefined, "selected")
+  idle.resolve(true)
+  await background
+  assert.deepEqual(started, ["shared"])
+})
+
+test("background queued before a swipe is rechecked at native admission; selected priority remains eligible", async () => {
+  const first = deferred<boolean>()
+  const session = createWarmupSessionBudget(4, 1_600)
+  let interactive = false
+  const started: string[] = []
+  const lane = createPrioritySequentialPrefetchLane((uri) => {
+    started.push(uri)
+    return uri === "first" ? first.promise : Promise.resolve(true)
+  }, {
+    onNativeStart: (uri, priority) => (priority === "selected" || !interactive) &&
+      admitWarmupUri(uri, { width: 10, height: 10 }, session),
+    onNativeSettled: (uri, accepted) => settleWarmupUri(uri, accepted, session)
+  })
+  const firstRequest = lane("first", () => true)
+  const background = lane("queued-background", () => true)
+  interactive = true
+  const selected = lane("selected", () => true, "selected")
+  first.resolve(true)
+  assert.deepEqual(await Promise.all([firstRequest, background, selected]), [true, false, true])
+  assert.deepEqual(started, ["first", "selected"])
+  assert.equal(session.seenUris.has("queued-background"), false)
+  assert.equal(session.estimatedDecodedBytes, 800)
+})
+
 test("first Shop page selects at most four visible top thumbnails and tolerates an empty catalog", () => {
   const tops = ["Z", "A", "B", "C", "D"].map((id) => ({ id, name: id, type: "top", outfitKey: undefined }))
   assert.deepEqual(selectInitialShopTopIds([], new Set(), new Set(), new Set(), () => true, "en-US"), [])

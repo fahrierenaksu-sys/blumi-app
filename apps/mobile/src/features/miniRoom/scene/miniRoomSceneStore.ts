@@ -147,6 +147,19 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       usesRoomV2Scene
     )
   )
+  // The lazy state above already represents these inputs. Remember them so
+  // the first passive effect does not rebuild the same scene after its first
+  // paint; a real participant/appearance/geometry change still resets it.
+  const sceneInputRef = useRef({
+    geometry,
+    localDisplayName,
+    localUserId,
+    participantAvatarSnapshots,
+    partnerDisplayName,
+    partnerUserId,
+    scene,
+    usesRoomV2Scene
+  })
   // Committed avatars for callbacks. The scene reset below writes it before
   // publishing new avatars, so reads during render see the current id set.
   const avatarsRef = useRef(avatars)
@@ -194,6 +207,27 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   }, [])
 
   useEffect(() => {
+    const previous = sceneInputRef.current
+    if (
+      previous.geometry === geometry &&
+      previous.localDisplayName === localDisplayName &&
+      previous.localUserId === localUserId &&
+      previous.participantAvatarSnapshots === participantAvatarSnapshots &&
+      previous.partnerDisplayName === partnerDisplayName &&
+      previous.partnerUserId === partnerUserId &&
+      previous.scene === scene &&
+      previous.usesRoomV2Scene === usesRoomV2Scene
+    ) return
+    sceneInputRef.current = {
+      geometry,
+      localDisplayName,
+      localUserId,
+      participantAvatarSnapshots,
+      partnerDisplayName,
+      partnerUserId,
+      scene,
+      usesRoomV2Scene
+    }
     for (const ref of movementsRef.current.values()) cancelActiveMiniRoomMovement(ref, cancelMiniRoomMovementRun)
     cancelPendingMiniRoomMovementCompletion(
       movementCompletionTimerRef,

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react"
+import { useEffect, useLayoutEffect, useRef } from "react"
 import { useAnimatedStyle, useDerivedValue, useSharedValue, type SharedValue } from "react-native-reanimated"
 import { scheduleOnUI } from "react-native-worklets"
 import { animateTo, resolveMotion } from "../../../ui/motion"
 import {
-  applyMiniRoomPoseOffset, clampMiniRoomFollow, MINI_ROOM_NO_POSE_OFFSET, resolveMiniRoomFollowTarget,
+  applyMiniRoomPoseOffset, MINI_ROOM_NO_POSE_OFFSET,
   resolveMiniRoomPose, resolveMiniRoomPoseEndpoints, resolveMiniRoomPoseOffset, type MiniRoomPoseInput
 } from "./miniRoomTransitionModel"
 
@@ -15,10 +15,10 @@ import {
  * when the keyboard arrives, and a reversal mid-way just follows the keyboard.
  *
  * Changes that are not the keyboard (a draft growing a line, a measured
- * message) settle on the `smooth` token from the visible pose. A floor tap
- * pans the room only when its target would leave the safe frame (follow
- * camera); there is no zoom per tap. Reduce Motion lands every pose at once
- * and crossfades the paper's content (ui/motion `crossfade`).
+ * message) settle on the `smooth` token from the visible pose. The room stays
+ * horizontally fixed while avatars move; only the keyboard pose reframes it.
+ * Reduce Motion lands every pose at once and crossfades the paper's content
+ * (ui/motion `crossfade`).
  */
 export function useMiniRoomCameraTransform(input: {
   poseInput: MiniRoomPoseInput
@@ -30,8 +30,6 @@ export function useMiniRoomCameraTransform(input: {
   const appliedInput = useSharedValue(poseInput)
   const offset = useSharedValue(MINI_ROOM_NO_POSE_OFFSET)
   const offsetWeight = useSharedValue(0)
-  const follow = useSharedValue(0)
-  const followTarget = useSharedValue(0)
   const endpoints = useDerivedValue(() => applyMiniRoomPoseOffset(
     resolveMiniRoomPoseEndpoints(appliedInput.value, openHeight.value), offset.value, offsetWeight.value))
   const transition = useDerivedValue(() => resolveMiniRoomPose(endpoints.value, progress.value))
@@ -62,28 +60,11 @@ export function useMiniRoomCameraTransform(input: {
     }, poseInput)
   }, [appliedInput, offset, offsetWeight, openHeight, poseInput, reduceMotion])
 
-  /** A walk towards room point `pointX` (0..1): pan only if it would leave the safe frame at rest. */
-  const followTo = useCallback((pointX: number) => {
-    const pan = resolveMotion(reduceMotion).smooth
-    scheduleOnUI((x: number) => {
-      "worklet"
-      // A floor tap also closes the keyboard, so judge the frame the walk ends in.
-      const closed = resolveMiniRoomPoseEndpoints(appliedInput.value, openHeight.value).closed
-      const target = resolveMiniRoomFollowTarget({
-        pointX: x, frame: closed, windowWidth: appliedInput.value.windowWidth, current: followTarget.value
-      })
-      if (target === followTarget.value) return
-      followTarget.value = target
-      follow.value = animateTo(target, pan)
-    }, pointX)
-  }, [appliedInput, follow, followTarget, openHeight, reduceMotion])
-
   const cameraStyle = useAnimatedStyle(() => {
     const frame = transition.value
-    const pan = clampMiniRoomFollow(follow.value, frame, appliedInput.value.windowWidth)
     return {
-      transform: [{ translateX: frame.cameraX + pan }, { translateY: frame.cameraY }, { scale: frame.cameraScale }]
+      transform: [{ translateX: frame.cameraX }, { translateY: frame.cameraY }, { scale: frame.cameraScale }]
     }
   })
-  return { cameraStyle, transition, contentProgress, followTo }
+  return { cameraStyle, transition, contentProgress }
 }

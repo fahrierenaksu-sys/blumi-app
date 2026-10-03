@@ -1,7 +1,6 @@
 import type { LayoutChangeEvent } from "react-native"
 import {
   Keyboard,
-  Pressable,
   StyleSheet,
   View,
   useWindowDimensions
@@ -176,10 +175,11 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     () => resolveMiniRoomRestCamera({ ...poseInput, keyboardVisible: false, keyboardInset: 0 }),
     [poseInput]
   )
-  const { cameraStyle, transition, contentProgress, followTo } = useMiniRoomCameraTransform({
+  const { cameraStyle, transition, contentProgress } = useMiniRoomCameraTransform({
     poseInput, keyboard, reduceMotion
   })
   const {
+    deferUntilArrivalLands,
     dismissSpeechBubble,
     moveLocalAvatar,
     moveLocalAvatarToHotspot,
@@ -216,9 +216,9 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     })) return
     announcedPartnerUserIdRef.current = partnerUser.userId
     // A walk in from the door is felt when it lands, not when it starts.
-    if (store.deferUntilArrivalLands(partnerUser.userId, hapticSoft)) return
+    if (deferUntilArrivalLands(partnerUser.userId, hapticSoft)) return
     hapticSoft()
-  }, [partnerPresent, partnerUser.userId, store.deferUntilArrivalLands])
+  }, [deferUntilArrivalLands, partnerPresent, partnerUser.userId])
 
   useEffect(() => {
     if (inRoomMessages.length === 0) return
@@ -228,23 +228,19 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     }
   }, [consumeInRoomMessage, inRoomMessages, sayPhrase])
 
-  // The floor point under the finger (RoomFloorTapLayer measures the stage
-  // on the UI thread at the tap, through the camera's zoom and pan).
+  // Floor gestures are already mapped into room coordinates by RoomFloorTapLayer.
+  // Moving avatars never move the camera; the fixed room frame only adapts to
+  // the keyboard pose so the composer stays usable.
   const handleRoomTap = useCallback(
     (target: { x: number; y: number }): void => {
-      // The avatar starts at once; the keyboard (if any) eases down with the
-      // scene; the room pans only if the target would leave the safe frame.
       moveLocalAvatar(target)
-      followTo(Math.max(0, Math.min(1, target.x)))
-      handleCloseKeyboard()
     },
-    [followTo, handleCloseKeyboard, moveLocalAvatar]
+    [moveLocalAvatar]
   )
 
   const handleHotspotSelect = useCallback((hotspotId: string): void => {
-    handleCloseKeyboard()
     moveLocalAvatarToHotspot(hotspotId)
-  }, [handleCloseKeyboard, moveLocalAvatarToHotspot])
+  }, [moveLocalAvatarToHotspot])
 
   const handleSubmitComposer = useCallback((): boolean => {
     const result = resolveRoomComposerSubmit(composerText, onSendRoomMessage)
@@ -338,14 +334,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
 
   return (
     <View style={styles.root}>
-      {layout.panelMode === "typing" ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={copy.closeKeyboard}
-          style={StyleSheet.absoluteFill}
-          onPress={handleCloseKeyboard}
-        />
-      ) : null}
       <View pointerEvents="box-none" style={styles.roomStageFrame}>
         {roomDecorScene?.shell ? (
           <Reanimated.View
@@ -429,7 +417,6 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
         onToggleMic={onToggleMic}
         suggestionsEnabled={keyboardPreference.suggestionsEnabled}
         onToggleSuggestions={keyboardPreference.toggle}
-        onCloseKeyboard={handleCloseKeyboard}
       />
     </View>
   )

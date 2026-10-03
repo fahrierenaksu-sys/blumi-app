@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { ECONOMY_CATALOG, resolveR1PublishedEconomyCatalog } from "@blumi/domain"
 import { Image as ExpoImage } from "expo-image"
-import { Image as ReactNativeImage, type ImageSourcePropType } from "react-native"
+import { AppState, Image as ReactNativeImage, type ImageSourcePropType } from "react-native"
 import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import { getAvatarV2ShopItemsCompatibleWithBody } from "../avatarV2/avatarBodyCompatibility"
 import { getIdleAvatarLayerAssets } from "../avatarV2/room/avatarIdleAssets"
@@ -22,6 +22,7 @@ import {
 import { resolveShopCatalogRuntime } from "../shop/shopCatalogRuntime"
 import { getShopLayoutMetrics } from "../shop/shopLayoutMetrics"
 import { useAppViewportMetrics } from "../../ui/layout/useAppViewportMetrics"
+import { mainTabPagerIndicator } from "../../ui/mainTabPagerIndicator"
 import {
   admitWarmupUri,
   createWarmupSessionBudget,
@@ -54,21 +55,30 @@ export const SCENE_WARMUP_AFTER_ROUTE_MS = 300
 export function scheduleSceneAssetWarmup(
   runWarmup: () => void,
   enabled: boolean,
-  delayMs = 1_000
+  delayMs = 1_000,
+  canStart?: () => boolean
 ): () => void {
   if (!enabled) return () => {}
 
   let idleId: number | undefined
   let cancelled = false
-  const timeoutId = setTimeout(() => {
+  const runWhenReady = () => {
     if (cancelled) return
-    if (typeof globalThis.requestIdleCallback === "function") {
-      idleId = globalThis.requestIdleCallback(() => {
-        if (!cancelled) runWarmup()
+    if (canStart && !canStart()) {
+      void waitForBackgroundWarmupSlot(() => !cancelled, canStart).then((accepted) => {
+        if (accepted && !cancelled) runWarmup()
       })
       return
     }
     runWarmup()
+  }
+  const timeoutId = setTimeout(() => {
+    if (cancelled) return
+    if (typeof globalThis.requestIdleCallback === "function") {
+      idleId = globalThis.requestIdleCallback(runWhenReady)
+      return
+    }
+    runWhenReady()
   }, delayMs)
 
   return () => {
@@ -76,6 +86,42 @@ export function scheduleSceneAssetWarmup(
     clearTimeout(timeoutId)
     if (idleId !== undefined) globalThis.cancelIdleCallback?.(idleId)
   }
+}
+
+/** Yield between background assets; a new swipe or app suspension wins over cache work. */
+export function waitForBackgroundWarmupSlot(
+  isCurrent: () => boolean,
+  canStart: () => boolean,
+  maxWaitMs = 5_000
+): Promise<boolean> {
+  if (!isCurrent()) return Promise.resolve(false)
+  return new Promise((resolve) => {
+    let settled = false
+    let cancelScheduled: (() => void) | undefined
+    const finish = (accepted: boolean) => {
+      if (settled) return
+      settled = true
+      cancelScheduled?.()
+      clearTimeout(deadlineId)
+      resolve(accepted)
+    }
+    const check = () => {
+      if (!isCurrent()) {
+        finish(false)
+      } else if (canStart()) {
+        finish(true)
+      } else {
+        cancelScheduled = scheduleSceneAssetWarmup(check, true, 100)
+      }
+    }
+    // No forced work at the deadline: a busy scene simply abandons this batch.
+    const deadlineId = setTimeout(() => finish(false), maxWaitMs)
+    cancelScheduled = scheduleSceneAssetWarmup(check, true, 0)
+  })
+}
+
+function canStartBackgroundWarmup(): boolean {
+  return AppState.currentState === "active" && !mainTabPagerIndicator.tracking.value
 }
 
 function warmSources(
@@ -94,6 +140,7 @@ function warmSources(
     priority?: WarmupPriority
   } = {}
 ): Promise<void> {
+  if (!isCurrent()) return Promise.resolve()
   const priority = options.priority ?? "background"
   const resolvedSources = sources.map((source) => ReactNativeImage.resolveAssetSource(source) ?? {})
   const uris = selectBoundedWarmupUris(resolvedSources, budget)
@@ -110,7 +157,8 @@ function warmSources(
     isCurrent,
     completed,
     inFlight,
-    priority
+    priority,
+    () => waitForBackgroundWarmupSlot(isCurrent, canStartBackgroundWarmup)
   )
 }
 
@@ -174,7 +222,9 @@ export function CurrentSceneAssetWarmup({
     {
       logicalDeadlineMs: 5_000,
       uriCooldownMs: 30_000,
-      onNativeStart: (uri) => admitWarmupUri(uri, sourceDimensions.get(uri), sessionBudget),
+      onNativeStart: (uri, priority) =>
+        (priority !== "background" || canStartBackgroundWarmup()) &&
+        admitWarmupUri(uri, sourceDimensions.get(uri), sessionBudget),
       onNativeSettled: (uri, accepted) => {
         settleWarmupUri(uri, accepted, sessionBudget)
         // This is a shared native-cache receipt, not route or selection state.
@@ -201,12 +251,12 @@ export function CurrentSceneAssetWarmup({
       )?.asset.source
       if (roomShellSource === undefined) return
       void warmSources([roomShellSource], CURRENT_SCENE_BUDGET, () => current, completed, inFlight, sourceDimensions, prefetchLane)
-    }, true, SCENE_WARMUP_AFTER_ROUTE_MS)
+    }, true, SCENE_WARMUP_AFTER_ROUTE_MS, canStartBackgroundWarmup)
     const cancelScheduled = scheduleSceneAssetWarmup(() => {
       if (!current) return
       const sources = getIdleAvatarLayerAssets(avatar).map((asset) => asset.source)
       void warmSources(sources, CURRENT_SCENE_BUDGET, () => current, completed, inFlight, sourceDimensions, prefetchLane)
-    }, true)
+    }, true, 1_000, canStartBackgroundWarmup)
     cancelCommonRef.current = () => {
       current = false
       cancelShellWarmup()
@@ -306,7 +356,7 @@ export function CurrentSceneAssetWarmup({
           .filter((source): source is ImageSourcePropType => source !== undefined))
       }
       void warmSources(sources, SHOP_BUDGET, () => current && enabledRef.current, completed, inFlight, sourceDimensions, prefetchLane)
-    }, true, SCENE_WARMUP_AFTER_ROUTE_MS)
+    }, true, SCENE_WARMUP_AFTER_ROUTE_MS, canStartBackgroundWarmup)
     return () => {
       current = false
       cancelScheduled()

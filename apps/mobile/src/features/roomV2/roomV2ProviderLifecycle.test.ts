@@ -28,6 +28,8 @@ function deferred<T>() {
 function providerFixture(options?: {
   cache?: Map<string, string>
   server?: PersonalRoomDecorSnapshot
+  ownedRoomItemIds?: readonly string[]
+  freshRuntimeArrays?: boolean
 }) {
   const file = resolve(process.cwd().endsWith("apps/mobile") ? "src" : "apps/mobile/src",
     "features/roomV2/state/RoomV2Provider.tsx")
@@ -62,7 +64,7 @@ function providerFixture(options?: {
     if (!same(current.deps, deps)) { current.value = work(); current.deps = deps }
     return current.value
   }
-  const ownedItems: string[] = []
+  const ownedItems = [...(options?.ownedRoomItemIds ?? [])]
   const runtimeConfigInputs: string[][] = []
   const react = {
     createContext: () => ({ Provider: "provider" }), useContext: () => null,
@@ -142,7 +144,7 @@ function providerFixture(options?: {
     }) => {
       runtimeConfigInputs.push([...input.inventoryOwnedItemIds])
       return {
-        storageKey: input.storageScopeId, migrationMarkerKey: "migration", ownedRoomItemIds: ownedItems,
+        storageKey: input.storageScopeId, migrationMarkerKey: "migration", ownedRoomItemIds: [...input.inventoryOwnedItemIds],
         inventoryReadyForRoomEdits: true
       }
     } },
@@ -175,7 +177,8 @@ function providerFixture(options?: {
     if (!mounted) return
     dirty = false; index = 0
     output = module.exports.RoomV2Provider({ children: null, storageScopeId: scope,
-      requireServerInventory: true, baseHttpUrl: "https://fixture.invalid", serverSessionToken: token })
+      requireServerInventory: true, baseHttpUrl: "https://fixture.invalid", serverSessionToken: token,
+      ...(options?.freshRuntimeArrays ? { qaOnlyOwnedRoomItemIds: [], excludedRoomItemIds: [] } : {}) })
     const pending = effects.splice(0)
     for (const entry of pending) entry.slot.cleanup?.()
     for (const entry of pending) entry.slot.cleanup = entry.run() || undefined
@@ -193,6 +196,11 @@ function providerFixture(options?: {
     runtimeConfigInputs,
     rerender: () => render(),
     ownItem: (itemId: string) => { ownedItems.push(itemId); render() },
+    revokeItem: (itemId: string) => {
+      const itemIndex = ownedItems.indexOf(itemId)
+      if (itemIndex >= 0) ownedItems.splice(itemIndex, 1)
+      render()
+    },
     value: () => output.props.value as any,
     rotate: () => { token = `${token}-rotated`; render() },
     changeScope: () => { scope = "fixture-other-owner"; render() },
@@ -209,6 +217,78 @@ function providerFixture(options?: {
     unmount: () => { mounted = false; for (const current of slots) current.cleanup?.() }
   }
 }
+
+test("equivalent ownership arrays and no-op edits preserve the room snapshot without storage work", async () => {
+  const f = providerFixture({ freshRuntimeArrays: true })
+  await f.settle()
+  const current = f.value().userRoomDecor
+  const writes = f.cacheWrites.length
+  const stateWrites = f.stateWrites.length
+
+  f.rerender()
+  await f.settle()
+  assert.equal(f.value().userRoomDecor, current, "an unrelated parent render keeps the room scene")
+  assert.equal(f.stateWrites.length, stateWrites, "equivalent ownership cannot become a local room edit")
+  assert.equal(f.value().setUserRoomDecor(structuredClone(current)), true)
+  await f.settle()
+  f.fireTimers()
+  await f.settle()
+  assert.equal(f.value().userRoomDecor, current, "an accepted no-op edit keeps the scene")
+  assert.equal(f.cacheWrites.length, writes, "the unchanged room must not be written again")
+  assert.equal(f.saves.length, 0, "the unchanged room must not enter server autosave")
+  f.unmount()
+})
+
+test("an unrelated unlock keeps the scene while revoked ownership removes the placed item", async () => {
+  const room: UserRoomDecor = {
+    roomShellId: "base",
+    placedItems: [{ instanceId: "fixture-lamp", itemId: "room-lamp", x: 0.3, y: 0.6, rotation: "front" }]
+  }
+  const f = providerFixture({ server: snapshot(5, room), ownedRoomItemIds: ["room-lamp"] })
+  await f.settle()
+  const current = f.value().userRoomDecor
+  const writes = f.cacheWrites.length
+  f.ownItem("room-chair")
+  await f.settle()
+  assert.equal(f.value().userRoomDecor, current, "an unlock does not rebuild unchanged room contents")
+  assert.equal(f.cacheWrites.length, writes, "an unrelated unlock does not write the room")
+
+  f.revokeItem("room-lamp")
+  await f.settle()
+  assert.deepEqual(Array.from(f.value().userRoomDecor.placedItems), [], "revoked items disappear immediately")
+  assert.notEqual(f.value().userRoomDecor, current, "a real ownership removal publishes a new scene")
+  assert.equal(f.value().confirmedPersistedRoomDecor.placedItems.length, 1, "local filtering never claims a server save")
+  f.unmount()
+})
+
+test("accepted room input is copied while duplicate and unowned placements remain excluded", async () => {
+  const f = providerFixture({ ownedRoomItemIds: ["room-lamp"] })
+  await f.settle()
+  const input: UserRoomDecor = {
+    roomShellId: "edited-room",
+    placedItems: [
+      { instanceId: "fixture-lamp", itemId: "room-lamp", x: 0.3, y: 0.6, rotation: "front", supportLocalPosition: { x: 0.2, y: 0.4 } }
+    ]
+  }
+  assert.equal(f.value().setUserRoomDecor(input), true)
+  input.placedItems[0]!.x = 0.9
+  input.placedItems[0]!.supportLocalPosition!.x = 0.9
+  await f.settle()
+  const accepted = f.value().userRoomDecor
+  assert.equal(accepted.placedItems.length, 1)
+  assert.equal(accepted.placedItems[0].x, 0.3, "caller mutation cannot alter the accepted placement")
+  assert.equal(accepted.placedItems[0].supportLocalPosition.x, 0.2, "nested coordinates are copied at publication")
+  const duplicateInput: UserRoomDecor = structuredClone(accepted)
+  duplicateInput.placedItems.push(
+    { instanceId: "fixture-duplicate", itemId: "room-lamp", x: 0.5, y: 0.6, rotation: "front" },
+    { instanceId: "fixture-unowned", itemId: "room-chair", x: 0.7, y: 0.6, rotation: "front" }
+  )
+  assert.equal(f.value().setUserRoomDecor(duplicateInput), true)
+  await f.settle()
+  assert.equal(f.value().userRoomDecor, accepted, "ignored duplicate and unowned input cannot alter the scene")
+  assert.equal(f.value().confirmedPersistedRoomDecor.roomShellId, "base", "a local edit does not prove a server save")
+  f.unmount()
+})
 
 test("production room retries one same-owner hydration on reconnect and keeps a pending draft", async () => {
   const f = providerFixture()

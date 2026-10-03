@@ -31,6 +31,20 @@ test("a join snapshot places both avatars, then only newer partner steps walk", 
   ])
 })
 
+test("the first authoritative snapshot still places both avatars at the initial scene epoch", () => {
+  const plan = planMiniRoomMotionPresentation(INITIAL_MINI_ROOM_MOTION_PRESENTATION_CURSOR, {
+    avatars: [avatar("local"), avatar("partner")],
+    snapKey: 1,
+    sceneEpoch: 0,
+    localUserId: "local"
+  })
+  assert.deepEqual(plan.apply.map(({ avatar: value, snap }) => [value.userId, snap]), [
+    ["local", true],
+    ["partner", true]
+  ])
+  assert.equal(plan.cursor.sceneEpoch, 0)
+})
+
 test("a rebuilt scene or a new join snapshot re-places both avatars at the latest records", () => {
   assert.deepEqual(present([
     { avatars: [avatar("local"), avatar("partner")], snapKey: 1, sceneEpoch: 1 },

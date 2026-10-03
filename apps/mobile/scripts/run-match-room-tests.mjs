@@ -271,6 +271,7 @@ try {
       "src/features/miniRoom/scene/miniRoomAvatarStageModel.test.ts",
       "src/features/miniRoom/scene/useMiniRoomKeyboard.test.ts",
       "src/features/miniRoom/scene/useMiniRoomCameraTransform.test.ts",
+      "src/features/miniRoom/scene/MiniRoomScene.keyboardInteractions.test.ts",
       "src/features/miniRoom/scene/RoomChatComposer.test.ts",
       "src/features/miniRoom/scene/miniRoomControlsFeel.test.ts",
       "src/features/miniRoom/scene/miniRoomFirstAppearance.test.ts",

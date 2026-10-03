@@ -44,6 +44,7 @@ import {
   selectMiniRoomLivePartner
 } from "../features/miniRoom/miniRoomPartnerIdentity"
 import { useChatThreadStore } from "../features/chat/chatStore"
+import type { ChatThreadBindings } from "../features/chat/thread/chatThreadBindings"
 import type {
   MiniRoomParticipantAvatarSnapshots
 } from "../features/miniRoom/scene/miniRoomSceneTypes"
@@ -59,10 +60,11 @@ import { usePartnerTyping } from "../features/chat/typing/usePartnerTyping"
 
 type MiniRoomScreenProps = NativeStackScreenProps<RootStackParamList, "MiniRoom"> & {
   sessionActor: SessionActor
+  requestChatMessages: ChatThreadBindings["requestMessages"]
 }
 
 export function MiniRoomScreen(props: MiniRoomScreenProps) {
-  const { navigation, route, sessionActor } = props
+  const { navigation, route, sessionActor, requestChatMessages } = props
   const { readyMiniRoom, participants: participantParams } = route.params
   const { miniRoom, mediaSession } = readyMiniRoom
   // The partner's current name and outfit come from the room's conversation in
@@ -94,7 +96,8 @@ export function MiniRoomScreen(props: MiniRoomScreenProps) {
     miniRoomId: miniRoom.miniRoomId,
     sourceThreadId: miniRoom.sourceThreadId,
     localUserId: sessionActor.profile.userId,
-    partnerUserId: participants.partner.userId
+    partnerUserId: participants.partner.userId,
+    requestMessages: requestChatMessages
   })
   // The room shows its conversation's messages and invites itself.
   useFocusedConversation(roomChat.threadId, isFocused)

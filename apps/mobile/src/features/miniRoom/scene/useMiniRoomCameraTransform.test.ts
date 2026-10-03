@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createFakeReactRuntime, createReanimatedStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 import {
-  resolveMiniRoomFollowTarget, resolveMiniRoomPose, resolveMiniRoomPoseEndpoints, type MiniRoomPoseInput
+  resolveMiniRoomPose, resolveMiniRoomPoseEndpoints, type MiniRoomPoseInput
 } from "./miniRoomTransitionModel"
 import type * as Hook from "./useMiniRoomCameraTransform"
 
@@ -75,6 +75,7 @@ test("room camera, paper and content all follow the same keyboard progress, fram
       assert.deepEqual(api.transition.value, resolveMiniRoomPose(endpoints, progress))
       assert.equal(api.contentProgress.value, api.transition.value.progress, "the content rides the same progress")
       assert.equal(scaleOf(api.cameraStyle), api.transition.value.cameraScale)
+      assert.equal(translateX(api.cameraStyle), 0, "avatar movement cannot pan the room camera")
     }
   } finally {
     runtime.unmount()
@@ -95,23 +96,16 @@ test("a longer draft settles from the visible pose on the smooth token instead o
   }
 })
 
-test("floor tap: the room pans only when the target would leave the safe frame, and never zooms", () => {
-  const { runtime, api, frame, keyboardAt, animations } = mount()
+test("the camera stays horizontally fixed while keyboard framing keeps the composer clear", () => {
+  const { runtime, keyboardAt } = mount()
   try {
-    keyboardAt(1)
-    const scale = scaleOf(api().cameraStyle)
-    api().followTo(0.5)
-    assert.equal(animations.length, 0, "a target in the middle moves nothing")
-    api().followTo(0.04)
-    const closed = resolveMiniRoomPoseEndpoints(phone, 336).closed
-    const pan = resolveMiniRoomFollowTarget({ pointX: 0.04, frame: closed, windowWidth: phone.windowWidth, current: 0 })
-    assert.ok(pan > 0)
-    assert.deepEqual(animations.at(-1), { target: pan, motion: "smooth" })
-    assert.equal(scaleOf(frame().cameraStyle), scale, "a tap never changes the zoom")
-    // The keyboard goes down after the tap; at rest the pan is fully applied.
-    assert.equal(translateX(keyboardAt(0).cameraStyle), closed.cameraX + pan)
-    api().followTo(0.04)
-    assert.equal(animations.length, 1, "the same target again: no second camera move")
+    const closed = keyboardAt(0)
+    const open = keyboardAt(1)
+    assert.equal(translateX(closed.cameraStyle), 0)
+    assert.equal(translateX(open.cameraStyle), 0, "keyboard and floor interactions cannot pan the room")
+    assert.notEqual(scaleOf(open.cameraStyle), scaleOf(closed.cameraStyle), "keyboard pose still adapts to the available space")
+    assert.notEqual(open.transition.value.cameraY, closed.transition.value.cameraY)
+    assert.equal(translateX(keyboardAt(0).cameraStyle), 0, "closing the keyboard returns to the same horizontal frame")
   } finally {
     runtime.unmount()
   }
@@ -125,8 +119,7 @@ test("Reduce Motion: the pose lands with the keyboard and the dock's text crossf
     assert.equal(open.transition.value.progress, 1)
     assert.deepEqual(animations.at(-1), { target: 1, motion: "crossfade" })
     assert.equal(api().contentProgress.value, 1)
-    api().followTo(0.02)
-    assert.equal(animations.at(-1)?.motion, "instant", "a pan lands at once")
+    assert.equal(translateX(api().cameraStyle), 0, "Reduce Motion keeps the room centered")
   } finally {
     runtime.unmount()
   }

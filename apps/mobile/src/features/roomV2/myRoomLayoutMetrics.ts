@@ -9,8 +9,7 @@ const MY_ROOM_WIDE_STAGE_MIN_WIDTH = 720
 const MY_ROOM_PORTRAIT_STAGE_HEIGHT_RATIO = 1.4
 // Keep the full authored shell, including the left-side door, inside the card.
 const MY_ROOM_PORTRAIT_RENDERER_WIDTH_PERCENT = 155
-// Reserve the header plus the two-row action dock so the fixed bottom nav never
-// covers the final showcase action on portrait phones.
+// Initial estimate until the header and controls report their actual heights.
 const MY_ROOM_PORTRAIT_CHROME_HEIGHT = 152
 const MY_ROOM_PORTRAIT_RENDERER_TRANSLATE_Y = 0
 
@@ -19,6 +18,7 @@ export interface MyRoomLayoutMetricsInput {
   contentWidth: number
   availableContentHeight: number
   bottomContentInset: number
+  chromeHeight?: number
   camera: ResolvedRoomV2MyRoomCamera
 }
 
@@ -46,6 +46,9 @@ export function resolveMyRoomLayoutMetrics(
       contentWidth,
       finiteNonNegative(input.availableContentHeight),
       finiteNonNegative(input.bottomContentInset),
+      input.chromeHeight === undefined || !Number.isFinite(input.chromeHeight)
+        ? MY_ROOM_PORTRAIT_CHROME_HEIGHT
+        : finiteNonNegative(input.chromeHeight),
       usesWideStageCamera,
       input.camera
     ),
@@ -54,9 +57,8 @@ export function resolveMyRoomLayoutMetrics(
     rendererTranslateY: usesWideStageCamera
       ? input.camera.rendererTranslateY
       : MY_ROOM_PORTRAIT_RENDERER_TRANSLATE_Y,
-    contentBottomPadding: usesWideStageCamera
-      ? finiteNonNegative(input.bottomContentInset)
-      : 0,
+    // The fixed page reserves navigation space outside the room stage.
+    contentBottomPadding: 0,
     usesWideStageCamera
   }
 }
@@ -65,24 +67,20 @@ function resolveStageHeight(
   contentWidth: number,
   availableContentHeight: number,
   bottomContentInset: number,
+  chromeHeight: number,
   usesWideStageCamera: boolean,
   camera: ResolvedRoomV2MyRoomCamera
 ): number {
+  const stageBudget = Math.max(0, availableContentHeight - chromeHeight)
   if (usesWideStageCamera) {
-    return resolveRoomV2StageHeight(availableContentHeight, true, camera)
+    return Math.min(stageBudget, resolveRoomV2StageHeight(availableContentHeight, true, camera))
   }
-  const portraitStageMaximum = Math.max(
-    camera.compactMinStageHeight,
-    Math.min(
-      camera.compactMaxStageHeight,
-      availableContentHeight - MY_ROOM_PORTRAIT_CHROME_HEIGHT
-    )
-  )
-  return Math.round(clamp(
+  const portraitStageMaximum = Math.min(camera.compactMaxStageHeight, stageBudget)
+  return Math.min(stageBudget, Math.round(clamp(
     contentWidth * MY_ROOM_PORTRAIT_STAGE_HEIGHT_RATIO + bottomContentInset,
-    camera.compactMinStageHeight,
+    Math.min(camera.compactMinStageHeight, portraitStageMaximum),
     portraitStageMaximum
-  ))
+  )))
 }
 
 function finiteNonNegative(value: number): number {

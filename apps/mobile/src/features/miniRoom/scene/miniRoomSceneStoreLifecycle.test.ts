@@ -107,6 +107,14 @@ function mount() {
   return { runtime, timers, render, store, cancelledDrivers, clock, finishSegment, pendingSegments }
 }
 
+test("the lazy initial scene does not schedule a duplicate reset render", () => {
+  const f = mount()
+  f.render()
+  assert.equal(f.runtime.renderCount, 1)
+  assert.equal(f.store().sceneEpoch, 0)
+  f.runtime.unmount()
+})
+
 test("both avatars walk concurrently; retargeting one cancels only its own UI-thread driver", () => {
   const f = mount()
   f.render()
@@ -129,6 +137,7 @@ test("participant reset cancels both walking drivers before creating the new sce
   f.store().applyRemoteAvatar({ userId: "partner", x: .65, y: .72, present: true, revision: 1 })
   const previous = f.store().avatarPositions
   f.render({ partnerUser: { userId: "partner-2", displayName: "Other" } })
+  assert.equal(f.store().sceneEpoch, 1, "a changed participant still resets and replays the scene")
   assert.deepEqual(f.cancelledDrivers, [previous.local, previous.partner])
   assert.deepEqual(Object.keys(f.store().avatars).sort(), ["local", "partner-2"])
   assert.equal(f.store().avatars.local.motion, "idle")

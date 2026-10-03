@@ -22,8 +22,6 @@ export type MiniRoomTransitionFrame = {
   cameraScale: number
   /** The closed paper's height: the history transcript stays pinned to it. */
   restHeight: number
-  /** Width of the room canvas at rest (points); the follow camera's travel. */
-  roomWidth: number
 }
 
 /** Everything the pose depends on except the keyboard (that is `progress`). */
@@ -43,7 +41,7 @@ export function resolveMiniRoomTransitionTarget(
     progress: layout.panelMode === "typing" ? 1 : 0,
     bottom: layout.panelBottom, height: layout.panelHeight, margin: layout.panelMargin,
     cameraX: camera.translateX, cameraY: camera.translateY, cameraScale: camera.scale,
-    restHeight: restHeight ?? layout.panelHeight, roomWidth: rest.width
+    restHeight: restHeight ?? layout.panelHeight
   }
 }
 
@@ -76,8 +74,7 @@ function mixFrame(from: MiniRoomTransitionFrame, to: MiniRoomTransitionFrame, t:
     cameraX: from.cameraX + (to.cameraX - from.cameraX) * t,
     cameraY: from.cameraY + (to.cameraY - from.cameraY) * t,
     cameraScale: from.cameraScale + (to.cameraScale - from.cameraScale) * t,
-    restHeight: from.restHeight + (to.restHeight - from.restHeight) * t,
-    roomWidth: from.roomWidth + (to.roomWidth - from.roomWidth) * t
+    restHeight: from.restHeight + (to.restHeight - from.restHeight) * t
   }
 }
 
@@ -95,7 +92,7 @@ export function resolveMiniRoomPose(endpoints: MiniRoomPoseEndpoints, progress: 
 }
 
 const ZERO_FRAME: MiniRoomTransitionFrame = {
-  progress: 0, bottom: 0, height: 0, margin: 0, cameraX: 0, cameraY: 0, cameraScale: 0, restHeight: 0, roomWidth: 0
+  progress: 0, bottom: 0, height: 0, margin: 0, cameraX: 0, cameraY: 0, cameraScale: 0, restHeight: 0
 }
 export const MINI_ROOM_NO_POSE_OFFSET: MiniRoomPoseEndpoints = { closed: ZERO_FRAME, open: ZERO_FRAME }
 
@@ -108,7 +105,7 @@ function differenceFrame(a: MiniRoomTransitionFrame, b: MiniRoomTransitionFrame)
     // restHeight stays the laid-out value: the transcript is laid out at its
     // final size at once, and h − restHeight keeps it on the composer while
     // the paper settles around it.
-    restHeight: 0, roomWidth: a.roomWidth - b.roomWidth
+    restHeight: 0
   }
 }
 
@@ -130,7 +127,7 @@ function addFrame(a: MiniRoomTransitionFrame, b: MiniRoomTransitionFrame): MiniR
     progress: a.progress,
     bottom: a.bottom + b.bottom, height: a.height + b.height, margin: a.margin + b.margin,
     cameraX: a.cameraX + b.cameraX, cameraY: a.cameraY + b.cameraY, cameraScale: a.cameraScale + b.cameraScale,
-    restHeight: a.restHeight + b.restHeight, roomWidth: a.roomWidth + b.roomWidth
+    restHeight: a.restHeight + b.restHeight
   }
 }
 
@@ -158,48 +155,6 @@ export function resolveMiniRoomKeyboardFrame(
   const height = Number.isFinite(event.height) ? Math.max(0, event.height) : 0
   const openHeight = progress > 0.01 && height > 0 ? height / progress : previousOpenHeight
   return { progress, openHeight }
-}
-
-/**
- * Follow camera. The room is wider than the phone, so a walk target near a
- * side edge could leave the avatar half out of frame. Only then the room
- * pans, just far enough to bring the target back inside the safe frame (a
- * side margin of MINI_ROOM_FOLLOW_MARGIN of the window), never past the
- * room's own edges. Inside the safe frame nothing moves: a tap never zooms.
- */
-export const MINI_ROOM_FOLLOW_MARGIN = 0.16
-
-export function resolveMiniRoomFollowSlack(frame: MiniRoomTransitionFrame, windowWidth: number): number {
-  "worklet"
-  return Math.max(0, (frame.roomWidth * frame.cameraScale - windowWidth) / 2)
-}
-
-export function clampMiniRoomFollow(follow: number, frame: MiniRoomTransitionFrame, windowWidth: number): number {
-  "worklet"
-  const slack = resolveMiniRoomFollowSlack(frame, windowWidth)
-  return Math.min(slack, Math.max(-slack, follow))
-}
-
-/** The pan that keeps room point `pointX` (0..1) inside the safe frame of `frame`. */
-export function resolveMiniRoomFollowTarget(input: {
-  pointX: number
-  frame: MiniRoomTransitionFrame
-  windowWidth: number
-  current: number
-}): number {
-  "worklet"
-  const { frame, windowWidth } = input
-  const current = clampMiniRoomFollow(input.current, frame, windowWidth)
-  if (!Number.isFinite(input.pointX)) return current
-  const pointX = Math.min(1, Math.max(0, input.pointX))
-  const screenX = windowWidth / 2 + frame.cameraX + current + (pointX - 0.5) * frame.roomWidth * frame.cameraScale
-  const margin = windowWidth * MINI_ROOM_FOLLOW_MARGIN
-  let next = current
-  if (screenX < margin) next = current + (margin - screenX)
-  else if (screenX > windowWidth - margin) next = current - (screenX - (windowWidth - margin))
-  next = clampMiniRoomFollow(next, frame, windowWidth)
-  // Sub-point corrections are not worth a camera move.
-  return Math.abs(next - current) < 0.5 ? current : next
 }
 
 /** Each text layer keeps its settled width while the enclosing paper morphs.

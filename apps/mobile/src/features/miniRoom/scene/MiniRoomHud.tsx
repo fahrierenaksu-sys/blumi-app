@@ -33,8 +33,6 @@ interface MiniRoomHudProps {
   onToggleMic: () => void
   suggestionsEnabled: boolean
   onToggleSuggestions: () => void
-  /** The scene's close: starts the dock's return before UIKit dismisses the keyboard. */
-  onCloseKeyboard: () => void
 }
 
 /**
@@ -61,8 +59,7 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
     onRetryConnect,
     onToggleMic,
     suggestionsEnabled,
-    onToggleSuggestions,
-    onCloseKeyboard
+    onToggleSuggestions
   } = props
   const motion = useMotion()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -149,7 +146,6 @@ export function MiniRoomHud(props: MiniRoomHudProps) {
             expanded={menuOpen}
             onPress={() => {
               hapticSelection()
-              onCloseKeyboard()
               setMenuOpen((open) => !open)
               setMenuPresent(true)
             }}

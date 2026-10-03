@@ -21,6 +21,10 @@ const schedulerDeclaration = sourceFile.statements.find((statement) =>
   ts.isFunctionDeclaration(statement) && statement.name?.text === "scheduleSceneAssetWarmup"
 )
 assert.ok(schedulerDeclaration, "warmup scheduler is declared in the component module")
+const backgroundSlotDeclaration = sourceFile.statements.find((statement) =>
+  ts.isFunctionDeclaration(statement) && statement.name?.text === "waitForBackgroundWarmupSlot"
+)
+assert.ok(backgroundSlotDeclaration)
 const rootNavigatorSourceFile = ts.createSourceFile(
   "RootNavigationChrome.tsx",
   rootNavigatorSource,
@@ -33,9 +37,11 @@ const routePolicyDeclaration = rootNavigatorSourceFile.statements.find((statemen
 )
 assert.ok(routePolicyDeclaration, "RootNavigationChrome declares the warmup route allowlist")
 
-const schedulerCode = ts.transpileModule(schedulerDeclaration.getText(sourceFile), {
+const schedulerCode = ts.transpileModule(
+  schedulerDeclaration.getText(sourceFile) + "\n" + backgroundSlotDeclaration.getText(sourceFile), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
-}).outputText + "\nmodule.exports.scheduleSceneAssetWarmup = scheduleSceneAssetWarmup"
+}).outputText + "\nmodule.exports.scheduleSceneAssetWarmup = scheduleSceneAssetWarmup" +
+  "\nmodule.exports.waitForBackgroundWarmupSlot = waitForBackgroundWarmupSlot"
 const routePolicyCode = ts.transpileModule(routePolicyDeclaration.getText(rootNavigatorSourceFile), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
 }).outputText + "\nmodule.exports.isCurrentSceneWarmupRoute = isCurrentSceneWarmupRoute"
@@ -70,11 +76,115 @@ function loadScheduler(overrides = {}) {
   })
   return {
     schedule: sandboxModule.exports.scheduleSceneAssetWarmup,
+    waitForBackgroundSlot: sandboxModule.exports.waitForBackgroundWarmupSlot,
     timers,
     idleCallbacks,
     cancelledIdleIds
   }
 }
+
+function fireTimer(fixture, delayMs) {
+  const [id, timer] = [...fixture.timers.entries()].find(([, value]) => value.delayMs === delayMs)
+  fixture.timers.delete(id)
+  timer.callback()
+}
+
+function fireIdle(fixture) {
+  const [id, callback] = fixture.idleCallbacks.entries().next().value
+  fixture.idleCallbacks.delete(id)
+  callback()
+}
+
+test("background idle slots recheck a newly started swipe or app suspension and resume only once safe", async () => {
+  const f = loadScheduler()
+  let canStart = true
+  let accepted
+  const slot = f.waitForBackgroundSlot(() => true, () => canStart)
+    .then((result) => { accepted = result })
+  fireTimer(f, 0)
+  canStart = false
+  fireIdle(f)
+  await Promise.resolve()
+  assert.equal(accepted, undefined)
+  assert.equal([...f.timers.values()].some((timer) => timer.delayMs === 100), true)
+  canStart = true
+  fireTimer(f, 100)
+  fireIdle(f)
+  await slot
+  assert.equal(accepted, true)
+  assert.equal(f.timers.size, 0)
+  assert.equal(f.idleCallbacks.size, 0)
+})
+
+test("cancelled generations consume no background slot and clear pending scheduling", async () => {
+  const f = loadScheduler()
+  let current = true
+  const slot = f.waitForBackgroundSlot(() => current, () => true)
+  fireTimer(f, 0)
+  current = false
+  fireIdle(f)
+  assert.equal(await slot, false)
+  assert.equal(f.timers.size, 0)
+  assert.equal(f.idleCallbacks.size, 0)
+  assert.equal(await f.waitForBackgroundSlot(() => false, () => true), false)
+  assert.equal(f.timers.size, 0)
+})
+
+test("background slot deadline abandons work even when JS never gets an idle callback", async () => {
+  const f = loadScheduler()
+  const slot = f.waitForBackgroundSlot(() => true, () => false)
+  fireTimer(f, 0)
+  assert.equal(f.idleCallbacks.size, 1)
+  fireTimer(f, 5_000)
+  assert.equal(await slot, false)
+  assert.equal(f.idleCallbacks.size, 0)
+  assert.equal(f.timers.size, 0)
+})
+
+test("timer fallback rechecks activity before letting background work proceed", async () => {
+  const f = loadScheduler({ requestIdleCallback: undefined })
+  let foreground = false
+  const slot = f.waitForBackgroundSlot(() => true, () => foreground)
+  fireTimer(f, 0)
+  foreground = true
+  fireTimer(f, 100)
+  assert.equal(await slot, true)
+  assert.equal(f.timers.size, 0)
+})
+
+test("the background batch does not derive catalog or avatar sources during a swipe", async () => {
+  const f = loadScheduler()
+  let tracking = false
+  let derivedSources = false
+  f.schedule(() => { derivedSources = true }, true, 300, () => !tracking)
+  fireTimer(f, 300)
+  tracking = true
+  fireIdle(f)
+  fireTimer(f, 0)
+  fireIdle(f)
+  assert.equal(derivedSources, false)
+  tracking = false
+  fireTimer(f, 100)
+  fireIdle(f)
+  await Promise.resolve()
+  assert.equal(derivedSources, true)
+  assert.equal(f.timers.size, 0)
+})
+
+test("route cancellation while batch planning waits prevents source derivation", async () => {
+  const f = loadScheduler()
+  let derivedSources = false
+  const cancel = f.schedule(() => { derivedSources = true }, true, 300, () => false)
+  fireTimer(f, 300)
+  fireIdle(f)
+  cancel()
+  fireTimer(f, 0)
+  fireIdle(f)
+  await Promise.resolve()
+  assert.equal(derivedSources, false)
+  assert.equal(f.timers.size, 0)
+  assert.equal(f.idleCallbacks.size, 0)
+})
 
 function loadRoutePolicy() {
   const sandboxModule = { exports: {} }

@@ -79,7 +79,7 @@ test("wide stages keep the existing fitted camera mode without affecting phone f
   assert.equal(metrics.stageHeight, camera.wideMaxStageHeight)
 })
 
-test("wide short viewports retain the height-bounded stage camera", () => {
+test("wide short viewports keep controls reachable without scrolling", () => {
   const metrics = resolveMyRoomLayoutMetrics({
     viewportWidth: 800,
     contentWidth: 800,
@@ -88,7 +88,7 @@ test("wide short viewports retain the height-bounded stage camera", () => {
     camera
   })
 
-  assert.equal(metrics.stageHeight, camera.wideMinStageHeight)
+  assert.equal(metrics.stageHeight, 500 - 152)
 })
 
 test("My Room metrics fail safely for invalid measured space", () => {
@@ -100,7 +100,7 @@ test("My Room metrics fail safely for invalid measured space", () => {
     camera
   })
 
-  assert.equal(metrics.stageHeight, camera.compactMinStageHeight)
+  assert.equal(metrics.stageHeight, 0)
   assert.equal(metrics.contentBottomPadding, 0)
   assert.equal(metrics.rendererScalePercent, 155)
   assert.equal(metrics.rendererWidth, "155%")
@@ -173,4 +173,39 @@ test("tablet-safe viewport width keeps the wide stage camera even after gutters 
   assert.equal(metrics.usesWideStageCamera, true)
   assert.equal(metrics.rendererWidth, "100%")
   assert.equal(metrics.rendererTranslateY, camera.rendererTranslateY)
+})
+
+test("fixed My Room fits short phones and measured large-text controls", () => {
+  for (const viewportWidth of [320, 402, 744]) {
+    for (const availableContentHeight of [360, 500, 500.75, 707]) {
+      for (const chromeHeight of [152, 152.25, 210, 280]) {
+        const metrics = resolveMyRoomLayoutMetrics({
+          viewportWidth,
+          contentWidth: viewportWidth - 48,
+          availableContentHeight,
+          bottomContentInset: 108,
+          chromeHeight,
+          camera
+        })
+        assert.ok(metrics.stageHeight >= 0)
+        assert.ok(metrics.stageHeight + chromeHeight <= availableContentHeight)
+        assert.equal(metrics.contentBottomPadding, 0)
+      }
+    }
+  }
+})
+
+test("measured header growth reduces the stage, without changing its camera or width", () => {
+  const input = {
+    viewportWidth: 402,
+    contentWidth: 354,
+    availableContentHeight: 550,
+    bottomContentInset: 108,
+    camera
+  }
+  const regular = resolveMyRoomLayoutMetrics({ ...input, chromeHeight: 152 })
+  const largeText = resolveMyRoomLayoutMetrics({ ...input, chromeHeight: 220 })
+  assert.equal(regular.stageHeight - largeText.stageHeight, 68)
+  assert.equal(regular.rendererWidth, largeText.rendererWidth)
+  assert.equal(regular.rendererTranslateY, largeText.rendererTranslateY)
 })

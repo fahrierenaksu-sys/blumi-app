@@ -156,6 +156,8 @@ export function RoomV2Provider({
   const providerMountedRef = useRef(true)
   // Content key: the inventory snapshot is also replaced for unrelated changes.
   const ownedRoomItemIdKey = JSON.stringify(inventoryStore.inventory.ownedRoomItemIds)
+  const qaOwnedRoomItemIdKey = JSON.stringify(qaOnlyOwnedRoomItemIds ?? [])
+  const excludedRoomItemIdKey = JSON.stringify(excludedRoomItemIds ?? [])
   const runtimeConfig = useMemo(
     () => resolveRoomV2ProviderRuntimeConfig({
       storageScopeId,
@@ -164,19 +166,19 @@ export function RoomV2Provider({
       isQaRuntimeAuthorized,
       isVNextRuntimeProof,
       allowStarterOnboardingEdits,
-      excludedRoomItemIds,
+      excludedRoomItemIds: JSON.parse(excludedRoomItemIdKey) as string[],
       inventoryIsReady: inventoryStore.isReady,
       inventoryOwnedItemIds: JSON.parse(ownedRoomItemIdKey) as string[],
-      qaOnlyOwnedRoomItemIds
+      qaOnlyOwnedRoomItemIds: JSON.parse(qaOwnedRoomItemIdKey) as string[]
     }),
     [
       ownedRoomItemIdKey,
       inventoryStore.isReady,
-      qaOnlyOwnedRoomItemIds,
+      qaOwnedRoomItemIdKey,
       isQaRuntimeAuthorized,
       isVNextRuntimeProof,
       allowStarterOnboardingEdits,
-      excludedRoomItemIds,
+      excludedRoomItemIdKey,
       storageNamespace,
       storageScopeId
     ]
@@ -185,8 +187,11 @@ export function RoomV2Provider({
   const syncMetadataKey = storageKey ? `${storageKey}:server-sync` : undefined
   const migrationMarkerKey = runtimeConfig.migrationMarkerKey
   const effectiveOwnedRoomItemIds = runtimeConfig.ownedRoomItemIds
-  const effectiveOwnedRoomItemIdKey = effectiveOwnedRoomItemIds.join("|")
   const inventoryReadyForRoomEdits = runtimeConfig.inventoryReadyForRoomEdits
+  const ownershipSanitizedRoomDecor = useMemo(
+    () => sanitizeRoomV2DecorForOwnership(userRoomDecor, effectiveOwnedRoomItemIds),
+    [userRoomDecor, effectiveOwnedRoomItemIds]
+  )
 
   const publishRoomDecor = useCallback((
     nextDecor: UserRoomDecor,
@@ -194,6 +199,8 @@ export function RoomV2Provider({
   ): UserRoomDecor => {
     const previous = roomDecorIntentRef.current
     const sameScope = previous.storageKey === storageKey
+    if (sameScope && source === "local" &&
+      JSON.stringify(previous.decor) === JSON.stringify(nextDecor)) return previous.decor
     const decor = copyRoomV2Decor(nextDecor)
     roomDecorIntentRef.current = {
       storageKey,
@@ -214,7 +221,8 @@ export function RoomV2Provider({
     const current = roomDecorIntentRef.current.storageKey === storageKey
       ? roomDecorIntentRef.current.decor
       : createDefaultRoomV2Decor()
-    return publishRoomDecor(update(current), "local")
+    const next = update(current)
+    return next === current ? current : publishRoomDecor(next, "local")
   }, [publishRoomDecor, storageKey])
 
   const queueCacheWrite = useCallback((write: () => Promise<void>): Promise<void> => {
@@ -637,10 +645,7 @@ export function RoomV2Provider({
       !inventoryReadyForRoomEdits ||
       !storageKey
     ) return
-    const sanitizedDecor = sanitizeRoomV2DecorForOwnership(
-      userRoomDecor,
-      effectiveOwnedRoomItemIds
-    )
+    const sanitizedDecor = ownershipSanitizedRoomDecor
     const decorJson = JSON.stringify(sanitizedDecor)
     const intentAtStart = roomDecorIntentRef.current
     const editVersionAtStart = intentAtStart.storageKey === storageKey
@@ -705,15 +710,12 @@ export function RoomV2Provider({
   }, [
     baseHttpUrl,
     inventoryReadyForRoomEdits,
-    ownedRoomItemIdKey,
-    effectiveOwnedRoomItemIdKey,
     flushPendingServerDecor,
     queueCacheWrite,
     serverSessionToken,
     storageKey,
     syncMetadataKey,
-    userRoomDecor,
-    effectiveOwnedRoomItemIds
+    ownershipSanitizedRoomDecor
   ])
 
   const retryPersistence = useCallback((): void => {
@@ -1076,8 +1078,8 @@ export function RoomV2Provider({
         ? userRoomDecor
         : createDefaultRoomV2Decor()
       return {
-        userRoomDecor: inventoryReadyForRoomEdits
-          ? sanitizeRoomV2DecorForOwnership(visibleRoomDecor, effectiveOwnedRoomItemIds)
+        userRoomDecor: inventoryReadyForRoomEdits && hasCurrentRoomScope
+          ? ownershipSanitizedRoomDecor
           : visibleRoomDecor,
         confirmedPersistedRoomDecor: hasCurrentRoomScope
           ? confirmedPersistedRoomDecor
@@ -1094,7 +1096,7 @@ export function RoomV2Provider({
         removePlacedItem
       }
     },
-    [storageKey, userRoomDecor, confirmedPersistedRoomDecor, persistenceState, persistenceErrorMessage, inventoryReadyForRoomEdits, effectiveOwnedRoomItemIds, retryPersistence, setUserRoomDecor, saveUserRoomDecorConfirmed, selectRoomShell, resetRoomDecor, addPlacedItem, updatePlacedItem, removePlacedItem]
+    [storageKey, userRoomDecor, ownershipSanitizedRoomDecor, confirmedPersistedRoomDecor, persistenceState, persistenceErrorMessage, inventoryReadyForRoomEdits, retryPersistence, setUserRoomDecor, saveUserRoomDecorConfirmed, selectRoomShell, resetRoomDecor, addPlacedItem, updatePlacedItem, removePlacedItem]
   )
 
   return (
@@ -1139,24 +1141,24 @@ export function sanitizeRoomV2DecorForOwnership(
 ): UserRoomDecor {
   const ownedItemIds = new Set(ownedRoomItemIds)
   const placedItemIds = new Set<string>()
+  const placedItems = Array.isArray(decor.placedItems)
+    ? decor.placedItems.filter((item) => {
+        if (!ownedItemIds.has(item.itemId) || placedItemIds.has(item.itemId)) return false
+        placedItemIds.add(item.itemId)
+        return true
+      })
+    : []
+  // An unchanged ownership snapshot must not rebuild the scene or schedule
+  // a local edit. Publication still copies accepted external input.
+  if (Array.isArray(decor.placedItems) && placedItems.length === decor.placedItems.length) return decor
   return {
     ...decor,
-    placedItems: Array.isArray(decor.placedItems)
-      ? decor.placedItems
-        .filter((item) => {
-          if (!ownedItemIds.has(item.itemId) || placedItemIds.has(item.itemId)) {
-            return false
-          }
-          placedItemIds.add(item.itemId)
-          return true
-        })
-        .map((item) => ({
-          ...item,
-          ...(item.supportLocalPosition
-            ? { supportLocalPosition: { ...item.supportLocalPosition } }
-            : {})
-        }))
-      : []
+    placedItems: placedItems.map((item) => ({
+      ...item,
+      ...(item.supportLocalPosition
+        ? { supportLocalPosition: { ...item.supportLocalPosition } }
+        : {})
+    }))
   }
 }
 

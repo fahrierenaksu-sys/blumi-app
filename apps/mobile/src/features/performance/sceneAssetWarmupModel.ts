@@ -148,7 +148,7 @@ export interface PriorityPrefetchLaneOptions {
   now?: () => number
   setTimeout?: (callback: () => void, delayMs: number) => unknown
   clearTimeout?: (handle: unknown) => void
-  onNativeStart?: (uri: string) => boolean
+  onNativeStart?: (uri: string, priority: WarmupPriority) => boolean
   onNativeSettled?: (uri: string, accepted: boolean) => void
   onNativeNotStarted?: (uri: string) => void
 }
@@ -254,7 +254,7 @@ export function createPrioritySequentialPrefetchLane(
 
     let admitted = true
     try {
-      admitted = options.onNativeStart?.(job.uri) ?? true
+      admitted = options.onNativeStart?.(job.uri, job.priority) ?? true
     } catch {
       admitted = false
     }
@@ -433,11 +433,17 @@ export async function prefetchCurrentSceneUris(
   isCurrent: () => boolean,
   completed?: Set<string>,
   inFlight?: Map<string, Promise<boolean>>,
-  priority: WarmupPriority = "background"
+  priority: WarmupPriority = "background",
+  waitForBackgroundSlot?: () => Promise<boolean>
 ): Promise<void> {
   for (const uri of new Set(uris)) {
     if (!isCurrent()) return
     if (completed?.has(uri)) continue
+    if (priority === "background" && !inFlight?.has(uri) && waitForBackgroundSlot) {
+      if (!await waitForBackgroundSlot() || !isCurrent()) return
+      // A selected preview may have loaded this asset while we yielded.
+      if (completed?.has(uri)) continue
+    }
     let request = inFlight?.get(uri)
     const adoptedInFlightRequest = Boolean(request)
     try {
