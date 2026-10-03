@@ -838,7 +838,7 @@ test("ending a session forgets presented and reconciling matches and closes the 
   assert.deepEqual(modalUpdates, [null])
 })
 
-test("an inactive session resets demo mode, matches, invites, chat, and the socket in order", () => {
+test("an inactive session resets demo mode, matches, invites, chat, settings, and the socket in order", () => {
   const calls = []
   let demo = true
   evaluate(findInitializer(OWNER.sessionReset, "resetInactiveSessionState"), {
@@ -847,9 +847,10 @@ test("an inactive session resets demo mode, matches, invites, chat, and the sock
     resetMatchModal: () => calls.push(["matches"]),
     resetRoomInviteRouting: () => calls.push(["invites"]),
     resetChatStore: () => calls.push(["chat"]),
+    resetSettingsServerCache: () => calls.push(["settings"]),
     disconnectGlobal: () => calls.push(["disconnect"])
   })()
-  assert.deepEqual(calls, [["demo", false], ["matches"], ["invites"], ["chat"], ["disconnect"]])
+  assert.deepEqual(calls, [["demo", false], ["matches"], ["invites"], ["chat"], ["settings"], ["disconnect"]])
 })
 
 // ── Notification responses ─────────────────────────────────
