@@ -5,6 +5,7 @@ import { DEFAULT_FEMALE_AVATAR_LOADOUT } from "@blumi/domain"
 import { createNotificationService, type CreateNotificationServiceOptions } from "./notificationService"
 import { createInMemoryNotificationRepository } from "./notificationRepository"
 import { createPushSenderResolver } from "./notificationDeliveryContext"
+import { createNotificationPortraitService } from "./notificationPortraitService"
 import type { PushNotification } from "./pushProvider"
 
 const messageText = "Meet me at the ferry, code 4821"
@@ -116,7 +117,6 @@ test("the sender resolver names only the other person of the event", async () =>
 })
 
 test("a chat push carries the sender's 2.5D portrait, drawn from server state at send time; the outbox holds neither picture nor text", async () => {
-  const { createNotificationPortraitService } = await import("./notificationPortraitService")
   const portraits = createNotificationPortraitService({ secret: randomBytes(32).toString("base64url"), publicOrigin: "https://api.example.test" })
   // Server state: the sender's stored loadout, with items no rig has art for (they draw as the starter pieces).
   const storedLoadout = {
@@ -146,8 +146,8 @@ test("a chat push carries the sender's 2.5D portrait, drawn from server state at
   assert.ok(!outbox.includes("never_existed") && !outbox.includes("avatar_v2_"), "the outbox keeps no loadout")
 
   await service.dispatchDue()
-  const imageUrl = sent[0]?.data?.senderImage
-  assert.ok(imageUrl?.startsWith("https://api.example.test/v1/notification-portraits/"), "the picture is the server's own link")
+  const imageUrl = sent[0]?.data?.senderImage ?? ""
+  assert.ok(imageUrl.startsWith("https://api.example.test/v1/notification-portraits/"), "the picture is the server's own link")
   const portrait = await portraits.render(imageUrl.split("/").at(-1)!, new Date())
   assert.ok(portrait && portrait.body.length > 0, "the link draws a picture for a sender wearing items without rig art")
   assert.equal(portrait.mimeType, "image/png")
