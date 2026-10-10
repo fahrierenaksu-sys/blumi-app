@@ -1,3 +1,5 @@
+import { AVATAR_SWATCHES } from "@blumi/domain"
+
 export const uiTheme = {
   colors: {
     brandPink: "#F45A9F",
@@ -191,16 +193,7 @@ export const uiTheme = {
     disabled: 0.5,
   },
   palette: {
-    avatar: [
-      { bg: "#FFD9E8", fg: "#9E1F56" },
-      { bg: "#E3DAF8", fg: "#5A3FB5" },
-      { bg: "#D6EEFF", fg: "#1D5A8C" },
-      { bg: "#FFE4CC", fg: "#9C4B16" },
-      { bg: "#D9F0E0", fg: "#236C4D" },
-      { bg: "#FFE8F0", fg: "#B93872" },
-      { bg: "#E8E0F5", fg: "#4A2F87" },
-      { bg: "#FEEBC8", fg: "#7A4B09" }
-    ],
+    avatar: AVATAR_SWATCHES,
     rarity: {
       common: { border: "#E0E0E0", glow: "transparent", label: "#888888" },
       rare: { border: "#5B9BD5", glow: "rgba(91,155,213,0.2)", label: "#3A7CC0" },
