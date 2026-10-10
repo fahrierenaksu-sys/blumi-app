@@ -28,7 +28,11 @@ const UI_RUNTIME_GLOBALS = new Set([
   "String", "Symbol", "TypeError", "WeakMap", "WeakSet", "console",
   "global", "globalThis", "isFinite", "isNaN", "parseFloat", "parseInt", "undefined",
   "_WORKLET", "__DEV__", "_log", "arguments", "requestAnimationFrame",
-  "performance", "setTimeout", "clearTimeout", "queueMicrotask"
+  "performance", "setTimeout", "clearTimeout", "queueMicrotask",
+  // Standard typed arrays: Hermes provides them on every runtime. The 2.5D avatar renderer
+  // (react-native-webgpu) builds its GPU skinning palette and uniform buffers in worklets with
+  // them; plain arrays cannot be written into GPU buffers without a copy per frame.
+  "Float32Array", "Uint8Array", "Uint16Array"
 ])
 
 function listCandidateFiles(directory) {
