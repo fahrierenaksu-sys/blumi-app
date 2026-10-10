@@ -154,7 +154,9 @@ try {
       resolve(workspaceRoot, "src/features/avatar/model/avatarStillLayout.test.ts"),
       resolve(workspaceRoot, "src/features/avatar/model/avatarLiveBudget.test.ts"),
       // AvatarLive's canvas gate: useAvatarLiveSlot as AvatarLive calls it, against the real budget (review A F4)
-      resolve(workspaceRoot, "src/features/avatar/components/useAvatarLiveSlot.test.ts")
+      resolve(workspaceRoot, "src/features/avatar/components/useAvatarLiveSlot.test.ts"),
+      // review A F1: a valid old dress loadout draws as the body's rig starter on the live and still resolvers
+      resolve(workspaceRoot, "src/features/avatar/model/dressLoadoutDraw.test.ts")
     ],
     {
       cwd: workspaceRoot,

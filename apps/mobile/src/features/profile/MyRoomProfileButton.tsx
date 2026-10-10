@@ -1,6 +1,6 @@
 import { StyleSheet, Text } from "react-native"
 import { PressableScale } from "../../ui/PressableScale"
-import { MyAvatar } from "../../ui/myAvatar"
+import { MyAvatarPortrait } from "../../ui/myAvatarPortrait"
 import { uiTheme } from "../../ui/theme"
 import { getAppLocale } from "../session/appLocale"
 import { getOwnProfileCopy } from "./profileCopy"
@@ -24,7 +24,7 @@ export function MyRoomProfileButton(props: {
       style={styles.button}
       testID="my-room-profile-button"
     >
-      <MyAvatar name={props.displayName} seed={props.userId} size={34} ring="soft" />
+      <MyAvatarPortrait name={props.displayName} size={34} ring="soft" />
       <Text style={styles.label} numberOfLines={1}>{copy.myRoomEntryLabel}</Text>
     </PressableScale>
   )

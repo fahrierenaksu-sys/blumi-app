@@ -234,6 +234,7 @@ try {
       "src/features/miniRoom/scene/useMiniRoomKeyboard.test.ts",
       "src/features/miniRoom/scene/useMiniRoomCameraTransform.test.ts",
       "src/features/miniRoom/scene/MiniRoomScene.keyboardInteractions.test.ts",
+      "src/features/miniRoom/scene/MiniRoomContext.test.ts",
       "src/features/miniRoom/scene/RoomChatComposer.test.ts",
       "src/features/miniRoom/scene/RoomChatComposer.retainedDraft.test.ts",
       "src/features/miniRoom/scene/MiniRoomChatPanel.retainedTranscript.test.ts",

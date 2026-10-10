@@ -35,7 +35,7 @@ import { useInboxClock } from "../features/inbox/useInboxClock"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
-import { MyAvatar } from "../ui/myAvatar"
+import { MyAvatarPortrait } from "../ui/myAvatarPortrait"
 import { uiTheme } from "../ui/theme"
 import { useEntranceAnimation, useReducedMotion } from "../ui/animations"
 import { PressableScale } from "../ui/PressableScale"
@@ -352,7 +352,6 @@ export function InboxScreen(props: InboxScreenProps) {
               <EmptyInbox
                 threadListState={threadListState}
                 myDisplayName={sessionActor.profile.displayName}
-                myUserId={sessionActor.profile.userId}
                 copy={copy}
                 onGoDiscover={handleGoDiscover}
                 onRetryThreads={props.onRetryThreads}
@@ -387,7 +386,6 @@ interface EmptyInboxProps {
   copy: InboxCopy
   threadListState: ThreadListState
   myDisplayName?: string
-  myUserId?: string
   onGoDiscover?: () => void
   onRetryThreads?: () => Promise<void>
 }
@@ -452,9 +450,8 @@ function EmptyInbox(props: EmptyInboxProps) {
         end={{ x: 0.5, y: 1 }}
       />
       {props.myDisplayName ? (
-        <MyAvatar
+        <MyAvatarPortrait
           name={props.myDisplayName}
-          seed={props.myUserId ?? props.myDisplayName}
           size={80}
           ring="soft"
         />
