@@ -1,4 +1,3 @@
-import { NavigationContext, NavigationRouteContext } from "@react-navigation/native"
 import {
   memo,
   startTransition,
@@ -10,6 +9,7 @@ import {
   useState,
   type ReactNode
 } from "react"
+import { MainTabPageFocusScope } from "./MainTabPageFocusScope"
 import {
   AppState,
   BackHandler,
@@ -857,11 +857,9 @@ export const MainTabPagerPage = memo(function MainTabPagerPage({
   // route; the pager, bottom bar and other pages stay usable.
   const content = mounted ? (
     <ErrorBoundary routeName={routeName}>
-      <NavigationContext.Provider value={navigation as never}>
-        <NavigationRouteContext.Provider value={pageRoute}>
-          {renderPage(routeName, { navigation, route: pageRoute })}
-        </NavigationRouteContext.Provider>
-      </NavigationContext.Provider>
+      <MainTabPageFocusScope navigation={navigation as never} route={pageRoute} slotKey={slotKey}>
+        {renderPage(routeName, { navigation, route: pageRoute })}
+      </MainTabPageFocusScope>
     </ErrorBoundary>
   ) : null
 

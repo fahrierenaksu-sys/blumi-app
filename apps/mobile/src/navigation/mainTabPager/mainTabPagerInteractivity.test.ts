@@ -115,10 +115,6 @@ function mountPager(initialRoute: string, initiallyFocused = true, reduceMotion 
     runtime,
     {
       modules: {
-        "@react-navigation/native": {
-          NavigationContext: { Provider: "NavigationContext.Provider" },
-          NavigationRouteContext: { Provider: "NavigationRouteContext.Provider" }
-        },
         "react-native": native.module,
         "react-native-gesture-handler": gesture.module,
         "react-native-reanimated": reanimated.module,
@@ -134,7 +130,8 @@ function mountPager(initialRoute: string, initiallyFocused = true, reduceMotion 
         "../../ui/mainTabPagerIndicator": { mainTabPagerIndicator: indicator },
         "../../ui/theme": { uiTheme: { colors: { background: "#fff" } } },
         "../../ui/MainTabPagerGestureOwnership": { MainTabPagerGestureProvider: "MainTabPagerGestureProvider" },
-        "./MainTabPageShell": { MainTabPageShell: "MainTabPageShell" }
+        "./MainTabPageShell": { MainTabPageShell: "MainTabPageShell" },
+        "./MainTabPageFocusScope": { MainTabPageFocusScope: "MainTabPageFocusScope" }
       },
       real: [
         "./mainTabPagerConfig",

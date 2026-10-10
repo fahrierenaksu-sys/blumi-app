@@ -75,10 +75,6 @@ function mountPager(renderPage: (...args: unknown[]) => unknown) {
     runtime,
     {
       modules: {
-        "@react-navigation/native": {
-          NavigationContext: { Provider: "NavigationContext.Provider" },
-          NavigationRouteContext: { Provider: "NavigationRouteContext.Provider" }
-        },
         "react-native": createReactNativeStub({
           BackHandler: { addEventListener: () => ({ remove: () => undefined }) }
         }).module,
@@ -93,7 +89,8 @@ function mountPager(renderPage: (...args: unknown[]) => unknown) {
         "../../ui/mainTabPagerIndicator": { mainTabPagerIndicator: indicator },
         "../../ui/theme": { uiTheme: { colors: { background: "#fff" } } },
         "../../ui/MainTabPagerGestureOwnership": { MainTabPagerGestureProvider: "MainTabPagerGestureProvider" },
-        "./MainTabPageShell": { MainTabPageShell: "MainTabPageShell" }
+        "./MainTabPageShell": { MainTabPageShell: "MainTabPageShell" },
+        "./MainTabPageFocusScope": { MainTabPageFocusScope: "MainTabPageFocusScope" }
       },
       real: [
         "./mainTabPagerConfig",
