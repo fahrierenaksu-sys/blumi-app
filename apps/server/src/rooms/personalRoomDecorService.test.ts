@@ -421,3 +421,109 @@ test("a revision conflict never hands stored retired placements to the client", 
   if (stale.kind !== "conflict") return
   assert.deepEqual(stale.current.decor.placedItems.map((item) => item.itemId), ["room_v2_chair_blush"])
 })
+
+// Phase 2 closing review M3 and L2: a held (pricing-pending) item that the user owns and had placed is not active,
+// so the read hides it and no client sends it back. A save must keep its stored placement exactly as it was, never
+// show it, never grant it, and never refuse or reshuffle a save the user did not change for its sake.
+const HELD_CHAIR_PLACEMENT = { instanceId: "chair-1", itemId: "room_v2_chair_blush", x: 0.22, y: 0.66, rotation: "right" as const }
+const ACTIVE_TABLE_PLACEMENT = { instanceId: "table-1", itemId: "room_v2_table_round", x: 0.5, y: 0.7, rotation: "front" as const }
+
+async function createServiceWithStoredHeldChair(rawOwned: readonly string[] = ["room_v2_chair_blush", "room_v2_table_round"]) {
+  const repository = createInMemoryPersonalRoomDecorRepository()
+  const stored = await repository.save({
+    userId: "user_1",
+    expectedRevision: 0,
+    decor: { ...DECOR, placedItems: [HELD_CHAIR_PLACEMENT, ACTIVE_TABLE_PLACEMENT] },
+    updatedAt: "2026-09-01T00:00:00.000Z"
+  })
+  assert.equal(stored.kind, "saved")
+  return createPersonalRoomDecorService({
+    repository,
+    // the economy read projects held items out of ownership, the stored inventory row still holds them
+    getOwnedRoomItemIds: async () => ["room_v2_table_round"],
+    getStoredOwnedRoomItemIds: async () => rawOwned,
+    isActiveRoomItemId: (itemId) => itemId === "room_v2_table_round"
+  })
+}
+
+const storedItems = async (service: ReturnType<typeof createPersonalRoomDecorService>) =>
+  (await service.repository.get("user_1"))?.decor.placedItems ?? []
+
+test("a save keeps the stored placement of a held item the user owns and never shows or grants it", async () => {
+  const service = await createServiceWithStoredHeldChair()
+  const read = await service.get("user_1")
+  assert.ok(read)
+  assert.deepEqual(read.decor.placedItems.map((item) => item.itemId), ["room_v2_table_round"])
+
+  const result = await service.save("user_1", {
+    expectedRevision: read.revision,
+    decor: { ...read.decor, placedItems: [{ ...ACTIVE_TABLE_PLACEMENT, x: 0.4 }] }
+  })
+  assert.equal(result.kind, "saved")
+  if (result.kind !== "saved") return
+  assert.deepEqual(await storedItems(service), [{ ...ACTIVE_TABLE_PLACEMENT, x: 0.4 }, HELD_CHAIR_PLACEMENT])
+  assert.deepEqual(result.snapshot.decor.placedItems.map((item) => item.itemId), ["room_v2_table_round"])
+
+  // sending the held item as a new placement is still refused: ownership never makes it placeable
+  await assert.rejects(
+    service.save("user_1", {
+      expectedRevision: result.snapshot.revision,
+      decor: { ...DECOR, placedItems: [HELD_CHAIR_PLACEMENT] }
+    }),
+    /not available/i
+  )
+  assert.deepEqual(await storedItems(service), [{ ...ACTIVE_TABLE_PLACEMENT, x: 0.4 }, HELD_CHAIR_PLACEMENT])
+})
+
+test("a stored placement of an item the user does not own is not carried over", async () => {
+  const service = await createServiceWithStoredHeldChair(["room_v2_table_round"])
+  const result = await service.save("user_1", { expectedRevision: 1, decor: { ...DECOR, placedItems: [ACTIVE_TABLE_PLACEMENT] } })
+  assert.equal(result.kind, "saved")
+  assert.deepEqual((await storedItems(service)).map((item) => item.itemId), ["room_v2_table_round"])
+})
+
+test("a new placement that reuses a carried placement's instanceId is kept under a unique id and the carried one is untouched", async () => {
+  const service = await createServiceWithStoredHeldChair()
+  const result = await service.save("user_1", {
+    expectedRevision: 1,
+    decor: { ...DECOR, placedItems: [{ ...ACTIVE_TABLE_PLACEMENT, instanceId: HELD_CHAIR_PLACEMENT.instanceId }] }
+  })
+  assert.equal(result.kind, "saved")
+  if (result.kind !== "saved") return
+  const items = await storedItems(service)
+  assert.equal(new Set(items.map((item) => item.instanceId)).size, items.length)
+  assert.deepEqual(items.find((item) => item.itemId === "room_v2_chair_blush"), HELD_CHAIR_PLACEMENT)
+  assert.equal(items.find((item) => item.itemId === "room_v2_table_round")?.x, ACTIVE_TABLE_PLACEMENT.x)
+  assert.deepEqual(result.snapshot.decor.placedItems.map((item) => item.itemId), ["room_v2_table_round"])
+})
+
+test("carried placements never make a valid save fail, even past the placement limit", async () => {
+  const repository = createInMemoryPersonalRoomDecorRepository()
+  const heldIds = Array.from({ length: 5 }, (_, index) => `held_item_${index}`)
+  const activeIds = Array.from({ length: 60 }, (_, index) => `active_item_${index}`)
+  const place = (itemId: string, index: number) => ({
+    instanceId: `i-${itemId}`, itemId, x: (index % 10) / 10, y: 0.5, rotation: "front" as const
+  })
+  await repository.save({
+    userId: "user_1",
+    expectedRevision: 0,
+    decor: { ...DECOR, placedItems: heldIds.map(place) },
+    updatedAt: "2026-09-01T00:00:00.000Z"
+  })
+  const service = createPersonalRoomDecorService({
+    repository,
+    getOwnedRoomItemIds: async () => activeIds,
+    getStoredOwnedRoomItemIds: async () => [...heldIds, ...activeIds],
+    isActiveRoomItemId: (itemId) => itemId.startsWith("active_")
+  })
+  const result = await service.save("user_1", { expectedRevision: 1, decor: { ...DECOR, placedItems: activeIds.map(place) } })
+  assert.equal(result.kind, "saved")
+  const items = await storedItems(service)
+  assert.equal(items.length, 65)
+  assert.equal(new Set(items.map((item) => item.instanceId)).size, 65)
+  // the 61st sent placement is still refused: the limit is only about what the client sends
+  await assert.rejects(
+    service.save("user_1", { expectedRevision: 2, decor: { ...DECOR, placedItems: [...activeIds, "active_extra"].map(place) } }),
+    /up to 60/i
+  )
+})

@@ -40,6 +40,12 @@ export interface PersonalRoomDecorService {
 export function createPersonalRoomDecorService(options: {
   repository?: PersonalRoomDecorRepository
   getOwnedRoomItemIds(userId: string): Promise<readonly string[]>
+  /**
+   * Ownership as stored, including items that are not active (held or retired). Only used to decide that a stored
+   * placement of an owned, inactive item is carried over a save; it never makes an item placeable. Defaults to
+   * `getOwnedRoomItemIds`.
+   */
+  getStoredOwnedRoomItemIds?: (userId: string) => Promise<readonly string[]>
   /** Defaults to the room catalog of this environment minus the retired ids (`roomItemProjection.ts`). */
   isActiveRoomItemId?: (itemId: string) => boolean
   /** Retired ids an older client may still send; they are left out of a save. Defaults to the legacy registry. */
@@ -100,14 +106,18 @@ export function createPersonalRoomDecorService(options: {
       }
       // The read hid the user's stored retired placements, so no client sends them back: they are carried over
       // untouched (F3 not waived). Only from the revision the client saves over; any other revision conflicts below.
+      // The same holds for a held item the user owns (a pricing-pending chair): inactive, so hidden, but never erased.
       const stored = await repository.get(normalizedUserId)
+      const storedOwnedItemIds = options.getStoredOwnedRoomItemIds
+        ? new Set(await options.getStoredOwnedRoomItemIds(normalizedUserId))
+        : ownedItemIds
       const carried = stored?.revision === input.expectedRevision
-        ? stored.decor.placedItems.filter((item) => isStoredRetired(item.itemId))
+        ? stored.decor.placedItems.filter((item) => isStoredCarried(item.itemId, storedOwnedItemIds))
         : []
       const result = await repository.save({
         userId: normalizedUserId,
         expectedRevision: input.expectedRevision,
-        decor: { ...decor, placedItems: [...decor.placedItems, ...carried] },
+        decor: { ...decor, placedItems: [...withFreeInstanceIds(decor.placedItems, carried), ...carried] },
         updatedAt: now.toISOString()
       })
       if (result.kind === "missing") {
@@ -130,9 +140,13 @@ export function createPersonalRoomDecorService(options: {
     }
   }
 
-  /** A stored placement of a retired id: kept in the row, never shown, drawn, validated or counted as owned. */
-  function isStoredRetired(itemId: string): boolean {
-    return !isActive(itemId) && isRetiredItemId(itemId)
+  /**
+   * A stored placement of an inactive item that is retired, or held and owned by the user: kept in the row, never
+   * shown, drawn, validated or counted as owned. Anything else not active (unknown, unowned) was never a valid save.
+   */
+  function isStoredCarried(itemId: string, storedOwnedItemIds: ReadonlySet<string>): boolean {
+    if (isActive(itemId)) return false
+    return isRetiredItemId(itemId) || storedOwnedItemIds.has(itemId)
   }
 
   /** What a client may see of a stored room: active, owned items only; the row and its revision stay as stored. */
@@ -148,6 +162,27 @@ export function createPersonalRoomDecorService(options: {
       )
     }
   }
+}
+
+/**
+ * Carried placements keep their stored instanceId untouched, so a new placement that reuses one gets a free id. The
+ * 60-item limit applies to what the client sends, never to the carried rows: a valid save is not refused for them.
+ */
+function withFreeInstanceIds(
+  placed: PersonalRoomDecor["placedItems"],
+  carried: PersonalRoomDecor["placedItems"]
+): PersonalRoomDecor["placedItems"] {
+  const carriedIds = new Set(carried.map((item) => item.instanceId))
+  const taken = new Set([...carried, ...placed].map((item) => item.instanceId))
+  return placed.map((item) => {
+    if (!carriedIds.has(item.instanceId)) return item
+    const stem = item.instanceId.slice(0, 120)
+    let suffix = 2
+    while (taken.has(`${stem}-${suffix}`)) suffix += 1
+    const instanceId = `${stem}-${suffix}`
+    taken.add(instanceId)
+    return { ...item, instanceId }
+  })
 }
 
 function normalizePersonalRoomDecor(value: unknown): PersonalRoomDecor {

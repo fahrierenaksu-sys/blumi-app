@@ -210,6 +210,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     createPersonalRoomDecorService({
       getOwnedRoomItemIds: async (userId) =>
         (await economyService.getInventory(userId)).ownedRoomItemIds,
+      // stored ownership, held items included: only decides that a stored placement is carried over a save
+      getStoredOwnedRoomItemIds: async (userId) =>
+        (await economyService.repository.getInventory(userId))?.ownedRoomItemIds ?? [],
       isActiveRoomItemId: economyService.isActiveRoomItemId,
       roomSnapshotService
     })
