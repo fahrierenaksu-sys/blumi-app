@@ -190,7 +190,7 @@ Needed from the owner: approval of before/after captures (a visible look change)
 
 ## 3. Master checklist
 
-One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catalog, P5 verify, R reset. Status is Open for every row. Surface numbers match `MOBILE_SURFACES_CHECKLIST.md`.
+One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catalog, P5 verify, R reset. Status starts Open and uses the `AGENTS.md` labels (Implemented, Tested, Native verified, ...); a commit hash names where a row landed. Surface numbers match `MOBILE_SURFACES_CHECKLIST.md`.
 
 ### 3.1 Surfaces (E)
 
@@ -198,7 +198,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 |---|---|---|---|---|---|
 | S1 | Discover card front | `S/features/demo/SwipeableDiscoverCard.tsx:471` (`CandidateAvatarPreview`) | `AvatarHero`: live on the top card, `AvatarStill full` on the cards behind | P3 | Open |
 | S2 | Discover card back | same file `:570` | `AvatarStill half` | P3 | Open |
-| S3 | Discover room picture on the card back | `DiscoveryRoomShowcaseSlot` + `SV/rooms/roomSnapshotRenderer.ts` | same slot; server renderer v2 from the art pack | P2 | Open |
+| S3 | Discover room picture on the card back | `DiscoveryRoomShowcaseSlot` + `SV/rooms/roomSnapshotRenderer.ts` | same slot; server renderer v2 from the art pack | P2 | Tested (server, 4180673c, c0909df2); Discover native check Open |
 | S4 | Empty Discover deck (self) | `S/features/discovery/EmptyDiscoveryDeck.tsx:70`, `S/components/DiscoverCard.tsx:296` | `AvatarStill full` | P3 | Open |
 | S5 | Demo Discover view | `S/screens/DemoLobbyView.tsx:110` | as S4; its `miniRoom/assets/runtime` background replaced by the shell art | P3 | Open |
 | S6 | Legacy lobby pending-invite strip (initials) | `S/features/lobby/PendingInviteStrip.tsx` | removed with the lobby split | P4 | Open |
@@ -207,7 +207,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | S9 | Match flight | `S/features/matches/matchChibiFlight.tsx:34` | carries an `AvatarStill full` | P3 | Open |
 | S10 | MatchResult screen | `S/screens/MatchResultScreen.tsx:308` | `AvatarStill half` in `AvatarFrame` | P3 | Open |
 | S11 | ProfilePreview and LinkedProfile | `S/screens/ProfilePreviewScreen.tsx:305` | `AvatarHero` (live) | P3 | Open |
-| S12 | RoomDebrief (dead screen) | `S/screens/RoomDebriefScreen.tsx`, route name, `miniRoom/roomDebriefCopy.ts` | removed | P2 | Open |
+| S12 | RoomDebrief (dead screen) | `S/screens/RoomDebriefScreen.tsx`, route name, `miniRoom/roomDebriefCopy.ts` | removed | P2 | Tested (fd4b80d5) |
 | S13 | Inbox row | `S/features/inbox/InboxConversationRow.tsx:86` (`ParticipantAvatar` 56) | `AvatarPortrait` small | P3 | Open |
 | S14 | Inbox actions sheet | `InboxConversationActionsSheet.tsx:83` | `AvatarPortrait` small | P3 | Open |
 | S15 | Inbox header / empty state | `S/screens/InboxScreen.tsx:455` (`MyAvatar` 80) | `AvatarPortrait` medium | P3 | Open |
@@ -232,7 +232,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | S34 | Register sign-in avatar | `S/features/session/register/RegisterSignInView.tsx:96` (`AvatarPreview2D`) | `AvatarStill half` | P3 | Open |
 | S35 | ProfileSetup reaction stage | `S/features/session/ProfileCharacterReactionStage.tsx:240` (`AvatarPreview2D`) + reaction atlases (`profile-character-reaction-v4-runtime`) | split: `AvatarPreview2D` → `AvatarStill` in P3; the twirl/collar atlases stay until P6, then a wave sprite with a small hop (review R6) | P3 + P6 | Open |
 | S36 | AvatarSetup | `S/screens/AvatarSetupScreen.tsx`, `AvatarSetupStudioStage.tsx` | `AvatarHero` (live); body choice + starter items | P4 | Open |
-| S37 | RoomSetup | `S/screens/RoomSetupScreen.tsx:401`, `roomStarterModel.ts`, `useRoomSetupBedDrag.ts` | new room renderer; the step places the free starter bed (F9) once its art lands in 4.7; until then the empty shell | P2, P4 | Open |
+| S37 | RoomSetup | `S/screens/RoomSetupScreen.tsx:401`, `roomStarterModel.ts`, `useRoomSetupBedDrag.ts` | new room renderer; the step places the free starter bed (F9) once its art lands in 4.7; until then the empty shell | P2, P4 | P2 part Tested (3ae7fdb4); starter bed (P4, 4.7) Open |
 | S38 | Wardrobe stage | `WardrobePreviewStage.tsx`, `AvatarTryOnTransition` | `AvatarHero` (live) + try-on cross-fade | P4 | Open |
 | S39 | Wardrobe cards | `WardrobeCatalogCard.tsx:72` (shop-thumbnails) | `thumb` stills | P4 | Open |
 | S40 | Shop preview panel | `S/features/shop/ShopPreviewPanel.tsx:380/411` | avatar mode `AvatarHero` (live); home mode the new room renderer | P4 | Open |
@@ -247,8 +247,8 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | S49 | MiniRoom | `S/screens/MiniRoomScreen.tsx`, `miniRoom/scene/*` | per-seat claims, layered seats, one `AvatarLive` per participant with their own rig | P2 | Open |
 | S50 | MiniRoom speech and typing bubbles | `AvatarLayer.tsx:435` | kept; anchored to the calibrated figure height | P2 | Open |
 | S51 | MiniRoom context chips | `MiniRoomContext.tsx:25` | `AvatarPortrait` tiny | P3 | Open |
-| S52 | MiniRoomRigPreview (dev route) | `S/screens/MiniRoomRigPreviewScreen.tsx`, route, dev entry | removed | P2 | Open |
-| S53 | HomeStudio (dev/QA route) | `S/screens/HomeStudioScreen.tsx`, `S/features/roomStudio/**` | removed | P2 | Open |
+| S52 | MiniRoomRigPreview (dev route) | `S/screens/MiniRoomRigPreviewScreen.tsx`, route, dev entry | removed | P2 | Tested (608549e7) |
+| S53 | HomeStudio (dev/QA route) | `S/screens/HomeStudioScreen.tsx`, `S/features/roomStudio/**` | removed | P2 | Tested (7f9ed28b) |
 | S54 | Boot asset warm-up | `S/features/performance/CurrentSceneAssetWarmup.tsx`, `sceneAssetWarmupModel.ts`, `discoveryFirstFrameAssets*.ts` | warms rig pages, still layers and furniture layers per scene | P3 | Open |
 
 ### 3.2 Mobile module groups, assets, client state
@@ -264,7 +264,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | G7 | roomV2 core (72 files) | `S/features/roomV2/**` | kept + experiment diffs; `roomV3*`, `roomVNext*`, `roomV3UniversalCore*` candidates (≈20 files) deleted; seam inlined | P2 | Open |
 | G8 | Room editor (33 files) | `S/features/roomV2/editor/**`, `S/screens/MyRoomEditorScreen.tsx` | experiment editor + 6 new files | P2 | Open |
 | G9 | roomWorld (9 files) | `S/features/roomWorld/**` | kept + `roomWorldWallInset.ts`, calibrated walk geometry | P2 | Open |
-| G10 | roomStudio (13 files, 16 QA bitmaps, 19.6 MB) | `S/features/roomStudio/**`, `homeStudioQaModuleRouting.*`, Metro alias | deleted | P2 | Open |
+| G10 | roomStudio (13 files, 16 QA bitmaps, 19.6 MB) | `S/features/roomStudio/**`, `homeStudioQaModuleRouting.*`, Metro alias | deleted | P2 | Tested (7f9ed28b) |
 | G11 | miniRoom (67 files) | `S/features/miniRoom/**` | kept + experiment diffs, `miniRoomLayeredSeats.ts`; old avatar branch removed | P2 | Open |
 | G12 | lobby (11 files) | `S/features/lobby/**` | split: `useLobbyFlow`, `lobbyState`, `interactionState`, `lobbyFeedbackCopy`, `pendingInvitesStore` move to `S/features/discovery/`; `PendingInviteStrip`, `useLegacyLobbyInvites`, `useLegacyMiniRoomNavigation`, `publicLobby`, `lobbyInviteAttempt`, `pendingInviteModel` deleted with their `LobbyScreen` branches | P4 | Open |
 | G13 | Host screens (23 files) | `S/screens/*` listed in the audit, plus `S/navigation/LinkedProfileScreen.tsx` (`candidateAvatarSnapshot`), `ProfileSetupScreen.tsx` (`avatarV2Catalog`, `avatarStarterModel`), `PreAuthSetupFlowScreen.tsx` and `RegisterScreen.tsx` (`UserAvatar` type) | edited with their surfaces; the type-only imports move in X17, the catalog imports before X15 (review R8) | P2–P4 | Open |
@@ -340,7 +340,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | T7 | Realtime, chat, discovery, connections, navigation runners (21) | `run-*-tests.mjs` | fixtures only | P3 | Open |
 | T8 | Inline groups | `test:wardrobe`, `test:shop-preview-assets`, `test:performance-assets`, `test:layout` in `M/package.json` | scripts edited freely once OTA is gone | P2–P4 | Open |
 | T9 | Verified source-text pins (7) | `wardrobeCatalogModel.test.ts`, `useInRoomChat.reconnect.test.ts`, `CurrentSceneAssetWarmup.test.mjs`, `roomV2ProviderLifecycle.test.ts`, `CosmeticShopScreen.test.mjs`, `WardrobeV2Screen.test.mjs`, `useRoomEditorInventoryEntries.test.mjs` | behaviour tests with the same intent (§10.2) | with their code | Open |
-| T10 | Two-phone e2e | `S/features/miniRoom/miniRoomMotionTwoPhones.e2e.test.ts` | three-way hand merge with develop's hunk | P2 | Open |
+| T10 | Two-phone e2e | `S/features/miniRoom/miniRoomMotionTwoPhones.e2e.test.ts` | three-way hand merge with develop's hunk | P2 | Tested (7754f55d); two phones native Open |
 | T11 | Server tests using old art or IDs | `avatarPortrait.test.ts`, `roomSnapshot*.test.ts`, `discoverRoomShowcase.test.ts`, economy and adversarial fixtures | same intent, new art pack and IDs | P2–P4 | Open |
 | T12 | Domain and contracts tests | `avatarLoadoutRules.test.ts`, `universalCoreRoomEconomy.test.ts`, schema tests | rules kept on the new catalog; universal test replaced by L14 | P2, P4 | Open |
 | T13 | 77 tests that only mention avatars or rooms | list in the audit §G2 | re-run; fixtures only | each phase | Open |
@@ -586,6 +586,8 @@ Reviewer checks: nothing from D4–D9 arrived; no pure module imports `react-nat
 | 2.9 | `feat(server): room showcase renderer v2 from the art pack` (V15, S3) |
 | 2.10 | `refactor: retire the old furniture items` (X8) |
 | 2.11–2.15 | X3, X4, X5, X6, X9, then X10 |
+
+Status (2026-10-10, after the Phase 2 review fixes): 2.1–2.10 and X3, X4, X5 are Tested; X6, X9 and X10 are Open; the Simulator gate below is Open (Native verified: none yet).
 
 Gate: typecheck; `test:match-room`, `test:room-persistence`, `test:room-hydration`, `test:theme`, `test:navigation`, domain and server suites; Simulator: My Room, editor (drag from tray, rotate, undo, wall pieces), sit on sofa and armchair front and back for girl and boy (both are held in `pricing-pending`, so the gate places them through a test-only inventory grant on the memory server that never ships; the hold itself is not weakened), MiniRoom two phones on the memory server, default room for a new and an existing account, Discover room picture.
 Reviewer checks: no flat-sprite or demo-ownership path left; every placed item is checked against ownership AND the active catalog on save; held IDs cannot be bought, placed or seen; the calibration JSON equals the Workbench file; server walk checks accept calibrated points (V17).
