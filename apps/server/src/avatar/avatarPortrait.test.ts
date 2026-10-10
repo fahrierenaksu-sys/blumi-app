@@ -4,7 +4,14 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
 import sharp from "sharp"
-import { DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT, cloneAvatarLoadout, pickAvatarSwatch } from "@blumi/domain"
+import {
+  AVATAR_STILL_MANIFEST,
+  DEFAULT_FEMALE_AVATAR_LOADOUT,
+  DEFAULT_MALE_AVATAR_LOADOUT,
+  cloneAvatarLoadout,
+  pickAvatarSwatch,
+  type AvatarStillManifest
+} from "@blumi/domain"
 import type { AvatarLoadout } from "@blumi/contracts"
 import {
   AVATAR_PORTRAIT_SIZE,
@@ -150,4 +157,60 @@ test("a truncated art manifest never stops the server: no art, so the fixed bust
   } finally {
     rmSync(broken, { recursive: true, force: true })
   }
+})
+
+/**
+ * The baked manifest holds only each body's starter outfit today (the rigs have no other items; every catalog item
+ * outside it, even the default girl's own, draws as a starter piece), so the "saved outfit changes the picture"
+ * proof bakes a real second girl top (a stock catalog item) into a copy of it: same files, other pieces.
+ */
+const OTHER_TOP = "avatar_v2_top_sage_ribbon_knit_jacket"
+const girlWithOtherTop = (): AvatarStillManifest => {
+  const female = AVATAR_STILL_MANIFEST.bodies.female
+  const polo = "avatar_v2_top_coral_wave_polo"
+  const frontOnly = female.layers.bust.filter((entry) => entry.owner === polo && entry.key.includes("__o0"))
+  return {
+    ...AVATAR_STILL_MANIFEST,
+    bodies: {
+      ...AVATAR_STILL_MANIFEST.bodies,
+      female: {
+        ...female,
+        items: { ...female.items, [OTHER_TOP]: { slot: "top", rigItemId: "top_sage_ribbon_knit_jacket", thumb: polo } },
+        layers: {
+          ...female.layers,
+          bust: [...female.layers.bust, ...frontOnly.map((entry, index) => ({ ...entry, owner: OTHER_TOP, seq: 9000 + index }))]
+        }
+      }
+    }
+  }
+}
+
+test("the saved outfit decides the picture: another worn item draws other layers, the same outfit the same bytes", async () => {
+  assert.ok(art)
+  const renderer = createAvatarPortraitRenderer({ art, manifest: girlWithOtherTop() })
+  const background = "#FFD9E8"
+  const starter = await renderer.render({ loadout: female, background })
+  const other = await renderer.render({ loadout: { ...female, topId: OTHER_TOP }, background })
+  const otherAgain = await renderer.render({ loadout: { ...female, topId: OTHER_TOP }, background })
+  assert.equal(other.level, "look")
+  assert.ok(!other.body.equals(starter.body), "a different worn top is a different picture")
+  assert.ok(other.body.equals(otherAgain.body))
+  // The real manifest bakes no such top: the same loadout there is the starter picture.
+  const real = await createAvatarPortraitRenderer({ art }).render({ loadout: { ...female, topId: OTHER_TOP }, background })
+  assert.ok(real.body.equals(starter.body))
+})
+
+test("a sender wearing retired catalog items and an old dress pair still gets the body's starter picture", async () => {
+  assert.ok(art)
+  const renderer = createAvatarPortraitRenderer({ art })
+  const background = "#FFD9E8"
+  const retired = {
+    ...female,
+    hairId: "avatar_v2_hair_male_espresso_crop",
+    topId: "avatar_v2_top_male_charcoal_leather_bomber_hybrid"
+  } as AvatarLoadout
+  const drawn = await renderer.render({ loadout: retired, background })
+  const starter = await renderer.render({ loadout: female, background })
+  assert.ok(drawn.body.equals(starter.body))
+  assert.equal(drawn.level, "look")
 })

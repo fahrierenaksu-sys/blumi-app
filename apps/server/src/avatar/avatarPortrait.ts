@@ -8,6 +8,7 @@ import {
   DEFAULT_MALE_AVATAR_LOADOUT,
   pickAvatarSwatch,
   resolveAvatarStillLayers,
+  type AvatarStillManifest,
   type AvatarStillResolved,
   type AvatarStillRigId
 } from "@blumi/domain"
@@ -65,6 +66,8 @@ export function loadAvatarPortraitArt(dir = resolveRoomArtPackDir()): { dir: str
 export function createAvatarPortraitRenderer(options: {
   /** Null when the server has no art pack: every picture is then the fixed bust of the body. */
   art: { dir: string; files: ReadonlySet<string> } | null
+  /** The baked-still manifest that names the layers of a look; the built one unless a test supplies another. */
+  manifest?: AvatarStillManifest
   maxCacheBytes?: number
 }): AvatarPortraitRenderer {
   const { art } = options
@@ -113,8 +116,8 @@ export function createAvatarPortraitRenderer(options: {
       if (!HEX_COLOUR.test(background)) throw new Error("Avatar portrait background is invalid.")
       // Total: the loadout is coerced and unknown items draw as the body's starter pieces. A valid link never fails
       // for an art reason: look, then that body's starter, then the fixed bust of the body.
-      const still = resolveAvatarStillLayers(loadout, "bust")
-      const starter = resolveAvatarStillLayers(STARTER_LOADOUTS[still.rig], "bust")
+      const still = resolveAvatarStillLayers(loadout, "bust", { manifest: options.manifest })
+      const starter = resolveAvatarStillLayers(STARTER_LOADOUTS[still.rig], "bust", { manifest: options.manifest })
       const attempts: readonly (readonly [AvatarPortraitLevel, AvatarStillResolved])[] = [["look", still], ["starter", starter]]
       if (art) {
         for (const [level, attempt] of attempts) {
