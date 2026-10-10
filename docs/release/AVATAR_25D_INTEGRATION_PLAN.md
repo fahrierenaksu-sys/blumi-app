@@ -21,7 +21,7 @@ The new 2.5D avatar (WebGPU rig, girl and boy), the calibrated 2.5D room, layere
 | F5 | Old entitlement, loadout and room ROWS stay in the database and are ignored; old IDs are never reused | 2026-10-10 | prompt §4 |
 | F6 | OTA is removed; every release is a TestFlight build | 2026-10-10 (first decided 2026-10-08 on the experiment) | RESUME |
 | F7 | The six develop commits 3b288243..e5bcb2ed (OTP and abuse defence) stay intact | 2026-10-10 | RESUME |
-| F8 | Only the three girl starter wearables `avatar_v2_top_coral_wave_polo`, `avatar_v2_bottom_coral_wave_pants`, `avatar_v2_hair_ink_pageboy_star` become FREE `ownedByDefault`; their receipts are REMOVED in the commit that changes them (a removal, never a new receipt). `room_v2_chair_blush` stays as it is (published, price 0, receipt untouched); see review finding R1 (§11.1): its receipt binds the old flat art, so its art switch needs a decision | 2026-10-10 | lead (delegated by the owner), revised ~16:45 |
+| F8 | Only the three girl starter wearables `avatar_v2_top_coral_wave_polo`, `avatar_v2_bottom_coral_wave_pants`, `avatar_v2_hair_ink_pageboy_star` become FREE `ownedByDefault`; their receipts are REMOVED in the commit that changes them (a removal, never a new receipt). `room_v2_chair_blush`: its receipt is REMOVED (a removal, never a new receipt) in X8, the commit that retires the old flat art it binds, and the chair joins the `pricing-pending` hold until §12; the owner issues a new receipt for its layered art if he wants it sold (R1, decided) | 2026-10-10 | lead (delegated by the owner), revised ~16:45; chair reversed 17:20 (owner told) |
 | F9 | Every user gets ONE free starter bed with a NEW canonical ID (`room_v3_bed_blumi_starter`), and the default room contains ONLY that bed. The bed gets its own design from the furniture pipeline in Phase 4, shown to the owner; no stand-in bed | 2026-10-10 | lead chat (~15:42, ~16:45) |
 | F10 | Economy balance (prices, coin packs, earn rates) is its own workstream (§12); no paid item gets a receipt before the owner approves that proposal | 2026-10-10 | lead chat |
 | F11 | Boy: 6 starter outfits (2, 3, 4, 12, 13, 14), each piece its own item, all free; 2 free basic combos; 3 hairs + 9 colour variants; plus the old designs `male_blue_black_short_curls` and `male_short_twists_textured_style` redrawn as NEW items with NEW IDs, in the same production lane (old #4 `male_soft_textured_crop` not picked). Girl: starter + feminine free basics (concepts need approval) + five NEW hairs redrawn from the old #1 `berry_velvet_soft_updo`, #2 `caramel_braided_crown`, #3 `cherry_ribbon_twin_braids`, #11 `rosewood_butterfly_layers`, #13 `mocha_ribbon_blowout`. Old IDs are never reused | 2026-10-10 | prompt §2b; owner picks ~16:25, ~16:45 |
@@ -38,7 +38,7 @@ Still needs the owner's explicit yes at the time: push (his "push at"), `main`, 
 
 ### 1.2 Owner questions
 
-All eleven questions of the first draft are decided (2026-10-10). The one question this review opened is R1 (§11.1).
+All eleven questions of the first draft are decided (2026-10-10). The one question this review opened, R1 (§11.1), is decided too (2026-10-10, 17:20).
 
 | # | Question | Decision (2026-10-10) | Blocks |
 |---|---|---|---|
@@ -310,8 +310,8 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 
 | # | What | Old file(s) | New replacement | Phase | Status |
 |---|---|---|---|---|---|
-| L1 | Release catalog | `D/release/blumiR1ReleaseCatalog.json` | P2: remove the 5 receipts of the retired room items (the chair receipt is kept; see R1), replace the `room_v3_` hold with a `pricing-pending` scope (§5.3). P4: remove the 83 avatar receipts (80 retired items + the 3 girl starters). Removals only | P2, P4 | Open |
-| L2 | Receipt test | `S/features/shop/shopReleaseCatalog.test.ts` | every rule kept, resolvers repointed; passes with only the chair receipt (or none, per R1) and binds any future one. A published item's resolver is never repointed before the commit that retires or re-receipts it (R5) | P2, P4 | Open |
+| L1 | Release catalog | `D/release/blumiR1ReleaseCatalog.json` | P2: remove the 5 receipts of the retired room items and the chair receipt (R1, decided), replace the `room_v3_` hold with a `pricing-pending` scope (§5.3). P4: remove the 83 avatar receipts (80 retired items + the 3 girl starters). Removals only | P2, P4 | Open |
+| L2 | Receipt test | `S/features/shop/shopReleaseCatalog.test.ts` | every rule kept, resolvers repointed; passes with no receipt left (R1, decided) and binds any future one. A published item's resolver is never repointed before the commit that retires or re-receipts it (R5) | P2, P4 | Open |
 | L3 | Publication manifest | `docs/quality/SHOP_CATALOG_PUBLICATION_2026-09-30.md` | never edited; unreferenced history once no receipt cites it | P4 | Open |
 | L4 | Server release tests | `SV/economy/economyCatalog.release.test.ts`, `economyService.production.test.ts` | same intent with new IDs (free default bought-refused, held refused, legacy refused) | P2, P4 | Open |
 | L5 | Catalog parity | `S/features/shop/shopCatalogParity.test.ts` | kept against the new catalogs | P4 | Open |
@@ -335,7 +335,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | T3 | Match and room runner (79) | `run-match-room-tests.mjs` | + the experiment's 13 files with final paths | P2 | Open |
 | T4 | Room persistence and hydration (8) | `run-room-persistence-tests.mjs`, `test:room-hydration` | kept; provider test rewritten by behaviour | P2 | Open |
 | T5 | Inventory runner (11) | `run-inventory-tests.mjs` | kept; demo-owner fixture dropped; legacy projection test added | P4 | Open |
-| T6 | Session runner (29) | `run-session-tests.mjs` | onboarding sprite tests follow the re-baked sets | P3 | Open |
+| T6 | Session runner (29) | `run-session-tests.mjs` | onboarding sprite tests follow the re-baked sets | P6 (F15) | Open |
 | T7 | Realtime, chat, discovery, connections, navigation runners (21) | `run-*-tests.mjs` | fixtures only | P3 | Open |
 | T8 | Inline groups | `test:wardrobe`, `test:shop-preview-assets`, `test:performance-assets`, `test:layout` in `M/package.json` | scripts edited freely once OTA is gone | P2–P4 | Open |
 | T9 | Verified source-text pins (7) | `wardrobeCatalogModel.test.ts`, `useInRoomChat.reconnect.test.ts`, `CurrentSceneAssetWarmup.test.mjs`, `roomV2ProviderLifecycle.test.ts`, `CosmeticShopScreen.test.mjs`, `WardrobeV2Screen.test.mjs`, `useRoomEditorInventoryEntries.test.mjs` | behaviour tests with the same intent (§10.2) | with their code | Open |
@@ -370,7 +370,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 |---|---|---|---|---|---|
 | O1 | OTA runtime | `expo-updates` in `M/package.json`, `runtimeVersion` and `updates` in `M/app.json`, channels in `M/eas.json`, `M/App.tsx` hook, `S/features/appUpdates/*`, OTA label in `SettingsScreen.tsx` | removed (experiment port, reconciled with develop's newer `package.json` and `app.json`); lockfile regenerated | P1 | Open |
 | O2 | OTA workflows | `.github/workflows/develop-ota-publish.yml`, `M/.eas/workflows/develop-preview-update.yml`, OTA jobs in `testflight.yml`, `preview-testflight-build.yml`; `testflight-after-asc-upload.yml` checked in review: no OTA step | removed or simplified | P1 | Open |
-| O3 | OTA guards | `M/scripts/mobile-ota-asset-budget.test.mjs`, `mobile-release-channels.test.mjs`, entries in `run-avatar-v2-tests.mjs`, `run-navigation-tests.mjs`, `.railway/railway.test.ts` | budget test retired with the reason (no EAS Update, so no 1,000-asset cap); channel test becomes "no OTA is configured" | P1 | Open |
+| O3 | OTA guards | `M/scripts/mobile-ota-asset-budget.test.mjs`, `mobile-release-channels.test.mjs`, entries in `run-avatar-v2-tests.mjs`, `run-navigation-tests.mjs`, `.railway/railway.test.ts` | budget test retired with the reason (no EAS Update, so no 1,000-asset cap) and replaced in the same commit by the bundled-bytes guard `mobile-bundled-asset-bytes.test.mjs` (R9); channel test becomes "no OTA is configured" | P1 | Open |
 | O4 | OTA documents | `docs/release/OTA_AND_TESTFLIGHT.md`, `docs/quality/OTA_ASSET_BUDGET_2026-10-02.md`, `docs/quality/ENGINEERING_RULES.md` | first rewritten for TestFlight-only; second left as a dated snapshot; third updated | P1 | Open |
 | O5 | `AGENTS.md` | Strict "conventions" fingerprint rule, OTA facts, "071 next", avatar/room facts, asset count | P1: dated waiver, OTA removal, script rule dropped, "074 next". P5: avatar and room facts rewritten for the new system | P1, P5 | Open |
 | O6 | `README.md:29` | "chibi characters" blurb | updated text | P5 | Open |
@@ -461,7 +461,7 @@ One canonical ID per item through Shop → Purchase → Inventory → Wardrobe �
 | ID | State at launch | Notes |
 |---|---|---|
 | `room_v2_shell_blumi_world_v1` | active (kept) | the only shell the server accepts |
-| `room_v2_chair_blush` | stays published, price 0, receipt untouched (F8) | NOT in the default room. Its receipt binds the OLD flat art (`roomV2/assets/runtime/furniture_world_chair_v1.png` + its Shop thumbnail), so it cannot switch to its layered folder without a decision: see R1 (§11.1). Until R1 is decided X8 keeps those two files and the chair is excluded from the old-art deletion |
+| `room_v2_chair_blush` | receipt REMOVED in X8; held in `pricing-pending` until §12 (F8, R1 decided) | NOT in the default room. Its art moves to its layered folder; the two old files its receipt bound (`roomV2/assets/runtime/furniture_world_chair_v1.png` + its Shop thumbnail) are deleted in X8 with the other old furniture art. The ID stays (never renamed or reused) |
 | `room_v3_sofa_japon_cream` | User approved, `pricing-pending` | like the other 26 (F14); NOT in the default room |
 | `room_v3_bed_blumi_starter` | reserved, no art, not owned by anyone | the free starter bed (F9). Its own design is made with the furniture pipeline in Phase 4 (4.7) and shown to the owner. It becomes `ownedByDefault` in the commit that adds its art; the inventory self-heal then grants it to everyone on their next read. It is the ONLY item of the default room. Rooms that already exist get it only when their decor reads empty (all legacy) and the client rebuilds the default room |
 | 26 other `room_v3_*` (12 Japon, 14 Oyun; list in `furniture/ROOM_SYSTEM_HANDOFF.md` §2) | User approved (F14), `pricing-pending` | art in the repo; economy entries with placeholder prices inside the `pricing-pending` held scope, so the server refuses purchase and placement and Shop and editor hide them. After §12: one commit per batch sets the final price, removes the batch from the hold, and adds the thumbnail. The production projection (`resolveR1PublishedEconomyCatalog`) keeps only `ownedByDefault` items and items with a receipt, so even a price-0 Shop item needs an owner receipt; free without a receipt means `ownedByDefault` (everyone owns it) |
@@ -473,10 +473,10 @@ Default room: created on the client as today (`roomStarterModel.ts`), saved with
 
 | When | Edit | Why it is allowed |
 |---|---|---|
-| P2 | Remove the 5 receipts of the retired room items (`room_v2_table_round`, `_lamp_heart`, `_cute_bookshelf`, `_heart_rug`, `_side_table`). The `room_v2_chair_blush` receipt stays untouched (F8, R1) | removal, in the commit that retires those items (X8) |
+| P2 | Remove the 5 receipts of the retired room items (`room_v2_table_round`, `_lamp_heart`, `_cute_bookshelf`, `_heart_rug`, `_side_table`). The `room_v2_chair_blush` receipt is removed in the same commit and the chair joins `pricing-pending` (F8, R1 decided) | removal, in the commit that retires those items (X8) |
 | P2 | Scope `room-v3-shell-and-furniture-candidates` (`^(?:universal_|room_v3_)`, `^room_v2_(?:qa_|candidate_)`) → a `pricing-pending` scope `^room_v3_(?!bed_blumi_starter$)`; the `room_v2_(qa_|candidate_)` pattern moves to the dev/QA scope | the 27 approved pieces wait for prices, not approval (F14); `universal_*` become legacy IDs; the starter bed is `ownedByDefault` and never held |
 | P2 | Trim `forbiddenRuntimeFlags` to the flags that still exist | D11 |
-| P4 | Remove the 83 avatar receipts, including the three girl starters | removal (F8 + F1); `publishedItems` then holds only `room_v2_chair_blush` (or nothing, per R1) |
+| P4 | Remove the 83 avatar receipts, including the three girl starters | removal (F8 + F1); `publishedItems` is then empty (R1 decided) |
 | P4 | Remove the `female-wardrobe-promotion-hold` scope; extend `pricing-pending` to the 9 boy hair colour variants and the 7 redrawn hairs as they land | its item is legacy; these wait for §12 |
 | after §12 | Each priced batch leaves `pricing-pending`; a paid or price-0 Shop item gets an owner-approved receipt binding its new runtime bytes | owner only |
 | later | Any paid item | only with an owner-approved receipt that binds its new runtime bytes |
@@ -510,7 +510,7 @@ Each line is one commit (one purpose). "Needs" names what must already be merged
 | X5 | `refactor: remove the rig preview QA route and dev entries` | S52, D3, D11 | experiment MiniRoom port (its tests no longer need the route) |
 | X6 | `refactor: remove Room V3 / VNext / universal-core candidates` | ≈20 `roomV3*`, `roomVNext*` files, `D/economy/universalCoreRoomEconomy.ts`, their scripts | legacy registry (room part), L14 |
 | X7 | `feat(server): ignore legacy items in stored room decor` | — (tolerance) | — |
-| X8 | `refactor: retire the old furniture items` | 6 old room economy entries (all but the chair, incl. the old free `room_v2_cozy_bed`), 5 room receipts (the chair receipt and the two files it binds stay until R1 is decided), old entries in `roomV2Catalog.ts`, `roomV2ProductionAssets.ts` (shell kept), `roomV2/assets/runtime` furniture, `roomV2/assets/shop-thumbnails`, flat-sprite branches in `RoomRenderer2D.tsx`, server snapshot v1 table | X7, new furniture + thumbnails, snapshot renderer v2, default room, `RoomSetup` rework |
+| X8 | `refactor: retire the old furniture items` | 6 old room economy entries (all but the chair, which stays and is held in `pricing-pending`, incl. the old free `room_v2_cozy_bed`), 6 room receipts (the 5 retired items + the chair, R1 decided) and the two old chair files, old entries in `roomV2Catalog.ts`, `roomV2ProductionAssets.ts` (shell kept), `roomV2/assets/runtime` furniture, `roomV2/assets/shop-thumbnails`, flat-sprite branches in `RoomRenderer2D.tsx`, server snapshot v1 table | X7, new furniture + thumbnails, snapshot renderer v2, default room, `RoomSetup` rework |
 | X9 | `refactor: remove the dance state` | G14 | F17 |
 | X10 | `refactor: inline the room avatar seam` | old avatar branch in `RoomRendererAvatarBody.tsx`, `AvatarLayer.tsx`, `miniRoomAvatarMotion.ts`, `enabled` checks | P2 gate |
 | X11 | `refactor: switch portraits to AvatarPortrait` etc. (P3 surface commits) | per-surface use of `RoomAvatarStill`, `RoomAvatarRenderer2D`, `AvatarPreview2D`, `ProfileChibi` | P1 components |
@@ -546,7 +546,7 @@ Counted with the retired budget test's own logic (distinct `require()`d image an
 | Avatar stills (`full`, `bust`, `thumb`) | 0 | ≈65 (2 bodies, ≈10 items) | ≈215 (≈44 items) |
 | **Total distinct** | **869** | **≈363** | **≈530** |
 | Test estimate (+60 package allowance) | 929 of 950 allowed | ≈423 | ≈590 |
-| Old-system files on disk | 1,481 (≈66 MB) | 101 (`session/assets`, until Phase 6) + the 2 chair receipt files while R1 is open | 0 |
+| Old-system files on disk | 1,481 (≈66 MB) | 101 (`session/assets`, until Phase 6) | 0 |
 
 The 1,000-asset limit belonged to EAS Update and disappears with OTA (F6); the App Store build has no comparable per-file cap. The count is still reported in Phase 5 (and after Phase 6) by running the old scan once as a script, and it stays well under 1,000 in every column, so turning OTA back on later would not hit the cap. Note the scan only sees literal relative `require()` calls: the ported rig, furniture and still tables must keep literal requires (Metro needs them anyway) or the count is wrong. Review R9 recommends replacing the retired budget test with a bundled-bytes ratchet instead of nothing. App size: about −43 MB of old art, +18 MB rigs and furniture, +≈5 MB stills.
 
@@ -559,7 +559,7 @@ After every phase a separate fresh reviewer (Opus) compares §3, this section an
 | # | Commit |
 |---|---|
 | 1.1 | `docs: record the 2.5D migration waiver and plan` (this file; the §4 waiver with its date 2026-10-10 and "confirmed by the owner in the lead chat" in `AGENTS.md`; the experiment's "Subagent strategy" hunk is NOT ported) |
-| 1.2 | `chore: remove OTA updates` (X1; `AGENTS.md` script rule and OTA facts; "074 next") |
+| 1.2 | `chore: remove OTA updates` (X1; bundled-bytes guard replaces the 1,000-asset guard, R9; `AGENTS.md` script rule and OTA facts; "074 next") |
 | 1.3 | `chore: add react-native-webgpu` (dependency, regenerated lockfile, L11) |
 | 1.4 | `feat: add the 2.5D avatar renderer and rigs` (final home, tests in `run-avatar-tests.mjs`, checksums verified) |
 | 1.5 | `chore: add the rig exporter tools` |
@@ -575,7 +575,7 @@ Reviewer checks: nothing from D4–D9 arrived; no pure module imports `react-nat
 | # | Commit |
 |---|---|
 | 2.1 | `feat: room calibration and layered furniture` (code, art, seam) |
-| 2.2 | `feat(domain): register the 2.5D furniture IDs` (27 approved `room_v3_*` in the `pricing-pending` scope, reserved `room_v3_bed_blumi_starter`, legacy registry room part, L14; the chair and its receipt untouched, R1) |
+| 2.2 | `feat(domain): register the 2.5D furniture IDs` (27 approved `room_v3_*` in the `pricing-pending` scope, reserved `room_v3_bed_blumi_starter`, legacy registry room part, L14; the chair added to the `pricing-pending` scope; its receipt is removed in X8, R1 decided) |
 | 2.3 | `feat: draw My Room with the calibrated room and the 2.5D avatar` |
 | 2.4 | `feat: room editor on the calibrated grid` (old room items keep their old thumbnails and flat sprites until X8, R5) |
 | 2.5 | `feat: shared room with per-seat sitting and both rigs` (incl. T10) |
@@ -586,7 +586,7 @@ Reviewer checks: nothing from D4–D9 arrived; no pure module imports `react-nat
 | 2.10 | `refactor: retire the old furniture items` (X8) |
 | 2.11–2.15 | X3, X4, X5, X6, X9, then X10 |
 
-Gate: typecheck; `test:match-room`, `test:room-persistence`, `test:room-hydration`, `test:theme`, `test:navigation`, domain and server suites; Simulator: My Room, editor (drag from tray, rotate, undo, wall pieces), sit on sofa and armchair front and back for girl and boy, MiniRoom two phones on the memory server, default room for a new and an existing account, Discover room picture.
+Gate: typecheck; `test:match-room`, `test:room-persistence`, `test:room-hydration`, `test:theme`, `test:navigation`, domain and server suites; Simulator: My Room, editor (drag from tray, rotate, undo, wall pieces), sit on sofa and armchair front and back for girl and boy (both are held in `pricing-pending`, so the gate places them through a test-only inventory grant on the memory server that never ships; the hold itself is not weakened), MiniRoom two phones on the memory server, default room for a new and an existing account, Discover room picture.
 Reviewer checks: no flat-sprite or demo-ownership path left; every placed item is checked against ownership AND the active catalog on save; held IDs cannot be bought, placed or seen; the calibration JSON equals the Workbench file; server walk checks accept calibrated points (V17).
 
 ### Phase 3: surfaces
@@ -617,7 +617,7 @@ Reviewer checks: no surface outside the allowed list mounts a canvas; no import 
 | 4.7 | `feat: free starter bed` (A5): design with the furniture pipeline, owner sees it, then layered art, thumbnail, `ownedByDefault`, default room and RoomSetup place it |
 
 Gate: `npm run verify`; `npm run verify:postgres` (as `pgtest` in the cloud container); the release audit run against a disposable database seeded with old IDs exits 0 and reports them as ignored; a new girl, a new boy and an existing account with an old loadout, old inventory and old room all open every screen.
-Reviewer checks: `publishedItems` holds at most the untouched chair receipt (R1) and no receipt was added; no legacy ID in any active list; every catalog item has rig art and stills; `SHOP_CATALOG_PUBLICATION_2026-09-30.md` unchanged; purchase and ownership rules unchanged in behaviour (money tests still cover refusal, double spend, idempotent rewards).
+Reviewer checks: `publishedItems` is empty (the chair receipt was removed in X8, R1) and no receipt was added; no legacy ID in any active list; every catalog item has rig art and stills; `SHOP_CATALOG_PUBLICATION_2026-09-30.md` unchanged; purchase and ownership rules unchanged in behaviour (money tests still cover refusal, double spend, idempotent rewards).
 
 ### Phase 5: verify and ship
 
@@ -711,7 +711,7 @@ Before the reset can be called done: a test on the memory server proves that a p
 | 9 | Beta reset on the only database, no point-in-time recovery | Script rails in §9, dry run, dump, runs last |
 | 10 | Rig pages grow with the catalog (each page ≈3.4 MB of GPU memory per view with ASTC) | Exporter packs pages per item group; confirm the renderer uploads only the pages of worn items (its texture cache is keyed by the page list); measure when the boy catalog lands |
 | 11 | Onboarding re-bake does not match the approved choreography (walk instead of run, no twirl); until Phase 6 new users see the old chibi in onboarding next to the new avatar elsewhere (F15) | Phase 6 is last and gets its own TestFlight build; show the owner before/after; non-character fallback |
-| 12 | All 27 approved furniture pieces wait for §12 prices, so a launch before §12 has a room with only the starter bed (and the chair) | `pricing-pending` scope keeps them refused and hidden; §12 is reviewed after Phase 3, well before Phase 5.6; the TestFlight gate checks that §12 is decided or that the owner accepts a bed-only launch |
+| 12 | All 27 approved furniture pieces wait for §12 prices, so a launch before §12 has a room with only the starter bed (the chair is held too) | `pricing-pending` scope keeps them refused and hidden; §12 is reviewed after Phase 3, well before Phase 5.6; the TestFlight gate checks that §12 is decided or that the owner accepts a bed-only launch |
 | 13 | Lost first tap after mount and the pager desync are only worked around | Carried as an open issue; cheaper first mount is future work |
 | 14 | Editing `M/package.json` scripts before OTA removal lands would change the native fingerprint | OTA removal is commit 1.2; script edits come after |
 
@@ -734,7 +734,7 @@ Before the reset can be called done: a test on the memory server proves that a p
 
 | Retire or replace | Reason |
 |---|---|
-| `mobile-ota-asset-budget.test.mjs` | EAS Update is gone; the cap no longer exists (retired with the reason in commit 1.2) |
+| `mobile-ota-asset-budget.test.mjs` | EAS Update is gone; the cap no longer exists (retired with the reason in commit 1.2 and replaced there by the bundled-bytes guard `mobile-bundled-asset-bytes.test.mjs`, R9) |
 | `mobile-release-channels.test.mjs` | rewritten to assert no OTA configuration |
 | `roomAvatarMotionAtlas.test.ts`, atlas and capsule asset tests | their code and art are deleted; L13 keeps the "baked art equals its source" intent |
 | `avatarPortrait.test.ts` (asserts old layer order and mobile paths) | replaced by the portrait v2 tests above |
@@ -753,7 +753,7 @@ Tests in old directories are read before they are removed (the audit classified 
 | Still vs live | `full`, `half`, `bust` composites equal the live frame 0 within tolerance, zoomed 2–4× on the floor colour |
 | Old-code grep | no `avatarV2`, `roomStudio`, `experimental/`, `RoomAvatarRenderer2D`, `RoomAvatarStill`, `EXPO_PUBLIC_BLUMI_ROOM_AVATAR_25D`, `universal_` in `apps/` and `packages/` outside the legacy registry and dated docs |
 | Old-ID grep | every ID in `legacyItemIds.json` appears nowhere else in `apps/` and `packages/` except test fixtures that test refusal |
-| Image sweep | every tracked image is opened and classified; none shows the old chibi, old room or old items (covers `M/assets`, `.github/assets`, `S/**/assets`). Until Phase 6 the only allowed exception is the list of `S/features/session/assets` files that onboarding, boot and register require (F15); while R1 is open, also the two chair receipt files |
+| Image sweep | every tracked image is opened and classified; none shows the old chibi, old room or old items (covers `M/assets`, `.github/assets`, `S/**/assets`). Until Phase 6 the only allowed exception is the list of `S/features/session/assets` files that onboarding, boot and register require (F15) |
 | Dev-only sweep | none of D1–D13 exists; no `*candidate/` import; no Workbench path in app code |
 
 ### 10.4 Simulator walkthrough matrix
@@ -767,7 +767,7 @@ Each cell is a screenshot with pass/fail. Columns: girl new account, boy new acc
 | Chat | inbox list, actions sheet, thread header, empty thread, room invite cards, door zoom, notification permission card, push banner on the lock screen |
 | Profile | You, ProfileEdit, ProfilePreview, LinkedProfile, Settings blocked list |
 | Items | Wardrobe (try-on, save, locked preview), Shop avatar and home modes, checkout sheet, purchase flight |
-| Rooms | My Room (walk, tap wave, sit front and back on sofa and armchair), editor (place, rotate, undo, wall piece, save), MiniRoom girl + boy (both seats of one sofa, chat, leave) |
+| Rooms | My Room (walk, tap wave, sit front and back on sofa and armchair, placed through the test-only inventory grant on the memory server, see the Phase 2 gate), editor (place, rotate, undo, wall piece, save), MiniRoom girl + boy (both seats of one sofa, chat, leave) |
 | Accessibility | Reduce Motion on, Reduce Transparency on, VoiceOver labels on the new components |
 
 Native visual checks run on the owner's Mac or phone; until then their status stays Open.
@@ -798,7 +798,7 @@ Independent review of this plan against the eight Phase 0 audits, `RESUME_INTEGR
 
 | # | Severity | Finding | Recommendation |
 |---|---|---|---|
-| R1 | CRITICAL (owner) | `room_v2_chair_blush` is to stay "published, price 0, receipt untouched", but its receipt binds the OLD flat art `roomV2/assets/runtime/furniture_world_chair_v1.png` and `roomV2/assets/shop-thumbnails/room_v2_chair_blush.png`. `shopReleaseCatalog.test.ts` ("each receipt binds exactly the runtime assets the app resolves") fails the moment the chair draws from its layered folder. "Untouched" is only possible if the chair keeps old flat art and the flat-sprite path survives X8, which contradicts F1/F12 | Ask the owner once, at the §12 review: (a) he issues a new receipt that binds the chair's layered art (his act, never ours); or (b) the receipt is REMOVED and the chair joins the `pricing-pending` scope with the 27 others until §12; or (c) receipt removed and the chair becomes `ownedByDefault`. Lead's recommendation: (b). Until then the chair keeps its flat art, its two bound files and the flat-sprite branch for that one ID; the Phase 5 sweep lists them as the second known exception |
+| R1 | CRITICAL (decided) | The first draft kept `room_v2_chair_blush` "published, price 0, receipt untouched", but its receipt binds the OLD flat art `roomV2/assets/runtime/furniture_world_chair_v1.png` and `roomV2/assets/shop-thumbnails/room_v2_chair_blush.png`. `shopReleaseCatalog.test.ts` ("each receipt binds exactly the runtime assets the app resolves") fails the moment the chair draws from its layered folder. "Untouched" is only possible if the chair keeps old flat art and the flat-sprite path survives X8, which contradicts F1/F12 | Options were: (a) he issues a new receipt that binds the chair's layered art (his act, never ours); or (b) the receipt is REMOVED and the chair joins the `pricing-pending` scope with the 27 others until §12; or (c) receipt removed and the chair becomes `ownedByDefault`. **Decided 2026-10-10 (17:20), lead decision under the owner's delegation, owner told:** (b). The receipt is removed in X8 together with the two old files, the chair joins `pricing-pending` until §12, and no flat-sprite exception remains |
 | R2 | HIGH | Free price-0 items that are not `ownedByDefault` disappear in production: `resolveR1PublishedEconomyCatalog` keeps only `ownedByDefault` items and receipt-bound items (`releaseCatalog.ts`). So "free furniture in the Shop" needs an owner receipt per item, and "free boy outfits, no receipts" works only as `ownedByDefault` | Folded into §5.2, §5.3 and §12. Every free starter wearable (boy outfits, basics, base hairs) is `ownedByDefault`; body compatibility, not ownership, keeps the girl from wearing them |
 | R3 | HIGH | Mid-plan breakage: from Phase 1 to Phase 4 the old items stay active, coercion keeps them, but the rigs cannot draw them, and today's `DEFAULT_FEMALE_AVATAR_LOADOUT` is NOT the coral starter (it is `hair_mocha_ribbon_blowout` + `top_default` + `bottom_default` + `shoes_milk_tea_court_sneakers`). Every Phase 3 surface would draw undrawable loadouts | Folded into §2.4: a draw-only fallback to the per-body rig starter, and coercion reads the `DEFAULT_*` constants that X15 switches |
 | R4 | MEDIUM | The planned "every catalog item has `full`, `bust`, `thumb`" test fails from 1.7 to X15 if it walks the economy catalog | Folded into §10.2: iterate `avatarItemArt.ts`; add the catalog-wide assertion in X15 |
@@ -828,7 +828,7 @@ Does not block Phases 1–3. The launch catalog is entirely free; no paid item i
 
 | Output (one proposal the owner approves) | Notes |
 |---|---|
-| Price tiers for hair, hair colours, clothes, furniture, collections | first candidates: the 27 approved `room_v3_*` pieces (F14), the 9 boy hair colour variants, the 2 redrawn boy hairs and the 5 redrawn girl hairs, and the chair (R1). For each: paid (owner receipt), price-0 Shop item (still an owner receipt, because the production projection keeps only receipt-bound or `ownedByDefault` items), or `ownedByDefault` (everyone owns it, no receipt) |
+| Price tiers for hair, hair colours, clothes, furniture, collections | first candidates: the 27 approved `room_v3_*` pieces (F14), the 9 boy hair colour variants, the 2 redrawn boy hairs and the 5 redrawn girl hairs, and the chair (held since R1 was decided). For each: paid (owner receipt), price-0 Shop item (still an owner receipt, because the production projection keeps only receipt-bound or `ownedByDefault` items), or `ownedByDefault` (everyone owns it, no receipt) |
 | Starter coins after the reset, daily and event earn rates | the reset script reads `STARTER_COIN_BALANCE`, so a change lands before the reset |
 | Coin pack sizes and whether payments turn on | changing a pack or the payment flag is a third-party and production change: owner's yes |
 | Days of play needed to afford each tier, with and without packs | the balance check ("pazarın dengesi") |
