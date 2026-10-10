@@ -147,7 +147,9 @@ try {
       resolve(workspaceRoot, "src/features/avatar/renderer/avatarRenderer.test.ts"),
       resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Motion.test.ts"),
       resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Life.test.ts"),
-      resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Astc.test.ts")
+      resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Astc.test.ts"),
+      // baked stills (plan 2.2): match the rigs (L13), bundled, cover the art map (R4), live draw order
+      resolve(workspaceRoot, "src/features/avatar/stills/avatarStills.test.ts")
     ],
     {
       cwd: workspaceRoot,

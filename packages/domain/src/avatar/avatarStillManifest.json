@@ -1,0 +1,641 @@
+{
+  "bakerVersion": 1,
+  "supersample": 2,
+  "bodies": {
+    "female": {
+      "rigSha256": "65c6cd5b717be70abb0d9923a4142edc6c1f9186f58f39ff75331d93b7503d2f",
+      "sheetHeight": 967,
+      "canvas": {
+        "width": 640,
+        "height": 1039
+      },
+      "ground": [
+        319.5,
+        1008
+      ],
+      "windows": {
+        "bust": [
+          98,
+          2,
+          419,
+          419
+        ],
+        "half": [
+          95,
+          2,
+          423,
+          564
+        ],
+        "full": [
+          2,
+          2,
+          636,
+          1025
+        ]
+      },
+      "bustPx": 256,
+      "starter": {
+        "hair": "avatar_v2_hair_ink_pageboy_star",
+        "top": "avatar_v2_top_coral_wave_polo",
+        "bottom": "avatar_v2_bottom_coral_wave_pants",
+        "shoes": "avatar_v2_shoes_mint_ribbon_court_sneakers"
+      },
+      "items": {
+        "avatar_v2_shoes_mint_ribbon_court_sneakers": {
+          "slot": "shoes",
+          "rigItemId": "shoes_mint_ribbon_court_sneakers",
+          "thumb": "avatar_v2_shoes_mint_ribbon_court_sneakers"
+        },
+        "avatar_v2_bottom_coral_wave_pants": {
+          "slot": "bottom",
+          "rigItemId": "bottom_coral_wave_pants",
+          "thumb": "avatar_v2_bottom_coral_wave_pants"
+        },
+        "avatar_v2_top_coral_wave_polo": {
+          "slot": "top",
+          "rigItemId": "top_coral_wave_polo",
+          "thumb": "avatar_v2_top_coral_wave_polo"
+        },
+        "avatar_v2_hair_ink_pageboy_star": {
+          "slot": "hair",
+          "rigItemId": "hair_ink_pageboy_star",
+          "thumb": "avatar_v2_hair_ink_pageboy_star"
+        }
+      },
+      "layers": {
+        "full": [
+          {
+            "key": "body__o0",
+            "owner": "body",
+            "slot": "body",
+            "order": 0,
+            "seq": 0,
+            "rect": [
+              126,
+              274,
+              156,
+              340
+            ]
+          },
+          {
+            "key": "avatar_v2_top_coral_wave_polo__o0p45",
+            "owner": "avatar_v2_top_coral_wave_polo",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              200,
+              305,
+              25,
+              53
+            ]
+          },
+          {
+            "key": "body__o1",
+            "owner": "body",
+            "slot": "body",
+            "order": 1,
+            "seq": 1,
+            "rect": [
+              189,
+              520,
+              121,
+              466
+            ],
+            "leg": "farLeg"
+          },
+          {
+            "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__o1__shoes",
+            "owner": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "slot": "shoes",
+            "order": 1,
+            "seq": 1002,
+            "rect": [
+              189,
+              520,
+              121,
+              455
+            ],
+            "leg": "farLeg",
+            "legVariant": "shoes"
+          },
+          {
+            "key": "avatar_v2_bottom_coral_wave_pants__o1__bottom",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              189,
+              875,
+              112,
+              111
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom"
+          },
+          {
+            "key": "avatar_v2_bottom_coral_wave_pants__o1__bottom-shoes",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2005,
+            "rect": [
+              189,
+              875,
+              112,
+              100
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom+shoes"
+          },
+          {
+            "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__o1p15",
+            "owner": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "slot": "shoes",
+            "order": 1.15,
+            "seq": 1001,
+            "rect": [
+              177,
+              863,
+              132,
+              112
+            ],
+            "leg": "farLeg"
+          },
+          {
+            "key": "avatar_v2_bottom_coral_wave_pants__o1p3",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 1.3,
+            "seq": 2002,
+            "rect": [
+              212,
+              519,
+              109,
+              368
+            ],
+            "leg": "farLeg"
+          },
+          {
+            "key": "body__o2",
+            "owner": "body",
+            "slot": "body",
+            "order": 2,
+            "seq": 2,
+            "rect": [
+              288,
+              520,
+              124,
+              495
+            ],
+            "leg": "nearLeg"
+          },
+          {
+            "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__o2__shoes",
+            "owner": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "slot": "shoes",
+            "order": 2,
+            "seq": 1003,
+            "rect": [
+              288,
+              520,
+              124,
+              492
+            ],
+            "leg": "nearLeg",
+            "legVariant": "shoes"
+          },
+          {
+            "key": "avatar_v2_bottom_coral_wave_pants__o2__bottom",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              288,
+              899,
+              120,
+              116
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom"
+          },
+          {
+            "key": "avatar_v2_bottom_coral_wave_pants__o2__bottom-shoes",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2006,
+            "rect": [
+              288,
+              899,
+              120,
+              113
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom+shoes"
+          },
+          {
+            "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__o2p15",
+            "owner": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "slot": "shoes",
+            "order": 2.15,
+            "seq": 1000,
+            "rect": [
+              283,
+              892,
+              132,
+              119
+            ],
+            "leg": "nearLeg"
+          },
+          {
+            "key": "avatar_v2_bottom_coral_wave_pants__o2p3",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 2.3,
+            "seq": 2001,
+            "rect": [
+              292,
+              519,
+              142,
+              392
+            ],
+            "leg": "nearLeg"
+          },
+          {
+            "key": "body__o3",
+            "owner": "body",
+            "slot": "body",
+            "order": 3,
+            "seq": 3,
+            "rect": [
+              209,
+              250,
+              199,
+              344
+            ]
+          },
+          {
+            "key": "avatar_v2_bottom_coral_wave_pants__o3p3",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 3.3,
+            "seq": 2000,
+            "rect": [
+              212,
+              450,
+              194,
+              147
+            ]
+          },
+          {
+            "key": "avatar_v2_top_coral_wave_polo__o3p45",
+            "owner": "avatar_v2_top_coral_wave_polo",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              214,
+              248,
+              176,
+              233
+            ]
+          },
+          {
+            "key": "body__o4",
+            "owner": "body",
+            "slot": "body",
+            "order": 4,
+            "seq": 9,
+            "rect": [
+              221,
+              40,
+              192,
+              215
+            ]
+          },
+          {
+            "key": "avatar_v2_hair_ink_pageboy_star__o4p6",
+            "owner": "avatar_v2_hair_ink_pageboy_star",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              198,
+              26,
+              246,
+              230
+            ]
+          },
+          {
+            "key": "body__o5",
+            "owner": "body",
+            "slot": "body",
+            "order": 5,
+            "seq": 10,
+            "rect": [
+              365,
+              277,
+              114,
+              369
+            ]
+          },
+          {
+            "key": "avatar_v2_top_coral_wave_polo__o5p45",
+            "owner": "avatar_v2_top_coral_wave_polo",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              365,
+              274,
+              62,
+              110
+            ]
+          }
+        ],
+        "bust": [
+          {
+            "key": "body__o0",
+            "owner": "body",
+            "slot": "body",
+            "order": 0,
+            "seq": 0,
+            "rect": [
+              49,
+              164,
+              66,
+              92
+            ]
+          },
+          {
+            "key": "avatar_v2_top_coral_wave_polo__o0p45",
+            "owner": "avatar_v2_top_coral_wave_polo",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              60,
+              183,
+              20,
+              37
+            ]
+          },
+          {
+            "key": "body__o3",
+            "owner": "body",
+            "slot": "body",
+            "order": 3,
+            "seq": 3,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ]
+          },
+          {
+            "key": "avatar_v2_top_coral_wave_polo__o3p45",
+            "owner": "avatar_v2_top_coral_wave_polo",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              68,
+              148,
+              113,
+              108
+            ]
+          },
+          {
+            "key": "body__o4",
+            "owner": "body",
+            "slot": "body",
+            "order": 4,
+            "seq": 9,
+            "rect": [
+              73,
+              21,
+              122,
+              136
+            ]
+          },
+          {
+            "key": "avatar_v2_hair_ink_pageboy_star__o4p6",
+            "owner": "avatar_v2_hair_ink_pageboy_star",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              59,
+              12,
+              155,
+              146
+            ]
+          },
+          {
+            "key": "body__o5",
+            "owner": "body",
+            "slot": "body",
+            "order": 5,
+            "seq": 10,
+            "rect": [
+              161,
+              166,
+              46,
+              90
+            ]
+          },
+          {
+            "key": "avatar_v2_top_coral_wave_polo__o5p45",
+            "owner": "avatar_v2_top_coral_wave_polo",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              161,
+              164,
+              42,
+              72
+            ]
+          }
+        ]
+      }
+    },
+    "male": {
+      "rigSha256": "9a048ff5d1e7bce02ef99aca75bb3c9e99abdb8c6dbf9192b9a35eb49fa254f6",
+      "sheetHeight": 982,
+      "canvas": {
+        "width": 649,
+        "height": 1053
+      },
+      "ground": [
+        324.5,
+        1023
+      ],
+      "windows": {
+        "bust": [
+          91,
+          2,
+          425,
+          425
+        ],
+        "half": [
+          83,
+          2,
+          442,
+          589
+        ],
+        "full": [
+          2,
+          2,
+          645,
+          1041
+        ]
+      },
+      "bustPx": 256,
+      "starter": {},
+      "items": {},
+      "layers": {
+        "full": [
+          {
+            "key": "body__o0",
+            "owner": "body",
+            "slot": "body",
+            "order": 0,
+            "seq": 0,
+            "rect": [
+              125,
+              269,
+              150,
+              364
+            ]
+          },
+          {
+            "key": "body__o1",
+            "owner": "body",
+            "slot": "body",
+            "order": 1,
+            "seq": 1,
+            "rect": [
+              177,
+              537,
+              139,
+              462
+            ],
+            "leg": "farLeg"
+          },
+          {
+            "key": "body__o2",
+            "owner": "body",
+            "slot": "body",
+            "order": 2,
+            "seq": 2,
+            "rect": [
+              290,
+              537,
+              128,
+              493
+            ],
+            "leg": "nearLeg"
+          },
+          {
+            "key": "body__o3",
+            "owner": "body",
+            "slot": "body",
+            "order": 3,
+            "seq": 3,
+            "rect": [
+              209,
+              225,
+              200,
+              411
+            ]
+          },
+          {
+            "key": "body__o4",
+            "owner": "body",
+            "slot": "body",
+            "order": 4,
+            "seq": 9,
+            "rect": [
+              219,
+              40,
+              191,
+              219
+            ]
+          },
+          {
+            "key": "body__o5",
+            "owner": "body",
+            "slot": "body",
+            "order": 5,
+            "seq": 10,
+            "rect": [
+              370,
+              282,
+              112,
+              382
+            ]
+          }
+        ],
+        "bust": [
+          {
+            "key": "body__o0",
+            "owner": "body",
+            "slot": "body",
+            "order": 0,
+            "seq": 0,
+            "rect": [
+              53,
+              158,
+              60,
+              98
+            ]
+          },
+          {
+            "key": "body__o3",
+            "owner": "body",
+            "slot": "body",
+            "order": 3,
+            "seq": 3,
+            "rect": [
+              73,
+              132,
+              116,
+              124
+            ]
+          },
+          {
+            "key": "body__o4",
+            "owner": "body",
+            "slot": "body",
+            "order": 4,
+            "seq": 9,
+            "rect": [
+              75,
+              20,
+              120,
+              137
+            ]
+          },
+          {
+            "key": "body__o5",
+            "owner": "body",
+            "slot": "body",
+            "order": 5,
+            "seq": 10,
+            "rect": [
+              166,
+              166,
+              50,
+              90
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

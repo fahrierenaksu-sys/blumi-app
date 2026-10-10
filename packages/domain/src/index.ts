@@ -11,6 +11,7 @@ export * from "./avatar/avatarLoadoutCatalog";
 export * from "./avatar/avatarLoadoutRules";
 export * from "./avatar/avatarLoadoutCoercion";
 export * from "./avatar/retiredAvatarItems";
+export * from "./avatar/avatarStills";
 export * from "./roomWorld/roomWorldGeometry";
 export * from "./roomWorld/miniRoomFloor";
 export * from "./roomWorld/roomFloorGrid";

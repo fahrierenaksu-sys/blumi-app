@@ -275,42 +275,7 @@ export function compileAvatar(rig: Rig25, viewName: Avatar25ViewName, itemIds: s
   const layerOfPage = new Map(usedPages.map((page, layer) => [page, layer]))
   const base: number[] = []
   const vertexTotal = meshes.reduce((n, m) => { base.push(n); return n + m.pos.length / 2 }, 0)
-  // the bare legs drawn for what is worn (lab40 wear(): key from the worn trousers and shoes)
-  const legKey = wornLegKey(worn.map((id) => v.items[id].slot))
-  const replacedLegs = new Set<string>()
-  for (const id of worn) {
-    for (const r of v.items[id].mesh.ranges) if (r.legVariant === legKey && r.layer) replacedLegs.add(r.layer)
-  }
-  const entries: DrawEntry[] = []
-  let seq = 0
-  for (const r of v.mesh.ranges) {
-    const pm = bodyPoseMask(r.name, has, v, motion)
-    const leg = r.name === "farLeg" || r.name === "nearLeg" ? r.name : null
-    entries.push({
-      set: 0, start: r.start, count: r.count, mask: leg && replacedLegs.has(leg) ? 0 : pm.mask, frame: pm.frame,
-      order: r.order, seq: seq++, leg,
-      // lab40 setWalkWeights: the torso layer and every item piece take their baked walk weights while walking
-      walkBaked: Boolean(r.walk) && TORSO_RANGES.has(r.name),
-      seat: TORSO_RANGES.has(r.name),
-      seated: r.name === "sit"
-    })
-  }
-  worn.forEach((id, k) => {
-    const item = v.items[id]
-    for (const r of item.mesh.ranges) {
-      const leg = r.layer === "farLeg" || r.layer === "nearLeg" ? r.layer : null
-      // a leg drawing for what is worn is drawn exactly as the body leg it replaces; the others are not drawn
-      const pm = r.legVariant !== undefined
-        ? r.legVariant === legKey && leg ? bodyPoseMask(leg, has, v, motion) : { mask: 0, frame: -1 }
-        : itemPoseMask(r, v, motion)
-      entries.push({
-        set: k + 1, start: r.start, count: r.count, mask: pm.mask, frame: pm.frame, order: r.order, seq: seq++, leg,
-        walkBaked: Boolean(r.walk) && r.legVariant === undefined,
-        seat: item.slot === "bottom" && r.layer === "torso",
-        seated: r.name === "sit"
-      })
-    }
-  })
+  const entries = buildDrawEntries(v, worn, motion, has)
   const n = v.walk.frames.length
   const keys: DrawKey[] = [
     { bit: POSE_BITS.stand, frame: -1, farFront: false, walkWeights: false },
@@ -365,6 +330,91 @@ export function compileAvatar(rig: Rig25, viewName: Avatar25ViewName, itemIds: s
     variants,
     pages: usedPages.map((page) => v.pages[page])
   }
+}
+
+/**
+ * Every drawn range of the body and the worn items with its pose mask and painter's order (doll25 renderOrder):
+ * the one source of draw order for the live renderer and the still baker (tools/avatar25d/bake-stills.mjs).
+ */
+function buildDrawEntries(v: Rig25View, worn: string[], motion: boolean, has: Set<string>): DrawEntry[] {
+  // the bare legs drawn for what is worn (lab40 wear(): key from the worn trousers and shoes)
+  const legKey = wornLegKey(worn.map((id) => v.items[id].slot))
+  const replacedLegs = new Set<string>()
+  for (const id of worn) {
+    for (const r of v.items[id].mesh.ranges) if (r.legVariant === legKey && r.layer) replacedLegs.add(r.layer)
+  }
+  const entries: DrawEntry[] = []
+  let seq = 0
+  for (const r of v.mesh.ranges) {
+    const pm = bodyPoseMask(r.name, has, v, motion)
+    const leg = r.name === "farLeg" || r.name === "nearLeg" ? r.name : null
+    entries.push({
+      set: 0, start: r.start, count: r.count, mask: leg && replacedLegs.has(leg) ? 0 : pm.mask, frame: pm.frame,
+      order: r.order, seq: seq++, leg,
+      // lab40 setWalkWeights: the torso layer and every item piece take their baked walk weights while walking
+      walkBaked: Boolean(r.walk) && TORSO_RANGES.has(r.name),
+      seat: TORSO_RANGES.has(r.name),
+      seated: r.name === "sit"
+    })
+  }
+  worn.forEach((id, k) => {
+    const item = v.items[id]
+    for (const r of item.mesh.ranges) {
+      const leg = r.layer === "farLeg" || r.layer === "nearLeg" ? r.layer : null
+      // a leg drawing for what is worn is drawn exactly as the body leg it replaces; the others are not drawn
+      const pm = r.legVariant !== undefined
+        ? r.legVariant === legKey && leg ? bodyPoseMask(leg, has, v, motion) : { mask: 0, frame: -1 }
+        : itemPoseMask(r, v, motion)
+      entries.push({
+        set: k + 1, start: r.start, count: r.count, mask: pm.mask, frame: pm.frame, order: r.order, seq: seq++, leg,
+        walkBaked: Boolean(r.walk) && r.legVariant === undefined,
+        seat: item.slot === "bottom" && r.layer === "torso",
+        seated: r.name === "sit"
+      })
+    }
+  })
+  return entries
+}
+
+/** One drawn range of the stand pose, in painter's order: whose it is, its order and its triangles (mesh-local). */
+export interface Avatar25StandEntry {
+  /** "body", or the worn rig item id. */
+  owner: string
+  order: number
+  seq: number
+  /** The worn-items key this range is drawn for (a leg drawing owned by an item), else undefined. */
+  legVariant?: string
+  /** The leg layer this range is drawn on (a body leg, or an item piece on it), else null. */
+  leg: "farLeg" | "nearLeg" | null
+  /** Mesh-local triangle indices of this range. */
+  index: number[]
+}
+
+/**
+ * The stand pose's visible ranges for this worn set, sorted exactly as `compileAvatar` draws them (order, then
+ * seq). Pure: the still baker and the still-order test read it, so a still and live frame 0 never drift.
+ */
+export function avatar25StandEntries(rig: Rig25, viewName: Avatar25ViewName, itemIds: string[]): Avatar25StandEntry[] {
+  const v = rig.views[viewName]
+  const motion = compileView(viewName, v).motion !== null
+  const has = new Set(v.mesh.ranges.map((r) => r.name))
+  const worn = itemIds.filter((id) => v.items[id])
+  const meshes = [v.mesh, ...worn.map((id) => v.items[id].mesh)]
+  const ranges = [v.mesh.ranges, ...worn.map((id) => v.items[id].mesh.ranges)]
+  const entries = buildDrawEntries(v, worn, motion, has)
+  const rangeAt = new Map<string, (typeof ranges)[number][number]>()
+  ranges.forEach((list, set) => list.forEach((r) => rangeAt.set(`${set}:${r.start}`, r)))
+  return entries
+    .filter((e) => (e.mask & POSE_BITS.stand) !== 0 && e.frame < 0)
+    .sort((a, b) => a.order - b.order || a.seq - b.seq)
+    .map((e) => ({
+      owner: e.set === 0 ? "body" : worn[e.set - 1]!,
+      order: e.order,
+      seq: e.seq,
+      legVariant: rangeAt.get(`${e.set}:${e.start}`)?.legVariant,
+      leg: e.leg,
+      index: meshes[e.set].index.slice(e.start, e.start + e.count)
+    }))
 }
 
 interface DrawEntry {
