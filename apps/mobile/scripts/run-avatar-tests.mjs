@@ -152,7 +152,9 @@ try {
       resolve(workspaceRoot, "src/features/avatar/stills/avatarStills.test.ts"),
       // still layout and the live-canvas budget (plan 2.2)
       resolve(workspaceRoot, "src/features/avatar/model/avatarStillLayout.test.ts"),
-      resolve(workspaceRoot, "src/features/avatar/model/avatarLiveBudget.test.ts")
+      resolve(workspaceRoot, "src/features/avatar/model/avatarLiveBudget.test.ts"),
+      // AvatarLive's canvas gate: useAvatarLiveSlot as AvatarLive calls it, against the real budget (review A F4)
+      resolve(workspaceRoot, "src/features/avatar/components/useAvatarLiveSlot.test.ts")
     ],
     {
       cwd: workspaceRoot,
