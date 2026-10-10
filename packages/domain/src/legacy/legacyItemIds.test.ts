@@ -2,7 +2,6 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { ECONOMY_CATALOG } from "../economy/economyCatalog"
 import { RESERVED_ROOM_ITEM_IDS, ROOM_V3_FURNITURE } from "../economy/roomFurnitureIds"
-import { UNIVERSAL_CORE_ROOM_ECONOMY_CANDIDATES } from "../economy/universalCoreRoomEconomy"
 import {
   BLUMI_R1_RELEASE_CATALOG,
   isReleaseCatalogItemHeld,
@@ -21,6 +20,55 @@ const RETIRED_FLAT_ROOM_IDS = new Set([
   "room_v2_table_round"
 ])
 
+/** The 45 Universal Core candidate IDs removed with their code in X6: kept in the registry forever. */
+const RETIRED_UNIVERSAL_CORE_IDS = [
+  "universal_petal_side_table_a",
+  "universal_cloud_loveseat_a",
+  "universal_orbit_floor_lamp_a",
+  "universal_tidy_work_desk_a",
+  "universal_arc_coffee_table_b",
+  "universal_cloud_accent_chair_b",
+  "universal_round_dining_table_a",
+  "universal_soft_media_console_b",
+  "universal_open_bookshelf_a",
+  "universal_table_lamp_a",
+  "universal_wall_clock_a",
+  "universal_small_tabletop_plant_a",
+  "universal_ceramic_vase_set_a",
+  "universal_books_magazine_stack_a",
+  "universal_tea_coffee_tray_a",
+  "universal_dining_chair_a",
+  "universal_desk_chair_a",
+  "universal_bench_a",
+  "universal_soft_floor_cushion_a",
+  "universal_pet_bed_a",
+  "universal_nightstand_a",
+  "universal_laundry_basket_a",
+  "universal_cushion_set_a",
+  "universal_vanity_table_a",
+  "universal_shoe_cabinet_a",
+  "universal_long_sofa_a",
+  "universal_lounge_armchair_a",
+  "universal_cloud_bed_b",
+  "universal_rounded_wardrobe_a",
+  "universal_soft_coat_stand_a",
+  "universal_soft_pouf_b",
+  "universal_arch_wall_mirror_a",
+  "universal_storage_cabinet_a",
+  "universal_dresser_a",
+  "universal_console_table_a",
+  "universal_large_standing_plant_a",
+  "universal_wall_artwork_a",
+  "universal_ceiling_light_a",
+  "universal_curtain_set_a",
+  "universal_decorative_object_set_a",
+  "universal_small_speaker_a",
+  "universal_rug_a",
+  "universal_full_length_mirror_a",
+  "universal_open_display_shelf_a",
+  "universal_room_divider_a",
+] as const
+
 const ROOM_V3_IDS = ROOM_V3_FURNITURE.map((item) => item.itemId)
 
 test("L14: no new, reserved or kept id is in the legacy registry, and old ids are never reused", () => {
@@ -36,9 +84,11 @@ test("L14: no new, reserved or kept id is in the legacy registry, and old ids ar
 
 test("the room part of the registry holds the six old flat pieces and all 45 universal core candidates", () => {
   for (const id of RETIRED_FLAT_ROOM_IDS) assert.ok(isLegacyItemId(id), id)
-  const universal = UNIVERSAL_CORE_ROOM_ECONOMY_CANDIDATES.map((item) => item.itemId)
-  assert.equal(universal.length, 45)
-  for (const id of universal) assert.ok(isLegacyItemId(id), id)
+  assert.equal(new Set(RETIRED_UNIVERSAL_CORE_IDS).size, 45)
+  for (const id of RETIRED_UNIVERSAL_CORE_IDS) {
+    assert.ok(isLegacyItemId(id), id)
+    assert.equal(ECONOMY_CATALOG.some((item) => item.itemId === id), false, `${id} must never be sold again`)
+  }
   assert.equal(LEGACY_ROOM_ITEM_IDS.length, 51)
 })
 

@@ -92,7 +92,7 @@ test("room storage preserves geometry, surface, and parent-local placement metad
   })
 })
 
-test("room storage normalizes known legacy QA candidate IDs on reopen", () => {
+test("room storage keeps stored item IDs exactly as written on reopen (no alias rewrite)", () => {
   const result = readStoredRoomV2Decor(
     '{"roomShellId":"cozy","placedItems":[{"instanceId":"bed-1","itemId":"room_v2_cozy_bed","x":0.5,"y":0.72,"rotation":"front","geometryVersion":"room-furniture-vnext-25","placementSurface":"floor"},{"instanceId":"chair-1","itemId":"room_vnext_lounge_chair","x":0.61,"y":0.74,"rotation":"left","geometryVersion":"room-furniture-vnext-17","placementSurface":"floor"},{"instanceId":"lamp-1","itemId":"room_vnext_lamp","x":0.72,"y":0.68,"rotation":"right","geometryVersion":"room-furniture-vnext-17","placementSurface":"floor"}]}'
   )
@@ -103,7 +103,7 @@ test("room storage normalizes known legacy QA candidate IDs on reopen", () => {
       roomShellId: "cozy",
       placedItems: [{
         instanceId: "bed-1",
-        itemId: "universal_cloud_bed_b",
+        itemId: "room_v2_cozy_bed",
         x: 0.5,
         y: 0.72,
         rotation: "front",
@@ -111,7 +111,7 @@ test("room storage normalizes known legacy QA candidate IDs on reopen", () => {
         placementSurface: "floor"
       }, {
         instanceId: "chair-1",
-        itemId: "universal_lounge_armchair_a",
+        itemId: "room_vnext_lounge_chair",
         x: 0.61,
         y: 0.74,
         rotation: "left",
@@ -119,7 +119,7 @@ test("room storage normalizes known legacy QA candidate IDs on reopen", () => {
         placementSurface: "floor"
       }, {
         instanceId: "lamp-1",
-        itemId: "universal_orbit_floor_lamp_a",
+        itemId: "room_vnext_lamp",
         x: 0.72,
         y: 0.68,
         rotation: "right",

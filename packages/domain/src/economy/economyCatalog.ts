@@ -1,8 +1,3 @@
-import {
-  resolvePromotedUniversalCoreRoomEconomyItems,
-  UNIVERSAL_CORE_ROOM_PROMOTION_RECORD,
-  type UniversalCoreRoomPromotionRecord
-} from "./universalCoreRoomEconomy"
 import { PRICING_PENDING_PLACEHOLDER_COINS, ROOM_V3_FURNITURE } from "./roomFurnitureIds"
 
 export type EconomyItemType = "avatar" | "room"
@@ -395,14 +390,8 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   ...ROOM_V3_FURNITURE.map(({ itemId, title }) => roomItem(itemId, title, PRICING_PENDING_PLACEHOLDER_COINS))
 ]
 
-export function resolveEconomyCatalog(
-  record: UniversalCoreRoomPromotionRecord | null =
-    UNIVERSAL_CORE_ROOM_PROMOTION_RECORD
-): EconomyCatalogItem[] {
-  return [
-    ...BASE_ECONOMY_CATALOG,
-    ...resolvePromotedUniversalCoreRoomEconomyItems(record)
-  ].map(cloneEconomyCatalogItem)
+export function resolveEconomyCatalog(): EconomyCatalogItem[] {
+  return BASE_ECONOMY_CATALOG.map(cloneEconomyCatalogItem)
 }
 
 export const ECONOMY_CATALOG: readonly EconomyCatalogItem[] =

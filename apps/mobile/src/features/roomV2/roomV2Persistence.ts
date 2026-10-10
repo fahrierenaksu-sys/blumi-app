@@ -1,4 +1,3 @@
-import { normalizeRoomVNextCandidateItemId } from "./roomVNextCandidateIdAdapter"
 import type { PlacedRoomItem, UserRoomDecor } from "./roomV2.types"
 
 const ROOM_V2_DECOR_STORAGE_PREFIX = "@blumi/room_v2/user_room_decor:v2"
@@ -66,10 +65,7 @@ export function readStoredRoomV2Decor(
             }
           : {}),
         roomShellId: parsed.roomShellId,
-        placedItems: parsed.placedItems.map((item) => ({
-          ...item,
-          itemId: normalizeRoomVNextCandidateItemId(item.itemId)
-        }))
+        placedItems: parsed.placedItems.map((item) => ({ ...item }))
       }
     }
   } catch {

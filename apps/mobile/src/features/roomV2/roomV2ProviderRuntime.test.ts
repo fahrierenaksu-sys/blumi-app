@@ -14,9 +14,10 @@ test("QA provider runtime keeps storage and ownership isolated from production",
     inventoryIsReady: false,
     inventoryOwnedItemIds: ["room_v2_legacy_probe"],
     qaOnlyOwnedRoomItemIds: [
-      "universal_orbit_floor_lamp_a",
+      "room_v3_bed_blumi_starter",
       "not_a_catalog_item",
-      "universal_orbit_floor_lamp_a"
+      "universal_orbit_floor_lamp_a",
+      "room_v3_bed_blumi_starter"
     ]
   })
 
@@ -30,7 +31,7 @@ test("QA provider runtime keeps storage and ownership isolated from production",
   )
   assert.deepEqual(qa.ownedRoomItemIds, [
     "room_v2_legacy_probe",
-    "universal_orbit_floor_lamp_a"
+    "room_v3_bed_blumi_starter"
   ])
   assert.equal(qa.inventoryReadyForRoomEdits, true)
 
@@ -40,7 +41,7 @@ test("QA provider runtime keeps storage and ownership isolated from production",
     isDevelopmentRuntime: true,
     inventoryIsReady: false,
     inventoryOwnedItemIds: ["room_v2_legacy_probe"],
-    qaOnlyOwnedRoomItemIds: ["universal_orbit_floor_lamp_a"]
+    qaOnlyOwnedRoomItemIds: ["room_v3_bed_blumi_starter"]
   })
 
   assert.equal(
@@ -62,12 +63,12 @@ test("provider runtime config fails closed for an ownerless scope", () => {
     isDevelopmentRuntime: true,
     inventoryIsReady: false,
     inventoryOwnedItemIds: [],
-    qaOnlyOwnedRoomItemIds: ["universal_orbit_floor_lamp_a"]
+    qaOnlyOwnedRoomItemIds: ["room_v3_bed_blumi_starter"]
   })
 
   assert.equal(result.storageKey, null)
   assert.equal(result.migrationMarkerKey, null)
-  assert.deepEqual(result.ownedRoomItemIds, ["universal_orbit_floor_lamp_a"])
+  assert.deepEqual(result.ownedRoomItemIds, ["room_v3_bed_blumi_starter"])
   assert.equal(result.inventoryReadyForRoomEdits, true)
 })
 
@@ -110,13 +111,14 @@ test("an explicitly authorized native UI QA runtime can persist isolated candida
     inventoryIsReady: false,
     inventoryOwnedItemIds: [],
     qaOnlyOwnedRoomItemIds: [
-      "universal_cloud_loveseat_a",
+      "room_v3_bed_blumi_starter",
+      "room_v3_bed_blumi_starter",
       "universal_cloud_loveseat_a",
       "not_a_catalog_item"
     ]
   })
 
-  assert.deepEqual(result.ownedRoomItemIds, ["universal_cloud_loveseat_a"])
+  assert.deepEqual(result.ownedRoomItemIds, ["room_v3_bed_blumi_starter"])
   assert.equal(result.inventoryReadyForRoomEdits, true)
   assert.equal(
     result.storageKey,
@@ -132,7 +134,7 @@ test("an unauthorized Release runtime cannot gain QA ownership", () => {
     isQaRuntimeAuthorized: false,
     inventoryIsReady: false,
     inventoryOwnedItemIds: [],
-    qaOnlyOwnedRoomItemIds: ["universal_cloud_loveseat_a"]
+    qaOnlyOwnedRoomItemIds: ["room_v3_bed_blumi_starter"]
   })
 
   assert.deepEqual(result.ownedRoomItemIds, [])
@@ -177,13 +179,11 @@ test("full-wave QA ownership never leaks the onboarding starter bed", () => {
     isQaRuntimeAuthorized: true,
     inventoryIsReady: false,
     inventoryOwnedItemIds: [],
-    qaOnlyOwnedRoomItemIds: ["universal_cloud_loveseat_a"],
+    qaOnlyOwnedRoomItemIds: ["room_v3_bed_blumi_starter", "universal_cloud_loveseat_a"],
     allowStarterOnboardingEdits: false,
     isVNextRuntimeProof: false,
     excludedRoomItemIds: ["room_v3_bed_blumi_starter"]
   })
 
-  assert.deepEqual(result.ownedRoomItemIds, ["universal_cloud_loveseat_a"])
-  assert.ok(!result.ownedRoomItemIds.includes("room_v3_bed_blumi_starter"))
-  assert.equal(result.inventoryReadyForRoomEdits, true)
+  assert.deepEqual(result.ownedRoomItemIds, [])
 })
