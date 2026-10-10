@@ -82,7 +82,7 @@ test("room onboarding can place only the free starter bed before inventory hydra
     qaOnlyOwnedRoomItemIds: []
   })
 
-  assert.ok(result.ownedRoomItemIds.includes("room_v2_cozy_bed"))
+  assert.ok(result.ownedRoomItemIds.includes("room_v3_bed_blumi_starter"))
   assert.equal(result.inventoryReadyForRoomEdits, true)
 })
 
@@ -151,7 +151,7 @@ test("VNext QA owns the starter bed only in its isolated namespace", () => {
     isVNextRuntimeProof: true
   })
 
-  assert.deepEqual(qa.ownedRoomItemIds, ["room_v2_cozy_bed"])
+  assert.deepEqual(qa.ownedRoomItemIds, ["room_v3_bed_blumi_starter"])
   assert.equal(qa.inventoryReadyForRoomEdits, true)
 
   const production = resolveRoomV2ProviderRuntimeConfig({
@@ -180,10 +180,10 @@ test("full-wave QA ownership never leaks the onboarding starter bed", () => {
     qaOnlyOwnedRoomItemIds: ["universal_cloud_loveseat_a"],
     allowStarterOnboardingEdits: false,
     isVNextRuntimeProof: false,
-    excludedRoomItemIds: ["room_v2_cozy_bed"]
+    excludedRoomItemIds: ["room_v3_bed_blumi_starter"]
   })
 
   assert.deepEqual(result.ownedRoomItemIds, ["universal_cloud_loveseat_a"])
-  assert.ok(!result.ownedRoomItemIds.includes("room_v2_cozy_bed"))
+  assert.ok(!result.ownedRoomItemIds.includes("room_v3_bed_blumi_starter"))
   assert.equal(result.inventoryReadyForRoomEdits, true)
 })

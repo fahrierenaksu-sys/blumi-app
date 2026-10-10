@@ -31,6 +31,7 @@ import {
   validateRoomV2FurniturePlacement
 } from "../features/roomV2/roomV2Selectors"
 import {
+  canCompleteRoomSetup,
   hasPlacedStarterBed,
   placeStarterBed,
   rotateStarterBed,
@@ -145,6 +146,13 @@ export function RoomSetupScreen({
       candidate
     }).isValid
   }, [starterBed, userRoomDecor])
+  // until the starter bed's art lands the step finishes on the empty default room
+  const canComplete = canCompleteRoomSetup({
+    decor: userRoomDecor,
+    defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID,
+    starterBedAvailable: Boolean(starterBed),
+    placedBedIsValid: starterRoomReady
+  })
   const roomTaskCardMinHeight = getRoomSetupTaskCardMinHeight(
     setupMetrics.compact,
     starterRoomReady
@@ -379,7 +387,7 @@ export function RoomSetupScreen({
         void onComplete(onboardingDecor).catch(() => undefined)
       }}
       primaryActionBusy={isSubmitting}
-      primaryActionDisabled={busy || !starterRoomReady}
+      primaryActionDisabled={busy || !canComplete}
       primaryActionLabel={completionLabel ?? copy.completionLabel}
       primaryActionTestID="room-setup-submit"
       reduceMotion={reduceMotion}

@@ -1,7 +1,11 @@
 import type { RoomWorldPoint } from "../roomWorld/roomWorldGeometry"
 import type { RoomFurnitureRotation, UserRoomDecor } from "./roomV2.types"
 
-export const STARTER_ROOM_BED_ITEM_ID = "room_v2_cozy_bed"
+/**
+ * The one free starter bed (a new canonical id, reserved in the domain catalog). The default room holds only this bed.
+ * Its art lands later; until then no room catalog entry draws it and the default room is the empty shell.
+ */
+export const STARTER_ROOM_BED_ITEM_ID = "room_v3_bed_blumi_starter"
 export const STARTER_ROOM_BED_DEFAULT_POINT: RoomWorldPoint = Object.freeze({
   x: 0.52,
   y: 0.7
@@ -67,4 +71,18 @@ export function hasPlacedStarterBed(decor: UserRoomDecor): boolean {
     decor.placedItems.length === 1 &&
     decor.placedItems[0]?.itemId === STARTER_ROOM_BED_ITEM_ID
   )
+}
+
+/**
+ * Whether the room setup step can finish: with a drawable starter bed it must be placed (the caller also checks the
+ * spot is valid); while the bed has no art the step finishes on the empty default room.
+ */
+export function canCompleteRoomSetup(input: {
+  decor: UserRoomDecor
+  defaultRoomShellId: string
+  starterBedAvailable: boolean
+  placedBedIsValid: boolean
+}): boolean {
+  if (input.decor.roomShellId !== input.defaultRoomShellId) return false
+  return input.starterBedAvailable ? hasPlacedStarterBed(input.decor) && input.placedBedIsValid : true
 }

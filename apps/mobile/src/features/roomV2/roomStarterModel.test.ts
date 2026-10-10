@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  canCompleteRoomSetup,
   STARTER_ROOM_BED_DEFAULT_POINT,
   STARTER_ROOM_BED_ITEM_ID,
   createStarterRoomDecor,
@@ -90,4 +91,23 @@ test("starter readiness requires exactly one placed bed", () => {
     ...placed,
     placedItems: [...placed.placedItems, { ...placed.placedItems[0], instanceId: "duplicate" }]
   }), false)
+})
+
+test("room setup finishes on the empty default room while the starter bed has no art", () => {
+  const empty = createStarterRoomDecor("room-shell")
+  assert.equal(canCompleteRoomSetup({
+    decor: empty, defaultRoomShellId: "room-shell", starterBedAvailable: false, placedBedIsValid: false
+  }), true)
+  assert.equal(canCompleteRoomSetup({
+    decor: createStarterRoomDecor("other-shell"), defaultRoomShellId: "room-shell", starterBedAvailable: false, placedBedIsValid: false
+  }), false)
+})
+
+test("with a drawable starter bed, room setup waits for the bed on a valid spot", () => {
+  const empty = createStarterRoomDecor("room-shell")
+  const placed = placeStarterBed(empty, { x: 0.5, y: 0.7 })
+  const base = { defaultRoomShellId: "room-shell", starterBedAvailable: true }
+  assert.equal(canCompleteRoomSetup({ ...base, decor: empty, placedBedIsValid: false }), false)
+  assert.equal(canCompleteRoomSetup({ ...base, decor: placed, placedBedIsValid: false }), false)
+  assert.equal(canCompleteRoomSetup({ ...base, decor: placed, placedBedIsValid: true }), true)
 })

@@ -12,7 +12,7 @@ test("QA-only room ownership is development-only, canonical, deduplicated, and i
     "not_a_catalog_item",
     "  ",
     "universal_table_lamp_a",
-    "room_v2_cozy_bed"
+    "room_v3_bed_blumi_starter"
   ]
   assert.deepEqual(
     resolveRoomV2QaOwnedItemIds({
@@ -39,13 +39,13 @@ test("QA-only room ownership is development-only, canonical, deduplicated, and i
     "universal_wall_clock_a",
     "universal_cloud_sectional_sofa_a",
     "universal_table_lamp_a",
-    "room_v2_cozy_bed"
+    "room_v3_bed_blumi_starter"
   ])
   candidates[0] = "mutated"
   assert.deepEqual(ids, [
     "universal_wall_clock_a",
     "universal_cloud_sectional_sofa_a",
     "universal_table_lamp_a",
-    "room_v2_cozy_bed"
+    "room_v3_bed_blumi_starter"
   ])
 })
