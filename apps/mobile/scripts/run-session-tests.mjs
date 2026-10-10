@@ -168,6 +168,7 @@ try {
       "src/features/session/setupFlow/setupFlowCopy.test.ts",
       "src/features/session/setupFlow/setupStaticExperience.test.ts",
       "src/features/profile/profileViewModel.test.ts",
+      "src/features/profile/profileAvatarInput.test.ts",
       "src/screens/youScreenFirstFrame.test.ts",
       "src/features/settings/settingsCopy.test.ts",
       "src/features/settings/settingsPresentationModel.test.ts",

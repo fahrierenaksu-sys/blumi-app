@@ -10,7 +10,7 @@ import {
 import { PageSafeArea as SafeAreaView, PageScrollContent } from "../ui/layout/PageContainer"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
-import { MyAvatar } from "../ui/myAvatar"
+import { ProfileEditAvatar } from "../features/profile/ProfileEditAvatar"
 import { SoftBlobBackground } from "../ui/backgrounds"
 import { LinearGradient } from "../ui/linearGradient"
 import { TopBar } from "../ui/primitives"
@@ -57,7 +57,6 @@ type ProfileEditScreenProps = NativeStackScreenProps<
   currentAvatarBodyId?: string
   currentInterests?: string[]
   currentPrompts?: UserProfilePrompt[]
-  currentUserId: string
   onSave: (input: UpdateSessionProfileInput) => Promise<void>
 }
 
@@ -79,7 +78,6 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
     currentAvatarBodyId,
     currentInterests,
     currentPrompts,
-    currentUserId,
     onSave
   } = props
   const [displayName, setDisplayName] = useState(currentDisplayName)
@@ -190,15 +188,8 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
   useProfileEditExitGuard({ enabled: shouldConfirmProfileEditExit({ hasChanges, isSaving, saved }), navigation, copy })
   const discoveryCopy = copy
   const avatarPreview = useMemo(
-    () => (
-      <MyAvatar
-        name={displayName || "?"}
-        seed={currentUserId}
-        size={110}
-        ring="strong"
-      />
-    ),
-    [currentUserId, displayName]
+    () => <ProfileEditAvatar name={displayName || "?"} />,
+    [displayName]
   )
 
   const toggleDiscoveryGender = useCallback((option: DiscoveryGender) => {

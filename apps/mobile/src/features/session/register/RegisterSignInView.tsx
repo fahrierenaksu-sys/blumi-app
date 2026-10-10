@@ -16,7 +16,8 @@ import { AppKeyboardAvoidingView, useKeyboardOpenAmount } from "../../../ui/keyb
 import { PrimaryButton } from "../../../ui/primitives"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
 import type { UserAvatar } from "../../avatarV2/avatarV2.types"
-import { AvatarPreview2D } from "../../avatarV2/components/AvatarPreview2D"
+import { AvatarStill } from "../../avatar/components/AvatarStill"
+import { avatarInputFromDraft } from "../../profile/profileAvatarInput"
 import {
   getAccountRecoveryCopy,
   type AccountRecoveryLocale
@@ -91,19 +92,18 @@ export function RegisterSignInView({
   // Closing the keyboard brings the page back to its top (top bar and hero).
   const keyboardOpen = useKeyboardOpenAmount()
   const { scrollRef, onScroll } = useSetupKeyboardScrollReturn(keyboardOpen)
-  const signInAvatar = useMemo(
-    () => (
-      <AvatarPreview2D
-        animationState="idle_front"
-        avatar={createFlowAvatar ?? undefined}
-        showGlow={false}
-        size={createHeroAvatarSize}
-        stageHeight={createHeroStageHeight}
-        themeTone="entry"
+  const signInAvatar = useMemo(() => {
+    const input = avatarInputFromDraft(createFlowAvatar)
+    return (
+      <AvatarStill
+        loadout={input.loadout}
+        hints={input.hints}
+        crop="half"
+        width={createHeroAvatarSize}
+        height={createHeroStageHeight}
       />
-    ),
-    [createFlowAvatar, createHeroAvatarSize, createHeroStageHeight]
-  )
+    )
+  }, [createFlowAvatar, createHeroAvatarSize, createHeroStageHeight])
   const fallbackHeading = resolveFallbackHeadingCopy(
     isCodeStep,
     register.codeRequestStatus,

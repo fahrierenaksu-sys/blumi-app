@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import Reanimated, { useAnimatedStyle, useFrameCallback, useSharedValue, withDelay, withTiming } from "react-native-reanimated"
 import { AVATAR_STILL_MANIFEST, resolveAvatarStillLayers, type AvatarLoadoutCoercionHints } from "@blumi/domain"
@@ -16,6 +16,9 @@ const PIXEL_RATIO_CAP_ABOVE_PT = 250
 const PIXEL_RATIO_CAP = 2
 const CROSS_FADE_MS = 160
 const POSE_STAND = AVATAR25_POSES.indexOf("stand")
+const POSE_WAVE = AVATAR25_POSES.indexOf("wave")
+/** A tap-triggered wave (`waveSignal`) plays this long, then the hero stands again (ms). */
+const HERO_WAVE_MS = 1800
 
 export interface AvatarHeroProps {
   loadout: unknown
@@ -30,6 +33,8 @@ export interface AvatarHeroProps {
   liveScope?: AvatarLiveScope
   liveActive?: boolean
   reduceMotion?: boolean
+  /** Changes each time the hero should wave once (a tap); 0 or unchanged = no wave. Only the live canvas waves. */
+  waveSignal?: number
   style?: StyleProp<ViewStyle>
   accessibilityLabel?: string
 }
@@ -95,6 +100,7 @@ export const AvatarHero = memo(function AvatarHero(props: AvatarHeroProps) {
             instances={instances}
             rig={spec.rig}
             reduceMotion={reduceMotion}
+            waveSignal={props.waveSignal ?? 0}
             maxPixelRatio={height > PIXEL_RATIO_CAP_ABOVE_PT ? PIXEL_RATIO_CAP : undefined}
             onReady={onReady}
             onError={onError}
@@ -110,6 +116,7 @@ function HeroCanvas(props: {
   instances: Avatar25Instance[]
   rig: Avatar25Instance["rig"]
   reduceMotion: boolean
+  waveSignal: number
   maxPixelRatio?: number
   onReady: () => void
   onError: (error: Error) => void
@@ -122,9 +129,23 @@ function HeroCanvas(props: {
   const breath = AVATAR_RIG_DATA[props.rig ?? "female"].views.front.breath
   const breathes = !props.reduceMotion && (breath?.poses.includes("stand") ?? false)
   const fadeS = breath?.fadeS ?? 0
+  const firstSignal = useRef(props.waveSignal)
+  useEffect(() => {
+    // a changed signal starts one wave (the frame callback stamps its start and ends it); never under Reduce Motion
+    if (props.reduceMotion || props.waveSignal === firstSignal.current) return
+    firstSignal.current = props.waveSignal
+    waveStartMs.value = -1
+    pose.value = POSE_WAVE
+  }, [pose, props.reduceMotion, props.waveSignal, waveStartMs])
   useFrameCallback((info) => {
     "worklet"
-    const next = stepBreathWeight(breathWeight.value, breathes, (info.timeSincePreviousFrame ?? 16.7) / 1000, fadeS)
+    const waving = pose.value === POSE_WAVE
+    if (waving && waveStartMs.value < 0) waveStartMs.value = info.timestamp
+    else if (waving && info.timestamp - waveStartMs.value > HERO_WAVE_MS) {
+      pose.value = POSE_STAND
+      waveStartMs.value = -1
+    }
+    const next = stepBreathWeight(breathWeight.value, breathes && !waving, (info.timeSincePreviousFrame ?? 16.7) / 1000, fadeS)
     if (next !== breathWeight.value) breathWeight.value = next
   })
   return (

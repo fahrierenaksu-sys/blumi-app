@@ -10,16 +10,21 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets"
 import { hapticSuccess } from "../../ui/haptics"
 import { animateTo, animateToAfter, useMotion } from "../../ui/motion"
-import { MyAvatar } from "../../ui/myAvatar"
+import { AvatarStill } from "../avatar/components/AvatarStill"
+import { useOwnAvatarLoadout } from "../profile/useOwnAvatarLoadout"
 import { uiTheme } from "../../ui/theme"
 import { getAppLocale } from "./appLocale"
 import { getOnboardingDoneCopy, ONBOARDING_DONE_HOLD_MS } from "./onboardingDoneMomentModel"
 
+/** The full-body still is 645 x 1041 (girl) / 649 x 1053 (boy): the box keeps that shape. */
+const DONE_AVATAR_HEIGHT = 250
+const DONE_AVATAR_WIDTH = 154
+
 /**
  * The "you did it" beat after a new account finishes setting up
- * (onboardingDoneMoment): the person's own chibi lands on a soft veil above
+ * (onboardingDoneMoment): the person's own 2.5D avatar (the baked still) lands on a soft veil above
  * Discover (bouncy spring, success haptic as it lands), the congratulation
- * fades in under it, and after a short hold the veil and chibi dissolve into
+ * fades in under it, and after a short hold the veil and avatar dissolve into
  * Discover, which is already live underneath. A tap anywhere skips it.
  * Reduce Motion: no travel or scale, crossfades only, the haptic stays.
  */
@@ -28,6 +33,7 @@ export function OnboardingDoneMoment({ displayName, onDone }: {
   onDone: () => void
 }) {
   const motion = useMotion()
+  const loadout = useOwnAvatarLoadout()
   const [copy] = useState(() => getOnboardingDoneCopy(getAppLocale(), displayName))
   const veil = useSharedValue(0)
   const arrive = useSharedValue(0)
@@ -38,11 +44,11 @@ export function OnboardingDoneMoment({ displayName, onDone }: {
     const reduced = motion.reduceMotion
     arrive.value = animateToAfter(reduced ? 0 : 80, 1, reduced ? motion.crossfade : motion.bouncy, (finished) => {
       "worklet"
-      // The success tap lands with the chibi.
+      // The success tap lands with the avatar.
       if (finished) scheduleOnRN(hapticSuccess)
     })
     words.value = animateToAfter(reduced ? 0 : 160, 1, motion.fadeIn)
-    // Hold, then the chibi settles into Discover a little faster than it came
+    // Hold, then the avatar settles into Discover a little faster than it came
     // (exits ≈ 0.7× the entrance) while the veil dissolves.
     leave.value = withDelay(ONBOARDING_DONE_HOLD_MS + 320, animateTo(1, reduced ? motion.crossfade : motion.snappy), ReduceMotion.Never)
     veil.value = withSequence(
@@ -84,7 +90,13 @@ export function OnboardingDoneMoment({ displayName, onDone }: {
       >
         <View style={styles.content}>
           <Animated.View style={heroStyle}>
-            <MyAvatar name={displayName} seed={displayName} size={168} ring="strong" />
+            <AvatarStill
+              loadout={loadout}
+              crop="full"
+              width={DONE_AVATAR_WIDTH}
+              height={DONE_AVATAR_HEIGHT}
+              accessibilityLabel={`${displayName} avatar`}
+            />
           </Animated.View>
           <Animated.View style={[styles.words, wordsStyle]}>
             <Text style={styles.headline}>{copy.headline}</Text>

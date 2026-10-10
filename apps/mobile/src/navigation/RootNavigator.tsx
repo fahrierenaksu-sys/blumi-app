@@ -841,7 +841,6 @@ export function RootNavigator() {
                     }
                     currentInterests={sessionActor!.profile.interests}
                     currentPrompts={sessionActor!.profile.prompts}
-                    currentUserId={sessionActor!.profile.userId}
                     onSave={updateSessionProfile}
                   />
                 )}

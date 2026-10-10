@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { useIsFocused } from "@react-navigation/native"
 import { useEffect, useRef } from "react"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
@@ -17,12 +18,12 @@ import { PageSafeArea } from "../../ui/layout/PageContainer"
 import { LinearGradient } from "../../ui/linearGradient"
 import { ActionButtonCircle } from "../../ui/primitives"
 import { uiTheme } from "../../ui/theme"
-import { ProfileChibi, type ProfileChibiHandle } from "./ProfileChibi"
+import { ProfileAvatarHero, type ProfileAvatarHeroHandle } from "./ProfileAvatarHero"
 import type { OwnProfileCopy } from "./profileCopy"
 import { getProfileHeroParallax } from "./profileMotionModel"
 
 export const OWN_PROFILE_HERO_HEIGHT = 430
-const CHIBI_WIDTH = 196
+const AVATAR_WIDTH = 190
 const BLOB_DRIFT_PT = 12
 const BLOB_DRIFT_MS = 5600
 
@@ -36,8 +37,8 @@ const SPARKLES: readonly [number, number, number, number][] = [
 
 /**
  * The own profile's stage: a soft Blumi backdrop with drifting colour blobs,
- * the user's live chibi standing on it, back on the left and Settings (gear)
- * on the right. The chibi trails the scroll (parallax) and the backdrop
+ * the user's live 2.5D avatar standing on it, back on the left and Settings (gear)
+ * on the right. The avatar trails the scroll (parallax) and the backdrop
  * stretches on pull. Every motion runs on the UI thread and stops under
  * Reduce Motion.
  */
@@ -50,7 +51,8 @@ export function OwnProfileHero(props: {
 }) {
   const { copy, displayName, scrollY } = props
   const reduceMotion = useReducedMotion()
-  const chibiRef = useRef<ProfileChibiHandle>(null)
+  const avatarRef = useRef<ProfileAvatarHeroHandle>(null)
+  const focused = useIsFocused()
   const drift = useSharedValue(0)
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export function OwnProfileHero(props: {
     const stretch = getProfileHeroStretch(scrollY.value, reduceMotion)
     return { transform: [{ translateY: stretch.translateY }, { scale: stretch.scale }] }
   })
-  const chibiStyle = useAnimatedStyle(() => {
+  const avatarStyle = useAnimatedStyle(() => {
     const parallax = getProfileHeroParallax(scrollY.value, reduceMotion)
     return { opacity: parallax.opacity, transform: [{ translateY: parallax.translateY }] }
   })
@@ -84,7 +86,7 @@ export function OwnProfileHero(props: {
 
   const cheer = (): void => {
     hapticLight()
-    chibiRef.current?.cheer()
+    avatarRef.current?.cheer()
   }
 
   return (
@@ -122,7 +124,7 @@ export function OwnProfileHero(props: {
         </ActionButtonCircle>
       </PageSafeArea>
 
-      <Animated.View style={[styles.chibiSlot, chibiStyle]}>
+      <Animated.View style={[styles.avatarSlot, avatarStyle]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={copy.heroAvatar(displayName)}
@@ -130,7 +132,7 @@ export function OwnProfileHero(props: {
           onPress={cheer}
           hitSlop={8}
         >
-          <ProfileChibi ref={chibiRef} width={CHIBI_WIDTH} />
+          <ProfileAvatarHero ref={avatarRef} width={AVATAR_WIDTH} active={focused} />
         </Pressable>
       </Animated.View>
     </View>
@@ -209,7 +211,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.85)"
   },
-  chibiSlot: {
+  avatarSlot: {
     position: "absolute",
     left: 0,
     right: 0,

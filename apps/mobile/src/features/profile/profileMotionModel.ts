@@ -4,13 +4,10 @@
  * resting pose, so nothing moves.
  */
 
-/** The avatar rig's frame is 256 × 384. */
-export const PROFILE_CHIBI_ASPECT = 384 / 256
-export const PROFILE_CHIBI_BOB_PT = 4
-export const PROFILE_CHIBI_BOB_MS = 1700
-export const PROFILE_CHIBI_HOP_PT = 22
+/** The full-body still's window (the girl's 645 x 1041 crop) is this much taller than wide. */
+export const PROFILE_AVATAR_ASPECT = 1041 / 645
 
-/** The chibi trails the scroll, so the page slides over it like a stage. */
+/** The avatar trails the scroll, so the page slides over it like a stage. */
 export const PROFILE_HERO_PARALLAX = 0.42
 export const PROFILE_HERO_FADE_DISTANCE = 320
 

@@ -14,7 +14,8 @@ import Animated, {
 
 import { useReducedMotionPreference } from "../../ui/animations"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
-import { AvatarPreview2D } from "../avatarV2/components/AvatarPreview2D"
+import { AvatarStill } from "../avatar/components/AvatarStill"
+import { avatarInputFromDraft } from "../profile/profileAvatarInput"
 import type { UserAvatar } from "../avatarV2/avatarV2.types"
 import {
   PROFILE_CHARACTER_REACTION_ASSET_MODE,
@@ -212,6 +213,7 @@ export function ProfileCharacterReactionStage({
     transform: [{ translateY: -1.5 * breath.value }, { scale: 1 + 0.006 * breath.value }]
   }))
 
+  const avatarInput = useMemo(() => avatarInputFromDraft(avatar, gender), [avatar, gender])
   const characterName = useMemo(
     () => displayName.trim(),
     [displayName]
@@ -237,14 +239,12 @@ export function ProfileCharacterReactionStage({
               motionActive={motionActive}
             />
           ) : (
-            <AvatarPreview2D
-              animationState="idle_front"
-              avatar={avatar}
-              showGlow={false}
-              size={compact ? 132 : 164}
-              stageHeight={compact ? 184 : 220}
-              style={styles.avatarPreview}
-              themeTone="entry"
+            <AvatarStill
+              loadout={avatarInput.loadout}
+              hints={avatarInput.hints}
+              crop="full"
+              width={compact ? 114 : 142}
+              height={compact ? 184 : 220}
             />
           )}
         </Animated.View>
@@ -306,10 +306,6 @@ const styles = StyleSheet.create({
     left: 0,
     position: "absolute",
     top: 0
-  },
-  avatarPreview: {
-    borderRadius: uiTheme.radius.xl,
-    overflow: "hidden"
   },
   meta: {
     alignItems: "center",

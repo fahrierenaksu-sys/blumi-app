@@ -1,16 +1,18 @@
+import { useIsFocused } from "@react-navigation/native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, Text, View } from "react-native"
 import Reanimated, { useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { getProfileHeroStretch } from "../features/discovery/profilePreviewHeroModel"
 import { hapticLight } from "../ui/haptics"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import {
-  CandidateAvatarPreview,
   createCandidateAvatarSnapshot,
   type CandidateAvatarSnapshot
-} from "../components/DiscoverCard"
+} from "../features/avatarV2/candidateAvatarSnapshot"
+import { AvatarHero } from "../features/avatar/components/AvatarHero"
+import { avatarInputFromSelection } from "../features/profile/profileAvatarInput"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { getLobbyReturnStrategy, goBackOrFallback } from "../navigation/rootNavigationModel"
 import { ReportModal } from "../components/ReportModal"
@@ -113,6 +115,19 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
     const stretch = getProfileHeroStretch(scrollY.value, reduceMotion)
     return { transform: [{ translateY: stretch.translateY }, { scale: stretch.scale }] }
   })
+
+  // The one live canvas of this page, only while it is the focused screen; the loadout is what the server sent.
+  const focused = useIsFocused()
+  const avatarInput = useMemo(
+    () => avatarInputFromSelection(profile
+      ? createCandidateAvatarSnapshot({
+        userId: profile.userId,
+        displayName: profile.displayName,
+        avatarSnapshot: profile.avatarSnapshot
+      }).avatarSelection
+      : undefined),
+    [profile]
+  )
 
   if (!profile) return null
   const isProductionDiscovery = props.sessionActor.session.mode === "production"
@@ -302,10 +317,15 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
 
             {/* Giant Avatar */}
             <View style={styles.avatarContainer} pointerEvents="none">
-              <CandidateAvatarPreview
-                snapshot={avatarSnapshot}
-                size={280}
-                stage="profile"
+              <AvatarHero
+                loadout={avatarInput.loadout}
+                hints={avatarInput.hints}
+                width={PROFILE_HERO_AVATAR_WIDTH}
+                height={PROFILE_HERO_AVATAR_HEIGHT}
+                liveScope="screen"
+                liveActive={focused}
+                reduceMotion={reduceMotion}
+                accessibilityLabel={`${profile.displayName} ${avatarSnapshot.label}`}
               />
             </View>
 
@@ -454,6 +474,10 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
   )
 }
 
+/** The hero avatar's box: the full-body still is 645 x 1041, so the width follows the height. */
+const PROFILE_HERO_AVATAR_HEIGHT = 330
+const PROFILE_HERO_AVATAR_WIDTH = Math.round(PROFILE_HERO_AVATAR_HEIGHT * 645 / 1041)
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -513,8 +537,9 @@ const styles = StyleSheet.create({
   avatarContainer: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-    marginTop: 20,
+    justifyContent: "flex-start",
+    // below the nav buttons; the figure's soles end above the name and the info panel
+    paddingTop: 72,
   },
   heroInfoOverlay: {
     position: "absolute",
