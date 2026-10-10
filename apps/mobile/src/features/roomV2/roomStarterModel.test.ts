@@ -7,8 +7,10 @@ import {
   createStarterRoomDecor,
   hasPlacedStarterBed,
   placeStarterBed,
+  resolveRoomSetupSummary,
   rotateStarterBed
 } from "./roomStarterModel"
+import { getRoomSetupCopy } from "./roomSetupCopy"
 
 test("onboarding starts with one standard empty room", () => {
   const decor = createStarterRoomDecor("room-shell")
@@ -110,4 +112,23 @@ test("with a drawable starter bed, room setup waits for the bed on a valid spot"
   assert.equal(canCompleteRoomSetup({ ...base, decor: empty, placedBedIsValid: false }), false)
   assert.equal(canCompleteRoomSetup({ ...base, decor: placed, placedBedIsValid: false }), false)
   assert.equal(canCompleteRoomSetup({ ...base, decor: placed, placedBedIsValid: true }), true)
+})
+
+// Phase 2 closing review M2: until the starter bed has art, the setup step must not tell new users to place a free
+// gift bed that is not on screen.
+test("room setup promises no gift bed while the starter bed is not available", () => {
+  for (const locale of ["tr", "en"] as const) {
+    const copy = getRoomSetupCopy(locale)
+    const withoutBed = resolveRoomSetupSummary({ starterBedAvailable: false, starterRoomReady: false, copy })
+    assert.equal(withoutBed.showGiftBadge, false)
+    assert.ok(withoutBed.text.length > 0)
+    assert.notEqual(withoutBed.text, copy.bedPendingSummary)
+    assert.notEqual(withoutBed.text, copy.bedPlacedSummary)
+    assert.doesNotMatch(withoutBed.text, /Pembe|Pink|Yatak|Bed/i)
+
+    const pending = resolveRoomSetupSummary({ starterBedAvailable: true, starterRoomReady: false, copy })
+    assert.deepEqual(pending, { text: copy.bedPendingSummary, showGiftBadge: true })
+    const placed = resolveRoomSetupSummary({ starterBedAvailable: true, starterRoomReady: true, copy })
+    assert.deepEqual(placed, { text: copy.bedPlacedSummary, showGiftBadge: true })
+  }
 })

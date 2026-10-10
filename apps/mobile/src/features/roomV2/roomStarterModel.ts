@@ -1,5 +1,6 @@
 import type { RoomWorldPoint } from "../roomWorld/roomWorldGeometry"
 import type { RoomFurnitureRotation, UserRoomDecor } from "./roomV2.types"
+import type { RoomSetupCopy } from "./roomSetupCopy"
 
 /**
  * The one free starter bed (a new canonical id, reserved in the domain catalog). The default room holds only this bed.
@@ -71,6 +72,22 @@ export function hasPlacedStarterBed(decor: UserRoomDecor): boolean {
     decor.placedItems.length === 1 &&
     decor.placedItems[0]?.itemId === STARTER_ROOM_BED_ITEM_ID
   )
+}
+
+/**
+ * The summary line under the setup title, and whether the GIFT chip shows. While the starter bed is not available
+ * (Phase 4.7 adds it) no bed and no gift is mentioned: the user gets an empty room, so that is all the text says.
+ */
+export function resolveRoomSetupSummary(input: {
+  starterBedAvailable: boolean
+  starterRoomReady: boolean
+  copy: Pick<RoomSetupCopy, "bedPlacedSummary" | "bedPendingSummary" | "roomOnlySummary">
+}): { text: string; showGiftBadge: boolean } {
+  if (!input.starterBedAvailable) return { text: input.copy.roomOnlySummary, showGiftBadge: false }
+  return {
+    text: input.starterRoomReady ? input.copy.bedPlacedSummary : input.copy.bedPendingSummary,
+    showGiftBadge: true
+  }
 }
 
 /**

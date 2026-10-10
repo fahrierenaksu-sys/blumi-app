@@ -34,6 +34,7 @@ import {
   canCompleteRoomSetup,
   hasPlacedStarterBed,
   placeStarterBed,
+  resolveRoomSetupSummary,
   rotateStarterBed,
   STARTER_ROOM_BED_DEFAULT_POINT,
   STARTER_ROOM_BED_ITEM_ID
@@ -152,6 +153,11 @@ export function RoomSetupScreen({
     defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID,
     starterBedAvailable: Boolean(starterBed),
     placedBedIsValid: starterRoomReady
+  })
+  const setupSummary = resolveRoomSetupSummary({
+    starterBedAvailable: Boolean(starterBed),
+    starterRoomReady,
+    copy
   })
   const roomTaskCardMinHeight = getRoomSetupTaskCardMinHeight(
     setupMetrics.compact,
@@ -416,7 +422,7 @@ export function RoomSetupScreen({
             onItemLongPressRelease={handlePlacedBedLongPressRelease}
             onStagePress={bedSelected || starterRoomReady ? placeBedAtPoint : undefined}
             showDepthWash={false}
-            accessibilityLabel={copy.roomAccessibilityLabel}
+            accessibilityLabel={starterBed ? copy.roomAccessibilityLabel : setupSummary.text}
             style={styles.roomSceneSurface}
             testID="onboarding-room-preview"
           />
@@ -471,14 +477,12 @@ export function RoomSetupScreen({
           <Text accessibilityRole="header" style={styles.roomFirstTitle}>
             {copy.summaryTitle}
           </Text>
-          <Text style={styles.roomFirstDescription}>
-            {starterRoomReady
-              ? copy.bedPlacedSummary
-              : copy.bedPendingSummary}
-          </Text>
-          <View style={styles.giftChip}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.giftChipText}>{copy.giftBadge}</Text>
-          </View>
+          <Text style={styles.roomFirstDescription}>{setupSummary.text}</Text>
+          {setupSummary.showGiftBadge ? (
+            <View style={styles.giftChip}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.giftChipText}>{copy.giftBadge}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={styles.roomFirstStatus}>
           {starterRoomReady ? (

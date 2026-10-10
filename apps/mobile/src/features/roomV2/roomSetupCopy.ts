@@ -8,6 +8,8 @@ export interface RoomSetupCopy {
   readonly giftBadge: string
   readonly bedPlacedSummary: string
   readonly bedPendingSummary: string
+  /** Shown while the starter bed is not available: the room is ready, its furniture comes later. */
+  readonly roomOnlySummary: string
   readonly roomAccessibilityLabel: string
   readonly avatarName: string
   readonly moveBedAccessibilityLabel: string
@@ -41,6 +43,7 @@ const COPY: Record<AppLocale, RoomSetupCopy> = {
     giftBadge: "HEDİYE",
     bedPlacedSummary: "Pembe Bulut Yatak odanda.",
     bedPendingSummary: "Pembe Bulut Yatağı odana yerleştir.",
+    roomOnlySummary: "Odan hazır. Eşyalarını sonra buraya yerleştirebilirsin.",
     roomAccessibilityLabel: "Başlangıç yatağını odaya yerleştir",
     avatarName: "Blumi karakterin",
     moveBedAccessibilityLabel: "Yatağı taşımak için yatağa basılı tutup sürükle",
@@ -73,6 +76,7 @@ const COPY: Record<AppLocale, RoomSetupCopy> = {
     giftBadge: "GIFT",
     bedPlacedSummary: "The Pink Cloud Bed is in your room.",
     bedPendingSummary: "Place the Pink Cloud Bed in your room.",
+    roomOnlySummary: "Your room is ready. You can place furniture here later.",
     roomAccessibilityLabel: "Place the starter bed in the room",
     avatarName: "Your Blumi character",
     moveBedAccessibilityLabel: "Press and hold the bed, then drag to move it",
