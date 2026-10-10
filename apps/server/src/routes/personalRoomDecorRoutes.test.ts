@@ -3,6 +3,14 @@ import test from "node:test"
 import { createAuthService } from "../auth/authService"
 import { createPersonalRoomDecorService } from "../rooms/personalRoomDecorService"
 import { createServer } from "../server"
+import {
+  TEST_ROOM_PAID_ITEM_ID,
+  TEST_ROOM_STARTER_ITEM_ID
+} from "../economy/testRoomCatalog"
+
+// test-only stand-in room catalog: these tests cover sessions, ownership and revisions
+const isTestActiveRoomItemId = (itemId: string) =>
+  itemId === TEST_ROOM_STARTER_ITEM_ID || itemId === TEST_ROOM_PAID_ITEM_ID
 
 test("personal Room decor is available while the owner is completing onboarding", async () => {
   const authService = createAuthService({ codeFactory: () => "482931" })
@@ -10,7 +18,8 @@ test("personal Room decor is available while the owner is completing onboarding"
   await authService.sendCode(phoneNumber)
   const signedIn = await authService.verifyCode(phoneNumber, "482931")
   const personalRoomDecorService = createPersonalRoomDecorService({
-    getOwnedRoomItemIds: async () => ["room_v2_chair_blush"]
+    getOwnedRoomItemIds: async () => [TEST_ROOM_STARTER_ITEM_ID],
+    isActiveRoomItemId: isTestActiveRoomItemId
   })
   const app = createServer({ authService, personalRoomDecorService })
   const headers = {
@@ -20,7 +29,7 @@ test("personal Room decor is available while the owner is completing onboarding"
     roomShellId: "room_v2_shell_blumi_world_v1",
     placedItems: [{
       instanceId: "onboarding-chair",
-      itemId: "room_v2_chair_blush",
+      itemId: TEST_ROOM_STARTER_ITEM_ID,
       x: 0.5,
       y: 0.72,
       rotation: "front"
@@ -66,7 +75,8 @@ test("personal Room decor is authenticated, ownership-bound, and revision-safe",
     await authService.completeOnboardingStep(signedIn.sessionToken, step)
   }
   const personalRoomDecorService = createPersonalRoomDecorService({
-    getOwnedRoomItemIds: async () => ["room_v2_chair_blush"]
+    getOwnedRoomItemIds: async () => [TEST_ROOM_STARTER_ITEM_ID],
+    isActiveRoomItemId: isTestActiveRoomItemId
   })
   const app = createServer({ authService, personalRoomDecorService })
   const headers = {
@@ -76,7 +86,7 @@ test("personal Room decor is authenticated, ownership-bound, and revision-safe",
     roomShellId: "room_v2_shell_blumi_world_v1",
     placedItems: [{
       instanceId: "chair-1",
-      itemId: "room_v2_chair_blush",
+      itemId: TEST_ROOM_STARTER_ITEM_ID,
       x: 0.5,
       y: 0.72,
       rotation: "front"
@@ -125,7 +135,7 @@ test("personal Room decor is authenticated, ownership-bound, and revision-safe",
         ...decor,
         placedItems: [{
           ...decor.placedItems[0],
-          itemId: "room_v2_cozy_bed"
+          itemId: TEST_ROOM_PAID_ITEM_ID
         }]
       }
     }
@@ -144,7 +154,8 @@ test("personal Room routes reject missing sessions and isolate each account's la
   const first = await signIn("+905551110101")
   const second = await signIn("+905551110202")
   const personalRoomDecorService = createPersonalRoomDecorService({
-    getOwnedRoomItemIds: async () => ["room_v2_chair_blush"]
+    getOwnedRoomItemIds: async () => [TEST_ROOM_STARTER_ITEM_ID],
+    isActiveRoomItemId: isTestActiveRoomItemId
   })
   const app = createServer({ authService, personalRoomDecorService })
 
@@ -164,7 +175,7 @@ test("personal Room routes reject missing sessions and isolate each account's la
     roomShellId: "room_v2_shell_blumi_world_v1",
     placedItems: [{
       instanceId: "first-chair",
-      itemId: "room_v2_chair_blush",
+      itemId: TEST_ROOM_STARTER_ITEM_ID,
       x: 0.4,
       y: 0.72,
       rotation: "front"

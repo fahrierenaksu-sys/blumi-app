@@ -5,14 +5,23 @@ import {
   createDefaultEconomyInventory
 } from "./economyRepository"
 import { createEconomyService } from "./economyService"
+import {
+  TEST_ROOM_ECONOMY_CATALOG as catalog,
+  TEST_ROOM_PAID_ITEM_ID,
+  TEST_ROOM_PAID_ITEM_PRICE,
+  TEST_ROOM_STARTER_ITEM_ID
+} from "./testRoomCatalog"
 
 test("complete inventory reads stay authoritative without reconciliation writes", async () => {
   const backing = createInMemoryEconomyRepository()
-  const original = createDefaultEconomyInventory("complete_user")
+  const original = {
+    ...createDefaultEconomyInventory("complete_user"),
+    ownedRoomItemIds: [TEST_ROOM_STARTER_ITEM_ID]
+  }
   await backing.saveInventory(original)
   let reads = 0
   let repairs = 0
-  const service = createEconomyService({ repository: {
+  const service = createEconomyService({ catalog, repository: {
     ...backing,
     async getInventory(userId) {
       reads += 1
@@ -42,7 +51,7 @@ test("missing starter ownership is repaired once without replacing balances", as
   }
   await backing.saveInventory(inventory)
   let repairs = 0
-  const service = createEconomyService({ repository: {
+  const service = createEconomyService({ catalog, repository: {
     ...backing,
     async ensureInventory(input) {
       repairs += 1
@@ -53,13 +62,14 @@ test("missing starter ownership is repaired once without replacing balances", as
   const repaired = await service.getInventory(inventory.userId)
   assert.equal(repaired.coins, 700)
   assert.equal(repaired.coinDebt, 25)
-  assert.deepEqual(repaired.ownedRoomItemIds, ["room_v2_cozy_bed"])
+  assert.deepEqual(repaired.ownedRoomItemIds, [TEST_ROOM_STARTER_ITEM_ID])
   assert.deepEqual(await service.getInventory(inventory.userId), repaired)
   assert.equal(repairs, 1)
 })
 
 test("economy creates a starter inventory once per user", async () => {
   const service = createEconomyService({
+    catalog,
     repository: createInMemoryEconomyRepository()
   })
 
@@ -91,7 +101,7 @@ test("economy creates a starter inventory once per user", async () => {
       "avatar_v2_shoes_milk_tea_court_sneakers"
     )
   )
-  assert.deepEqual(first.ownedRoomItemIds, ["room_v2_cozy_bed"])
+  assert.deepEqual(first.ownedRoomItemIds, [TEST_ROOM_STARTER_ITEM_ID])
 })
 
 test("an active mobile shop garment can be purchased at the server price", async () => {
@@ -139,7 +149,7 @@ test("existing inventories gain current free starter items and legacy replacemen
     ownedRoomItemIds: ["room_v2_cozy_bed"],
     updatedAt: "2026-06-01T00:00:00.000Z"
   })
-  const service = createEconomyService({ repository })
+  const service = createEconomyService({ catalog, repository })
 
   const inventory = await service.getInventory(
     "returning_user",
@@ -172,8 +182,9 @@ test("existing inventories gain current free starter items and legacy replacemen
       "avatar_v2_bottom_male_navy_straight_pants"
     )
   )
-  assert.ok(inventory.ownedRoomItemIds.includes("room_v2_cozy_bed"))
-  assert.deepEqual(inventory.ownedRoomItemIds, ["room_v2_cozy_bed"])
+  // the retired old bed stays in the row but is read past; the current free starter is granted
+  assert.deepEqual(inventory.ownedRoomItemIds, [TEST_ROOM_STARTER_ITEM_ID])
+  assert.ok((await repository.getInventory("returning_user"))?.ownedRoomItemIds.includes("room_v2_cozy_bed"))
 })
 
 test("purchasing a dress grants its hidden paired bottom", async () => {
@@ -238,8 +249,8 @@ test("starter reconciliation preserves a concurrent reward", async () => {
     ownedRoomItemIds: [],
     updatedAt: "2026-07-12T00:00:00.000Z"
   })
-  const firstService = createEconomyService({ repository })
-  const secondService = createEconomyService({ repository })
+  const firstService = createEconomyService({ catalog, repository })
+  const secondService = createEconomyService({ catalog, repository })
 
   await Promise.all([
     firstService.getInventory("reward_user"),
@@ -252,20 +263,20 @@ test("starter reconciliation preserves a concurrent reward", async () => {
 
   assert.equal(inventory.coins, 1275)
   assert.ok(inventory.ownedAvatarItemIds.includes("avatar_v2_body_default"))
-  assert.ok(inventory.ownedRoomItemIds.includes("room_v2_cozy_bed"))
+  assert.ok(inventory.ownedRoomItemIds.includes(TEST_ROOM_STARTER_ITEM_ID))
 })
 
 test("room purchases deduct coins and add room ownership", async () => {
-  const service = createEconomyService()
+  const service = createEconomyService({ catalog })
 
   const result = await service.purchaseItem("user_a", {
     type: "room",
-    itemId: "room_v2_side_table"
+    itemId: TEST_ROOM_PAID_ITEM_ID
   })
 
-  assert.equal(result.priceCoins, 240)
-  assert.equal(result.inventory.coins, 1010)
-  assert.ok(result.inventory.ownedRoomItemIds.includes("room_v2_side_table"))
+  assert.equal(result.priceCoins, TEST_ROOM_PAID_ITEM_PRICE)
+  assert.equal(result.inventory.coins, 1250 - TEST_ROOM_PAID_ITEM_PRICE)
+  assert.ok(result.inventory.ownedRoomItemIds.includes(TEST_ROOM_PAID_ITEM_ID))
 })
 
 test("unpromoted Universal Core room products are unavailable to direct server purchases", async () => {
@@ -461,4 +472,31 @@ test("held pricing-pending furniture, the reserved starter bed and legacy ids ca
   const inventory = await service.getInventory("held_user")
   assert.equal(inventory.coins, 1250)
   assert.equal(inventory.ownedRoomItemIds.some((id) => id.startsWith("room_v3_")), false)
+})
+
+test("retired room ids are refused for purchase and left out of the inventory read without a row write", async () => {
+  const repository = createInMemoryEconomyRepository()
+  await repository.saveInventory({
+    userId: "legacy_user",
+    coins: 900,
+    coinDebt: 0,
+    ownedAvatarItemIds: [],
+    ownedRoomItemIds: ["room_v2_table_round", "room_v2_cozy_bed", TEST_ROOM_STARTER_ITEM_ID],
+    updatedAt: "2026-07-01T00:00:00.000Z"
+  })
+  const service = createEconomyService({ catalog, repository })
+  for (const itemId of ["room_v2_side_table", "room_v2_lamp_heart"]) {
+    await assert.rejects(
+      () => service.purchaseItem("legacy_user", { type: "room", itemId }),
+      /not available/i,
+      itemId
+    )
+  }
+  const inventory = await service.getInventory("legacy_user")
+  assert.deepEqual(inventory.ownedRoomItemIds, [TEST_ROOM_STARTER_ITEM_ID])
+  assert.equal(inventory.coins, 900)
+  assert.deepEqual(
+    (await repository.getInventory("legacy_user"))?.ownedRoomItemIds,
+    ["room_v2_table_round", "room_v2_cozy_bed", TEST_ROOM_STARTER_ITEM_ID]
+  )
 })

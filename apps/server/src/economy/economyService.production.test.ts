@@ -32,7 +32,7 @@ const purchases = [
 })()
 `
 
-test("production economy sells receipted women's, men's and home items and refuses held or retired ones", () => {
+test("production economy sells receipted women's and men's items and refuses held, retired and retired room ones", () => {
   const output = execFileSync(process.execPath, ["-e", PRODUCTION_PURCHASE_SCRIPT], {
     encoding: "utf8",
     env: {
@@ -47,8 +47,8 @@ test("production economy sells receipted women's, men's and home items and refus
   assert.equal(results.female_dress?.purchasedItemId, "avatar_v2_top_boho_patchwork_maxi_dress")
   assert.ok(results.female_dress?.owned?.includes("avatar_v2_bottom_boho_patchwork_maxi_dress"))
   assert.equal(results.male_top?.purchasedItemId, "avatar_v2_top_male_tonal_geometric_camp_collar_shirt")
-  assert.equal(results.room?.purchasedItemId, "room_v2_cute_bookshelf")
-  assert.ok(results.room?.owned?.includes("room_v2_cute_bookshelf"))
+  // the old flat furniture is in the legacy registry: never sold again, even while its receipt still exists
+  assert.equal(results.room?.error, "That shop item is not available.")
   assert.equal(results.held?.error, "That shop item is not available.")
   assert.equal(results.retired?.error, "That shop item is not available.")
 })

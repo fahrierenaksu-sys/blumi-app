@@ -7,6 +7,11 @@ import {
 } from "@blumi/domain"
 import { createAuthService, type AuthService } from "../auth/authService"
 import { createEconomyService } from "../economy/economyService"
+import {
+  TEST_ROOM_ECONOMY_CATALOG,
+  TEST_ROOM_PAID_ITEM_ID,
+  TEST_ROOM_STARTER_ITEM_ID
+} from "../economy/testRoomCatalog"
 import { createReferralService } from "../referrals/referralService"
 import { createServer } from "../server"
 
@@ -19,7 +24,7 @@ const CODE = "482931"
 const FEMALE_TOP = "avatar_v2_top_sage_ribbon_knit_jacket" // 410 coins
 const CHEAP_TOP = "avatar_v2_top_rosebud_picnic_peplum" // 80 coins
 const MALE_TOP = "avatar_v2_top_male_tonal_geometric_camp_collar_shirt"
-const ROOM_ITEM = "room_v2_side_table" // 240 coins
+const ROOM_ITEM = TEST_ROOM_PAID_ITEM_ID // 240 coins (test-only stand-in; no live room piece is sellable yet)
 const STARTER_COINS = 1250
 const ROOM_SHELL = "room_v2_shell_blumi_world_v1"
 
@@ -54,7 +59,7 @@ async function onboardedAccount(authService: AuthService, options: { onboard?: b
 
 function harness() {
   const authService = createAuthService({ codeFactory: () => CODE })
-  const economyService = createEconomyService()
+  const economyService = createEconomyService({ catalog: TEST_ROOM_ECONOMY_CATALOG })
   const referralService = createReferralService()
   const app = createServer({ authService, economyService, referralService })
   return { app, authService, economyService }
@@ -122,7 +127,9 @@ test("A4 unknown, cross-category, default-owned, retired and wrong-body items ar
     { itemId: FEMALE_TOP, type: "room", error: /not available/i },
     { itemId: ROOM_ITEM, type: "avatar", error: /not available/i },
     { itemId: "avatar_v2_top_default", type: "avatar", error: /already own/i },
-    { itemId: "room_v2_cozy_bed", type: "room", error: /already own/i },
+    { itemId: TEST_ROOM_STARTER_ITEM_ID, type: "room", error: /already own/i },
+    { itemId: "room_v2_cozy_bed", type: "room", error: /not available/i },
+    { itemId: "room_v3_sofa_japon_cream", type: "room", error: /not available/i },
     { itemId: "avatar_v2_top_locked_luxe", type: "avatar", error: /not available/i },
     { itemId: MALE_TOP, type: "avatar", error: /does not fit/i },
     { itemId: "", type: "avatar", error: /choose a shop item/i },
@@ -314,7 +321,7 @@ test("A11 room decor rejects unowned, other-account, duplicate, out-of-bounds, o
   const owner = await onboardedAccount(authService)
   const user = await onboardedAccount(authService)
   assert.equal((await app.inject({ method: "POST", url: "/v1/economy/purchase", headers: owner.headers, payload: { itemId: ROOM_ITEM, type: "room" } })).statusCode, 201)
-  const placed = (overrides: Record<string, unknown> = {}) => ({ instanceId: "a", itemId: "room_v2_cozy_bed", x: 0.5, y: 0.5, rotation: "front", ...overrides })
+  const placed = (overrides: Record<string, unknown> = {}) => ({ instanceId: "a", itemId: TEST_ROOM_STARTER_ITEM_ID, x: 0.5, y: 0.5, rotation: "front", ...overrides })
   const put = (payload: unknown) => app.inject({
     method: "PUT", url: "/v1/users/me/room-decor",
     headers: { ...user.headers, "content-type": "application/json" },
@@ -376,7 +383,7 @@ test("A12 twenty concurrent room saves with the same revision produce exactly on
   const responses = await Promise.all(Array.from({ length: 20 }, (_, index) =>
     app.inject({
       method: "PUT", url: "/v1/users/me/room-decor", headers: user.headers,
-      payload: { expectedRevision: 0, decor: { roomShellId: ROOM_SHELL, placedItems: [{ instanceId: "bed", itemId: "room_v2_cozy_bed", x: index / 20, y: 0.5, rotation: "front" }] } }
+      payload: { expectedRevision: 0, decor: { roomShellId: ROOM_SHELL, placedItems: [{ instanceId: "bed", itemId: TEST_ROOM_STARTER_ITEM_ID, x: index / 20, y: 0.5, rotation: "front" }] } }
     })
   ))
   assert.equal(responses.filter((response) => response.statusCode === 200).length, 1)

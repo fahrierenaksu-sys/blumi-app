@@ -11,6 +11,7 @@ import { createPostgresEconomyRepository } from "../db/postgresEconomyRepository
 import { createPostgresPersonalRoomDecorRepository } from "../db/postgresPersonalRoomDecorRepository"
 import { createPostgresReferralRepository } from "../db/postgresReferralRepository"
 import { createEconomyService } from "../economy/economyService"
+import { TEST_ROOM_ECONOMY_CATALOG, TEST_ROOM_STARTER_ITEM_ID } from "../economy/testRoomCatalog"
 import { createReferralService } from "../referrals/referralService"
 import { createPersonalRoomDecorService } from "../rooms/personalRoomDecorService"
 import { createServer } from "../server"
@@ -47,10 +48,14 @@ function harness() {
     otpHmacSecret: process.env.BLUMI_OTP_HMAC_SECRET,
     smsProvider: createDevelopmentSmsProvider()
   })
-  const economyService = createEconomyService({ repository: createPostgresEconomyRepository(pool) })
+  const economyService = createEconomyService({
+    repository: createPostgresEconomyRepository(pool),
+    catalog: TEST_ROOM_ECONOMY_CATALOG
+  })
   const personalRoomDecorService = createPersonalRoomDecorService({
     repository: createPostgresPersonalRoomDecorRepository(pool),
-    getOwnedRoomItemIds: async (userId) => (await economyService.getInventory(userId)).ownedRoomItemIds
+    getOwnedRoomItemIds: async (userId) => (await economyService.getInventory(userId)).ownedRoomItemIds,
+    isActiveRoomItemId: economyService.isActiveRoomItemId
   })
   const app = createServer({
     authService,
@@ -159,7 +164,7 @@ test("PG-A12 twenty concurrent room saves with the same revision produce exactly
   const user = await onboardedAccount(authService)
   const save = (expectedRevision: number, index: number) => app.inject({
     method: "PUT", url: "/v1/users/me/room-decor", headers: user.headers,
-    payload: { expectedRevision, decor: { roomShellId: ROOM_SHELL, placedItems: [{ instanceId: "bed", itemId: "room_v2_cozy_bed", x: index / 20, y: 0.5, rotation: "front" }] } }
+    payload: { expectedRevision, decor: { roomShellId: ROOM_SHELL, placedItems: [{ instanceId: "bed", itemId: TEST_ROOM_STARTER_ITEM_ID, x: index / 20, y: 0.5, rotation: "front" }] } }
   })
   for (const expectedRevision of [0, 1]) {
     const responses = await Promise.all(Array.from({ length: 20 }, (_, index) => save(expectedRevision, index)))

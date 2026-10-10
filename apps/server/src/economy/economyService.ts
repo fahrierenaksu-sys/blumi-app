@@ -1,13 +1,17 @@
 import {
   isAvatarLoadoutItemCompatibleWithBody,
+  isLegacyItemId,
   isReleaseCatalogItemHeld,
   isRetiredAvatarItemId
 } from "@blumi/domain"
+import { isActiveRoomItemIdIn, projectInventoryRoomItems } from "../rooms/roomItemProjection"
 import {
+  ECONOMY_CATALOG,
   findEconomyCatalogItem,
   getDefaultOwnedItemIds,
   getLegacyAvatarReplacementIds,
   STARTER_COIN_BALANCE,
+  type EconomyCatalogItem,
   type EconomyItemType
 } from "./economyCatalog"
 import {
@@ -21,6 +25,8 @@ import { PublicRequestError } from "../errors/publicRequestError"
 
 export interface EconomyService {
   repository: EconomyRepository
+  /** Room items this server sells or grants and that are not retired: placement and the inventory read use it. */
+  isActiveRoomItemId?(itemId: string): boolean
   getInventory(userId: string, now?: Date): Promise<EconomyInventoryRecord>
   purchaseItem(
     userId: string,
@@ -75,41 +81,53 @@ const EVENT_REWARD_COINS = {
 
 export interface CreateEconomyServiceOptions {
   repository?: EconomyRepository
+  /** Defaults to the catalog of this environment (`economyCatalog.ts`); tests and memory QA pass their own. */
+  catalog?: readonly EconomyCatalogItem[]
 }
 
 export function createEconomyService(
   options: CreateEconomyServiceOptions = {}
 ): EconomyService {
+  const catalog = options.catalog ?? ECONOMY_CATALOG
   const repository = options.repository ?? createInMemoryEconomyRepository()
+  const isActiveRoomItemId = isActiveRoomItemIdIn(catalog)
+  const project = (inventory: EconomyInventoryRecord) =>
+    projectInventoryRoomItems(inventory, isActiveRoomItemId)
 
   return {
     repository,
+    isActiveRoomItemId,
     async getInventory(userId, now = new Date()) {
       const existing = await repository.getInventory(userId)
       const requiredAvatarItemIds = [
-        ...getDefaultOwnedItemIds("avatar"),
+        ...getDefaultOwnedItemIds("avatar", catalog),
         ...getLegacyAvatarReplacementIds(
           existing?.ownedAvatarItemIds ?? []
         )
       ]
-      const requiredRoomItemIds = getDefaultOwnedItemIds("room")
+      // a retired default (the old free bed) is no longer granted; rows that hold it are read past
+      const requiredRoomItemIds = getDefaultOwnedItemIds("room", catalog).filter(isActiveRoomItemId)
       if (
         existing &&
         requiredAvatarItemIds.every((itemId) => existing.ownedAvatarItemIds.includes(itemId)) &&
         requiredRoomItemIds.every((itemId) => existing.ownedRoomItemIds.includes(itemId))
       ) {
-        return existing
+        return project(existing)
       }
-      return repository.ensureInventory({
+      return project(await repository.ensureInventory({
         userId,
         starterCoins: STARTER_COIN_BALANCE,
         requiredAvatarItemIds,
         requiredRoomItemIds,
         updatedAt: now.toISOString()
-      })
+      }))
     },
     async purchaseItem(userId, input, now = new Date()) {
       const itemId = normalizeItemId(input.itemId)
+      // a retired id is never sold again: rows that hold it are read past (room part of the legacy registry)
+      if (isLegacyItemId(itemId)) {
+        throw new PublicRequestError("That shop item is not available.")
+      }
       if (input.type === "avatar" && isRetiredAvatarItemId(itemId)) {
         throw new PublicRequestError("That shop item is not available.")
       }
@@ -117,7 +135,7 @@ export function createEconomyService(
       if (isReleaseCatalogItemHeld(itemId)) {
         throw new PublicRequestError("That shop item is not available.")
       }
-      const item = findEconomyCatalogItem(itemId, input.type)
+      const item = findEconomyCatalogItem(itemId, input.type, catalog)
       if (!item) {
         throw new PublicRequestError("That shop item is not available.")
       }
@@ -148,7 +166,7 @@ export function createEconomyService(
         throwPurchaseFailure(currentInventory, item.itemId, input.type)
       }
       return {
-        inventory: cloneInventory(nextInventory),
+        inventory: project(cloneInventory(nextInventory)),
         purchasedItemId: item.itemId,
         type: input.type,
         priceCoins: item.priceCoins
@@ -165,7 +183,7 @@ export function createEconomyService(
         createdAt: now.toISOString()
       })
       return {
-        inventory: cloneInventory(result.inventory),
+        inventory: project(cloneInventory(result.inventory)),
         claimed: result.claimed,
         rewardCoins: result.claimed ? DAILY_REWARD_COINS : 0,
         rewardDate
@@ -190,7 +208,7 @@ export function createEconomyService(
         createdAt: now.toISOString()
       })
       return {
-        inventory: cloneInventory(result.inventory),
+        inventory: project(cloneInventory(result.inventory)),
         claimed: result.claimed,
         rewardCoins: result.claimed ? coins : 0
       }

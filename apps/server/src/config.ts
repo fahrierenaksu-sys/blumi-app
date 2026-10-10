@@ -624,6 +624,7 @@ export function createConfiguredServerServices(
       repository: createPostgresPersonalRoomDecorRepository(pool),
       getOwnedRoomItemIds: async (userId) =>
         (await economyService.getInventory(userId)).ownedRoomItemIds,
+      isActiveRoomItemId: economyService.isActiveRoomItemId,
       roomSnapshotService
     })
     const presenceRepository = createPostgresPresenceRepository(pool)
@@ -758,6 +759,7 @@ export function createConfiguredServerServices(
   const personalRoomDecorService = createPersonalRoomDecorService({
     getOwnedRoomItemIds: async (userId) =>
       (await economyService.getInventory(userId)).ownedRoomItemIds,
+    isActiveRoomItemId: economyService.isActiveRoomItemId,
     roomSnapshotService
   })
   const presenceRepository = createInMemoryPresenceRepository(undefined, {

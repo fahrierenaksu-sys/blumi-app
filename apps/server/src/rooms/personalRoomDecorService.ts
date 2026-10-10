@@ -7,6 +7,7 @@ import {
   type PersonalRoomDecorSnapshot,
   type PersonalRoomRotation
 } from "./personalRoomDecorRepository"
+import { isActiveRoomItemId, projectRoomDecorItems } from "./roomItemProjection"
 import type { RoomSnapshotService } from "./roomSnapshotService"
 
 const MAX_PLACED_ITEMS = 60
@@ -33,16 +34,33 @@ export interface PersonalRoomDecorService {
 export function createPersonalRoomDecorService(options: {
   repository?: PersonalRoomDecorRepository
   getOwnedRoomItemIds(userId: string): Promise<readonly string[]>
+  /** Defaults to the room catalog of this environment minus the retired ids (`roomItemProjection.ts`). */
+  isActiveRoomItemId?: (itemId: string) => boolean
   roomSnapshotService?: RoomSnapshotService
   onRoomSnapshotError?: (error: unknown, room: PersonalRoomDecorSnapshot) => void
 }): PersonalRoomDecorService {
   const repository =
     options.repository ?? createInMemoryPersonalRoomDecorRepository()
+  const isActive = options.isActiveRoomItemId ?? isActiveRoomItemId
 
   return {
     repository,
     async get(userId) {
-      return repository.get(normalizeUserId(userId))
+      const normalizedUserId = normalizeUserId(userId)
+      const stored = await repository.get(normalizedUserId)
+      if (!stored) return null
+      // Read projection: legacy, unknown, held and unowned items are left out; the row and its revision stay as
+      // stored, so the next save with this revision succeeds.
+      const ownedItemIds = new Set(
+        await options.getOwnedRoomItemIds(normalizedUserId)
+      )
+      return {
+        ...stored,
+        decor: projectRoomDecorItems(
+          stored.decor,
+          (itemId) => isActive(itemId) && ownedItemIds.has(itemId)
+        )
+      }
     },
     async save(userId, input, now = new Date()) {
       const normalizedUserId = normalizeUserId(userId)
@@ -53,6 +71,11 @@ export function createPersonalRoomDecorService(options: {
         throw new PublicRequestError("Refresh your room and try again.")
       }
       const decor = normalizePersonalRoomDecor(input.decor)
+      if (decor.placedItems.some((item) => !isActive(item.itemId))) {
+        throw new PublicRequestError(
+          "Your room includes an item that is not available."
+        )
+      }
       const ownedItemIds = new Set(
         await options.getOwnedRoomItemIds(normalizedUserId)
       )

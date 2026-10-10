@@ -199,6 +199,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     createPersonalRoomDecorService({
       getOwnedRoomItemIds: async (userId) =>
         (await economyService.getInventory(userId)).ownedRoomItemIds,
+      isActiveRoomItemId: economyService.isActiveRoomItemId,
       roomSnapshotService
     })
   const capabilityService = options.capabilityService ?? createCapabilityService({
