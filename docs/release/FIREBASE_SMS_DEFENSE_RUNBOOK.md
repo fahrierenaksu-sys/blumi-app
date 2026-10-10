@@ -14,8 +14,12 @@ from the existing provider secret using stdin, without rotating it or
 triggering a deployment. Observer-role SET permission was verified; membership
 does not automatically inherit its grants. Firebase readback confirms Phone
 enabled, ENFORCE, fraud threshold 0.5 and `useSmsBotScore=true`; the field-only
-update preserved SMS fraud protection. Function redeployment and branch/server
-deployment are verified below when complete. Native/real SMS proof remains Open.
+update preserved SMS fraud protection. Both function updates completed and
+read back ACTIVE with dedicated identities, maxInstances 2, concurrency 1,
+hook timeout 6 seconds and gate timeout 15 seconds. Unauthenticated gate
+request returned 401; unsigned provider request returned 400. Native/real SMS
+proof remains Open. Source deployment is verified separately against the Git
+commit actually running in Railway; function success alone does not prove it.
 
 New admission builds require the 073 checksum. Outcome recording is bounded
 background backend work driven by fresh, server-verified phone tokens; there

@@ -93,6 +93,8 @@ SMS fraud ve bot korumasının birlikte kullanımı: https://docs.cloud.google.c
 
 Son üç korumanın doğrulaması: mobil Firebase, doğrulanmış kimlik/başarı gözlemi ve config gruplarında **46 PASS**; migration hazırlık grubunda güncellenen 073 beklentisiyle **5 PASS**. Giriş/kurtarma/yeniden doğrulama ve ortak bütçe API grubunda **30 PASS**. Function paketi **9 PASS**; build, server typecheck ve son diff kontrolü geçti. Son izole PostgreSQL 17 çalışmasında kabul/başarı/risk grubu **19 PASS**, ortak atomik bütçe **1 PASS**; 73 migration sıfırdan ve tekrar uygulandı. Gerçek SMS gönderilmedi. İlk birleşik çalışmadaki eski migration listesi beklentisi düzeltildi; son PostgreSQL çalışması son observer rolü ve migration checksum'unu içerir.
 
+Yayın öncesi tam `npm run verify` çalışması eski, kapatılmış OTP hesap yollarının yeni hassas işlem bütçesini tükettiğini buldu (410 yerine 429). Düzeltme bu yolları Firebase modunda olağan API bütçesinde tutar; oturum sınırı, 410 ve yan etkisiz ret korunur. Aktif Firebase challenge/reauth ve hesap işlemleri sıkı ortak bütçeyi kullanmaya devam eder. Eski yolların aktif hakları tüketemediği regresyonu dahil ilgili API grubu **21 PASS**; migration/checksum kapıları **10 PASS**. İlk toplu verify çalışması başarılı diye sunulmaz; kalan ve son kaynak kontrolleri ayrıca doğrulanır.
+
 ### Son eklenen üç koruma
 
 - Başarı takibi yalnız Firebase Admin tarafından imzası, sağlayıcısı ve iptali kontrol edilmiş, son beş dakikada telefon doğrulaması yapılmış token'dan üretilir. İstemcinin “doğruladım” bildirimi kabul edilmez. `auth_time` ve HMAC ile tekrarlar tekilleştirilir; token yenilemesi yeni başarı veya bütçe iadesi oluşturmaz. Aynı telefondaki yalnız en son uygun SMS işaretlenir. Bu, teslim raporu değil, gözlemlenen başarılı telefon doğrulamasıdır.
@@ -121,4 +123,4 @@ Firebase function paketi yeniden build edilip ayrı deploy edilmeden gate/admiss
 
 Yeni Android aday kimlikleri eski gate sürümünde kayıtlı satır bulunmadığı için reddedilebilir. Geri almada yeni aday kimliğinin doğrulama ve kanıttan sonra kayıt oluşturma desteği korunmalı veya düzeltme ileriye taşınmalıdır; kayıtlı kullanıcı kimlikleri silinmemelidir. Başarısız gönderimde bütçeyi sıfırlamak geri alma yöntemi değildir.
 
-Durum: **Implemented / Tested** yerel yama. **Native verified / Production ready / canlı yayın: Open.**
+Durum: **Implemented / Tested** kaynak. **External verified:** taze yedek/restore, yalnız 073 canlı geçişi, kısıtlı observer rolü, mevcut anahtarın backend ile eşleşmesi, Phone/ENFORCE/0,5 ve bot puanı ayarı, iki ACTIVE function güncellemesi, kanıtsız/imzasız ret. Güncel politika 6 USD/gün, 20 USD/ay, 1.500/gün ve 72 ülke; ledger'da 21 gönderim, sıfır başarı gözlemi, sonuç yaptırımı kapalı. **Native verified / Production ready: Open.** Git kaynak yayını ile gerçekten çalışan Railway commit'i ayrı doğrulanmalıdır.

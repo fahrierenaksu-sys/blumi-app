@@ -338,7 +338,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     : undefined
   app.addHook("onClose", async () => { stopSessionReuseRevocation?.() })
   void app.register(async (instance) => {
-    registerSharedRateBudget(instance, authService, options.sharedRateLimiter ?? createInMemoryRateBudget(), options.authRateLimiter)
+    registerSharedRateBudget(instance, authService, options.sharedRateLimiter ?? createInMemoryRateBudget(), options.authRateLimiter, Boolean(options.firebaseAuthVerifier))
     await registerAuthRoutes(instance, routeServices)
     await registerRealtimeTicketRoutes(instance, {
       authService,

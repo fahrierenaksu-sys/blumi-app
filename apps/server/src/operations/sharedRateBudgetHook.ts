@@ -32,7 +32,7 @@ export function createBudgetRefusalLog(options: {
 
 /** preHandler runs after the existing cheap onRequest/IP limiter. */
 export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService, budget: SharedRateBudget,
-  authBudget: SharedRateBudget = budget): void {
+  authBudget: SharedRateBudget = budget, legacyOtpDisabled = false): void {
   const guardedBudget = cacheRateBudgetRefusals(budget)
   const guardedAuthBudget = cacheRateBudgetRefusals(authBudget)
   // The first refusal of a quiet period is logged at once (its window began
@@ -67,7 +67,7 @@ export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService
     const resolved = await resolveRequestSession(request, auth, token)
     if (!resolved) return
     try {
-      const scope = requestBudgetScope(request.method, request.routeOptions.url)
+      const scope = requestBudgetScope(request.method, request.routeOptions.url, legacyOtpDisabled)
       const result = await (scope === "accountSecurity" ? guardedAuthBudget : guardedBudget).consumeUser(resolved.account.userId, scope)
       if (!result.allowed) recordRefusal(scope)
       if (!result.allowed) return reply.header("Retry-After", String(result.retryAfterSeconds)).code(429)
@@ -81,7 +81,17 @@ export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService
   })
 }
 
-export function requestBudgetScope(method: string, route: string | undefined): UserRateBudgetScope {
+const LEGACY_ACCOUNT_OTP_ROUTES = new Set([
+  "/v1/account/deletion/challenge", "/v1/account/deletion/confirm",
+  "/v1/account/export/challenge", "/v1/account/export/confirm",
+  "/v1/account/phone-change/current/challenge", "/v1/account/phone-change/current/confirm",
+  "/v1/account/phone-change/new/challenge", "/v1/account/phone-change/new/confirm"
+])
+
+export function requestBudgetScope(method: string, route: string | undefined, legacyOtpDisabled = false): UserRateBudgetScope {
+  // Dead Firebase compatibility endpoints still authenticate and use the
+  // ordinary API budget; they cannot consume real account-operation rights.
+  if (legacyOtpDisabled && route && LEGACY_ACCOUNT_OTP_ROUTES.has(route)) return "general"
   if (method === "POST" && route?.startsWith("/v1/account/")) return "accountSecurity"
   if (route === "/v1/devices" && method === "POST") return "deviceRegistration"
   if (route === "/v1/devices" && method === "DELETE") return "deviceRemoval"

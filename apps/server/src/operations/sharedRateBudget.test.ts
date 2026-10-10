@@ -52,6 +52,11 @@ test("sensitive account actions share a verified-user budget even across changin
     firebaseAuthVerifier: { async verifyIdToken() { assert.fail("challenge must not verify tokens") } } }))
   try {
     for (let i = 0; i < 8; i++) {
+      const retired = await apps[i % 2]!.inject({ method: "POST", url: "/v1/account/deletion/challenge",
+        headers: { authorization: `Bearer ${session.sessionToken}` }, payload: {} })
+      assert.equal(retired.statusCode, 410)
+    }
+    for (let i = 0; i < 8; i++) {
       const response = await apps[i % 2]!.inject({ method: "POST", url: "/v1/account/firebase/challenge",
         remoteAddress: `203.0.113.${i + 1}`, headers: { authorization: `Bearer ${session.sessionToken}` },
         payload: { purpose: i % 2 ? "account_data_export" : "phone_change_current" } })
