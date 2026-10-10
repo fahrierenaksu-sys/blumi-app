@@ -209,3 +209,21 @@ test("the editor tray never offers a held piece, even to an owner", () => {
   ]).map((item) => item.id)
   assert.deepEqual(offered, ["standin_room_piece"])
 })
+
+test("the held-piece tray override is the local QA guard's decision and changes nothing else", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- CommonJS fixture loading as above
+  const { resolveRoomEditorTrayCatalog, ROOM_EDITOR_TRAY_CATALOG } = require("./editor/roomEditorTrayCatalog") as typeof import("./editor/roomEditorTrayCatalog")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- CommonJS fixture loading as above
+  const { isReleaseCatalogItemHeld } = require("@blumi/domain") as typeof import("@blumi/domain")
+  const catalog = [{ id: "room_v3_sofa_japon_cream" }, { id: "standin_room_piece" }]
+  assert.deepEqual(
+    resolveRoomEditorTrayCatalog(catalog, { showHeldPieces: false }).map((item) => item.id),
+    ["standin_room_piece"]
+  )
+  assert.deepEqual(
+    resolveRoomEditorTrayCatalog(catalog, { showHeldPieces: true }).map((item) => item.id),
+    ["room_v3_sofa_japon_cream", "standin_room_piece"]
+  )
+  // Node tests, like release bundles, run without a dev build: the shipped tray stays filtered.
+  assert.equal(ROOM_EDITOR_TRAY_CATALOG.some((item) => isReleaseCatalogItemHeld(item.id)), false)
+})
