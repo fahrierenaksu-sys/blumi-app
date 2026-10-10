@@ -260,6 +260,8 @@ try {
       // floor, depth, wall-flush floor-cell footprints, size; without the installed seam the room is unchanged
       "src/features/roomV2/calibration/roomCalibration.test.ts",
       "src/features/roomV2/calibration/roomCalibrationScene.test.ts",
+      // V17: every calibrated walk and seat target passes the server floor rule (@blumi/domain miniRoomFloor)
+      "src/features/roomV2/calibration/roomCalibrationServerFloor.test.ts",
       // Layered furniture (item.json): seated layer order, card split / clip, placement, seats, per-collection
       // catalog ids, bundled layers, cells, rugs, wall pieces per measured wall, a furnished room
       "src/features/roomV2/furniture/layeredFurniture.test.ts",

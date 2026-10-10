@@ -37,3 +37,14 @@ export function getMiniRoomFloorDistance(point: RoomWorldPoint): number {
     return Math.hypot(nearest.x - point.x, nearest.y - point.y)
   }))
 }
+
+/**
+ * How far a seat target may overhang the shared floor (the seat sits on furniture, so its point can lie just
+ * off the walk floor). Receivers resolve the seat itself from its hotspot id.
+ */
+export const MINI_ROOM_SEAT_FLOOR_TOLERANCE = 0.12
+
+/** The server's rule for a seat move target (`miniRoomMotionService.move`). */
+export function isMiniRoomSeatTargetNearFloor(point: RoomWorldPoint): boolean {
+  return getMiniRoomFloorDistance(point) <= MINI_ROOM_SEAT_FLOOR_TOLERANCE
+}

@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto"
 import { miniRoomMoveSchema, type MiniRoomAvatarMotion, type MiniRoomMove, type ServerEvent } from "@blumi/contracts"
-import { getMiniRoomFloorDistance, isPointOnMiniRoomFloor } from "@blumi/domain"
+import {
+  isMiniRoomSeatTargetNearFloor,
+  isPointOnMiniRoomFloor,
+  MINI_ROOM_SEAT_FLOOR_TOLERANCE
+} from "@blumi/domain"
 import type { MiniRoomRecord } from "./miniRoomRepository"
 
 /**
@@ -30,18 +34,14 @@ interface MotionRoom {
 }
 
 /**
- * How far a seat target may lie outside the shared floor (room units). A seat
- * sits on furniture and may overhang the floor edge (a chair at the front
- * edge seats at y≈0.93 against a floor edge of 0.9), but never far from it.
- * The server has no layout of the room's furniture, so this bounds a seat
- * claim to the floor's neighbourhood instead of trusting any point in the
- * unit square (2026-10-02: a modified client could stand on a wall).
+ * A seat target may lie outside the shared floor by MINI_ROOM_SEAT_FLOOR_TOLERANCE (room units, @blumi/domain).
+ * A seat sits on furniture and may overhang the floor edge (a chair at the front edge seats at y≈0.93 against a
+ * floor edge of 0.9), but never far from it. The server has no layout of the room's furniture, so this bounds a
+ * seat claim to the floor's neighbourhood instead of trusting any point in the unit square (2026-10-02: a
+ * modified client could stand on a wall). The rule lives in the domain so the client can test its calibrated
+ * seats against it.
  */
-export const MINI_ROOM_SEAT_FLOOR_TOLERANCE = 0.12
-
-function isSeatTargetNearFloor(point: { x: number; y: number }): boolean {
-  return getMiniRoomFloorDistance(point) <= MINI_ROOM_SEAT_FLOOR_TOLERANCE
-}
+export { MINI_ROOM_SEAT_FLOOR_TOLERANCE }
 
 /**
  * Background re-check age of an occupied room's access (room row plus block
@@ -297,7 +297,7 @@ export function createMiniRoomMotionService(options: {
       // clients still walk. A seat target may overhang it
       // (the seat sits on furniture), within MINI_ROOM_SEAT_FLOOR_TOLERANCE;
       // receivers resolve the seat from hotspotId.
-      if (move.hotspotId ? !isSeatTargetNearFloor(move) : !isPointOnMiniRoomFloor(move)) return
+      if (move.hotspotId ? !isMiniRoomSeatTargetNearFloor(move) : !isPointOnMiniRoomFloor(move)) return
       const entered = rooms.get(move.miniRoomId)?.connections.get(connectionId)
       if (!entered || entered.userId !== userId) return
       const room = await authorize(move.miniRoomId, userId)
