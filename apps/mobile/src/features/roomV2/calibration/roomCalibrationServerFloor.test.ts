@@ -1,6 +1,12 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { isMiniRoomSeatTargetNearFloor, isPointOnMiniRoomFloor } from "@blumi/domain"
+import { isMiniRoomSeatTargetNearFloor, isPointOnMiniRoomFloor, ROOM_BLUMI_WORLD_FLOOR_GRID } from "@blumi/domain"
+import { validateRoomV2FurniturePlacement, resolvePlacedFurnitureRenderItem } from "../roomV2Selectors"
+import type { RoomFurnitureRotation, RoomShell } from "../roomV2.types"
+import { createRoomAvatar25dRoomCalibration } from "./roomAvatar25dRoomCalibration"
+import { calibrateRoomShell } from "./roomCalibrationScene"
+import { LAYERED_FURNITURE_SPECS, type LayeredFurnitureAssets } from "../furniture/layeredFurniture"
+import { createRoomAvatar25dFurnitureCatalog } from "../furniture/layeredFurnitureCatalog"
 import {
   floorToStageFraction,
   isPointInFloorPolygon,
@@ -55,4 +61,54 @@ test("the server accepts every seat target on the calibrated painted floor", () 
     rejectedTargets(ROOM_CALIBRATION, ROOM_CALIBRATION.floorPolygon, isMiniRoomSeatTargetNearFloor),
     []
   )
+})
+
+// MEDIUM-1 (fresh review): the seat half must use the real seat points. For every seat piece of the room catalog,
+// placed validly anywhere on the floor in every rotation, each seat's hip point and its approach spot (what a seat
+// claim carries, `miniRoomSceneStore` -> `seatPlan.target`) must pass the server's seat rule.
+const SEAT_ROTATIONS: RoomFurnitureRotation[] = ["front", "right", "back", "left"]
+const PLACEMENT_STEP = ROOM_CALIBRATION.cell / 2
+
+test("the server accepts every seat point of every seat piece placed anywhere on the floor", () => {
+  const stand = (key: string) => ({ key, source: 0 as never })
+  const assets = Object.fromEntries(Object.keys(LAYERED_FURNITURE_SPECS).map((id) => [id, Object.fromEntries(
+    ([0, 1, 2, 3] as const).map((r) => [r, { back: stand(`${id}_${r}_b`), front: stand(`${id}_${r}_f`), shadow: stand(`${id}_${r}_s`) }])
+  )])) as unknown as LayeredFurnitureAssets
+  const calibration = createRoomAvatar25dRoomCalibration(assets)
+  const shell = calibrateRoomShell({
+    id: "room_v2_shell_blumi_world_v1",
+    name: "Blumi Home",
+    asset: stand("shell"),
+    canvasSize: { width: 1254, height: 714 },
+    floorGrid: ROOM_BLUMI_WORLD_FLOOR_GRID
+  } satisfies RoomShell)
+  const seatPieces = createRoomAvatar25dFurnitureCatalog(assets).filter((item) => item.interactionType === "seat")
+  assert.ok(seatPieces.length >= 2, "the catalog has seat pieces")
+  const xs = ROOM_CALIBRATION.floorPolygon.map((point) => point.x)
+  const zs = ROOM_CALIBRATION.floorPolygon.map((point) => point.z)
+  const rejected: string[] = []
+  for (const item of seatPieces) {
+    let checkedSeats = 0
+    for (const rotation of SEAT_ROTATIONS) {
+      for (let x = Math.min(...xs); x <= Math.max(...xs); x += PLACEMENT_STEP) {
+        for (let z = Math.min(...zs); z <= Math.max(...zs); z += PLACEMENT_STEP) {
+          const at = floorToStageFraction(ROOM_CALIBRATION, { x, z })
+          const plain = resolvePlacedFurnitureRenderItem({ instanceId: item.id, itemId: item.id, x: at.x, y: at.y, rotation }, item)
+          if (!plain) continue
+          const piece = calibration.calibrateFurnitureItem(plain)
+          if (!validateRoomV2FurniturePlacement({ scene: { shell, renderItems: [] }, candidate: piece }).isValid) continue
+          for (const seat of piece.seatWorldPoints ?? []) {
+            checkedSeats += 1
+            for (const [name, point] of [["seat", seat.seat], ["approach", seat.approach]] as const) {
+              if (!isMiniRoomSeatTargetNearFloor(point)) {
+                rejected.push(`${item.id} ${rotation} ${seat.id} ${name} (${point.x.toFixed(3)}, ${point.y.toFixed(3)})`)
+              }
+            }
+          }
+        }
+      }
+    }
+    assert.ok(checkedSeats > 0, `${item.id}: placed validly with seats somewhere on the floor`)
+  }
+  assert.deepEqual(rejected.slice(0, 20), [], `${rejected.length} seat targets refused`)
 })
