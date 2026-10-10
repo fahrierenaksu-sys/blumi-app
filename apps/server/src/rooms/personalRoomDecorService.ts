@@ -26,7 +26,12 @@ export interface PersonalRoomDecorService {
     input: { expectedRevision: number; decor: unknown },
     now?: Date
   ): Promise<
-    | { kind: "saved"; snapshot: PersonalRoomDecorSnapshot }
+    | {
+        kind: "saved"
+        snapshot: PersonalRoomDecorSnapshot
+        /** Items left out because the server would not place them (retired, held or unknown ids). */
+        strippedItemCount: number
+      }
     | { kind: "conflict"; current: PersonalRoomDecorSnapshot }
   >
 }
@@ -70,12 +75,15 @@ export function createPersonalRoomDecorService(options: {
       ) {
         throw new PublicRequestError("Refresh your room and try again.")
       }
-      const decor = normalizePersonalRoomDecor(input.decor)
-      if (decor.placedItems.some((item) => !isActive(item.itemId))) {
-        throw new PublicRequestError(
-          "Your room includes an item that is not available."
-        )
+      // Transition (2.5D cutover): an older client still sends retired ids such as its starter bed. They are left
+      // out, like the read projection leaves them out, instead of refusing the whole save. Nothing is granted:
+      // every item that stays must be active and owned.
+      const sent = normalizePersonalRoomDecor(input.decor)
+      const decor: PersonalRoomDecor = {
+        ...sent,
+        placedItems: sent.placedItems.filter((item) => isActive(item.itemId))
       }
+      const strippedItemCount = sent.placedItems.length - decor.placedItems.length
       const ownedItemIds = new Set(
         await options.getOwnedRoomItemIds(normalizedUserId)
       )
@@ -105,7 +113,7 @@ export function createPersonalRoomDecorService(options: {
           options.onRoomSnapshotError?.(error, result.snapshot)
         }
       }
-      return result
+      return result.kind === "saved" ? { ...result, strippedItemCount } : result
     }
   }
 }

@@ -716,6 +716,7 @@ Before the reset can be called done: a test on the memory server proves that a p
 | 12 | All 27 approved furniture pieces wait for §12 prices, so a launch before §12 has a room with only the starter bed (the chair is held too) | `pricing-pending` scope keeps them refused and hidden; §12 is reviewed after Phase 3, well before Phase 5.6; the TestFlight gate checks that §12 is decided or that the owner accepts a bed-only launch |
 | 13 | Lost first tap after mount and the pager desync are only worked around | Carried as an open issue; cheaper first mount is future work |
 | 14 | Editing `M/package.json` scripts before OTA removal lands would change the native fingerprint | OTA removal is commit 1.2; script edits come after |
+| 15 | Cutover order (Phase 2 review M5): if Railway deploys this server before testers install the new build, the old TestFlight client keeps sending retired room ids (its starter bed `room_v2_cozy_bed`) and reads old rooms as empty | The server leaves out retired, held and unknown ids on a room save instead of refusing it (`personalRoomDecorService.ts`, a count-only log line), and never places an inactive or unowned item. Still land the server deploy and the TestFlight build together in 5.6; remove the tolerance only after X22 |
 
 ### 10.2 Behaviour tests to add, and guards to retire or replace
 

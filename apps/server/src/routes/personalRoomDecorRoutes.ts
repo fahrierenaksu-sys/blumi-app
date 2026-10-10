@@ -78,6 +78,13 @@ export async function registerPersonalRoomDecorRoutes(
           current: result.current
         })
       }
+      if (result.strippedItemCount > 0) {
+        // a count only: never the user, the room or the item ids
+        request.log.info(
+          { strippedItemCount: result.strippedItemCount },
+          "Room save left out items that are not available"
+        )
+      }
       return { roomDecor: result.snapshot }
     } catch (error) {
       if (!isPublicRequestError(error)) throw error
