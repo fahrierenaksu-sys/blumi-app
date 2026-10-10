@@ -172,8 +172,12 @@ function mount(options: MountOptions = {}) {
           },
           signOutFirebasePhoneAuth: async () => undefined
         },
+        "./localQaEnvironment": {
+          IS_LOCAL_QA_ENVIRONMENT: false,
+          LOCAL_QA_PHONE_LIST: undefined,
+          LOCAL_QA_CODE: undefined
+        },
         "./localQaPhoneAuth": {
-          isLocalQaPhoneAuthAllowed: () => false,
           requestLocalQaPhoneCode: async () => assert.fail("Firebase builds never use local QA sign-in"),
           completeLocalQaPhoneSignIn: async () => assert.fail("Firebase builds never use local QA sign-in")
         },
