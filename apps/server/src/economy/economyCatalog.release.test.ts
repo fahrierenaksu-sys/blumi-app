@@ -27,7 +27,6 @@ test("the production economy projection sells receipted paid items and excludes 
     "avatar_v2_top_boho_patchwork_maxi_dress",
     "avatar_v2_top_male_tonal_geometric_camp_collar_shirt",
     "avatar_v2_hair_male_soft_textured_crop",
-    "room_v2_chair_blush",
     "room_v2_cute_bookshelf"
   ]) {
     const item = catalog.find((entry) => entry.itemId === paidId)
@@ -39,7 +38,10 @@ test("the production economy projection sells receipted paid items and excludes 
     "avatar_v2_top_cherry_heart_milkmaid_blouse",
     "avatar_v2_top_blush_lace_cardigan",
     "avatar_v2_top_male_acid_washed_boxy_sweatshirt",
-    "universal_cloud_loveseat_a"
+    "universal_cloud_loveseat_a",
+    // pricing-pending (plan F8/R1): the blush chair is held although its receipt stays until X8 removes it
+    "room_v2_chair_blush",
+    "room_v3_sofa_japon_cream"
   ]) {
     assert.equal(ids.has(excludedId), false, excludedId)
   }

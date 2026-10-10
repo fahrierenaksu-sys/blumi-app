@@ -4383,11 +4383,11 @@
   ],
   "heldScopes": [
     {
-      "scope": "room-v3-shell-and-furniture-candidates",
+      "scope": "pricing-pending",
       "productionPublication": false,
       "itemIdPatterns": [
-        "^(?:universal_|room_v3_)",
-        "^room_v2_(?:qa_|candidate_)"
+        "^room_v3_(?!bed_blumi_starter$)",
+        "^room_v2_chair_blush$"
       ]
     },
     {
@@ -4401,7 +4401,8 @@
       "scope": "development-and-qa-flags",
       "productionPublication": false,
       "itemIdPatterns": [
-        "^(?:qa_|dev_|test_)"
+        "^(?:qa_|dev_|test_)",
+        "^room_v2_(?:qa_|candidate_)"
       ]
     }
   ],

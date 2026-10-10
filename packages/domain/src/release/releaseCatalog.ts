@@ -85,10 +85,42 @@ export function isReleaseCatalogItemPublished(
 }
 
 /**
+ * True when a held scope names the item (pricing pending, promotion holds,
+ * QA/dev ids). A held item is never sold or listed, in any build, even while
+ * it still has a receipt (the blush chair until its receipt is removed).
+ */
+export function isReleaseCatalogItemHeld(
+  itemId: string,
+  catalog: ReleaseCatalog = BLUMI_R1_RELEASE_CATALOG
+): boolean {
+  return catalog.heldScopes.some(
+    (scope) =>
+      scope.productionPublication === false &&
+      scope.itemIdPatterns.some((pattern) => new RegExp(pattern).test(itemId))
+  )
+}
+
+/**
+ * The economy catalog without held items: what any build (development too)
+ * may sell or list. Callers receive fresh item objects.
+ */
+export function resolveUnheldEconomyCatalog(
+  catalog: readonly EconomyCatalogItem[],
+  releaseCatalog: ReleaseCatalog = BLUMI_R1_RELEASE_CATALOG
+): EconomyCatalogItem[] {
+  return catalog
+    .filter((item) => !isReleaseCatalogItemHeld(item.itemId, releaseCatalog))
+    .map((item) => ({
+      ...item,
+      grantedItemIds: item.grantedItemIds ? [...item.grantedItemIds] : undefined
+    }))
+}
+
+/**
  * R1 never removes a user's starter loadout, but it does remove every paid
- * product that is absent from the immutable publication catalog. This is the
- * one runtime projection mobile Shop and server economy must use for a
- * production build; callers receive fresh item objects.
+ * product that is absent from the immutable publication catalog, and every
+ * held item. This is the one runtime projection mobile Shop and server economy
+ * must use for a production build; callers receive fresh item objects.
  */
 export function resolveR1PublishedEconomyCatalog(
   catalog: readonly EconomyCatalogItem[],
@@ -97,8 +129,9 @@ export function resolveR1PublishedEconomyCatalog(
   return catalog
     .filter(
       (item) =>
-        item.ownedByDefault === true ||
-        isReleaseCatalogItemPublished(item.itemId, releaseCatalog)
+        (item.ownedByDefault === true ||
+          isReleaseCatalogItemPublished(item.itemId, releaseCatalog)) &&
+        !isReleaseCatalogItemHeld(item.itemId, releaseCatalog)
     )
     .map((item) => ({
       ...item,

@@ -3,6 +3,7 @@ import {
   STARTER_COIN_BALANCE,
   getLegacyAvatarReplacementIds,
   resolveR1PublishedEconomyCatalog,
+  resolveUnheldEconomyCatalog,
   type EconomyCatalogItem,
   type EconomyItemType
 } from "@blumi/domain"
@@ -14,6 +15,8 @@ export type { EconomyCatalogItem, EconomyItemType }
  * Production is fail-closed: paid catalog entries must be listed in the R1
  * receipt-backed catalog. Development remains capable of exercising planned
  * data, while the production process never receives it from this module.
+ * Held items (pricing pending, promotion holds, QA ids) are absent in every
+ * environment, so no build can sell them.
  */
 export function resolveProductionEconomyCatalog(
   catalog: readonly EconomyCatalogItem[] = DOMAIN_ECONOMY_CATALOG
@@ -24,7 +27,7 @@ export function resolveProductionEconomyCatalog(
 export const ECONOMY_CATALOG: readonly EconomyCatalogItem[] =
   process.env.NODE_ENV === "production"
     ? resolveProductionEconomyCatalog()
-    : DOMAIN_ECONOMY_CATALOG
+    : resolveUnheldEconomyCatalog(DOMAIN_ECONOMY_CATALOG)
 
 export function findEconomyCatalogItem(
   itemId: string,

@@ -3,6 +3,7 @@ import {
   UNIVERSAL_CORE_ROOM_PROMOTION_RECORD,
   type UniversalCoreRoomPromotionRecord
 } from "./universalCoreRoomEconomy"
+import { PRICING_PENDING_PLACEHOLDER_COINS, ROOM_V3_FURNITURE } from "./roomFurnitureIds"
 
 export type EconomyItemType = "avatar" | "room"
 
@@ -394,7 +395,9 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   roomItem("room_v2_heart_rug", "Heart Cloud Rug", 0),
   roomItem("room_v2_cozy_bed", "Pink Cloud Bed", 0, true),
   roomItem("room_v2_cute_bookshelf", "Cozy Bookshelf", 360),
-  roomItem("room_v2_side_table", "Petal Side Table", 240)
+  roomItem("room_v2_side_table", "Petal Side Table", 240),
+  // the 2.5D furniture: held in the release catalog's `pricing-pending` scope until the economy proposal (§12)
+  ...ROOM_V3_FURNITURE.map(({ itemId, title }) => roomItem(itemId, title, PRICING_PENDING_PLACEHOLDER_COINS))
 ]
 
 export function resolveEconomyCatalog(

@@ -6,6 +6,8 @@ export * from "./safety/safetyRules";
 export * from "./economy/economyCatalog";
 export * from "./economy/coinPacks";
 export * from "./economy/universalCoreRoomEconomy";
+export * from "./economy/roomFurnitureIds";
+export * from "./legacy/legacyItemIds";
 export * from "./release/releaseCatalog";
 export * from "./avatar/avatarLoadoutCatalog";
 export * from "./avatar/avatarLoadoutRules";

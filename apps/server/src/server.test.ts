@@ -2024,13 +2024,13 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     },
     payload: {
       type: "avatar",
-      itemId: "avatar_v2_top_cherry_heart_milkmaid_blouse",
+      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
       priceCoins: 1
     }
   })
   assert.equal(purchase.statusCode, 201)
-  assert.equal(purchase.json().priceCoins, 430)
-  assert.equal(purchase.json().inventory.coins, 845)
+  assert.equal(purchase.json().priceCoins, 410)
+  assert.equal(purchase.json().inventory.coins, 865)
 
   const repeat = await app.inject({
     method: "POST",
@@ -2040,7 +2040,7 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     },
     payload: {
       type: "avatar",
-      itemId: "avatar_v2_top_cherry_heart_milkmaid_blouse"
+      itemId: "avatar_v2_top_sage_ribbon_knit_jacket"
     }
   })
   assert.equal(repeat.statusCode, 400)

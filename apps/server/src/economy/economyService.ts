@@ -1,4 +1,8 @@
-import { isAvatarLoadoutItemCompatibleWithBody, isRetiredAvatarItemId } from "@blumi/domain"
+import {
+  isAvatarLoadoutItemCompatibleWithBody,
+  isReleaseCatalogItemHeld,
+  isRetiredAvatarItemId
+} from "@blumi/domain"
 import {
   findEconomyCatalogItem,
   getDefaultOwnedItemIds,
@@ -107,6 +111,10 @@ export function createEconomyService(
     async purchaseItem(userId, input, now = new Date()) {
       const itemId = normalizeItemId(input.itemId)
       if (input.type === "avatar" && isRetiredAvatarItemId(itemId)) {
+        throw new PublicRequestError("That shop item is not available.")
+      }
+      // a held item (pricing pending, promotion hold, QA id) is never sold, in any environment
+      if (isReleaseCatalogItemHeld(itemId)) {
         throw new PublicRequestError("That shop item is not available.")
       }
       const item = findEconomyCatalogItem(itemId, input.type)

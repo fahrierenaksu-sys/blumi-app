@@ -442,3 +442,23 @@ test("room reward keys accept only anchored, non-future UTC dates", async () => 
     /reward date is invalid/i
   )
 })
+
+test("held pricing-pending furniture, the reserved starter bed and legacy ids cannot be bought", async () => {
+  const service = createEconomyService()
+  for (const itemId of [
+    "room_v3_sofa_japon_cream",
+    "room_v3_armchair_japon_cream",
+    "room_v2_chair_blush",
+    "room_v3_bed_blumi_starter",
+    "universal_bench_a"
+  ]) {
+    await assert.rejects(
+      () => service.purchaseItem("held_user", { type: "room", itemId }),
+      /not available/i,
+      itemId
+    )
+  }
+  const inventory = await service.getInventory("held_user")
+  assert.equal(inventory.coins, 1250)
+  assert.equal(inventory.ownedRoomItemIds.some((id) => id.startsWith("room_v3_")), false)
+})

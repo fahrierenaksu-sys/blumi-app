@@ -1,5 +1,6 @@
 import {
   findEconomyCatalogItem,
+  isReleaseCatalogItemHeld,
   type EconomyCatalogItem
 } from "@blumi/domain"
 import {
@@ -171,7 +172,9 @@ export function buildRoomShopItems(input: Pick<
   const publishedItemIds = input.publishedItemIds
     ? new Set(input.publishedItemIds)
     : undefined
+  // a held piece (pricing pending) is never listed, in any build; the server refuses to sell it too
   const roomFurnitureCatalog = (input.roomFurnitureCatalog ?? ROOM_V2_FURNITURE_CATALOG)
+    .filter((item) => !isReleaseCatalogItemHeld(item.id))
     .filter((item) => !publishedItemIds || publishedItemIds.has(item.id))
   const qaOwnedRoomItemIds = new Set(input.qaOwnedRoomItemIds ?? [])
   return roomFurnitureCatalog.map((item) => {

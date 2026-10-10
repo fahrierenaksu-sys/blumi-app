@@ -22,6 +22,7 @@ const {
   AVATAR_LOADOUT_CATALOG,
   ECONOMY_CATALOG,
   findEconomyCatalogItem,
+  isReleaseCatalogItemHeld,
   resolvePublishedReleaseCatalogItemIds,
   resolveR1PublishedEconomyCatalog,
 } =
@@ -125,7 +126,8 @@ test("demo Shop lists Room products even when none are owned", () => {
     roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] }
   })
   const roomProducts = products.filter((product) => product.sectionId === "room")
-  assert.equal(roomProducts.length, ROOM_V2_FURNITURE_CATALOG.length)
+  // every piece but the held ones (pricing pending), which no build lists
+  assert.equal(roomProducts.length, ROOM_V2_FURNITURE_CATALOG.filter((item) => !isReleaseCatalogItemHeld(item.id)).length)
   assert.ok(roomProducts.some((product) => !product.owned))
   assert.ok(roomProducts.every((product) => product.roomItem))
 })
@@ -166,7 +168,7 @@ test("R1 Shop lists starter and receipted paid items and hides held ones", () =>
 });
 
 test("an owned room item already placed in the room is shown as placed, not offered for a duplicate placement", () => {
-  const item = ROOM_V2_FURNITURE_CATALOG[0]!;
+  const item = ROOM_V2_FURNITURE_CATALOG.find((entry) => !isReleaseCatalogItemHeld(entry.id))!;
   const products = buildShopCatalogItems({
     avatar: resolveInitialAvatarV2("avatar_v2_body_default"),
     inventory: {
