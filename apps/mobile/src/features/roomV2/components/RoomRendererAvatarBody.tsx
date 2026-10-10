@@ -60,7 +60,7 @@ export function RoomRendererAvatarBody(props: {
   live?: RoomRendererLiveAvatarPosition
   /** The existing idle/gesture motion (breathe, wave, seat offset). */
   motionStyle: StyleProp<AnimatedStyle<StyleProp<ViewStyle>>>
-  /** Every layer of the avatar is on screen (RoomAvatarRenderer2D). */
+  /** Every layer of the avatar is on screen (the live avatar surface, AvatarLive). */
   onAllLayersShown?: () => void
 }) {
   const { state, reduceMotion, boxHeightPx, stageWidthPx, stageHeightPx, live, walksWithFrames } = props
