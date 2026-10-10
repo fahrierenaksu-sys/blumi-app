@@ -20,7 +20,7 @@ import Animated, {
   withTiming,
   type SharedValue
 } from "react-native-reanimated"
-import { MyAvatar } from "../ui/myAvatar"
+import { MyAvatarStill } from "../ui/myAvatarStill"
 import {
   CandidateAvatarPreview,
   createCandidateAvatarSnapshot,
@@ -364,11 +364,11 @@ export function MatchResultModal(props: MatchResultModalProps) {
 
           <View style={styles.connectionRow}>
             <Animated.View style={[styles.avatarColumn, meeting.meStyle]}>
-              <MyAvatar
+              <MyAvatarStill
                 name={currentUserName}
-                seed={currentUserName}
                 size={84}
                 ring="strong"
+                crop="half"
               />
               <Text style={styles.avatarName}>{currentUserName}</Text>
             </Animated.View>
@@ -395,6 +395,8 @@ export function MatchResultModal(props: MatchResultModalProps) {
                     snapshot={resolvedMatchedAvatarSnapshot}
                     size={96}
                     stage="match"
+                    crop="half"
+                    mirror
                   />
                 </FlightTargetView>
               ) : (
@@ -402,6 +404,8 @@ export function MatchResultModal(props: MatchResultModalProps) {
                   snapshot={resolvedMatchedAvatarSnapshot}
                   size={96}
                   stage="match"
+                  crop="half"
+                  mirror
                 />
               )}
               <Text style={styles.avatarName}>{matchedUserName}</Text>

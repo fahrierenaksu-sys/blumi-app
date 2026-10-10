@@ -16,7 +16,8 @@ import Reanimated, {
   withTiming
 } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
-import { AvatarPreview2D } from "../features/avatarV2/components/AvatarPreview2D"
+import { AvatarStill } from "../features/avatar/components/AvatarStill"
+import { candidateAvatarInput, type CandidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import {
   canOpenMatchExperience
@@ -28,10 +29,6 @@ import {
   shouldCelebrateMatchResult,
   shouldPlayMatchHaptic
 } from "../features/matches/matchResultPresentation"
-import {
-  createStableMatchedUserAvatar,
-  resolveLatestMatchRoomAvatar
-} from "../features/matches/matchRoomResolvers"
 import { getAppLocale } from "../features/session/appLocale"
 import type { SessionActor } from "../features/session/sessionModel"
 import type { RootStackParamList } from "../navigation/RootNavigator"
@@ -69,12 +66,15 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
   const { navigation, route, sessionActor } = props
   const { avatar } = useAvatarV2()
   const match = route.params.match
-  const currentAvatar = useMemo(
-    () => resolveLatestMatchRoomAvatar(avatar),
-    [avatar]
-  )
+  // The person's own loadout, and the partner's as the server sent it; both are coerced when drawn.
+  const currentAvatar = useMemo((): CandidateAvatarInput => ({ loadout: avatar, hints: {} }), [avatar])
   const matchedAvatar = useMemo(
-    () => createStableMatchedUserAvatar(match.matchedUser),
+    () => candidateAvatarInput(createCandidateAvatarSnapshot({
+      userId: match.matchedUser.userId,
+      displayName: match.matchedUser.displayName,
+      avatarPresetId: match.matchedUser.avatarPresetId,
+      avatarSelection: match.matchedUser.avatarSelection
+    })),
     [match.matchedUser]
   )
   const canStartConversation = canOpenMatchExperience(sessionActor)
@@ -257,6 +257,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
                   <AvatarSpotlight
                     label={match.matchedUser.displayName}
                     avatar={matchedAvatar}
+                    mirror
                     frameVariant="champagne-gold"
                     rotation="4deg"
                     landingFlightId={partnerFlightId}
@@ -296,22 +297,35 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
   )
 }
 
+/** The frame the half-body still is drawn in (points). */
+const SPOTLIGHT_STILL_WIDTH = 112
+const SPOTLIGHT_STILL_HEIGHT = 168
+
 function AvatarSpotlight(props: {
   label: string
-  avatar: Parameters<typeof AvatarPreview2D>[0]["avatar"]
+  avatar: CandidateAvatarInput
+  /** Faces the other way: the partner turns towards the person. */
+  mirror?: boolean
   frameVariant?: AvatarFrameVariant
   rotation?: string
   /** The flown chibi lands here: the slot shows once it touches down. */
   landingFlightId?: string | null
 }) {
   const preview: ReactNode = (
-    <AvatarPreview2D
-      avatar={props.avatar}
-      size={112}
-      stageHeight={168}
-      metaTone="light"
-      label={props.label}
-    />
+    <View style={styles.spotlightPreview}>
+      <AvatarStill
+        loadout={props.avatar.loadout}
+        hints={props.avatar.hints}
+        crop="half"
+        width={SPOTLIGHT_STILL_WIDTH}
+        height={SPOTLIGHT_STILL_HEIGHT}
+        mirror={props.mirror}
+      />
+      <View style={styles.spotlightNamePill}>
+        <View style={styles.spotlightNameDot} />
+        <Text style={styles.spotlightNameText} numberOfLines={1}>{props.label}</Text>
+      </View>
+    </View>
   )
   return (
     <View style={[styles.avatarSpotlight, { transform: [{ rotate: props.rotation || "0deg" }] }]}>
@@ -377,6 +391,36 @@ const styles = StyleSheet.create({
   avatarSpotlight: {
     flex: 1,
     minWidth: 0
+  },
+  spotlightPreview: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  spotlightNamePill: {
+    marginTop: uiTheme.spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: uiTheme.radius.full,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#F2DDEA"
+  },
+  spotlightNameDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: uiTheme.colors.primary
+  },
+  spotlightNameText: {
+    maxWidth: 170,
+    color: uiTheme.colors.textPrimary,
+    ...uiTheme.font.caption,
+    fontWeight: "800",
+    textTransform: "capitalize"
   },
   heartLine: {
     position: "absolute",
