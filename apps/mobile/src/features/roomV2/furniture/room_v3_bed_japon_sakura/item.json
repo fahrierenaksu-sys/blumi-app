@@ -12,8 +12,7 @@
  "footprint": {
   "w": 5,
   "d": 4,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "chair",
  "symmetric": false,
@@ -157,8 +156,7 @@
    "flags": [
     {
      "kind": "concept_scale",
-     "ratio": 1.29,
-     "note": "the painted concept draws it 1.29x the size the plan/ergonomics give"
+     "ratio": 1.29
     }
    ],
    "rule": "ergonomics win over the sheet: fixed keys never move; the sheet only sets the free proportions"

@@ -12,8 +12,7 @@
  "footprint": {
   "w": 3,
   "d": 1,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "none",
  "symmetric": false,
@@ -149,7 +148,6 @@
    "fixed_ergonomic_keys": {
     "H": 1.8524
    },
-   "note": "Rodin shape + texture; scaled to H 1.8524, plan 1.2x0.5 (raw 1.215x0.547x1.892)",
    "rule": "ergonomics win over the sheet"
   }
  },

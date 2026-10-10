@@ -12,8 +12,7 @@
  "footprint": {
   "w": 3,
   "d": 2,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "chair",
  "symmetric": false,

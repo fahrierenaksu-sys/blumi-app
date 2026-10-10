@@ -12,8 +12,7 @@
  "footprint": {
   "w": 2,
   "d": 1,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "none",
  "symmetric": false,
@@ -141,7 +140,6 @@
    "fixed_ergonomic_keys": {
     "H_top": 0.62
    },
-   "note": "Rodin shape + texture, --cut-top: top 0.62, plan 0.6x0.5; cloud lamp + succulent keep proportions, total height 0.82",
    "rule": "ergonomics win over the sheet"
   }
  },

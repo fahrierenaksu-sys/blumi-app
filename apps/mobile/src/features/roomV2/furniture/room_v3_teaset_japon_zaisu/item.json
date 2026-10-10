@@ -12,8 +12,7 @@
  "footprint": {
   "w": 3,
   "d": 5,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "sit_low",
  "symmetric": false,
@@ -195,7 +194,6 @@
     "ch_seat_h": 0.25,
     "ch_d": 0.58
    },
-   "note": "per-object anisotropic rescale: sheet chairs are squat (seat 0.083 high in a 0.38 tall raw chair), the table raw is 0.7x0.92x0.25; table z x1.93, chairs z x1.7-1.8, xy to depth 0.58; table plan 1.2x0.95, gap 0.05; the plan set size 2.3x2.2 (5x5 half cells) is not reachable at D ergonomics (real 1.2x2.2)",
    "rule": "ergonomics win over the sheet"
   }
  },

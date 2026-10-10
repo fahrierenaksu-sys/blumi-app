@@ -12,8 +12,7 @@
  "footprint": {
   "w": 7,
   "d": 4,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "kind": "flat_floor",
  "walkable": true,

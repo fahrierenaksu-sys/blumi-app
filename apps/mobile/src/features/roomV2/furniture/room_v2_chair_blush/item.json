@@ -11,8 +11,7 @@
  "footprint": {
   "w": 3,
   "d": 2,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "chair",
  "symmetric": true,
@@ -313,7 +312,6 @@
   "k": 0.6312,
   "N": 2.105,
   "card_plane_P": 1.9566,
-  "M_PER_UNIT": 0.974,
-  "note": "uniform x k of out/room_v2_chair_blush_final (approved look and proportions)"
+  "M_PER_UNIT": 0.974
  }
 }

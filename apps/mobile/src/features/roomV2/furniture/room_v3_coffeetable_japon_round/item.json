@@ -12,8 +12,7 @@
  "footprint": {
   "w": 2,
   "d": 2,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "none",
  "symmetric": true,
@@ -146,7 +145,6 @@
    "fixed_ergonomic_keys": {
     "H_top": 0.5166
    },
-   "note": "Rodin shape + texture, --cut-top: table top fixed 0.5166 (0.9 x seat), diameter 0.85; props on top keep proportions; total height with plant 0.74",
    "rule": "ergonomics win over the sheet"
   }
  },

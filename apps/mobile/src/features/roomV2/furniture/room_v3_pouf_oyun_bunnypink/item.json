@@ -12,8 +12,7 @@
  "footprint": {
   "w": 2,
   "d": 2,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "sit_low",
  "symmetric": false,
@@ -139,7 +138,6 @@
    "fixed_ergonomic_keys": {
     "seat_hip_z": 0.2626
    },
-   "note": "Rodin bunny pouf squashed per axis to 0.9 x 0.7 x 0.55 (raw 1.59x0.89x1.90: a tall bean with ears; the plan size 0.9x0.9x0.55 wins); seat sit_low pose pending",
    "rule": "ergonomics win over the sheet"
   }
  },

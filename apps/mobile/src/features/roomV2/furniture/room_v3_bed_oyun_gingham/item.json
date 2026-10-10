@@ -12,8 +12,7 @@
  "footprint": {
   "w": 5,
   "d": 4,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "chair",
  "symmetric": false,
@@ -144,7 +143,6 @@
     "Hm": 0.574,
     "hb_top": 1.0908
    },
-   "note": "Rodin shape + texture scaled per axis to length 2.273, width 1.642, headboard top 1.091 (raw 1.55x1.89x0.83); head at -x, long side -y",
    "rule": "ergonomics win over the sheet"
   }
  },

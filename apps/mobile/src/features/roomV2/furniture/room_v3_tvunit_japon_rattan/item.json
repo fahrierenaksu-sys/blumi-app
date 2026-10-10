@@ -12,8 +12,7 @@
  "footprint": {
   "w": 4,
   "d": 2,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "none",
  "symmetric": false,
@@ -78,8 +77,7 @@
   "scale": "D",
   "N": 2.105,
   "targets": {
-   "cabinet_top_height": 0.574,
-   "note": "cab_h = seat height so a sitter looks straight at the screen"
+   "cabinet_top_height": 0.574
   },
   "twin_measured": {
    "overall": [
@@ -199,8 +197,7 @@
    "flags": [
     {
      "kind": "concept_scale",
-     "ratio": 1.5,
-     "note": "the painted concept draws it 1.50x the size the plan/ergonomics give"
+     "ratio": 1.5
     }
    ],
    "rule": "ergonomics win over the sheet: fixed keys never move; the sheet only sets the free proportions"

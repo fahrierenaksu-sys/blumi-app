@@ -12,8 +12,7 @@
  "footprint": {
   "w": 3,
   "d": 2,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "none",
  "symmetric": false,
@@ -149,7 +148,6 @@
    "fixed_ergonomic_keys": {
     "H_top": 0.89
    },
-   "note": "Rodin shape + texture, --cut-top --top-peak highest: dresser top (incl. the open shelf) 0.89, plan 1.2x0.55 (raw 1.39x0.82x1.89); props keep proportions, total height 1.37",
    "rule": "ergonomics win over the sheet"
   }
  },

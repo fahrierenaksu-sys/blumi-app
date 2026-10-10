@@ -12,8 +12,7 @@
  "footprint": {
   "w": 2,
   "d": 5,
-  "cell": 0.5,
-  "note": "cells at rotation 0; odd rotations swap w/d"
+  "cell": 0.5
  },
  "seat_class": "chair",
  "symmetric": false,
@@ -200,7 +199,6 @@
     "chair_depth": 0.75,
     "chair_total_height": 1.18
    },
-   "note": "Rodin shape + texture per object: table top 0.886, dia 0.9; flower chairs depth 0.75, width 0.85, total height 1.18, seat 0.574 (existing sit cards); one chair was fused to the table in the mesh and was cut at the table-top x extent; built exactly face to face (the concept angles them); plan set size 2.4x2.0 vs built 0.9x2.5",
    "rule": "ergonomics win over the sheet"
   }
  },
