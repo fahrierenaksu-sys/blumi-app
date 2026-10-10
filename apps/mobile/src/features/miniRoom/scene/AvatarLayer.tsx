@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { Image, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
+import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native"
 import Reanimated, {
   useAnimatedReaction,
   useAnimatedStyle,
@@ -7,17 +7,12 @@ import Reanimated, {
   type SharedValue
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
-import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import { AvatarLive } from "../../avatar/components/AvatarLive"
 import { roomAvatar25d } from "../../avatar/roomAvatarSeam"
 import { RoomRendererFurnitureSprite } from "../../roomV2/components/RoomRenderer2D"
 import { RoomRendererLayeredFurnitureFront } from "../../roomV2/components/RoomRendererLayeredFurniture"
 import { animateTo, useMotion } from "../../../ui/motion"
-import {
-  getMiniRoomAvatar25dSpec,
-  getMiniRoomAvatarRenderLayers,
-  getMiniRoomAvatarSittingScaleY
-} from "../miniRoomAvatarMotion"
+import { getMiniRoomAvatar25dSpec } from "../miniRoomAvatarMotion"
 import type { MiniRoomAvatarPosition } from "./miniRoomAvatarPositions"
 import {
   getMiniRoomAvatarLayeredSeat,
@@ -365,26 +360,6 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     showJoinPulse,
     motionPolicy
   } = props
-  const roomAvatarLayers = useMemo(
-    () => getMiniRoomAvatarRenderLayers({
-      appearance: avatar.appearance,
-      motion: avatar.motion,
-      facing: avatar.facing
-    }),
-    [
-      avatar.appearance,
-      avatar.facing,
-      avatar.motion
-    ]
-  )
-  const sittingScaleY = useMemo(
-    () => getMiniRoomAvatarSittingScaleY({
-      appearance: avatar.appearance,
-      motion: avatar.motion,
-      facing: avatar.facing
-    }),
-    [avatar.appearance, avatar.facing, avatar.motion]
-  )
   const avatar25d = useMemo(
     () => getMiniRoomAvatar25dSpec({
       appearance: avatar.appearance,
@@ -393,13 +368,11 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     }),
     [avatar.appearance, avatar.facing, avatar.motion]
   )
-  const usesAnimatedAvatarFrames = roomAvatarLayers.some(
-    (layer) => (layer.animation?.frames.length ?? 0) > 1
-  )
   const loops = useMiniRoomAvatarLoops(resolveMiniRoomAvatarLoops({
     motion: avatar.motion,
     policy: motionPolicy,
-    usesAnimatedFrames: usesAnimatedAvatarFrames,
+    // the 2.5D drawing animates itself; no procedural breathe or bob runs under it
+    usesAnimatedFrames: avatar25d !== null,
     arriving: showJoinPulse
   }))
 
@@ -425,8 +398,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     transform: [
       { translateY: -3 * walkBob.value - 1.2 * breathe.value },
       { scaleX: facingSignX },
-      // ROOM-04: squash only the standing idle fallback, never real sitting art.
-      { scaleY: (1 + 0.018 * breathe.value) * sittingScaleY },
+      { scaleY: 1 + 0.018 * breathe.value },
       { rotate: leanRotate },
       { rotate: `${2 * speaking.value}deg` }
     ]
@@ -474,14 +446,6 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
               calibratedFigureHeightPx={calibratedFigureHeightPx}
               seatPlacement={seatPlacement}
               holdCanvas={props.holdGpuSurface}
-            />
-          ) : roomAvatarLayers.length ? (
-            <RoomAvatarRenderer2D layers={roomAvatarLayers} allowDownscaling={false} />
-          ) : avatar.appearance.fullBodyAsset ? (
-            <Image
-              source={avatar.appearance.fullBodyAsset}
-              resizeMode="contain"
-              style={styles.avatarImage}
             />
           ) : null}
         </Reanimated.View>
@@ -573,10 +537,6 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: "center",
     justifyContent: "flex-end"
-  },
-  avatarImage: {
-    width: 74,
-    height: 108
   },
   avatarWalking: {
     bottom: 24

@@ -1,179 +1,80 @@
 import assert from "node:assert/strict"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 
-require.extensions[".png"] = (module, filename) => {
-  module.exports = filename
-}
+import type { RoomAvatar25dResolveInput, RoomAvatar25dSpec } from "../avatar/roomAvatarSeamContract"
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { createCandidateAvatarSnapshot } = require("../avatarV2/candidateAvatarSnapshot") as typeof import("../avatarV2/candidateAvatarSnapshot")
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { createMiniRoomPartnerAvatarSnapshot } = require("./partnerAvatarSnapshot") as typeof import("./partnerAvatarSnapshot")
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { createCurrentUserAvatarSnapshot } = require("./currentUserAvatarSnapshot") as typeof import("./currentUserAvatarSnapshot")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- CommonJS fixture loading requires static require.
+const { installRoomAvatarSeam, roomAvatar25d } = require("../avatar/roomAvatarSeam") as typeof import("../avatar/roomAvatarSeam")
 const {
   canMiniRoomAvatarUseMotion,
-  getMiniRoomAvatarSittingScaleY,
-  getMiniRoomAvatarRenderLayers
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  getMiniRoomAvatar25dSpec
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- CommonJS fixture loading requires static require.
 } = require("./miniRoomAvatarMotion") as typeof import("./miniRoomAvatarMotion")
-const {
-  DEFAULT_ROOM_AVATAR_MALE,
-  ROOM_AVATAR_CATALOG
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("../avatarV2/room/avatarRoomCatalog") as typeof import("../avatarV2/room/avatarRoomCatalog")
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { AVATAR_V2_CATALOG } = require("../avatarV2/avatarV2Catalog") as typeof import("../avatarV2/avatarV2Catalog")
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { resolveInitialAvatarV2 } = require("../avatarV2/avatarV2Persistence") as typeof import("../avatarV2/avatarV2Persistence")
 
-test("real sitting layers keep the chibi proportions; only the idle fallback is squashed (ROOM-04)", () => {
-  const snapshot = createCurrentUserAvatarSnapshot({
-    userId: "sitter",
-    displayName: "Ada",
-    avatar: resolveInitialAvatarV2("avatar_v2_body_male_light"),
-    avatarCatalog: AVATAR_V2_CATALOG
+const SPEC = { rig: "girl" } as unknown as RoomAvatar25dSpec
+const LOADOUT = { topId: "worn-top" }
+const appearance = { base: "female_base_01" as const, snapshotSource: "avatar_v2_current_user" as const, avatarLoadout: LOADOUT }
+
+/** Installs a seam whose resolver draws only the listed states; returns every input it was asked about. */
+function installDrawable(drawable: readonly string[]) {
+  const asked: RoomAvatar25dResolveInput[] = []
+  const restore = installRoomAvatarSeam({
+    ...roomAvatar25d,
+    resolveRoomAvatar25d: (input) => {
+      asked.push(input)
+      return input.state !== undefined && drawable.includes(input.state) ? SPEC : null
+    }
   })
-  assert.equal(getMiniRoomAvatarSittingScaleY({ appearance: snapshot.appearance, motion: "sitting", facing: "front" }), 1)
-  assert.equal(getMiniRoomAvatarSittingScaleY({ appearance: snapshot.appearance, motion: "idle", facing: "front" }), 1)
-  const catalogWithoutSitting = ROOM_AVATAR_CATALOG.map((item) => ({ ...item, assetsByMotion: undefined }))
-  assert.equal(getMiniRoomAvatarSittingScaleY({
-    appearance: snapshot.appearance,
-    motion: "sitting",
-    facing: "front",
-    catalog: catalogWithoutSitting
-  }), 0.86)
+  restoreSeam = restore
+  return asked
+}
+
+let restoreSeam: (() => void) | null = null
+afterEach(() => {
+  restoreSeam?.()
+  restoreSeam = null
 })
 
-test("authenticated male preview uses the production MiniRoom snapshot path", () => {
-  const snapshot = createCurrentUserAvatarSnapshot({
-    userId: "authenticated-male-qa",
-    displayName: "Eren QA",
-    avatar: {
-      ...resolveInitialAvatarV2("avatar_v2_body_male_light"),
-      hairId: "avatar_v2_hair_male_chestnut_short_waves",
-      topId: "avatar_v2_top_male_cocoa_varsity_jacket",
-      bottomId: "avatar_v2_bottom_male_mid_blue_straight_jeans",
-      shoesId: "avatar_v2_shoes_male_dusty_blue_canvas_sneakers"
-    },
-    avatarCatalog: AVATAR_V2_CATALOG
-  })
+test("the avatar's whole 2.5D spec is asked for with the worn loadout, the pose and the facing", () => {
+  const asked = installDrawable(["idle", "walking", "sitting"])
 
-  assert.equal(snapshot.userId, "authenticated-male-qa")
-  assert.equal(snapshot.source, "avatar_v2_current_user")
+  assert.equal(getMiniRoomAvatar25dSpec({ appearance, motion: "walking", facing: "left" }), SPEC)
+  assert.deepEqual(asked, [{ loadout: LOADOUT, state: "walking", direction: "left" }])
+})
+
+test("walking and sitting are drawable when the renderer resolves that pose (production snapshot path)", () => {
+  installDrawable(["idle", "walking", "sitting"])
+
   for (const motion of ["walking", "sitting"] as const) {
-    assert.equal(canMiniRoomAvatarUseMotion({
-      appearance: snapshot.appearance,
-      motion,
-      facing: "front"
-    }), true, motion)
+    assert.equal(canMiniRoomAvatarUseMotion({ appearance, motion, facing: "front" }), true, motion)
   }
 })
 
-test("MiniRoom resolves the canonical male walking frames from appearance", () => {
-  const candidate = createCandidateAvatarSnapshot({
-    userId: "male-walker",
-    displayName: "Mert",
-    avatarPresetId: "avatar_v2_body_male_light"
-  })
-  const snapshot = createMiniRoomPartnerAvatarSnapshot({
-    userId: candidate.userId,
-    displayName: candidate.displayName,
-    candidateAvatarSnapshot: candidate
-  })
+test("poses that are not walking or sitting are asked for as the standing idle pose", () => {
+  const asked = installDrawable(["idle"])
 
-  const layers = getMiniRoomAvatarRenderLayers({
-    appearance: snapshot.appearance,
-    motion: "walking",
-    facing: "front"
-  })
-
-  assert.ok(snapshot.appearance.roomAvatarAppearance)
-  assert.ok(layers.length >= 6)
-  assert.ok(layers.every((layer) => layer.requestedState === "walking"))
-  assert.ok(layers.every((layer) => (layer.animation?.frames.length ?? 0) >= 4))
-  assert.equal(canMiniRoomAvatarUseMotion({
-    appearance: snapshot.appearance,
-    motion: "walking",
-    facing: "front"
-  }), true)
+  assert.equal(canMiniRoomAvatarUseMotion({ appearance, motion: "speaking", facing: "front" }), true)
+  getMiniRoomAvatar25dSpec({ appearance, motion: "emoting", facing: "front" })
+  assert.ok(asked.every((input) => input.state === "idle"))
 })
 
-test("MiniRoom sitting readiness is evaluated from sitting layers, not idle layers", () => {
-  const candidate = createCandidateAvatarSnapshot({
-    userId: "male-sitter",
-    displayName: "Can",
-    avatarPresetId: "avatar_v2_body_male_light"
-  })
-  const snapshot = createMiniRoomPartnerAvatarSnapshot({
-    userId: candidate.userId,
-    displayName: candidate.displayName,
-    candidateAvatarSnapshot: candidate
-  })
+test("an avatar missing art for one pose keeps the others: only that pose is refused", () => {
+  installDrawable(["idle", "walking"])
 
-  const layers = getMiniRoomAvatarRenderLayers({
-    appearance: snapshot.appearance,
-    motion: "sitting",
-    facing: "front"
-  })
-
-  assert.ok(layers.every((layer) => layer.requestedState === "sitting"))
-  assert.equal(canMiniRoomAvatarUseMotion({
-    appearance: snapshot.appearance,
-    motion: "sitting",
-    facing: "front"
-  }), true)
+  assert.equal(canMiniRoomAvatarUseMotion({ appearance, motion: "walking", facing: "front" }), true)
+  assert.equal(canMiniRoomAvatarUseMotion({ appearance, motion: "sitting", facing: "front" }), false)
+  assert.equal(getMiniRoomAvatar25dSpec({ appearance, motion: "sitting", facing: "front" }), null)
 })
 
-test("legacy snapshots still render their immutable idle layer fallback", () => {
-  const legacyLayers = [{ id: "legacy-layer" }] as never[]
-  const appearance = {
+test("with no installed renderer (or an old snapshot with only layers) standing is allowed and no other pose is", () => {
+  const legacyAppearance = {
     base: "male_base_01" as const,
     snapshotSource: "partner_preview_fallback" as const,
-    roomAvatarLayers: legacyLayers
+    roomAvatarLayers: [{ id: "legacy-layer" }] as never[]
   }
 
-  assert.equal(getMiniRoomAvatarRenderLayers({
-    appearance,
-    motion: "walking",
-    facing: "front"
-  }), legacyLayers)
-  assert.equal(canMiniRoomAvatarUseMotion({
-    appearance,
-    motion: "sitting",
-    facing: "front"
-  }), false)
-})
-
-test("an incomplete outfit falls back as one idle stack instead of mixing moving and static layers", () => {
-  const catalogWithoutSageShortsMotion = ROOM_AVATAR_CATALOG.map((item) =>
-    item.id === "room_avatar_bottom_male_sage_cuffed_shorts_v1"
-      ? { ...item, assetsByMotion: undefined }
-      : item
-  )
-  const appearance = {
-    base: "male_base_01" as const,
-    snapshotSource: "avatar_v2_current_user" as const,
-    roomAvatarAppearance: {
-      ...DEFAULT_ROOM_AVATAR_MALE,
-      topId: "room_avatar_top_male_cream_basic_tee_v1",
-      bottomId: "room_avatar_bottom_male_sage_cuffed_shorts_v1"
-    }
+  assert.equal(canMiniRoomAvatarUseMotion({ appearance: legacyAppearance, motion: "idle", facing: "front" }), true)
+  for (const motion of ["walking", "sitting"] as const) {
+    assert.equal(canMiniRoomAvatarUseMotion({ appearance: legacyAppearance, motion, facing: "front" }), false, motion)
   }
-
-  const layers = getMiniRoomAvatarRenderLayers({
-    appearance,
-    motion: "walking",
-    facing: "front",
-    catalog: catalogWithoutSageShortsMotion
-  })
-
-  assert.ok(layers.length >= 6)
-  assert.ok(layers.every((layer) => layer.requestedState === "idle"))
-  assert.equal(canMiniRoomAvatarUseMotion({
-    appearance,
-    motion: "walking",
-    facing: "front",
-    catalog: catalogWithoutSageShortsMotion
-  }), false)
 })

@@ -141,7 +141,7 @@ test("the avatar layer hands each avatar only its own lines and the Reduce Motio
     {
       modules: {
         "react-native": createReactNativeStub().module,
-        "../miniRoomAvatarMotion": { getMiniRoomAvatarRenderLayers: () => [], getMiniRoomAvatarSittingScaleY: () => 1 },
+        "../miniRoomAvatarMotion": { getMiniRoomAvatar25dSpec: () => null },
         "./RoomSpeechBubbleStack": { RoomSpeechBubbleStack: "RoomSpeechBubbleStack" },
         "./RoomTypingBubble": { RoomTypingBubble: "RoomTypingBubble" }
       },
