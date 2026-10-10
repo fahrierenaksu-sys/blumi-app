@@ -18,7 +18,6 @@ export const ROOT_ROUTE_NAMES = [
   "MiniRoomRigPreview",
   "Inbox",
   "MyRoom",
-  "HomeStudio",
   "You",
   "CosmeticShop",
   "ProfileEdit",

@@ -121,14 +121,6 @@ export const BLUMI_FOCUS_12_QA_FLAG =
 export const BLUMI_ROOM_VNEXT_RUNTIME_PROOF_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_ROOM_VNEXT_RUNTIME_PROOF
 
-/** Isolated Home Studio Scene Kit preview flag; never a production feature flag. */
-export const BLUMI_HOME_STUDIO_QA_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_HOME_STUDIO_QA
-
-/** Candidate-only visual gate; native proof and user approval remain separate. */
-export const BLUMI_HOME_STUDIO_VISUAL_REVIEW_APPROVED_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_HOME_STUDIO_VISUAL_REVIEW_APPROVED
-
 /** Development-only 45-piece Room VNext full-wave QA flag. */
 export const BLUMI_ROOM_VNEXT_FULL_WAVE_QA_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_ROOM_VNEXT_FULL_WAVE_QA

@@ -128,7 +128,6 @@ import {
   myRoomScreenBundle,
   cosmeticShopScreenBundle,
   myRoomEditorScreenBundle,
-  homeStudioScreenBundle,
   settingsScreenBundle,
   wardrobeV2ScreenBundle,
   registerScreenBundle,
@@ -204,7 +203,6 @@ export type RootStackParamList = {
   MiniRoomRigPreview: undefined
   Inbox: undefined
   MyRoom: undefined
-  HomeStudio: undefined
   You: undefined
   CosmeticShop: {
     initialShopMode?: "avatar" | "home"
@@ -251,11 +249,6 @@ const CAN_REGISTER_MINI_ROOM_RIG_PREVIEW = canApplyBlumiDevEntry({
   buildProfile: BLUMI_BUILD_PROFILE,
   isDevelopmentRuntime: __DEV__
 }) && BLUMI_DEV_ENTRY_ROUTE === "mini-room-rig-preview"
-const CAN_REGISTER_HOME_STUDIO = canApplyBlumiDevEntry({
-  route: BLUMI_DEV_ENTRY_ROUTE,
-  buildProfile: BLUMI_BUILD_PROFILE,
-  isDevelopmentRuntime: __DEV__
-}) && BLUMI_DEV_ENTRY_ROUTE === "home-studio-pilot"
 
 const IS_FULL_SHOP_CATALOG_QA_PREVIEW = isAvatarQaUnlockEnabled(
   __DEV__,
@@ -586,10 +579,6 @@ export function RootNavigator() {
       navigationRef.navigate("MiniRoomRigPreview")
       return
     }
-
-    if (BLUMI_DEV_ENTRY_ROUTE === "home-studio-pilot") {
-      navigationRef.navigate("HomeStudio")
-    }
   }, [isNavigationReady, navigationReadyGeneration, sessionActor, sessionEntryRoute])
 
   // ── Global WS lifecycle ─────────────────────────────────
@@ -824,19 +813,6 @@ export function RootNavigator() {
                 >
                   {(screenProps) => (
                     <miniRoomRigPreviewScreenBundle.DeferredScreen
-                      {...screenProps}
-                      sessionActor={sessionActor}
-                    />
-                  )}
-                </Stack.Screen>
-              ) : null}
-              {CAN_REGISTER_HOME_STUDIO ? (
-                <Stack.Screen
-                  name="HomeStudio"
-                  options={detailScreenOptions}
-                >
-                  {(screenProps) => (
-                    <homeStudioScreenBundle.DeferredScreen
                       {...screenProps}
                       sessionActor={sessionActor}
                     />

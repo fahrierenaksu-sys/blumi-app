@@ -1,9 +1,5 @@
 const path = require("path")
 const { getSentryExpoConfig } = require("@sentry/react-native/metro")
-const {
-  resolveHomeStudioQaModuleDirectory,
-  resolveHomeStudioQaModulePath
-} = require("./scripts/homeStudioQaModuleRouting.cjs")
 
 const projectRoot = __dirname
 const workspaceRoot = path.resolve(projectRoot, "../..")
@@ -13,26 +9,6 @@ const config = getSentryExpoConfig(projectRoot, {
   includeWebReplay: false,
   includeWebFeedback: false
 })
-const homeStudioQaModulePath = resolveHomeStudioQaModulePath({
-  projectRoot,
-  rawQaFlag: process.env.EXPO_PUBLIC_BLUMI_HOME_STUDIO_QA,
-  buildProfile: process.env.EXPO_PUBLIC_BLUMI_BUILD_PROFILE?.trim() || "development"
-})
-const homeStudioQaModuleDirectory = resolveHomeStudioQaModuleDirectory({
-  projectRoot,
-  rawQaFlag: process.env.EXPO_PUBLIC_BLUMI_HOME_STUDIO_QA,
-  buildProfile: process.env.EXPO_PUBLIC_BLUMI_BUILD_PROFILE?.trim() || "development"
-})
-config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === "@blumi/home-studio-qa") {
-    return { type: "sourceFile", filePath: homeStudioQaModulePath }
-  }
-  return context.resolveRequest(context, moduleName, platform)
-}
-config.resolver.extraNodeModules = {
-  ...(config.resolver.extraNodeModules ?? {}),
-  "@blumi/home-studio-qa": homeStudioQaModuleDirectory
-}
 const getTransformOptions = config.transformer.getTransformOptions
 
 config.transformer.getTransformOptions = async (...args) => {

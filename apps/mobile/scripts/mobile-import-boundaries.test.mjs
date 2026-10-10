@@ -95,23 +95,3 @@ test("the shared room never reads the viewer's personal room state or storage", 
   )
   assert.deepEqual(describe(offenders), [], "use resolveSharedRoomDecor for the shared room")
 })
-
-// Home Studio QA bitmaps and candidate assets must never reach the production
-// or preview graph. Only the QA feature itself may import them, and the QA
-// screen is reachable only through the Metro-routed live module.
-test("Home Studio QA bindings and screen stay behind the QA module routing", () => {
-  const edges = collectImports("").filter((edge) => !TEST_FILE.test(edge.from))
-  const qaAssetOffenders = edges.filter((edge) =>
-    (edge.to === "src/features/roomStudio/roomStudioQaAssetBindings" ||
-      edge.to.startsWith("src/features/roomStudio/assets/qa/")) &&
-    !edge.from.startsWith("src/features/roomStudio/") &&
-    edge.from !== "src/screens/HomeStudioScreen.tsx"
-  )
-  assert.deepEqual(describe(qaAssetOffenders), [], "QA bitmaps stay inside the Home Studio QA feature")
-
-  const screenOffenders = edges.filter((edge) =>
-    edge.to === "src/screens/HomeStudioScreen" &&
-    !edge.from.startsWith("src/features/roomStudio/homeStudioQaLiveModule/")
-  )
-  assert.deepEqual(describe(screenOffenders), [], "import Home Studio through @blumi/home-studio-qa")
-})

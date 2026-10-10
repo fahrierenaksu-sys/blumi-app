@@ -116,21 +116,6 @@ const sourceFiles = [
   "src/features/roomWorld/myRoomInteractionModel.test.ts",
   "src/features/roomWorld/roomWorldRoomV2Projection.ts",
   "src/features/roomWorld/roomWorldRoomV2Projection.test.ts",
-  "src/features/roomStudio/roomStudioAssetManifest.ts",
-  "src/features/roomStudio/roomStudioAssetManifest.test.ts",
-  "src/features/roomStudio/roomStudioPersistence.ts",
-  "src/features/roomStudio/roomStudioPersistence.test.ts",
-  "src/features/roomStudio/roomStudioProductionIsolation.test.ts",
-  "src/features/roomStudio/roomStudioQaCatalog.ts",
-  "src/features/roomStudio/roomStudioQaCatalog.test.ts",
-  "src/features/roomStudio/roomStudioRecipes.ts",
-  "src/features/roomStudio/roomStudioRecipes.test.ts",
-  "src/features/roomStudio/roomStudioRuntimeGate.ts",
-  "src/features/roomStudio/roomStudioRuntimeGate.test.ts",
-  "src/features/roomStudio/roomStudioSession.ts",
-  "src/features/roomStudio/roomStudioSession.test.ts",
-  "src/features/roomStudio/roomStudioThemeMatrix.ts",
-  "src/features/roomStudio/roomStudioThemeMatrix.test.ts"
 ]
 
 try {
@@ -226,14 +211,6 @@ try {
       join(outputDirectory, "features/roomWorld/roomTapMarkerModel.test.js"),
       join(outputDirectory, "features/roomWorld/myRoomInteractionModel.test.js"),
       join(outputDirectory, "features/roomWorld/roomWorldRoomV2Projection.test.js"),
-      join(outputDirectory, "features/roomStudio/roomStudioAssetManifest.test.js"),
-      join(outputDirectory, "features/roomStudio/roomStudioPersistence.test.js"),
-      join(outputDirectory, "features/roomStudio/roomStudioProductionIsolation.test.js"),
-      join(outputDirectory, "features/roomStudio/roomStudioQaCatalog.test.js"),
-      join(outputDirectory, "features/roomStudio/roomStudioRecipes.test.js"),
-      join(outputDirectory, "features/roomStudio/roomStudioRuntimeGate.test.js"),
-      join(outputDirectory, "features/roomStudio/roomStudioSession.test.js"),
-      join(outputDirectory, "features/roomStudio/roomStudioThemeMatrix.test.js")
     ],
     {
       cwd: workspaceRoot,
@@ -249,17 +226,6 @@ try {
     }
   )
 
-  execFileSync(
-    process.execPath,
-    [
-      "--test",
-      resolve(workspaceRoot, "scripts/homeStudioQaModuleRouting.test.mjs")
-    ],
-    {
-      cwd: workspaceRoot,
-      stdio: "inherit"
-    }
-  )
 
   // Hook lifecycle tests read production sources through the hook harness.
   execFileSync(
