@@ -128,6 +128,15 @@ export type CapabilityRuntimeGates = Readonly<Partial<Record<CapabilityKey, () =
  */
 export type CapabilityDefaultRollouts = Readonly<Partial<Record<CapabilityKey, CapabilityRolloutStage>>>
 
+/**
+ * Production defaults: `chat_typing` stores nothing and has its own kill switch; `avatar_world_25d` is declared by
+ * builds that draw the 2.5D avatar, so the server can tell them from older builds (it changes no behaviour).
+ */
+export const DEFAULT_CAPABILITY_ROLLOUTS: CapabilityDefaultRollouts = Object.freeze({
+  chat_typing: 100,
+  avatar_world_25d: 100
+})
+
 export function createCapabilityService({
   manifest,
   runtimeGates = {},

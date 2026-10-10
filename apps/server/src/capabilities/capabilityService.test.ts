@@ -3,6 +3,7 @@ import test from "node:test"
 import { CAPABILITY_KEYS, type CapabilityKey } from "@blumi/contracts"
 import {
   CAPABILITY_PREREQUISITES,
+  DEFAULT_CAPABILITY_ROLLOUTS,
   createCapabilityService,
   parseCapabilityManifest,
   stableCapabilityBucket
@@ -245,3 +246,13 @@ function transitivePrerequisites(key: CapabilityKey, seen = new Set<CapabilityKe
   }
   return seen
 }
+
+test("a client that declares avatar_world_25d is told so from the start, an older one never is", () => {
+  const service = createCapabilityService({
+    manifest: parseCapabilityManifest(undefined).manifest,
+    defaultRollouts: DEFAULT_CAPABILITY_ROLLOUTS
+  })
+  assert.equal(service.resolve("user-new-build", ["avatar_world_25d"]).capabilities.avatar_world_25d, true)
+  assert.equal(service.resolve("user-old-build", ["chat_typing"]).capabilities.avatar_world_25d, false)
+  assert.equal(service.resolve("user-oldest-build", undefined).capabilities.avatar_world_25d, false)
+})

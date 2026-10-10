@@ -167,3 +167,7 @@ test("mobile declares only known capabilities, each once", () => {
     assert.ok((CAPABILITY_KEYS as readonly string[]).includes(capability), capability)
   }
 })
+
+test("a build that draws the 2.5D avatar declares avatar_world_25d so the server can tell it from older builds", () => {
+  assert.ok((SUPPORTED_MOBILE_CAPABILITIES as readonly string[]).includes("avatar_world_25d"))
+})

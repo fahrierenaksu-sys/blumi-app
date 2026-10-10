@@ -16,7 +16,9 @@ export const SUPPORTED_MOBILE_CAPABILITIES = [
   // Delivery ticks, "görüldü" and the read receipts setting (2026-10-01).
   "chat_read_receipts",
   // "yazıyor…" in chat and over the partner in the room (2026-10-01).
-  "chat_typing"
+  "chat_typing",
+  // This build draws the 2.5D avatar; the server counts builds that do not declare it (2026-10-10).
+  "avatar_world_25d"
 ] as const satisfies readonly CapabilityKey[]
 
 export interface SessionScopedCapabilities {

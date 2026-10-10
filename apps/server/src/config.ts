@@ -56,6 +56,7 @@ import {
 } from "./chat/chatReceiptSchema"
 import { createChatHideSchemaProbe } from "./chat/chatHideSchema"
 import {
+  DEFAULT_CAPABILITY_ROLLOUTS,
   createCapabilityService,
   parseCapabilityManifest,
   type CapabilityService
@@ -870,7 +871,7 @@ function createConfiguredCapabilityService(chatReceiptSchema: ChatReceiptSchemaP
   const chatTypingOn = isChatTypingSwitchedOn(process.env.BLUMI_CHAT_TYPING_ENABLED)
   return createCapabilityService({
     manifest: parseCapabilityManifest(process.env.BLUMI_CAPABILITY_MANIFEST).manifest,
-    defaultRollouts: { chat_typing: 100 },
+    defaultRollouts: DEFAULT_CAPABILITY_ROLLOUTS,
     runtimeGates: {
       chat_read_receipts: () => chatReceiptSchema.peek(),
       chat_typing: () => chatTypingOn
