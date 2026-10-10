@@ -1,3 +1,4 @@
+import { isLegacyItemId } from "@blumi/domain"
 import { PublicRequestError } from "../errors/publicRequestError"
 import {
   clonePersonalRoomDecor,
@@ -29,7 +30,7 @@ export interface PersonalRoomDecorService {
     | {
         kind: "saved"
         snapshot: PersonalRoomDecorSnapshot
-        /** Items left out because the server would not place them (retired, held or unknown ids). */
+        /** Retired items an older client sent; they were left out of the saved room. */
         strippedItemCount: number
       }
     | { kind: "conflict"; current: PersonalRoomDecorSnapshot }
@@ -41,12 +42,15 @@ export function createPersonalRoomDecorService(options: {
   getOwnedRoomItemIds(userId: string): Promise<readonly string[]>
   /** Defaults to the room catalog of this environment minus the retired ids (`roomItemProjection.ts`). */
   isActiveRoomItemId?: (itemId: string) => boolean
+  /** Retired ids an older client may still send; they are left out of a save. Defaults to the legacy registry. */
+  isRetiredItemId?: (itemId: string) => boolean
   roomSnapshotService?: RoomSnapshotService
   onRoomSnapshotError?: (error: unknown, room: PersonalRoomDecorSnapshot) => void
 }): PersonalRoomDecorService {
   const repository =
     options.repository ?? createInMemoryPersonalRoomDecorRepository()
   const isActive = options.isActiveRoomItemId ?? isActiveRoomItemId
+  const isRetiredItemId = options.isRetiredItemId ?? isLegacyItemId
 
   return {
     repository,
@@ -75,15 +79,20 @@ export function createPersonalRoomDecorService(options: {
       ) {
         throw new PublicRequestError("Refresh your room and try again.")
       }
-      // Transition (2.5D cutover): an older client still sends retired ids such as its starter bed. They are left
-      // out, like the read projection leaves them out, instead of refusing the whole save. Nothing is granted:
-      // every item that stays must be active and owned.
+      // Transition (2.5D cutover): an older client still sends retired ids (legacy registry), such as its starter
+      // bed. They are left out, as the read projection leaves them out, instead of refusing the whole save. Held
+      // and unknown ids are still refused, and nothing is granted: every item that stays must be active and owned.
       const sent = normalizePersonalRoomDecor(input.decor)
       const decor: PersonalRoomDecor = {
         ...sent,
-        placedItems: sent.placedItems.filter((item) => isActive(item.itemId))
+        placedItems: sent.placedItems.filter((item) => isActive(item.itemId) || !isRetiredItemId(item.itemId))
       }
       const strippedItemCount = sent.placedItems.length - decor.placedItems.length
+      if (decor.placedItems.some((item) => !isActive(item.itemId))) {
+        throw new PublicRequestError(
+          "Your room includes an item that is not available."
+        )
+      }
       const ownedItemIds = new Set(
         await options.getOwnedRoomItemIds(normalizedUserId)
       )

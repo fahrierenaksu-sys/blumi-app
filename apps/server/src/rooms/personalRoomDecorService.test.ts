@@ -225,12 +225,53 @@ test("a stored room reads without legacy, unknown, held or unowned items and kee
   assert.equal(next.kind, "saved")
 })
 
-// M5 (Phase 2 review): during the 2.5D transition the TestFlight client still sends retired ids (its starter bed
-// is room_v2_cozy_bed). The server leaves out every item it would not place, instead of refusing the whole save,
-// and never places an item outside the active catalog, owned or not.
-test("saving leaves out an item outside the active room catalog even when it is owned", async () => {
+test("saving refuses an item outside the active room catalog even when it is owned", async () => {
   const service = createPersonalRoomDecorService({
     getOwnedRoomItemIds: async () => ["room_v2_chair_blush", "room_v3_sofa_japon_cream"],
+    isActiveRoomItemId: (itemId) => itemId === "room_v2_chair_blush"
+  })
+  await assert.rejects(
+    service.save("user_1", {
+      expectedRevision: 0,
+      decor: {
+        ...DECOR,
+        placedItems: [{ ...DECOR.placedItems[0], itemId: "room_v3_sofa_japon_cream" }]
+      }
+    }),
+    /not available/i
+  )
+})
+
+// M5 (Phase 2 review): during the 2.5D cutover the TestFlight client still sends retired ids (its starter bed is
+// room_v2_cozy_bed). The server leaves a retired id out instead of refusing the whole save; held and unknown ids
+// are still refused, and no item outside the active catalog is ever placed, owned or not.
+test("the default room catalog leaves out a retired id and refuses a held or unknown one", async () => {
+  const service = createPersonalRoomDecorService({
+    getOwnedRoomItemIds: async () => ["room_v2_cozy_bed", "room_v3_sofa_japon_cream", "room_v9_unknown"]
+  })
+  const saved = await service.save("user_1", {
+    expectedRevision: 0,
+    decor: { ...DECOR, placedItems: [{ ...DECOR.placedItems[0], itemId: "room_v2_cozy_bed" }] }
+  })
+  assert.equal(saved.kind, "saved")
+  if (saved.kind !== "saved") return
+  assert.deepEqual(saved.snapshot.decor.placedItems, [])
+  assert.equal(saved.strippedItemCount, 1)
+  assert.deepEqual((await service.repository.get("user_1"))?.decor.placedItems, [])
+  for (const itemId of ["room_v3_sofa_japon_cream", "room_v9_unknown"]) {
+    await assert.rejects(
+      service.save("user_1", {
+        expectedRevision: saved.snapshot.revision,
+        decor: { ...DECOR, placedItems: [{ ...DECOR.placedItems[0], itemId }] }
+      }),
+      /not available/i
+    )
+  }
+})
+
+test("an old client's room save keeps its owned active items and drops only the retired bed", async () => {
+  const service = createPersonalRoomDecorService({
+    getOwnedRoomItemIds: async () => ["room_v2_chair_blush"],
     isActiveRoomItemId: (itemId) => itemId === "room_v2_chair_blush"
   })
   const result = await service.save("user_1", {
@@ -239,7 +280,7 @@ test("saving leaves out an item outside the active room catalog even when it is 
       ...DECOR,
       placedItems: [
         DECOR.placedItems[0],
-        { ...DECOR.placedItems[0], instanceId: "sofa-1", itemId: "room_v3_sofa_japon_cream" }
+        { ...DECOR.placedItems[0], instanceId: "bed-1", itemId: "room_v2_cozy_bed" }
       ]
     }
   })
@@ -247,31 +288,9 @@ test("saving leaves out an item outside the active room catalog even when it is 
   if (result.kind !== "saved") return
   assert.deepEqual(result.snapshot.decor.placedItems.map((item) => item.itemId), ["room_v2_chair_blush"])
   assert.equal(result.strippedItemCount, 1)
-  assert.deepEqual(
-    (await service.repository.get("user_1"))?.decor.placedItems.map((item) => item.itemId),
-    ["room_v2_chair_blush"]
-  )
 })
 
-test("the default room catalog never places a retired, held or unknown room id", async () => {
-  const service = createPersonalRoomDecorService({
-    getOwnedRoomItemIds: async () => ["room_v2_cozy_bed", "room_v3_sofa_japon_cream", "room_v9_unknown"]
-  })
-  let revision = 0
-  for (const itemId of ["room_v2_cozy_bed", "room_v3_sofa_japon_cream", "room_v9_unknown"]) {
-    const result = await service.save("user_1", {
-      expectedRevision: revision,
-      decor: { ...DECOR, placedItems: [{ ...DECOR.placedItems[0], itemId }] }
-    })
-    assert.equal(result.kind, "saved")
-    if (result.kind !== "saved") return
-    revision = result.snapshot.revision
-    assert.deepEqual(result.snapshot.decor.placedItems, [])
-    assert.equal(result.strippedItemCount, 1)
-  }
-})
-
-test("leaving out unavailable items never lets an unowned active item through", async () => {
+test("leaving out a retired item never lets an unowned active item through", async () => {
   const service = createPersonalRoomDecorService({
     getOwnedRoomItemIds: async () => [],
     isActiveRoomItemId: (itemId) => itemId === "room_v2_chair_blush"

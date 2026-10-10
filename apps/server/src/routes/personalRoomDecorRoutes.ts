@@ -82,7 +82,7 @@ export async function registerPersonalRoomDecorRoutes(
         // a count only: never the user, the room or the item ids
         request.log.info(
           { strippedItemCount: result.strippedItemCount },
-          "Room save left out items that are not available"
+          "Room save left out retired items"
         )
       }
       return { roomDecor: result.snapshot }
