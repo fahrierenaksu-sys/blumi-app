@@ -8,6 +8,11 @@ import {
 const METADATA_COLUMNS = `user_id, room_revision, asset_key, mime_type,
                 renderer_version, is_public, headline, updated_at`
 
+/** `roomSnapshotRendererGeneration` in SQL: `room-snapshot-v<N>` is N, any other version is 0. */
+function rendererGenerationSql(column: string): string {
+  return `COALESCE(substring(${column} from '^room-snapshot-v([0-9]+)$')::int, 0)`
+}
+
 interface QueryExecutor {
   query(
     text: string,
@@ -53,7 +58,8 @@ export function createPostgresRoomSnapshotRepository(
            updated_at = EXCLUDED.updated_at
          WHERE blumi_room_showcase_snapshots.room_revision < EXCLUDED.room_revision
             OR (blumi_room_showcase_snapshots.room_revision = EXCLUDED.room_revision
-                AND blumi_room_showcase_snapshots.renderer_version <> EXCLUDED.renderer_version)
+                AND ${rendererGenerationSql("blumi_room_showcase_snapshots.renderer_version")}
+                  < ${rendererGenerationSql("EXCLUDED.renderer_version")})
          RETURNING ${METADATA_COLUMNS}`,
         [
           input.userId,

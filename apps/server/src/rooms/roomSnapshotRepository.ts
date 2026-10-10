@@ -49,12 +49,7 @@ export function createInMemoryRoomSnapshotRepository(): RoomSnapshotRepository {
     },
     async save(input) {
       const current = snapshots.get(input.userId)
-      // a newer revision replaces the row; so does the same revision drawn by another renderer version (v1 -> v2)
-      if (
-        current &&
-        (current.roomRevision > input.roomRevision ||
-          (current.roomRevision === input.roomRevision && current.rendererVersion === input.rendererVersion))
-      ) {
+      if (current && !replacesRoomSnapshot(current, input)) {
         return toRoomShowcaseMetadata(current)
       }
       const next = cloneRoomShowcaseSnapshot({
@@ -79,6 +74,27 @@ export function createInMemoryRoomSnapshotRepository(): RoomSnapshotRepository {
       return toRoomShowcaseMetadata(next)
     }
   }
+}
+
+/**
+ * The generation of a renderer version: `room-snapshot-v<N>` is N, any other version (a test renderer) is 0. The
+ * PostgreSQL upsert computes the same number in SQL (`postgresRoomSnapshotRepository.ts`).
+ */
+export function roomSnapshotRendererGeneration(rendererVersion: string): number {
+  const match = /^room-snapshot-v([0-9]+)$/.exec(rendererVersion)
+  return match ? Number(match[1]) : 0
+}
+
+/**
+ * A newer room revision replaces the row; the same revision is replaced only by a newer renderer generation. One
+ * direction only, so during a rolling deploy an old and a new server never overwrite each other's drawing in turn.
+ */
+function replacesRoomSnapshot(
+  current: Pick<RoomShowcaseSnapshot, "roomRevision" | "rendererVersion">,
+  next: Pick<RoomShowcaseSnapshot, "roomRevision" | "rendererVersion">
+): boolean {
+  if (current.roomRevision !== next.roomRevision) return current.roomRevision < next.roomRevision
+  return roomSnapshotRendererGeneration(current.rendererVersion) < roomSnapshotRendererGeneration(next.rendererVersion)
 }
 
 export function toRoomShowcaseMetadata(snapshot: RoomShowcaseSnapshotMetadata): RoomShowcaseSnapshotMetadata {
