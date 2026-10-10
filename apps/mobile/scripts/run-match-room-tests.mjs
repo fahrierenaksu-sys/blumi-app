@@ -100,7 +100,6 @@ const sourceFiles = [
   "src/features/roomV2/roomStageViewport.ts",
   "src/features/roomV2/roomStageViewport.test.ts",
   "src/features/roomV2/roomV2DirectionalVisual.test.ts",
-  "src/features/roomV2/roomVNextRuntimeGate.ts",
   "src/features/roomWorld/roomWorldGeometry.ts",
   "src/features/roomWorld/roomWorldGeometry.test.ts",
   "src/features/roomWorld/roomWorldRuntime.ts",

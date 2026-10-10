@@ -11,7 +11,6 @@ export interface RoomV2ProviderRuntimeConfigInput {
   storageNamespace: RoomV2StorageNamespace
   isDevelopmentRuntime: boolean
   isQaRuntimeAuthorized?: boolean
-  isVNextRuntimeProof?: boolean
   allowStarterOnboardingEdits?: boolean
   excludedRoomItemIds?: readonly string[]
   inventoryIsReady: boolean
@@ -43,17 +42,12 @@ export function resolveRoomV2ProviderRuntimeConfig(
       input.storageNamespace
     )
     : null
-  const isVNextRuntimeProof = input.isVNextRuntimeProof === true
   const excludedRoomItemIds = new Set(input.excludedRoomItemIds ?? [])
   const qaOwnedRoomItemIds = resolveRoomV2QaOwnedItemIds({
     isDevelopmentRuntime: input.isDevelopmentRuntime,
-    isQaRuntimeAuthorized:
-      input.isQaRuntimeAuthorized === true || isVNextRuntimeProof,
+    isQaRuntimeAuthorized: input.isQaRuntimeAuthorized === true,
     storageNamespace: input.storageNamespace,
-    candidateIds: [
-      ...(isVNextRuntimeProof ? [STARTER_ROOM_BED_ITEM_ID] : []),
-      ...(input.qaOnlyOwnedRoomItemIds ?? [])
-    ]
+    candidateIds: input.qaOnlyOwnedRoomItemIds ?? []
   })
 
   const ownedRoomItemIds = [
@@ -74,8 +68,7 @@ export function resolveRoomV2ProviderRuntimeConfig(
       input.inventoryIsReady ||
       input.allowStarterOnboardingEdits === true ||
       ((input.isDevelopmentRuntime ||
-        input.isQaRuntimeAuthorized === true ||
-        isVNextRuntimeProof) &&
+        input.isQaRuntimeAuthorized === true) &&
         input.storageNamespace === "qa" &&
         qaOwnedRoomItemIds.length > 0)
   }

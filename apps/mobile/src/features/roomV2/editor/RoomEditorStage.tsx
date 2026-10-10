@@ -165,8 +165,7 @@ export function RoomEditorStage(props: {
           placementStateByRenderId={placementStateByRenderId}
           onItemTap={onItemTap}
           itemInteractionMode="edit"
-          roomVNextRuntimeMode="disabled"
-          debugPlacement={false}
+                    debugPlacement={false}
           testID="edit-room-v1"
           style={styles.renderer}
           floorUnderlay={<RoomEditorFloorGridOverlay overlay={floorOverlay} />}

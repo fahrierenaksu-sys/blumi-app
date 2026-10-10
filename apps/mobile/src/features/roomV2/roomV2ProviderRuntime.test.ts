@@ -141,36 +141,6 @@ test("an unauthorized Release runtime cannot gain QA ownership", () => {
   assert.equal(result.inventoryReadyForRoomEdits, false)
 })
 
-test("VNext QA owns the starter bed only in its isolated namespace", () => {
-  const qa = resolveRoomV2ProviderRuntimeConfig({
-    storageScopeId: "vnext-qa-owner",
-    storageNamespace: "qa",
-    isDevelopmentRuntime: false,
-    isQaRuntimeAuthorized: true,
-    inventoryIsReady: false,
-    inventoryOwnedItemIds: [],
-    qaOnlyOwnedRoomItemIds: [],
-    isVNextRuntimeProof: true
-  })
-
-  assert.deepEqual(qa.ownedRoomItemIds, ["room_v3_bed_blumi_starter"])
-  assert.equal(qa.inventoryReadyForRoomEdits, true)
-
-  const production = resolveRoomV2ProviderRuntimeConfig({
-    storageScopeId: "vnext-production-owner",
-    storageNamespace: "production",
-    isDevelopmentRuntime: false,
-    isQaRuntimeAuthorized: false,
-    inventoryIsReady: false,
-    inventoryOwnedItemIds: [],
-    qaOnlyOwnedRoomItemIds: [],
-    isVNextRuntimeProof: true
-  })
-
-  assert.deepEqual(production.ownedRoomItemIds, [])
-  assert.equal(production.inventoryReadyForRoomEdits, false)
-})
-
 test("full-wave QA ownership never leaks the onboarding starter bed", () => {
   const result = resolveRoomV2ProviderRuntimeConfig({
     storageScopeId: "full-wave-qa-owner",
@@ -181,7 +151,6 @@ test("full-wave QA ownership never leaks the onboarding starter bed", () => {
     inventoryOwnedItemIds: [],
     qaOnlyOwnedRoomItemIds: ["room_v3_bed_blumi_starter", "universal_cloud_loveseat_a"],
     allowStarterOnboardingEdits: false,
-    isVNextRuntimeProof: false,
     excludedRoomItemIds: ["room_v3_bed_blumi_starter"]
   })
 

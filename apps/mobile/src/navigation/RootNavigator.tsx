@@ -661,7 +661,6 @@ export function RootNavigator() {
       storageNamespace="production"
       qaOnlyOwnedRoomItemIds={NO_QA_OWNED_ROOM_ITEM_IDS}
       isQaRuntimeAuthorized={false}
-      isVNextRuntimeProof={false}
       allowStarterOnboardingEdits={
         !sessionActor || sessionActor.session.onboarding.room === "incomplete"
       }

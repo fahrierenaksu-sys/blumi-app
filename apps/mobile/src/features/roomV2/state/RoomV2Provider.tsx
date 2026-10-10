@@ -83,7 +83,6 @@ interface RoomV2ProviderProps {
   storageNamespace?: RoomV2StorageNamespace
   qaOnlyOwnedRoomItemIds?: readonly string[]
   isQaRuntimeAuthorized?: boolean
-  isVNextRuntimeProof?: boolean
   allowStarterOnboardingEdits?: boolean
   excludedRoomItemIds?: readonly string[]
   baseHttpUrl?: string
@@ -97,7 +96,6 @@ export function RoomV2Provider({
   storageNamespace = "production",
   qaOnlyOwnedRoomItemIds,
   isQaRuntimeAuthorized = false,
-  isVNextRuntimeProof = false,
   allowStarterOnboardingEdits = false,
   excludedRoomItemIds,
   baseHttpUrl,
@@ -164,7 +162,6 @@ export function RoomV2Provider({
       storageNamespace,
       isDevelopmentRuntime: typeof __DEV__ === "boolean" && __DEV__,
       isQaRuntimeAuthorized,
-      isVNextRuntimeProof,
       allowStarterOnboardingEdits,
       excludedRoomItemIds: JSON.parse(excludedRoomItemIdKey) as string[],
       inventoryIsReady: inventoryStore.isReady,
@@ -176,7 +173,6 @@ export function RoomV2Provider({
       inventoryStore.isReady,
       qaOwnedRoomItemIdKey,
       isQaRuntimeAuthorized,
-      isVNextRuntimeProof,
       allowStarterOnboardingEdits,
       excludedRoomItemIdKey,
       storageNamespace,

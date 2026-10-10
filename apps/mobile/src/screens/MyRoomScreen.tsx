@@ -919,8 +919,7 @@ export function MyRoomScreen({
               stageMarkers={stageMarkers}
               onStageMarkerFaded={handleStageMarkerFaded}
               testID="my-room-production-stage"
-              roomVNextRuntimeMode="disabled"
-              accessibilityValue={{ text: getMyRoomStageAccessibilityValue({ savedItemCount: userRoomDecor.placedItems.length, locale: getAppLocale() }) }}
+                            accessibilityValue={{ text: getMyRoomStageAccessibilityValue({ savedItemCount: userRoomDecor.placedItems.length, locale: getAppLocale() }) }}
               onStagePress={handleStagePress}
               onItemTap={handleRoomItemTap}
               style={[styles.stageRenderer, { width: stageRendererWidth }]}

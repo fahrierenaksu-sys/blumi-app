@@ -66,7 +66,6 @@ function mountRenderer(props: Record<string, unknown>) {
           useRoomRendererScreenFocused: () => true
         },
         "../../../ui/animations": { useReducedMotion: () => false },
-        "../../../config/env": { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF: false },
         "./roomSceneReadiness": loadSourceWithFakeReact("features/roomV2/components/roomSceneReadiness.ts", runtime)
       },
       inertUnknown: true

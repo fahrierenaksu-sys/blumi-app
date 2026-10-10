@@ -24,7 +24,6 @@ import { RoomFloorTapLayer } from "./RoomFloorTapLayer"
 import { getRoomAvatarTapTarget } from "./roomAvatarTapTargetModel"
 import { getRoomFurnitureTapTarget, isRoomFurnitureTapOnSeat } from "./roomFurnitureTapTargetModel"
 import { useReducedMotion } from "../../../ui/animations"
-import { IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF } from "../../../config/env"
 import type { RoomWorldPoint } from "../../roomWorld/roomWorldGeometry"
 import type {
   RoomShell,
@@ -64,7 +63,6 @@ import {
   getRoomV2FurnitureMobileRenderScale,
   isRoomV2LayeredFloorPiece
 } from "../roomV2RenderSurface"
-import type { RoomVNextRuntimeMode } from "../roomVNextRuntimeGate"
 import { ROOM_V2_OUTSIDE_COLOR } from "../roomV2Camera"
 import {
   RoomRendererLiveAvatarFrame,
@@ -104,8 +102,8 @@ interface RoomRenderer2DProps {
   onItemLongPressRelease?: (item: RoomV2RenderItem, point: { pageX: number; pageY: number }) => void
   itemInteractionMode?: "edit" | "interact"
   onStagePress?: (point: RoomWorldPoint) => void
-  /** Explicit QA-only switch; omitted callers stay on the legacy renderer. */
-  roomVNextRuntimeMode?: RoomVNextRuntimeMode
+  /** Draw authored furniture contact-shadow layers (off unless a caller asks). */
+  drawsContactShadows?: boolean
   accessibilityLabel?: string
   accessibilityValue?: AccessibilityValue
   motionEnabled?: boolean
@@ -150,9 +148,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     onItemLongPressRelease,
     itemInteractionMode = "interact",
     onStagePress,
-    roomVNextRuntimeMode = IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF
-      ? "candidate-proof"
-      : "disabled",
+    drawsContactShadows = false,
     accessibilityLabel,
     accessibilityValue,
     motionEnabled = true,
@@ -171,7 +167,6 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     const { width, height } = event.nativeEvent.layout
     setLayoutSize({ width, height })
   }, [])
-  const drawsContactShadows = roomVNextRuntimeMode !== "disabled"
   const markDrawn = useRoomSceneReadiness(
     getRoomSceneReadinessKeys({ renderItems, hiddenRenderIds: hiddenItemRenderIds, drawsContactShadows }),
     onSceneReady

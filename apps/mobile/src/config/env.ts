@@ -54,37 +54,8 @@ export const IS_BLUMI_NATIVE_UI_TEST_SESSION_RESET =
     rawResetFlag: process.env.EXPO_PUBLIC_BLUMI_NATIVE_UI_TEST_SESSION_RESET
   })
 
-export interface BlumiRoomV3DraftPreviewInput {
-  isDevelopmentRuntime: boolean
-  buildProfile: string
-  rawPreviewFlag: string | undefined
-}
-
-export function resolveBlumiRoomV3DraftPreviewEnabled(
-  input: BlumiRoomV3DraftPreviewInput
-): boolean {
-  return (
-    input.isDevelopmentRuntime &&
-    input.buildProfile === "development" &&
-    input.rawPreviewFlag?.trim() === "1"
-  )
-}
-
-/**
- * Universal Core furniture QA has its own explicit gate. Keeping a named
- * resolver prevents the furniture catalog from accidentally inheriting the
- * shell's draft-preview flag.
- */
-export function resolveBlumiUniversalCoreQaEnabled(
-  input: BlumiRoomV3DraftPreviewInput
-): boolean {
-  return resolveBlumiRoomV3DraftPreviewEnabled(input)
-}
-
 export const IS_BLUMI_DEVELOPMENT_RUNTIME =
   typeof __DEV__ === "boolean" && __DEV__
-
-const isDevelopmentRuntime = IS_BLUMI_DEVELOPMENT_RUNTIME
 
 export const BLUMI_ONBOARDING_RUN_V3_QA_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_ONBOARDING_RUN_V3_QA
@@ -99,106 +70,6 @@ export const BLUMI_PROFILE_CHARACTER_REACTION_REVIEW_APPROVED_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_PROFILE_CHARACTER_REACTION_REVIEW_APPROVED
 export const BLUMI_PROFILE_CHARACTER_REACTION_USER_APPROVED_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_PROFILE_CHARACTER_REACTION_USER_APPROVED
-
-export const IS_BLUMI_ROOM_V3_DRAFT_PREVIEW =
-  resolveBlumiRoomV3DraftPreviewEnabled({
-    isDevelopmentRuntime,
-    buildProfile: BLUMI_BUILD_PROFILE,
-    rawPreviewFlag: process.env.EXPO_PUBLIC_BLUMI_ROOM_V3_DRAFT_PREVIEW
-  })
-
-export const BLUMI_ROOM_V3_DRAFT_PREVIEW_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_ROOM_V3_DRAFT_PREVIEW
-
-export const BLUMI_UNIVERSAL_CORE_QA_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_UNIVERSAL_CORE_QA
-
-/** Separate development-only gate for the three Focus 12 candidate products. */
-export const BLUMI_FOCUS_12_QA_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_FOCUS_12_QA
-
-/** Development-only Room Cohesion VNext renderer proof flag. */
-export const BLUMI_ROOM_VNEXT_RUNTIME_PROOF_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_ROOM_VNEXT_RUNTIME_PROOF
-
-/** Development-only 45-piece Room VNext full-wave QA flag. */
-export const BLUMI_ROOM_VNEXT_FULL_WAVE_QA_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_ROOM_VNEXT_FULL_WAVE_QA
-
-/** Candidate-only visual polish overlay for the bounded full-wave QA packet. */
-export const BLUMI_ROOM_VNEXT_FULL_WAVE_POLISH_QA_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_ROOM_VNEXT_FULL_WAVE_POLISH_QA
-
-/** Candidate-only full 45-SKU v2 art packet for bounded Simulator QA. */
-export const BLUMI_ROOM_VNEXT_FULL_WAVE_POLISH_FULL_QA_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_ROOM_VNEXT_FULL_WAVE_POLISH_FULL_QA
-
-/** Candidate-only cute v3 art packet; requires the full-wave QA flag too. */
-export const BLUMI_ROOM_VNEXT_FULL_WAVE_CUTE_V3_QA_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_ROOM_VNEXT_FULL_WAVE_CUTE_V3_QA
-
-/** Explicit promotion approvals; both remain fail-closed unless supplied by
- * the release evidence workflow. They cannot enable a release build because
- * the runtime gate only allow-lists development/native-ui-test profiles. */
-export const BLUMI_ROOM_VNEXT_INDEPENDENT_REVIEW_APPROVED_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_ROOM_VNEXT_INDEPENDENT_REVIEW_APPROVED
-export const BLUMI_ROOM_VNEXT_FINAL_USER_APPROVAL_FLAG =
-  process.env.EXPO_PUBLIC_BLUMI_ROOM_VNEXT_FINAL_USER_APPROVAL
-
-export interface BlumiRoomVNextRuntimeProofInput {
-  isDevelopmentRuntime: boolean
-  buildProfile: string
-  rawProofFlag: string | undefined
-}
-
-export interface BlumiRoomVNextFullWaveQaInput {
-  isDevelopmentRuntime: boolean
-  buildProfile: string
-  rawQaFlag: string | undefined
-}
-
-/**
- * Candidate Room VNext may run in the interactive development app or in the
- * isolated native-ui-test build. It remains closed for every release profile;
- * the native test profile is explicitly allow-listed so Simulator evidence
- * exercises the same candidate renderer instead of silently testing legacy.
- */
-export function resolveBlumiRoomVNextRuntimeProofEnabled(
-  input: BlumiRoomVNextRuntimeProofInput
-): boolean {
-  const allowedBuild =
-    (input.isDevelopmentRuntime && input.buildProfile === "development") ||
-    input.buildProfile === "native-ui-test"
-  return allowedBuild && input.rawProofFlag?.trim() === "1"
-}
-
-export const IS_BLUMI_ROOM_VNEXT_RUNTIME_PROOF =
-  resolveBlumiRoomVNextRuntimeProofEnabled({
-    isDevelopmentRuntime,
-    buildProfile: BLUMI_BUILD_PROFILE,
-    rawProofFlag: BLUMI_ROOM_VNEXT_RUNTIME_PROOF_FLAG
-  })
-
-/**
- * The full-wave 45-piece candidate catalog stays behind its own explicit QA
- * gate so it can reuse the Room editor and QA namespace without replacing the
- * smaller eight-piece proof or affecting production catalogs.
- */
-export function resolveBlumiRoomVNextFullWaveQaEnabled(
-  input: BlumiRoomVNextFullWaveQaInput
-): boolean {
-  const allowedBuild =
-    (input.isDevelopmentRuntime && input.buildProfile === "development") ||
-    input.buildProfile === "native-ui-test"
-  return allowedBuild && input.rawQaFlag?.trim() === "1"
-}
-
-export const IS_BLUMI_ROOM_VNEXT_FULL_WAVE_QA =
-  resolveBlumiRoomVNextFullWaveQaEnabled({
-    isDevelopmentRuntime,
-    buildProfile: BLUMI_BUILD_PROFILE,
-    rawQaFlag: BLUMI_ROOM_VNEXT_FULL_WAVE_QA_FLAG
-  })
 
 export const BLUMI_QA_UNLOCK_AVATAR_ITEMS_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS
