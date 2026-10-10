@@ -202,17 +202,6 @@ export type RootStackParamList = {
     participants: MiniRoomParticipantsRouteParam
   }
   MiniRoomRigPreview: undefined
-  /** Legacy source contract only; the debrief screen is not registered. */
-  RoomDebrief: {
-    miniRoomId: string
-    partner: {
-      userId: string
-      displayName: string
-      avatarSnapshot?: CandidateAvatarSnapshot
-    }
-    durationSeconds: number
-    connected: boolean
-  }
   Inbox: undefined
   MyRoom: undefined
   HomeStudio: undefined
