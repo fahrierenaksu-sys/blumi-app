@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react"
 import { AVATAR_LIVE_BUDGET, type AvatarLiveBudget, type AvatarLiveScope } from "../model/avatarLiveBudget"
+import { useIsSurfaceFocused } from "./useIsSurfaceFocused"
 
 /**
- * Whether this caller may show a live canvas now. `active` must be false whenever the caller is not focused or not
- * shown (an unfocused pager page, a screen behind another): the slot is released and the still shows instead.
+ * Whether this caller may show a live canvas now. Only a caller on the focused screen asks: a mounted pager page
+ * that is not shown, or a screen behind another, releases its slot on blur and shows the still, so the visible
+ * surface always owns the canvas. `active` adds the caller's own condition (a held MiniRoom fade-in, a card
+ * showing its back).
  */
 export function useAvatarLiveSlot(scope: AvatarLiveScope | undefined, active: boolean, budget: AvatarLiveBudget = AVATAR_LIVE_BUDGET): boolean {
   const [granted, setGranted] = useState(false)
+  const isSurfaceFocused = useIsSurfaceFocused()
+  const wantsCanvas = active && isSurfaceFocused
   useEffect(() => {
-    if (!scope || !active) {
+    if (!scope || !wantsCanvas) {
       setGranted(false)
       return undefined
     }
@@ -20,6 +25,6 @@ export function useAvatarLiveSlot(scope: AvatarLiveScope | undefined, active: bo
       unsubscribe()
       budget.release(token)
     }
-  }, [active, budget, scope])
+  }, [budget, scope, wantsCanvas])
   return granted
 }
