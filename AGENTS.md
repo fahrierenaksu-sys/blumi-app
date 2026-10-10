@@ -52,6 +52,7 @@ These rules protect the data:
   - Each cosmetic or furniture item keeps one canonical ID through Shop → Purchase → Inventory → Wardrobe → Avatar → Room → MiniRoom → remote participant.
   - Never rename, reuse or fork an ID or entitlement when art or runtime changes. Hide an item with `RETIRED_AVATAR_ITEM_IDS` instead of deleting it.
   - A new avatar or room system must migrate existing inventories, rooms and loadouts without loss.
+  - Waiver, 2026-10-10, confirmed by the owner in the lead chat: for the 2.5D avatar and room migration only (`docs/release/AVATAR_25D_INTEGRATION_PLAN.md`), old avatar, room and item data need not be migrated, and old items may be deleted instead of hidden. Old rows stay in the database and are ignored by code; old IDs are never reused.
 
 ## Strict: security and privacy
 
