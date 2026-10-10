@@ -106,6 +106,7 @@ import {
 } from "./notifications/notificationPortraitService"
 import { createReactionService, type ReactionService } from "./reactions/reactionService"
 import { createRoomService, type RoomService } from "./rooms/roomService"
+import { resolveQaRoomGrantCatalog } from "./economy/qaRoomGrant"
 import {
   createPersonalRoomDecorService,
   type PersonalRoomDecorService
@@ -568,6 +569,8 @@ export function createConfiguredServerServices(
   })
   const revenueCatPurchaseVerifier = createConfiguredRevenueCatPurchaseVerifier(config)
   if (config.authRepositoryMode === "postgres") {
+    // refuses BLUMI_QA_ROOM_GRANT outside a local memory server
+    resolveQaRoomGrantCatalog({ env: process.env, authRepositoryMode: config.authRepositoryMode })
     const { pool, listenPool } = createDatabasePools(config)
     const onVerifiedPhone = config.smsOutcomeTracking ? createPhoneOutcomeReporter({
       projectId: config.smsOutcomeTracking.projectId, tasks: afterResponseTasks,
@@ -746,7 +749,14 @@ export function createConfiguredServerServices(
     blockPolicy: safetyService,
     profileSource: (userIds) => authService.repository.findAccountsByUserIds(userIds)
   })
-  const economyService = createEconomyService()
+  const qaRoomGrantCatalog = resolveQaRoomGrantCatalog({
+    env: process.env,
+    authRepositoryMode: config.authRepositoryMode
+  })
+  if (qaRoomGrantCatalog) {
+    console.warn("QA room grant is ON: held furniture is owned by every account on this memory server.")
+  }
+  const economyService = createEconomyService({ catalog: qaRoomGrantCatalog })
   const commerceService = createCommerceService({ economyService })
   const roomSnapshotService = createRoomSnapshotService({
     isPublicByDefault: false,
