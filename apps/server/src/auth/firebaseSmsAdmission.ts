@@ -207,10 +207,13 @@ export function createPostgresSmsAdmission(options: {
       // This does not attest the SDK caller itself; a race can consume the
       // intended phone's permit, but cannot authorize a different destination
       // or create another paid send without another budgeted device permit.
+      // Expiry is judged by the database clock at full (microsecond)
+      // precision: `clock` is a millisecond Date, so comparing against it
+      // would accept a permit that expired earlier in the same millisecond.
       const permit = (await client.query(
         `SELECT challenge_key FROM blumi_sms_device_permits
-         WHERE phone_key = $1 AND consumed_at IS NULL AND expires_at > $2
-         ORDER BY created_at LIMIT 1`, [phoneKey, clock]
+         WHERE phone_key = $1 AND consumed_at IS NULL AND expires_at > clock_timestamp()
+         ORDER BY created_at LIMIT 1`, [phoneKey]
       )).rows[0]
       if (!permit) {
         await client.query("ROLLBACK")

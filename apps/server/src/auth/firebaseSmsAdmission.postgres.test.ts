@@ -196,6 +196,23 @@ test("direct provider calls require a fresh destination-bound permit and consume
   } finally { await f.close() }
 })
 
+test("a permit that expired less than a millisecond ago never admits a send", disposablePostgresSkip(), async () => {
+  // PostgreSQL keeps microseconds; a JavaScript Date keeps milliseconds. The
+  // expiry check must use the database clock at full precision, so a permit
+  // that expired within the current millisecond is refused every time.
+  const f = await fixture()
+  try {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const event = input(10 + attempt)
+      await provisionPermit(f.pools[0]!, event)
+      await f.pools[0]!.query(`UPDATE blumi_sms_device_permits SET expires_at = created_at + interval '1 microsecond'
+        WHERE consumed_at IS NULL`)
+      assert.equal((await f.rawReserve[attempt % 2]!(event)).reason, "device_permit_required")
+    }
+    assert.equal((await f.pools[0]!.query("SELECT count(*)::int AS total FROM blumi_sms_send_admissions")).rows[0].total, 0)
+  } finally { await f.close() }
+})
+
 test("parallel requests with rotating phones and IPs cannot overdraw daily money", disposablePostgresSkip(), async () => {
   const f = await fixture()
   try {
