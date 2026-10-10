@@ -15,7 +15,7 @@ import Animated, {
 import { useReducedMotionPreference } from "../../ui/animations"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
 import { AvatarStill } from "../avatar/components/AvatarStill"
-import { avatarInputFromDraft } from "../profile/profileAvatarInput"
+import { avatarInputFromDraft } from "../avatar/model/avatarInput"
 import type { UserAvatar } from "../avatarV2/avatarV2.types"
 import {
   PROFILE_CHARACTER_REACTION_ASSET_MODE,

@@ -12,7 +12,7 @@ import {
   type CandidateAvatarSnapshot
 } from "../features/avatarV2/candidateAvatarSnapshot"
 import { AvatarHero } from "../features/avatar/components/AvatarHero"
-import { avatarInputFromSelection } from "../features/profile/profileAvatarInput"
+import { avatarInputFromSelection } from "../features/avatar/model/avatarInput"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { getLobbyReturnStrategy, goBackOrFallback } from "../navigation/rootNavigationModel"
 import { ReportModal } from "../components/ReportModal"

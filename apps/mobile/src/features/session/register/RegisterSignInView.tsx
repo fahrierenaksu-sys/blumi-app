@@ -17,7 +17,7 @@ import { PrimaryButton } from "../../../ui/primitives"
 import { blumiEntryTheme as uiTheme } from "../../../ui/theme"
 import type { UserAvatar } from "../../avatarV2/avatarV2.types"
 import { AvatarStill } from "../../avatar/components/AvatarStill"
-import { avatarInputFromDraft } from "../../profile/profileAvatarInput"
+import { avatarInputFromDraft } from "../../avatar/model/avatarInput"
 import {
   getAccountRecoveryCopy,
   type AccountRecoveryLocale

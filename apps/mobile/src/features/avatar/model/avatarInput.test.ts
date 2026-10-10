@@ -9,12 +9,12 @@ import {
   resolveAvatarStillLayers,
   type AvatarLoadoutCoercionHints
 } from "@blumi/domain"
-import { resolveAvatarDraw } from "../avatar/model/resolveAvatarDraw"
-import type { Rig25 } from "../avatar/renderer/rigTypes"
-import { avatarInputFromDraft, avatarInputFromSelection } from "./profileAvatarInput"
+import { resolveAvatarDraw } from "./resolveAvatarDraw"
+import type { Rig25 } from "../renderer/rigTypes"
+import { avatarInputFromDraft, avatarInputFromSelection } from "./avatarInput"
 
 const readRig = (name: string) =>
-  JSON.parse(readFileSync(resolve(import.meta.dirname, `../avatar/rigs/${name}/rig25.json`), "utf8")) as Rig25
+  JSON.parse(readFileSync(resolve(import.meta.dirname, `../rigs/${name}/rig25.json`), "utf8")) as Rig25
 const RIGS = { female: readRig("girl"), male: readRig("boy") }
 
 function drawnBy(input: { loadout: unknown; hints: AvatarLoadoutCoercionHints }) {

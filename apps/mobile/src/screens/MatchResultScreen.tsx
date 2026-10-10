@@ -17,7 +17,8 @@ import Reanimated, {
 } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { AvatarStill } from "../features/avatar/components/AvatarStill"
-import { candidateAvatarInput, type CandidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
+import type { AvatarInput } from "../features/avatar/model/avatarInput"
+import { candidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import {
   canOpenMatchExperience
@@ -67,7 +68,7 @@ export function MatchResultScreen(props: MatchResultScreenProps) {
   const { avatar } = useAvatarV2()
   const match = route.params.match
   // The person's own loadout, and the partner's as the server sent it; both are coerced when drawn.
-  const currentAvatar = useMemo((): CandidateAvatarInput => ({ loadout: avatar, hints: {} }), [avatar])
+  const currentAvatar = useMemo((): AvatarInput => ({ loadout: avatar, hints: {} }), [avatar])
   const matchedAvatar = useMemo(
     () => candidateAvatarInput(createCandidateAvatarSnapshot({
       userId: match.matchedUser.userId,
@@ -303,7 +304,7 @@ const SPOTLIGHT_STILL_HEIGHT = 168
 
 function AvatarSpotlight(props: {
   label: string
-  avatar: CandidateAvatarInput
+  avatar: AvatarInput
   /** Faces the other way: the partner turns towards the person. */
   mirror?: boolean
   frameVariant?: AvatarFrameVariant
