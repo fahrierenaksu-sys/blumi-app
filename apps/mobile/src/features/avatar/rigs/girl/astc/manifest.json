@@ -1,0 +1,190 @@
+{
+ "block": [
+  4,
+  4
+ ],
+ "encoder": {
+  "name": "astc-encoder-py",
+  "version": "0.1.12"
+ },
+ "format": "astc-4x4-unorm",
+ "premultiplied": true,
+ "preset": "VERYTHOROUGH",
+ "sets": {
+  "back": {
+   "file": "back.astc.zip",
+   "fileBytes": 2426544,
+   "gpuBytes": 2426544,
+   "height": 592,
+   "layers": 3,
+   "levels": [
+    {
+     "bh": 148,
+     "bw": 256,
+     "h": 592,
+     "w": 1024
+    },
+    {
+     "bh": 74,
+     "bw": 128,
+     "h": 296,
+     "w": 512
+    },
+    {
+     "bh": 37,
+     "bw": 64,
+     "h": 148,
+     "w": 256
+    },
+    {
+     "bh": 19,
+     "bw": 32,
+     "h": 74,
+     "w": 128
+    },
+    {
+     "bh": 10,
+     "bw": 16,
+     "h": 37,
+     "w": 64
+    },
+    {
+     "bh": 5,
+     "bw": 8,
+     "h": 18,
+     "w": 32
+    },
+    {
+     "bh": 3,
+     "bw": 4,
+     "h": 9,
+     "w": 16
+    },
+    {
+     "bh": 1,
+     "bw": 2,
+     "h": 4,
+     "w": 8
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 2,
+     "w": 4
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 1,
+     "w": 2
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 1,
+     "w": 1
+    }
+   ],
+   "pages": [
+    "back_page0.png",
+    "back_page1.png",
+    "back_page2.png"
+   ],
+   "sha256": "bbf94f92a5caf5cc599581ec85ca1fa216aae22201c7f23e873c62fdfa680028",
+   "sourceSha256": {
+    "back_page0.png": "c17cfa6aa06062f92fb5744b17261ba1f8efd6518e754296f1eff03b0b4fd211",
+    "back_page1.png": "975b8677d0ed1b556bd424d9c2a4e488b702e86f7fd6b2a671f1c7367973c7e1",
+    "back_page2.png": "1e104eb23da6b8bd63a95c066e83c74448a6f326431820c9f80bc72a3b92797b"
+   },
+   "width": 1024
+  },
+  "front": {
+   "file": "front.astc.zip",
+   "fileBytes": 2526384,
+   "gpuBytes": 2526384,
+   "height": 616,
+   "layers": 3,
+   "levels": [
+    {
+     "bh": 154,
+     "bw": 256,
+     "h": 616,
+     "w": 1024
+    },
+    {
+     "bh": 77,
+     "bw": 128,
+     "h": 308,
+     "w": 512
+    },
+    {
+     "bh": 39,
+     "bw": 64,
+     "h": 154,
+     "w": 256
+    },
+    {
+     "bh": 20,
+     "bw": 32,
+     "h": 77,
+     "w": 128
+    },
+    {
+     "bh": 10,
+     "bw": 16,
+     "h": 38,
+     "w": 64
+    },
+    {
+     "bh": 5,
+     "bw": 8,
+     "h": 19,
+     "w": 32
+    },
+    {
+     "bh": 3,
+     "bw": 4,
+     "h": 9,
+     "w": 16
+    },
+    {
+     "bh": 1,
+     "bw": 2,
+     "h": 4,
+     "w": 8
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 2,
+     "w": 4
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 1,
+     "w": 2
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 1,
+     "w": 1
+    }
+   ],
+   "pages": [
+    "front_page0.png",
+    "front_page1.png",
+    "front_page2.png"
+   ],
+   "sha256": "a2ad7895c2d8ef1865a7d386c84cef252f45a773c6dbb20f7b5926c360d0998a",
+   "sourceSha256": {
+    "front_page0.png": "aed6b1439a5d0109d3bcf8b0e9d6db8505ba4a3b70883bbdb99b17de5ec4a18c",
+    "front_page1.png": "5fab1d9cd079ed27bb3c5f2b873259609ba30df0e246eb2ed3cf7bddb85e2914",
+    "front_page2.png": "984184d418043a3ccf3c5247f505c0d3021eab0f0199518fa922093067fe2186"
+   },
+   "width": 1024
+  }
+ },
+ "version": 1
+}

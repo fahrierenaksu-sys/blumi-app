@@ -1,0 +1,48 @@
+import assert from "node:assert/strict"
+import { readdirSync, readFileSync } from "node:fs"
+import { join, relative } from "node:path"
+import test from "node:test"
+
+/**
+ * Release-safety guards for the 2.5D avatar module (plan §2.1 step 3, §3.6 D2/D4/D6/D7): no build flag or dev link
+ * reaches it, nothing imports the experiment, the Workbench or a candidate path, and only the GPU files touch
+ * react-native-webgpu, so every pure module (pose, resolver, stills) loads in Node.
+ */
+const ROOT = import.meta.dirname
+const GPU_FILES = new Set(["renderer/Avatar25Canvas.tsx", "renderer/avatar25Gpu.ts"])
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return sourceFiles(path)
+    return /\.(ts|tsx|mjs)$/.test(entry.name) && !/\.test\.(ts|mjs)$/.test(entry.name) ? [path] : []
+  })
+}
+
+const files = sourceFiles(ROOT).map((path) => ({ path: relative(ROOT, path), text: readFileSync(path, "utf8") }))
+
+test("the avatar module reads no build flag and carries no dev link or dev setter", () => {
+  assert.ok(files.length > 10)
+  for (const { path, text } of files) {
+    assert.doesNotMatch(text, /process\.env/, `${path} reads an env flag`)
+    assert.doesNotMatch(text, /blumi:\/\/dev|mini-room-qa/, `${path} names a dev link`)
+    assert.doesNotMatch(text, /setDev[A-Z]|DevOverride|DevQa/, `${path} has a dev switch`)
+  }
+})
+
+test("nothing in the avatar module imports the experiment, the Workbench or a candidate path", () => {
+  for (const { path, text } of files) {
+    const imports = [...text.matchAll(/(?:from\s+|require\()\s*["']([^"']+)["']/g)].map((match) => match[1]!)
+    for (const target of imports) {
+      assert.doesNotMatch(target, /experimental|BlumiArtWorkbench|candidate\/|room-avatar-25d|\/Users\//, `${path} imports ${target}`)
+    }
+  }
+})
+
+test("only the GPU files import react-native-webgpu, and only components draw with the canvas", () => {
+  for (const { path, text } of files) {
+    if (/["']react-native-webgpu["']/.test(text)) assert.ok(GPU_FILES.has(path), `${path} imports react-native-webgpu`)
+    if (/["'][./]+(?:renderer\/)?avatar25Gpu["']/.test(text)) assert.equal(path, "renderer/Avatar25Canvas.tsx", `${path} imports avatar25Gpu`)
+    if (/["'][./]+(?:renderer\/)?Avatar25Canvas["']/.test(text)) assert.match(path, /^components\/.*\.tsx$/, `${path} imports the canvas`)
+  }
+})

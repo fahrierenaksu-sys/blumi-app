@@ -140,7 +140,14 @@ try {
       resolve(workspaceRoot, "src/features/avatarV2/components/avatarTryOnTransitionModel.test.ts"),
       resolve(workspaceRoot, "src/features/shop/screen/shopPurchaseFlightModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarMotionAtlas.test.ts"),
-      resolve(workspaceRoot, "scripts/mobile-bundled-asset-bytes.test.mjs")
+      resolve(workspaceRoot, "scripts/mobile-bundled-asset-bytes.test.mjs"),
+      // 2.5D avatar (plan T1): module guards, total draw resolver, pose, motion, life and ASTC on the bundled rigs
+      resolve(workspaceRoot, "src/features/avatar/avatarModuleGuards.test.ts"),
+      resolve(workspaceRoot, "src/features/avatar/model/resolveAvatarDraw.test.ts"),
+      resolve(workspaceRoot, "src/features/avatar/renderer/avatarRenderer.test.ts"),
+      resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Motion.test.ts"),
+      resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Life.test.ts"),
+      resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Astc.test.ts")
     ],
     {
       cwd: workspaceRoot,

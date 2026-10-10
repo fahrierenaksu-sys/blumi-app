@@ -1,0 +1,182 @@
+{
+ "block": [
+  4,
+  4
+ ],
+ "encoder": {
+  "name": "astc-encoder-py",
+  "version": "0.1.12"
+ },
+ "format": "astc-4x4-unorm",
+ "premultiplied": true,
+ "preset": "VERYTHOROUGH",
+ "sets": {
+  "back": {
+   "file": "back.astc.zip",
+   "fileBytes": 732624,
+   "gpuBytes": 732624,
+   "height": 536,
+   "layers": 1,
+   "levels": [
+    {
+     "bh": 134,
+     "bw": 256,
+     "h": 536,
+     "w": 1024
+    },
+    {
+     "bh": 67,
+     "bw": 128,
+     "h": 268,
+     "w": 512
+    },
+    {
+     "bh": 34,
+     "bw": 64,
+     "h": 134,
+     "w": 256
+    },
+    {
+     "bh": 17,
+     "bw": 32,
+     "h": 67,
+     "w": 128
+    },
+    {
+     "bh": 9,
+     "bw": 16,
+     "h": 33,
+     "w": 64
+    },
+    {
+     "bh": 4,
+     "bw": 8,
+     "h": 16,
+     "w": 32
+    },
+    {
+     "bh": 2,
+     "bw": 4,
+     "h": 8,
+     "w": 16
+    },
+    {
+     "bh": 1,
+     "bw": 2,
+     "h": 4,
+     "w": 8
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 2,
+     "w": 4
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 1,
+     "w": 2
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 1,
+     "w": 1
+    }
+   ],
+   "pages": [
+    "back_page0.png"
+   ],
+   "sha256": "57c545eededda6d9be0f2659271d836a3d5c3537c37139d21d5424b91f541bbb",
+   "sourceSha256": {
+    "back_page0.png": "a0e89dbfc704bb6408a17d95fcc3db0524972ff1bd882659284e8ba1dd1f13d3"
+   },
+   "width": 1024
+  },
+  "front": {
+   "file": "front.astc.zip",
+   "fileBytes": 742992,
+   "gpuBytes": 742992,
+   "height": 544,
+   "layers": 1,
+   "levels": [
+    {
+     "bh": 136,
+     "bw": 256,
+     "h": 544,
+     "w": 1024
+    },
+    {
+     "bh": 68,
+     "bw": 128,
+     "h": 272,
+     "w": 512
+    },
+    {
+     "bh": 34,
+     "bw": 64,
+     "h": 136,
+     "w": 256
+    },
+    {
+     "bh": 17,
+     "bw": 32,
+     "h": 68,
+     "w": 128
+    },
+    {
+     "bh": 9,
+     "bw": 16,
+     "h": 34,
+     "w": 64
+    },
+    {
+     "bh": 5,
+     "bw": 8,
+     "h": 17,
+     "w": 32
+    },
+    {
+     "bh": 2,
+     "bw": 4,
+     "h": 8,
+     "w": 16
+    },
+    {
+     "bh": 1,
+     "bw": 2,
+     "h": 4,
+     "w": 8
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 2,
+     "w": 4
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 1,
+     "w": 2
+    },
+    {
+     "bh": 1,
+     "bw": 1,
+     "h": 1,
+     "w": 1
+    }
+   ],
+   "pages": [
+    "front_page0.png"
+   ],
+   "sha256": "ab97d847778dec246309ef5bbaef0b831a8a187bc2fcf4b565aa1e2dbeb1224b",
+   "sourceSha256": {
+    "front_page0.png": "af714ab32df860a1ea29c916ddf97865a21bf6e54768cfdf460c617e4348be68"
+   },
+   "width": 1024
+  }
+ },
+ "version": 1
+}
