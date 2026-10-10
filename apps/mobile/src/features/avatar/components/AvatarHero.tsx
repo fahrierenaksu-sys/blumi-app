@@ -37,6 +37,9 @@ export interface AvatarHeroProps {
   waveSignal?: number
   style?: StyleProp<ViewStyle>
   accessibilityLabel?: string
+  /** The still under the live canvas: once every layer is on screen, and when a layer fails. */
+  onStillDisplay?: () => void
+  onStillError?: () => void
 }
 
 /** The full-body avatar: the baked still first, cross-fading to a live 2.5D canvas when the live budget grants one. */
@@ -92,7 +95,16 @@ export const AvatarHero = memo(function AvatarHero(props: AvatarHeroProps) {
       style={[{ width, height }, props.style]}
     >
       <Reanimated.View style={[StyleSheet.absoluteFill, stillStyle]}>
-        <AvatarStill loadout={loadout} hints={hints} crop="full" width={width} height={height} mirror={mirror} />
+        <AvatarStill
+          loadout={loadout}
+          hints={hints}
+          crop="full"
+          width={width}
+          height={height}
+          mirror={mirror}
+          onDisplay={props.onStillDisplay}
+          onError={props.onStillError}
+        />
       </Reanimated.View>
       {showLive ? (
         <Reanimated.View style={[StyleSheet.absoluteFill, liveStyle]}>

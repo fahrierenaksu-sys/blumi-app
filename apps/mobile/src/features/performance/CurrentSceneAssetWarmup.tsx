@@ -4,8 +4,9 @@ import { Image as ExpoImage } from "expo-image"
 import { AppState, Image as ReactNativeImage, type ImageSourcePropType } from "react-native"
 import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import { getAvatarV2ShopItemsCompatibleWithBody } from "../avatarV2/avatarBodyCompatibility"
-import { getIdleAvatarLayerAssets } from "../avatarV2/room/avatarIdleAssets"
-import { loadoutToUserAvatar, normalizeCompleteAvatarSelection } from "../avatarV2/avatarSelectionModel"
+import { avatarStillWarmupSources } from "../avatar/model/avatarStillWarmup"
+import { AVATAR_STILL_ASSETS } from "../avatar/stills/stillAssets"
+import { normalizeCompleteAvatarSelection } from "../avatarV2/avatarSelectionModel"
 import { useAvatarV2 } from "../avatarV2/state/AvatarV2Provider"
 import {
   DEFAULT_ROOM_V2_SHELL_ID,
@@ -44,13 +45,13 @@ const shopBackgroundSource = require("../../../assets/ui/home-liquid-background-
 // Shop: the backdrop plus the first cards of both shelves (220 px thumbnails, ~0.2 MB each).
 const SHOP_BUDGET = { maxAssets: 12, maxDecodedBytes: 9 * 1024 * 1024 }
 const SELECTED_PREVIEW_BUDGET = { maxAssets: 4, maxDecodedBytes: 8 * 1024 * 1024 }
-const CURRENT_SCENE_BUDGET = { maxAssets: 15, maxDecodedBytes: 24 * 1024 * 1024 }
+const CURRENT_SCENE_BUDGET = { maxAssets: 24, maxDecodedBytes: 24 * 1024 * 1024 }
 // My Room as saved: the shell and every placed piece, so the room opens whole.
 const ROOM_SCENE_BUDGET = { maxAssets: 12, maxDecodedBytes: 32 * 1024 * 1024 }
-// A shared room about to open: its shell and both idle avatars.
+// A shared room about to open: its shell and both avatars' bust stills.
 const ROOM_ENTRY_BUDGET = { maxAssets: 36, maxDecodedBytes: 16 * 1024 * 1024 }
 // Every image above is one the next screen decodes anyway; this only moves it earlier.
-const SESSION_BUDGET = { maxAssets: 48, maxDecodedBytes: 72 * 1024 * 1024 }
+const SESSION_BUDGET = { maxAssets: 56, maxDecodedBytes: 72 * 1024 * 1024 }
 
 /**
  * The first-viewport warm-ups (room shell, Shop) start this long after the
@@ -262,7 +263,7 @@ export function CurrentSceneAssetWarmup({
     }, true, SCENE_WARMUP_AFTER_ROUTE_MS, canStartBackgroundWarmup)
     const cancelScheduled = scheduleSceneAssetWarmup(() => {
       if (!current) return
-      const sources = getIdleAvatarLayerAssets(avatar).map((asset) => asset.source)
+      const sources = avatarStillWarmupSources(avatar, "full", AVATAR_STILL_ASSETS)
       void warmSources(sources, CURRENT_SCENE_BUDGET, () => current, completed, inFlight, sourceDimensions, prefetchLane)
     }, true, 1_000, canStartBackgroundWarmup)
     cancelCommonRef.current = () => {
@@ -309,11 +310,9 @@ export function CurrentSceneAssetWarmup({
       for (const value of request.avatars) {
         const selection = normalizeCompleteAvatarSelection(value)
         if (!selection) continue
-        try {
-          sources.push(...getIdleAvatarLayerAssets(loadoutToUserAvatar(selection.loadout)).map((asset) => asset.source))
-        } catch {
-          // An avatar that cannot be resolved simply is not warmed.
-        }
+        // The shared room draws both avatars live from the rigs (read lazily, bundled with the app); what the image
+        // cache can warm are the small bust stills of their chips. An avatar that cannot be resolved is not warmed.
+        sources.push(...avatarStillWarmupSources(selection.loadout, "bust", AVATAR_STILL_ASSETS, { presetId: selection.presetId }))
       }
       void warmSources(
         sources,

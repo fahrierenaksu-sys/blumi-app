@@ -122,6 +122,8 @@ interface SwipeableDiscoverCardProps {
   onFrontImageError?: () => void
   deferFrontAvatar?: boolean
   deferBackAvatar?: boolean
+  /** The deck's one live avatar: true only for the top card while Discover is the focused, shown screen. */
+  avatarLiveActive?: boolean
   /** Flying out after its decision (`leaving`); the deck removes it on `onExitEnd`. */
   leaving?: boolean; exitRequest?: DiscoverCardExitRequest | null; onExitEnd?: (userId: string) => void
 }
@@ -472,7 +474,9 @@ export const SwipeableDiscoverCard = memo(function SwipeableDiscoverCard(props: 
               snapshot={avatarSnapshot}
               size={avatarSize}
               stage="discover"
-              imagePriority={imagePriority}
+              live
+              liveActive={props.avatarLiveActive === true && !isBackVisible && !props.leaving}
+              reduceMotion={reduceMotion}
               onDisplay={props.onFrontDisplay ? handleFrontAvatarDisplay : undefined}
               onImageError={props.onFrontImageError}
             /></View> : null}
@@ -571,7 +575,7 @@ function DiscoveryCardBack(props: {
               snapshot={snapshot}
               size={54}
               stage="discover"
-              imagePriority={imagePriority}
+              crop="half"
             /> : null}
           </View>
           <View>

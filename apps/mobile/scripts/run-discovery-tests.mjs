@@ -173,6 +173,10 @@ try {
       "src/features/discovery/screen/useProductionDiscoveryQuery.test.ts",
       "src/features/discovery/discoverySwipeModel.test.ts",
       "src/components/DiscoverCard.test.ts",
+      "src/features/avatar/components/useStillDisplayReceipts.test.ts",
+      "src/features/avatar/model/stillDisplayReceipts.test.ts",
+      "src/features/avatar/model/candidateAvatarInput.test.ts",
+      "src/features/avatar/model/avatarStillWarmup.test.ts",
       "src/features/discovery/copyLocaleParity.test.ts",
       "src/ui/preparedDiscoveryLoadingScreen.test.ts"
     ],

@@ -1,23 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useMemo } from "react"
 import type { AvatarSelection } from "@blumi/contracts"
 import { ImageBackground, StyleSheet, Text, View } from "react-native"
 import Animated from "react-native-reanimated"
 import type { RealtimeConnectionStatus } from "@blumi/realtime-client"
+import { AvatarHero } from "../features/avatar/components/AvatarHero"
+import { AvatarStill } from "../features/avatar/components/AvatarStill"
+import { candidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
 import {
-  ROOM_AVATAR_CATALOG
-} from "../features/avatarV2/room/avatarRoomCatalog"
-import {
-  getRoomAvatarRenderLayers
-} from "../features/avatarV2/room/avatarRoomSelectors"
-import { RoomAvatarRenderer2D } from "../features/avatarV2/room/components/RoomAvatarRenderer2D"
-import {
-  createCandidateAvatarAppearance,
   createCandidateAvatarSnapshot,
   type CandidateAvatarSnapshot
 } from "../features/avatarV2/candidateAvatarSnapshot"
 import { LinearGradient } from "../ui/linearGradient"
 import { usePulse } from "../ui/animations"
-import { MyAvatar } from "../ui/myAvatar"
+import { MyAvatarStill } from "../ui/myAvatarStill"
 import { TagChip } from "../ui/primitives"
 import { uiTheme } from "../ui/theme"
 
@@ -160,46 +155,37 @@ export function DiscoverCard(props: DiscoverCardProps) {
   )
 }
 
-export function CandidateAvatarPreview(props: {
+/** The figure fills this share of the stage width and height; the platform and glow sit behind its feet. */
+const FIGURE_WIDTH_SHARE = 0.78
+const FIGURE_HEIGHT_SHARE = 0.82
+
+export interface CandidateAvatarPreviewProps {
   snapshot: CandidateAvatarSnapshot
   size?: number
   stage?: "discover" | "profile" | "match"
-  imagePriority?: "low" | "normal" | "high"
+  /** `full` stands the whole figure on a platform; `half` shows it down to the hips (match moment, card back). */
+  crop?: "full" | "half"
+  /** Mirrored to face the other way (the partner in the match moment). */
+  mirror?: boolean
+  /**
+   * Draws the live-capable hero (Discover's front cards): it is a baked still until `liveActive` and the live
+   * budget grant a canvas, so a card promoted to the top is never remounted. Every other use is a plain still.
+   */
+  live?: boolean
+  liveActive?: boolean
+  reduceMotion?: boolean
   onDisplay?: () => void
   onImageError?: () => void
-}) {
-  const { snapshot, size = 160, stage = "profile", imagePriority = "high", onDisplay } = props
-  const layers = useMemo(() => {
-    const appearance = createCandidateAvatarAppearance(snapshot)
-    return getRoomAvatarRenderLayers({
-      appearance,
-      catalog: ROOM_AVATAR_CATALOG
-    })
-  }, [snapshot])
-  const displayScope = JSON.stringify(snapshot)
-  // Display receipts are recorded whether or not anyone listens yet: a Discover
-  // card behind the top one gets `onDisplay` only when it is promoted, and its
-  // layers, already on screen, do not display again. Receipts live in a ref
-  // and only the moment every layer has shown renders (once per avatar).
-  const shownLayersRef = useRef<{ scope: string; ids: Set<string> }>({ scope: displayScope, ids: new Set() })
-  const [completedScope, setCompletedScope] = useState<string | null>(null)
-  const onLayerDisplay = useCallback((id: string) => {
-    if (shownLayersRef.current.scope !== displayScope) {
-      shownLayersRef.current = { scope: displayScope, ids: new Set() }
-    }
-    const shown = shownLayersRef.current.ids
-    shown.add(id)
-    if (layers.length > 0 && layers.every((layer) => shown.has(`${layer.type}:${layer.id}`))) {
-      setCompletedScope(displayScope)
-    }
-  }, [displayScope, layers])
-  const allDisplayed = completedScope === displayScope
-  useEffect(() => {
-    if (allDisplayed) onDisplay?.()
-  }, [allDisplayed, onDisplay])
+}
+
+/** Another person's chibi on a soft stage: the baked 2.5D still, or the live hero on Discover's top card. */
+export function CandidateAvatarPreview(props: CandidateAvatarPreviewProps) {
+  const { snapshot, size = 160, stage = "profile", crop = "full", mirror = false, live = false } = props
+  const input = useMemo(() => candidateAvatarInput(snapshot), [snapshot])
+  const isFull = crop === "full"
   const platformWidth = size * (stage === "discover" ? 0.96 : 0.82)
-  const avatarWidth = size * 0.62
-  const avatarHeight = avatarWidth / (256 / 384)
+  const figureWidth = isFull ? size * FIGURE_WIDTH_SHARE : size
+  const figureHeight = isFull ? size * FIGURE_HEIGHT_SHARE : size
 
   return (
     <View
@@ -209,8 +195,9 @@ export function CandidateAvatarPreview(props: {
         {
           width: size,
           height: size,
-          borderRadius: size * 0.18
-        }
+          borderRadius: isFull ? size * 0.18 : size / 2
+        },
+        isFull ? null : cardStyles.candidateAvatarStageHalf
       ]}
     >
       <View
@@ -224,30 +211,45 @@ export function CandidateAvatarPreview(props: {
           }
         ]}
       />
-      <View
-        pointerEvents="none"
-        style={[
-          cardStyles.candidateAvatarPlatform,
-          {
-            width: platformWidth,
-            height: size * 0.2,
-            borderRadius: size * 0.1
-          }
-        ]}
-      />
-      <View
-        style={[
-          cardStyles.candidateAvatarBody,
-          {
-            width: avatarWidth,
-            height: avatarHeight
-          }
-        ]}
-      >
-        {/* One identity per avatar: gaining or losing the receipt listener (a
-            Discover card promoted to the top) never remounts the layers. */}
-        <RoomAvatarRenderer2D key={displayScope} layers={layers} imagePriority={imagePriority}
-          onLayerDisplay={onLayerDisplay} onImageError={props.onImageError} />
+      {isFull ? (
+        <View
+          pointerEvents="none"
+          style={[
+            cardStyles.candidateAvatarPlatform,
+            {
+              width: platformWidth,
+              height: size * 0.2,
+              borderRadius: size * 0.1
+            }
+          ]}
+        />
+      ) : null}
+      <View style={isFull ? cardStyles.candidateAvatarBody : cardStyles.candidateAvatarBodyHalf}>
+        {live && isFull ? (
+          <AvatarHero
+            loadout={input.loadout}
+            hints={input.hints}
+            width={figureWidth}
+            height={figureHeight}
+            mirror={mirror}
+            liveScope="screen"
+            liveActive={props.liveActive === true}
+            reduceMotion={props.reduceMotion}
+            onStillDisplay={props.onDisplay}
+            onStillError={props.onImageError}
+          />
+        ) : (
+          <AvatarStill
+            loadout={input.loadout}
+            hints={input.hints}
+            crop={crop}
+            width={figureWidth}
+            height={figureHeight}
+            mirror={mirror}
+            onDisplay={props.onDisplay}
+            onError={props.onImageError}
+          />
+        )}
       </View>
     </View>
   )
@@ -263,7 +265,7 @@ export interface EmptyDiscoverCardProps {
 }
 
 export function EmptyDiscoverCard(props: EmptyDiscoverCardProps) {
-  const { connectionStatus, myDisplayName, myUserId, hasSeenEveryone } = props
+  const { connectionStatus, myDisplayName, hasSeenEveryone } = props
   const connecting = connectionStatus === "connecting" || connectionStatus === "idle"
   const offline = connectionStatus === "error" || connectionStatus === "disconnected" || connectionStatus === "unreachable"
 
@@ -293,9 +295,8 @@ export function EmptyDiscoverCard(props: EmptyDiscoverCardProps) {
         <View style={cardStyles.heroGlassWash} pointerEvents="none" />
         <View style={cardStyles.heroGlow} pointerEvents="none" />
         <View style={cardStyles.heroGlowSecondary} pointerEvents="none" />
-        <MyAvatar
+        <MyAvatarStill
           name={myDisplayName}
-          seed={myUserId}
           size={132}
           ring="soft"
         />
@@ -376,8 +377,14 @@ const cardStyles = StyleSheet.create({
     backgroundColor: "rgba(64, 31, 66, 0.18)",
     transform: [{ rotate: "-3deg" }]
   },
+  candidateAvatarStageHalf: {
+    justifyContent: "center"
+  },
   candidateAvatarBody: {
-    marginBottom: "8%",
+    marginBottom: "14%",
+    zIndex: 2
+  },
+  candidateAvatarBodyHalf: {
     zIndex: 2
   },
   heroInfoPanel: {

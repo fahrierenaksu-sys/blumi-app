@@ -1,5 +1,6 @@
 import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { useIsFocused } from "@react-navigation/native"
 import {
   StyleSheet,
   Text,
@@ -89,6 +90,8 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
     [screenWidth, screenHeight]
   )
   const reduceMotion = useReducedMotion()
+  // The deck's one live avatar (plan 2.2): only while this page is the focused, shown one.
+  const isDiscoverFocused = useIsFocused()
   const [isFeaturedFlipped, setIsFeaturedFlipped] = useState(false)
   const actionRowOpacity = useSharedValue(1)
   const visibleProfiles = useMemo(
@@ -241,6 +244,7 @@ export function DiscoveryDeckView(props: DiscoveryDeckViewProps) {
                   onFrontImageError={isTop ? props.onFrontImageError : undefined}
                   deferFrontAvatar={!isTop && props.deferSecondaryImages}
                   deferBackAvatar={props.deferSecondaryImages}
+                  avatarLiveActive={isTop && !leaving && isDiscoverFocused}
                 />
               </DeckCardContainer>
             )

@@ -4,6 +4,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { resolveAvatarStillLayers, type AvatarLoadoutCoercionHints, type AvatarStillRect } from "@blumi/domain"
 import { avatarStillWindow, layoutAvatarStill, type AvatarStillCrop } from "../model/avatarStillLayout"
 import { AVATAR_STILL_ASSETS } from "../stills/stillAssets"
+import { useStillDisplayReceipts } from "./useStillDisplayReceipts"
 
 export interface AvatarStillProps {
   /** Anyone's loadout as stored or received: resolved by the domain still resolver (total). */
@@ -17,6 +18,10 @@ export interface AvatarStillProps {
   mirror?: boolean
   style?: StyleProp<ViewStyle>
   accessibilityLabel?: string
+  /** Once, when every layer of this look is on screen (startup readiness). */
+  onDisplay?: () => void
+  /** A layer failed to draw. */
+  onError?: () => void
 }
 
 /**
@@ -33,6 +38,8 @@ export const AvatarStill = memo(function AvatarStill(props: AvatarStillProps) {
     () => layoutAvatarStill(still, window ?? avatarStillWindow(still, crop), { width, height }),
     [crop, height, still, width, window]
   )
+  const assets = useMemo(() => layout.frames.map((frame) => frame.asset), [layout.frames])
+  const onLayerDisplay = useStillDisplayReceipts(assets.join("|"), assets, props.onDisplay)
   return (
     <View
       accessible={props.accessibilityLabel !== undefined}
@@ -48,6 +55,8 @@ export const AvatarStill = memo(function AvatarStill(props: AvatarStillProps) {
           contentFit="fill"
           cachePolicy="memory"
           transition={0}
+          onDisplay={() => onLayerDisplay(frame.asset)}
+          onError={props.onError}
         />
       ))}
     </View>

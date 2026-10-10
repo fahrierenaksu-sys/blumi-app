@@ -24,9 +24,9 @@ import { hapticLight } from "../ui/haptics"
 import { uiTheme } from "../ui/theme"
 import { getAppLocale } from "../features/session/appLocale"
 
-  // Demo-only visual fixture. Production Discovery receives roomSnapshotUrl
-  // from the server's revision-bound Room Save projection instead.
-  const demoRoomSnapshot = require("../features/miniRoom/assets/runtime/rooms/cozy_pink_bedroom/room_snapshot_card.png")
+  // Demo-only visual fixture: the empty shell of the calibrated room. Production Discovery receives
+  // roomSnapshotUrl from the server's revision-bound Room Save projection instead.
+  const demoRoomSnapshot = require("../features/roomV2/assets/runtime/room_shell_blumi_world_v1.webp")
 
 interface DemoLobbyViewProps {
   sessionActor: SessionActor

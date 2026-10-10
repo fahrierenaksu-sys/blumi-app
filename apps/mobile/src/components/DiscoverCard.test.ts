@@ -5,11 +5,11 @@ import {
   createReactNativeStub,
   loadSourceWithFakeReact
 } from "../testing/hookHarness"
+import { candidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
 
-// A Discover card behind the top one draws its chibi without the startup
-// receipt listener; promotion to the top card adds it. The chibi must not be
-// remounted then (it would blank and pop in), and the receipt must still
-// arrive although its layers are already on screen and never display again.
+// The chibi on Discover and in the match moment is the baked 2.5D still. Discover's front cards are the
+// live-capable hero (a still until the live budget grants a canvas), so promoting a card to the top card never
+// remounts its figure; everything else is a plain still.
 
 interface Element {
   type: unknown
@@ -17,28 +17,26 @@ interface Element {
   props: Record<string, unknown> & { children?: unknown }
 }
 
-function RoomAvatarRenderer2D() {
+function AvatarHero() {
+  return null
+}
+function AvatarStill() {
   return null
 }
 
-function findRenderer(node: unknown): Element | undefined {
+function find(node: unknown, type: unknown): Element | undefined {
   if (!node || typeof node !== "object") return undefined
   if (Array.isArray(node)) {
     for (const child of node) {
-      const found = findRenderer(child)
+      const found = find(child, type)
       if (found) return found
     }
     return undefined
   }
   const element = node as Element
-  if (element.type === RoomAvatarRenderer2D) return element
-  return findRenderer(element.props?.children)
+  if (element.type === type) return element
+  return find(element.props?.children, type)
 }
-
-const LAYERS = [
-  { type: "body", id: "body-1" },
-  { type: "hair", id: "hair-1" }
-]
 
 function mountPreview() {
   const runtime = createFakeReactRuntime()
@@ -47,58 +45,56 @@ function mountPreview() {
   }>("components/DiscoverCard.tsx", runtime, {
     modules: {
       "react-native": createReactNativeStub().module,
-      "../features/avatarV2/room/components/RoomAvatarRenderer2D": { RoomAvatarRenderer2D },
-      "../features/avatarV2/room/avatarRoomSelectors": { getRoomAvatarRenderLayers: () => LAYERS },
-      "../features/avatarV2/candidateAvatarSnapshot": {
-        createCandidateAvatarAppearance: () => ({}),
-        createCandidateAvatarSnapshot: () => ({})
-      }
+      "../features/avatar/components/AvatarHero": { AvatarHero },
+      "../features/avatar/components/AvatarStill": { AvatarStill },
+      "../features/avatar/model/candidateAvatarInput": { candidateAvatarInput }
     },
     inertUnknown: true
   })
-  const render = (props: Record<string, unknown>) => {
-    const output = runtime.render(() => CandidateAvatarPreview(props))
-    const renderer = findRenderer(output)
-    assert.ok(renderer, "the preview draws the layered avatar")
-    return renderer
-  }
+  const render = (props: Record<string, unknown>) => runtime.render(() => CandidateAvatarPreview(props))
   return { render }
 }
 
-const snapshot = { displayName: "Defne", label: "chibi", presetId: "preset-a" }
+const snapshot = { kind: "candidate_avatar_snapshot", displayName: "Defne", label: "chibi", bodyPreset: "female" }
 
-test("a card promoted to the top keeps its chibi mounted and still reports it displayed", () => {
+test("a Discover front card is the hero; it only asks for a live canvas while it is the active top card", () => {
   const preview = mountPreview()
-  // Behind the top card: no listener yet, the layers display.
-  const behind = preview.render({ snapshot, stage: "discover" })
-  const reportLayer = behind.props.onLayerDisplay as (id: string) => void
-  reportLayer("body:body-1")
-  reportLayer("hair:hair-1")
+  const behind = find(preview.render({ snapshot, stage: "discover", live: true, liveActive: false }), AvatarHero)
+  assert.ok(behind, "a card behind the top one is drawn by the hero, as a still")
+  assert.equal(behind.props.liveScope, "screen")
+  assert.equal(behind.props.liveActive, false)
 
-  // Promoted: the startup receipt listener arrives.
-  let receipts = 0
-  const onTop = preview.render({ snapshot, stage: "discover", onDisplay: () => { receipts += 1 } })
-  assert.equal(onTop.key, behind.key, "same identity, so the layers are not remounted")
-  assert.equal(onTop.props.onLayerDisplay, behind.props.onLayerDisplay)
-  assert.equal(receipts, 1, "the receipt arrives for layers already on screen")
+  const onTop = find(preview.render({ snapshot, stage: "discover", live: true, liveActive: true }), AvatarHero)
+  assert.ok(onTop)
+  assert.equal(onTop.type, behind.type, "promotion keeps the same figure mounted")
+  assert.equal(onTop.props.liveActive, true)
 })
 
-test("the receipt waits for every layer and starts over for a different avatar", () => {
+test("the startup receipt and error of the figure come from the still under the hero", () => {
   const preview = mountPreview()
-  let receipts = 0
-  const onDisplay = () => { receipts += 1 }
-  const first = preview.render({ snapshot, onDisplay })
-  ;(first.props.onLayerDisplay as (id: string) => void)("body:body-1")
-  preview.render({ snapshot, onDisplay })
-  assert.equal(receipts, 0, "one layer is not the whole chibi")
+  const onDisplay = () => undefined
+  const onImageError = () => undefined
+  const hero = find(preview.render({ snapshot, live: true, onDisplay, onImageError }), AvatarHero)
+  assert.equal(hero?.props.onStillDisplay, onDisplay)
+  assert.equal(hero?.props.onStillError, onImageError)
+})
 
-  const changed = preview.render({ snapshot: { ...snapshot, presetId: "preset-b" }, onDisplay })
-  assert.notEqual(changed.key, first.key, "a new look is a new avatar")
-  const report = changed.props.onLayerDisplay as (id: string) => void
-  report("hair:hair-1")
-  preview.render({ snapshot: { ...snapshot, presetId: "preset-b" }, onDisplay })
-  assert.equal(receipts, 0, "receipts of the previous avatar do not count")
-  report("body:body-1")
-  preview.render({ snapshot: { ...snapshot, presetId: "preset-b" }, onDisplay })
-  assert.equal(receipts, 1)
+test("everything else is a baked still, never the live hero", () => {
+  const preview = mountPreview()
+  const flight = preview.render({ snapshot, stage: "discover", size: 120 })
+  assert.equal(find(flight, AvatarHero), undefined)
+  assert.equal(find(flight, AvatarStill)?.props.crop, "full")
+})
+
+test("the match moment shows the partner's half-body still turned towards the person", () => {
+  const preview = mountPreview()
+  const still = find(preview.render({ snapshot, stage: "match", size: 96, crop: "half", mirror: true }), AvatarStill)
+  assert.equal(still?.props.crop, "half")
+  assert.equal(still?.props.mirror, true)
+})
+
+test("a half-body crop never mounts the live hero, even when asked", () => {
+  const preview = mountPreview()
+  const output = preview.render({ snapshot, crop: "half", live: true, liveActive: true })
+  assert.equal(find(output, AvatarHero), undefined)
 })
