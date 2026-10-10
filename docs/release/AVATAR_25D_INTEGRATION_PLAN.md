@@ -482,6 +482,8 @@ Default room: created on the client as today (`roomStarterModel.ts`), saved with
 | after §12 | Each priced batch leaves `pricing-pending`; a paid or price-0 Shop item gets an owner-approved receipt binding its new runtime bytes | owner only |
 | later | Any paid item | only with an owner-approved receipt that binds its new runtime bytes |
 
+Record of what is current (Phase 2 review L4): `docs/quality/SHOP_CATALOG_PUBLICATION_2026-09-30.md` still lists the six room items (the chair and the five retired pieces) as published. Their receipts were removed in 29b43912, and `blumiR1ReleaseCatalog.json` is the current record. The publication file stays byte-for-byte as it is, because every remaining receipt pins its SHA-256 (`shopReleaseCatalog.test.ts`), and editing it would force a reissue that only the owner can approve. Read it as the 2026-09-30 snapshot, not as today's shop.
+
 ### 5.4 Legacy registry and tolerant reads
 
 | Piece | Rule |
