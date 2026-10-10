@@ -369,6 +369,28 @@ export function getDiscoverDeckEntrance(
   return { opacity: clamped, scale: reduceMotion ? 1 : mix(0.94, 1, clamped) }
 }
 
+export interface DiscoverDeckCardMount {
+  /** The card's entrance progress in its committed (React-side) style. */
+  readonly entrance: 0 | 1
+  /** Whether a mount animation, started by the mount itself, fades the card in. */
+  readonly fadesInOnMount: boolean
+}
+
+/**
+ * How a card first appears. A card mounted straight into the deck (`entering`)
+ * is visible in its committed style and fades in with a mount animation that
+ * the mount itself starts. It must not mount hidden and wait for a UI-thread
+ * update: on iOS animated opacity and transform are applied to the native view
+ * directly, and an update sent before that view exists (a stalled main thread
+ * at startup) is lost, which left the whole deck invisible. A standby card
+ * mounts hidden; the deck's advance reveals it at a later release, long after
+ * its view exists.
+ */
+export function getDiscoverDeckCardMount(role: DiscoverDeckRole, entering: boolean): DiscoverDeckCardMount {
+  if (role === "standby") return { entrance: 0, fadesInOnMount: false }
+  return { entrance: 1, fadesInOnMount: entering }
+}
+
 /** px/s. A Like or Pass press throws the card as a brisk release would. */
 export const DISCOVER_BUTTON_THROW_VELOCITY = 2000
 

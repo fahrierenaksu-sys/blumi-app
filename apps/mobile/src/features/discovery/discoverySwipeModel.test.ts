@@ -21,6 +21,7 @@ import {
   getDiscoverDeckReanchorRank,
   isDiscoverDeckRoleOnScript,
   getDiscoverDeckDragMotion,
+  getDiscoverDeckCardMount,
   getDiscoverDeckEntrance,
   getDiscoverDeckRoleMotion,
   getDiscoverDeckRoleProgress,
@@ -430,4 +431,21 @@ test("a standby card has the back card's pose and only shows once the deck revea
   // Progress never leaves the deck, however far the step runs.
   assert.equal(getDiscoverDeckCardProgress(STANDBY, 6, 4), STANDBY)
   assert.equal(getDiscoverDeckCardProgress(TOP, 0, 9), TOP)
+})
+
+test("a card mounted straight into the deck is visible in its committed style and fades in from the mount", () => {
+  for (const role of ["top", "middle", "bottom"] as const) {
+    assert.deepEqual(getDiscoverDeckCardMount(role, true), { entrance: 1, fadesInOnMount: true })
+  }
+})
+
+test("a card of the deck's first render takes its slot at once", () => {
+  for (const role of ["top", "middle", "bottom"] as const) {
+    assert.deepEqual(getDiscoverDeckCardMount(role, false), { entrance: 1, fadesInOnMount: false })
+  }
+})
+
+test("a standby card mounts hidden and waits for the deck's advance", () => {
+  assert.deepEqual(getDiscoverDeckCardMount("standby", true), { entrance: 0, fadesInOnMount: false })
+  assert.deepEqual(getDiscoverDeckCardMount("standby", false), { entrance: 0, fadesInOnMount: false })
 })

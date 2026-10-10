@@ -33,6 +33,7 @@ import {
   getDiscoverActionExitDuration,
   getDiscoverDeckCardProgress,
   getDiscoverDeckDragMotion,
+  getDiscoverDeckCardMount,
   getDiscoverDeckEntrance,
   getDiscoverDeckRoleMotion,
   getDiscoverDeckRoleProgress,
@@ -344,7 +345,13 @@ function DeckCardContainer(props: {
   const anchorRef = useRef<DiscoverDeckAnchor>({ rank, commits: deckCommits })
   // A card that starts on top was carried fully forward.
   const promotedDragX = useSharedValue(DISCOVER_MIDDLE_CARD_TRAVEL)
-  const entrance = useSharedValue(props.entering || role === "standby" ? 0 : 1)
+  // Decided at mount: see getDiscoverDeckCardMount.
+  const mountRef = useRef(getDiscoverDeckCardMount(role, props.entering))
+  const entrance = useSharedValue(mountRef.current.entrance)
+  const enteringAnimation = useMemo(
+    () => mountRef.current.fadesInOnMount ? createDiscoverDeckCardEntering(reduceMotion) : undefined,
+    [reduceMotion]
+  )
   const previousRef = useRef({ role, featuredUserId })
   // Child layout effects run before the deck's, so the drag of the card that
   // just left is still readable here (the deck resets it for the new top).
@@ -367,7 +374,9 @@ function DeckCardContainer(props: {
     () => getDiscoverDeckCardProgress(anchorRank.value, anchorStep.value, deckTarget.value) > STANDBY_PROGRESS,
     (revealed, previous) => {
       if (revealed === previous) return
-      entrance.value = withTiming(revealed ? 1 : 0, { duration: DISCOVER_DECK_ENTRANCE_MS, reduceMotion: ReduceMotion.Never })
+      const target = revealed ? 1 : 0
+      if (entrance.value === target) return
+      entrance.value = withTiming(target, { duration: DISCOVER_DECK_ENTRANCE_MS, reduceMotion: ReduceMotion.Never })
     }
   )
   const motionStyle = useAnimatedStyle(() => {
@@ -396,28 +405,45 @@ function DeckCardContainer(props: {
       opacity: getDiscoverDeckRoleMotion(progress, getDiscoverDeckDragMotion(role, 0), getDiscoverMiddleCardAdvance(dragX)).overlayOpacity
     }
   })
+  // The mount animation and the slot motion live on separate views so they
+  // never write the same opacity and transform.
   return (
     <Animated.View
-      style={[
+      entering={enteringAnimation}
+      style={
         leaving
           ? styles.leavingCardContainer
           : role === "top"
             ? styles.topCardContainer
             : role === "middle"
               ? styles.middleCardContainer
-              : styles.bottomCardContainer,
-        motionStyle
-      ]}
+              : styles.bottomCardContainer
+      }
       pointerEvents={role === "top" && !leaving ? "auto" : "none"}
     >
-      {/* A card behind the top one is static: iOS keeps its content as one
-          bitmap (the motion and frost around it do not invalidate it). */}
-      <View style={styles.cardContent} shouldRasterizeIOS={role !== "top" && !leaving}>
-        {props.children}
-      </View>
-      <GlassDeckOverlay style={overlayStyle} />
+      <Animated.View style={[styles.cardMotion, motionStyle]}>
+        {/* A card behind the top one is static: iOS keeps its content as one
+            bitmap (the motion and frost around it do not invalidate it). */}
+        <View style={styles.cardContent} shouldRasterizeIOS={role !== "top" && !leaving}>
+          {props.children}
+        </View>
+        <GlassDeckOverlay style={overlayStyle} />
+      </Animated.View>
     </Animated.View>
   )
+}
+
+/** The arrival of a card mounted straight into the deck, run by the mount itself (see getDiscoverDeckCardMount). */
+function createDiscoverDeckCardEntering(reduceMotion: boolean) {
+  return () => {
+    "worklet"
+    const from = getDiscoverDeckEntrance(0, reduceMotion)
+    const timing = { duration: DISCOVER_DECK_ENTRANCE_MS, reduceMotion: ReduceMotion.Never }
+    return {
+      initialValues: { opacity: from.opacity, transform: [{ scale: from.scale }] },
+      animations: { opacity: withTiming(1, timing), transform: [{ scale: withTiming(1, timing) }] }
+    }
+  }
 }
 
 const STANDBY_PROGRESS = getDiscoverDeckRoleProgress("standby")
@@ -477,6 +503,9 @@ const styles = StyleSheet.create({
   bottomCardContainer: {
     ...StyleSheet.absoluteFill,
     zIndex: 0
+  },
+  cardMotion: {
+    flex: 1
   },
   cardContent: {
     flex: 1
