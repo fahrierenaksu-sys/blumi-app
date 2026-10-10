@@ -69,6 +69,20 @@ const RETIRED_UNIVERSAL_CORE_IDS = [
   "universal_room_divider_a",
 ] as const
 
+/** The 10 QA-only room ids (3 Focus-12 candidates, 7 VNext pilot ids): their code is gone, the ids stay reserved. */
+const RETIRED_QA_ROOM_IDS = [
+  "universal_cloud_sectional_sofa_a",
+  "universal_cozy_tv_media_unit_a",
+  "universal_home_arcade_a",
+  "room_vnext_lounge_chair",
+  "room_vnext_round_table",
+  "room_vnext_side_table",
+  "room_vnext_lamp",
+  "room_vnext_bookshelf",
+  "room_vnext_rug",
+  "room_vnext_tabletop_plant"
+] as const
+
 const ROOM_V3_IDS = ROOM_V3_FURNITURE.map((item) => item.itemId)
 
 test("L14: no new, reserved or kept id is in the legacy registry, and old ids are never reused", () => {
@@ -89,7 +103,15 @@ test("the room part of the registry holds the six old flat pieces and all 45 uni
     assert.ok(isLegacyItemId(id), id)
     assert.equal(ECONOMY_CATALOG.some((item) => item.itemId === id), false, `${id} must never be sold again`)
   }
-  assert.equal(LEGACY_ROOM_ITEM_IDS.length, 51)
+  assert.equal(LEGACY_ROOM_ITEM_IDS.length, 51 + RETIRED_QA_ROOM_IDS.length)
+})
+
+test("the 10 QA-only room ids are reserved: legacy and never sold", () => {
+  assert.equal(new Set(RETIRED_QA_ROOM_IDS).size, 10)
+  for (const id of RETIRED_QA_ROOM_IDS) {
+    assert.ok(isLegacyItemId(id), `${id} must stay reserved`)
+    assert.equal(ECONOMY_CATALOG.some((item) => item.itemId === id), false, `${id} must never be sold`)
+  }
 })
 
 test("the 27 approved 2.5D pieces and the blush chair are held as pricing-pending; the starter bed never is", () => {
