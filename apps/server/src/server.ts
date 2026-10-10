@@ -82,6 +82,7 @@ import { registerCapabilityRoutes } from "./routes/capabilityRoutes"
 import { createChatReceiptService } from "./chat/chatReceiptService"
 import { registerChatPreferencesRoutes } from "./routes/chatPreferencesRoutes"
 import { getRoomSnapshotSelfCheckState } from "./rooms/roomSnapshotRenderer"
+import { getAvatarPortraitSelfCheckState } from "./avatar/avatarPortrait"
 import {
   createPersonalRoomDecorService,
   type PersonalRoomDecorService
@@ -299,7 +300,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       ok: true,
       service: "blumi-server",
       // the room showcase art self-check (start-up); "failed" means Discover room pictures cannot be drawn
-      roomShowcaseArt: getRoomSnapshotSelfCheckState()
+      roomShowcaseArt: getRoomSnapshotSelfCheckState(),
+      // the push portrait art self-check (start-up); "failed" means pushes go out without a sender picture
+      pushPortraitArt: getAvatarPortraitSelfCheckState()
     }))
     app.get("/live", async () => ({ ok: true, service: "blumi-server" }))
     const probe = createReadinessProbe({

@@ -1,5 +1,6 @@
-// Builds dist/art: the server's own copy of every file the room showcase renderer can name, a sha256 manifest, and
-// the pure room draw-list resolver bundled from the app's calibration (esbuild, a dependency of tsx). At run time the
+// Builds dist/art: the server's own copy of every file the room showcase renderer and the push portrait renderer can
+// name (room shell and furniture layers, the baked 2.5D avatar bust layers), a sha256 manifest, and the pure room
+// draw-list resolver bundled from the app's calibration (esbuild, a dependency of tsx). At run time the
 // server reads only dist/art, never apps/mobile. The build FAILS on a missing file or a copy whose hash differs.
 // `--check` verifies an existing dist/art against the sources without writing.
 import { createHash } from "node:crypto"
@@ -10,6 +11,8 @@ import { fileURLToPath } from "node:url"
 
 const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const roomV2Root = resolve(serverRoot, "../mobile/src/features/roomV2")
+const stillLayersRoot = resolve(serverRoot, "../mobile/src/features/avatar/stills/layers")
+const stillManifestPath = resolve(serverRoot, "../../packages/domain/src/avatar/avatarStillManifest.json")
 const outDir = resolve(serverRoot, "dist/art")
 const require = createRequire(import.meta.url)
 const check = process.argv.includes("--check")
@@ -53,6 +56,14 @@ for (const itemId of drawList.listDrawableRoomItemIds()) {
   const paths = drawList.listRoomItemArtPaths(itemId)
   if (paths.length === 0) fail(`no art for ${itemId}`)
   for (const path of paths) sources.set(path, join(roomV2Root, path))
+}
+
+// every bust layer the still manifest can name: avatar/<rig>/bust/<key>.webp (the portrait renderer's paths)
+const stillManifest = JSON.parse(readFileSync(stillManifestPath, "utf8"))
+for (const [rig, body] of Object.entries(stillManifest.bodies ?? {})) {
+  const bust = body?.layers?.bust ?? []
+  if (bust.length === 0) fail(`no bust layers for ${rig}`)
+  for (const layer of bust) sources.set(`avatar/${rig}/bust/${layer.key}.webp`, join(stillLayersRoot, rig, "bust", `${layer.key}.webp`))
 }
 
 const files = {}

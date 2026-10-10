@@ -1,8 +1,7 @@
 import { randomBytes } from "node:crypto"
 import type { AvatarLoadout } from "@blumi/contracts"
 import {
-  createAvatarPortraitRenderer,
-  loadBundledAvatarPortraitLayers,
+  createDefaultAvatarPortraitRenderer,
   type AvatarPortrait,
   type AvatarPortraitRenderer
 } from "../avatar/avatarPortrait"
@@ -13,7 +12,7 @@ import {
 
 /** Sender pictures for pushes: a link when a push is sent, the image when a phone fetches it. */
 export interface NotificationPortraitService {
-  /** Undefined when pictures are off (no public origin, no bundled layers) or the loadout cannot be drawn. */
+  /** Undefined when pictures are off (no public origin, no art pack) or the loadout cannot be sealed. */
   urlFor(sender: { userId: string; loadout: AvatarLoadout }, now: Date): string | undefined
   /** Null for an invalid or expired token. */
   render(token: string, now: Date): Promise<AvatarPortrait | null>
@@ -26,7 +25,7 @@ export function createNotificationPortraitService(options: {
   links?: NotificationPortraitLinks
 }): NotificationPortraitService {
   const renderer = options.renderer === undefined
-    ? createDefaultRenderer()
+    ? createDefaultAvatarPortraitRenderer()
     : options.renderer
   const links = options.links ?? createNotificationPortraitLinks({
     // Without a configured secret (local development) links last one process.
@@ -49,14 +48,10 @@ export function createNotificationPortraitService(options: {
       try {
         return await renderer.render(content)
       } catch {
-        // An item whose art is missing from this build: the push simply has no picture.
+        // Neither the look nor the body's starter could be drawn: the push simply has no picture.
         return null
       }
     }
   }
 }
 
-function createDefaultRenderer(): AvatarPortraitRenderer | null {
-  const layers = loadBundledAvatarPortraitLayers()
-  return layers ? createAvatarPortraitRenderer({ layers }) : null
-}

@@ -1,49 +1,33 @@
 import { createHash } from "node:crypto"
-import { existsSync } from "node:fs"
-import { resolve } from "node:path"
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import sharp, { type OverlayOptions } from "sharp"
 import type { AvatarLoadout } from "@blumi/contracts"
+import {
+  DEFAULT_FEMALE_AVATAR_LOADOUT,
+  DEFAULT_MALE_AVATAR_LOADOUT,
+  pickAvatarSwatch,
+  resolveAvatarStillLayers,
+  type AvatarStillResolved,
+  type AvatarStillRigId
+} from "@blumi/domain"
+import { resolveRoomArtPackDir } from "../rooms/roomSnapshotRenderer"
 
 /**
- * Small pictures of a user's current chibi (head and shoulders on their avatar
- * circle colour), drawn from the app's own layered runtime PNGs in the app's
- * layer order. Used as the sender picture of chat and room invite pushes.
- * Nothing is stored: a portrait is rendered on demand and kept in a small
- * in-memory cache keyed by what it shows.
+ * Small pictures of a user's current 2.5D chibi (the baked head-and-shoulders still on their avatar circle colour),
+ * drawn from the server's art pack (`dist/art/avatar/<rig>/bust`, written by scripts/build-art-pack.mjs) with the
+ * same layer resolver the app uses. Used as the sender picture of chat and room invite pushes. Nothing is stored:
+ * a portrait is rendered on demand and kept in a small in-memory cache keyed by what it shows.
  */
-export const AVATAR_PORTRAIT_RENDERER_VERSION = "avatar-portrait-v1"
+export const AVATAR_PORTRAIT_RENDERER_VERSION = "avatar-portrait-v2"
 /** Output edge in pixels (square PNG; iOS draws it as a circle). */
 export const AVATAR_PORTRAIT_SIZE = 192
 
-/** The shared rig canvas every room avatar layer is authored on. */
-const LAYER_CANVAS_WIDTH = 256
-const LAYER_CANVAS_HEIGHT = 384
-/**
- * Head-and-shoulders window on the rig canvas: the head and the top of the
- * outfit, centred on the body's centre line.
- */
-const PORTRAIT_WINDOW = { left: 36, top: 78, size: 184 } as const
 const DEFAULT_CACHE_BYTES = 8 * 1024 * 1024
-
-/** One still layer from the app's resolver (apps/mobile/.../avatarPortraitLayers.ts). */
-export interface AvatarPortraitStillLayer {
-  type: string
-  source: unknown
-  crop?: {
-    canvasWidth: number
-    canvasHeight: number
-    x: number
-    y: number
-    width: number
-    height: number
-    atlasX: number
-    atlasY: number
-  }
-}
-
-export interface AvatarPortraitLayerSource {
-  resolveAvatarPortraitStillLayers(loadout: AvatarLoadout): AvatarPortraitStillLayer[]
-  resolveAvatarPortraitBackground(seed: string): string
+const HEX_COLOUR = /^#[0-9A-Fa-f]{6}$/
+const STARTER_LOADOUTS: Readonly<Record<AvatarStillRigId, unknown>> = {
+  female: DEFAULT_FEMALE_AVATAR_LOADOUT,
+  male: DEFAULT_MALE_AVATAR_LOADOUT
 }
 
 export interface AvatarPortrait {
@@ -57,32 +41,20 @@ export interface AvatarPortraitRenderer {
   render(input: { loadout: AvatarLoadout; background: string }): Promise<AvatarPortrait>
 }
 
-const repositoryRoot = resolve(__dirname, "../../../..")
-/** Written by scripts/build-avatar-portrait-layers.mjs as part of the server build. */
-export const BUNDLED_PORTRAIT_LAYERS_PATH = resolve(__dirname, "../../dist/generated/avatarPortraitLayers.cjs")
-
-/**
- * The app's portrait layer resolver, bundled at build time. Null when the
- * bundle is missing (a dev server started without a build): pushes then go
- * out without a picture.
- */
-export function loadBundledAvatarPortraitLayers(path = BUNDLED_PORTRAIT_LAYERS_PATH): AvatarPortraitLayerSource | null {
-  if (!existsSync(path)) return null
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const loaded = require(path) as Partial<AvatarPortraitLayerSource>
-  return typeof loaded.resolveAvatarPortraitStillLayers === "function" &&
-    typeof loaded.resolveAvatarPortraitBackground === "function"
-    ? loaded as AvatarPortraitLayerSource
-    : null
+/** The art pack files the portrait can name, or null when the pack has no avatar layers (a server never built). */
+export function loadAvatarPortraitArt(dir = resolveRoomArtPackDir()): { dir: string; files: ReadonlySet<string> } | null {
+  const manifestPath = join(dir, "manifest.json")
+  if (!existsSync(manifestPath)) return null
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { files?: Record<string, string> }
+  const files = new Set(Object.keys(manifest.files ?? {}).filter((path) => path.startsWith("avatar/")))
+  return files.size > 0 ? { dir, files } : null
 }
 
 export function createAvatarPortraitRenderer(options: {
-  layers: AvatarPortraitLayerSource
-  /** Root that layer `source` paths are relative to (the repository). */
-  assetRoot?: string
+  art: { dir: string; files: ReadonlySet<string> }
   maxCacheBytes?: number
 }): AvatarPortraitRenderer {
-  const assetRoot = options.assetRoot ?? repositoryRoot
+  const { art } = options
   const maxCacheBytes = options.maxCacheBytes ?? DEFAULT_CACHE_BYTES
   const cache = new Map<string, Buffer>()
   let cachedBytes = 0
@@ -99,58 +71,61 @@ export function createAvatarPortraitRenderer(options: {
     }
   }
 
-  const assetPath = (source: unknown): string => {
-    if (typeof source !== "string" || source.length === 0) {
-      throw new Error("Avatar portrait layer has no image file.")
+  const drawCached = async (still: AvatarStillResolved, background: string): Promise<Buffer> => {
+    const key = createHash("sha256")
+      .update(JSON.stringify([AVATAR_PORTRAIT_RENDERER_VERSION, background.toUpperCase(), AVATAR_PORTRAIT_SIZE, still.layers]))
+      .digest("hex")
+    const cached = cache.get(key)
+    if (cached) {
+      // Refresh recency: Map iteration order is insertion order.
+      cache.delete(key)
+      cache.set(key, cached)
+      return cached
     }
-    const path = resolve(assetRoot, source)
-    if (!path.startsWith(assetRoot)) throw new Error("Avatar portrait layer is outside the asset root.")
-    return path
+    let pending = inFlight.get(key)
+    if (!pending) {
+      pending = drawPortrait(art, still, background).finally(() => inFlight.delete(key))
+      inFlight.set(key, pending)
+    }
+    const body = await pending
+    if (!cache.has(key)) remember(key, body)
+    return body
   }
 
   return {
     backgroundFor(seed) {
-      return options.layers.resolveAvatarPortraitBackground(seed)
+      return pickAvatarSwatch(seed).bg
     },
     async render({ loadout, background }) {
-      if (!/^#[0-9A-Fa-f]{6}$/.test(background)) throw new Error("Avatar portrait background is invalid.")
-      const layers = options.layers.resolveAvatarPortraitStillLayers(loadout)
-      const key = createHash("sha256")
-        .update(JSON.stringify([AVATAR_PORTRAIT_RENDERER_VERSION, background.toUpperCase(), layers]))
-        .digest("hex")
-      const cached = cache.get(key)
-      if (cached) {
-        // Refresh recency: Map iteration order is insertion order.
-        cache.delete(key)
-        cache.set(key, cached)
-        return { body: cached, mimeType: "image/png" }
+      if (!HEX_COLOUR.test(background)) throw new Error("Avatar portrait background is invalid.")
+      // Total: the loadout is coerced and unknown items draw as the body's starter pieces.
+      const still = resolveAvatarStillLayers(loadout, "bust")
+      try {
+        return { body: await drawCached(still, background), mimeType: "image/png" }
+      } catch {
+        // Fallback: that body's starter look, so a valid link still gets a picture.
+        const starter = resolveAvatarStillLayers(STARTER_LOADOUTS[still.rig], "bust")
+        return { body: await drawCached(starter, background), mimeType: "image/png" }
       }
-      let pending = inFlight.get(key)
-      if (!pending) {
-        pending = drawPortrait(layers.map((layer) => ({ ...layer, path: assetPath(layer.source) })), background)
-          .finally(() => inFlight.delete(key))
-        inFlight.set(key, pending)
-      }
-      const body = await pending
-      if (!cache.has(key)) remember(key, body)
-      return { body, mimeType: "image/png" }
     }
   }
 }
 
 async function drawPortrait(
-  layers: Array<AvatarPortraitStillLayer & { path: string }>,
+  art: { dir: string; files: ReadonlySet<string> },
+  still: AvatarStillResolved,
   background: string
 ): Promise<Buffer> {
-  const composites: OverlayOptions[] = []
-  for (const layer of layers) {
-    composites.push({ input: await layerOnRigCanvas(layer), left: 0, top: 0 })
-  }
+  if (still.layers.length === 0) throw new Error("Avatar portrait has no layers.")
+  const composites: OverlayOptions[] = still.layers.map(({ asset, rect }) => {
+    const path = `avatar/${asset}.webp`
+    if (!art.files.has(path)) throw new Error("Avatar portrait layer is missing from the art pack.")
+    return { input: join(art.dir, path), left: rect[0], top: rect[1] }
+  })
   const figure = await sharp({
-    create: { width: LAYER_CANVAS_WIDTH, height: LAYER_CANVAS_HEIGHT, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
+    create: { width: still.space.width, height: still.space.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
   }).composite(composites).png().toBuffer()
   const head = await sharp(figure)
-    .extract({ left: PORTRAIT_WINDOW.left, top: PORTRAIT_WINDOW.top, width: PORTRAIT_WINDOW.size, height: PORTRAIT_WINDOW.size })
     .resize(AVATAR_PORTRAIT_SIZE, AVATAR_PORTRAIT_SIZE, { kernel: "lanczos3" })
     .png()
     .toBuffer()
@@ -162,26 +137,36 @@ async function drawPortrait(
     .toBuffer()
 }
 
-/** One layer as a full rig-canvas image, whether it is a file or an atlas crop. */
-async function layerOnRigCanvas(layer: AvatarPortraitStillLayer & { path: string }): Promise<Buffer> {
-  const crop = layer.crop
-  if (!crop) {
-    return sharp(layer.path)
-      .resize(LAYER_CANVAS_WIDTH, LAYER_CANVAS_HEIGHT, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .ensureAlpha()
-      .png()
-      .toBuffer()
+let selfCheckState: "unchecked" | "ok" | "failed" = "unchecked"
+
+/** The last start-up self-check result, for the health detail. */
+export function getAvatarPortraitSelfCheckState(): "unchecked" | "ok" | "failed" {
+  return selfCheckState
+}
+
+/**
+ * Start-up self-check: renders both default portraits once. Never throws; the result names only the error class, so
+ * it can be logged and shown in the health detail without any user or loadout value.
+ */
+export async function checkAvatarPortraitRenderer(
+  renderer: AvatarPortraitRenderer | null = createDefaultAvatarPortraitRenderer()
+): Promise<{ ok: true } | { ok: false; errorType: string }> {
+  try {
+    if (!renderer) throw Object.assign(new Error("Avatar portrait art pack is missing."), { name: "MissingArtPack" })
+    for (const loadout of Object.values(STARTER_LOADOUTS)) {
+      const result = await renderer.render({ loadout: loadout as AvatarLoadout, background: "#FFFFFF" })
+      if (result.body.length === 0) throw Object.assign(new Error("Empty portrait."), { name: "EmptyImage" })
+    }
+    selfCheckState = "ok"
+    return { ok: true }
+  } catch (error) {
+    selfCheckState = "failed"
+    return { ok: false, errorType: error instanceof Error ? error.name : typeof error }
   }
-  const piece = await sharp(layer.path)
-    .extract({ left: crop.atlasX, top: crop.atlasY, width: crop.width, height: crop.height })
-    .ensureAlpha()
-    .png()
-    .toBuffer()
-  const frame = await sharp({
-    create: { width: crop.canvasWidth, height: crop.canvasHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
-  }).composite([{ input: piece, left: crop.x, top: crop.y }]).png().toBuffer()
-  return sharp(frame)
-    .resize(LAYER_CANVAS_WIDTH, LAYER_CANVAS_HEIGHT, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer()
+}
+
+/** The renderer over the built art pack, or null when the pack is missing (pushes then go out without a picture). */
+export function createDefaultAvatarPortraitRenderer(): AvatarPortraitRenderer | null {
+  const art = loadAvatarPortraitArt()
+  return art ? createAvatarPortraitRenderer({ art }) : null
 }

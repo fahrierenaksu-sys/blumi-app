@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { randomBytes } from "node:crypto"
 import test from "node:test"
 import { DEFAULT_FEMALE_AVATAR_LOADOUT } from "@blumi/domain"
 import { createNotificationService, type CreateNotificationServiceOptions } from "./notificationService"
@@ -112,4 +113,42 @@ test("the sender resolver names only the other person of the event", async () =>
   assert.deepEqual(await withAvatar(push({ type: "chat.room_invite", inviteId: "for_bora" }), now),
     { displayName: "Ada", imageUrl: "https://api.example.test/p" })
   assert.deepEqual(urls, ["user_ada"], "the picture is the sender's, seeded by the sender")
+})
+
+test("a chat push carries the sender's 2.5D portrait, drawn from server state at send time; the outbox holds neither picture nor text", async () => {
+  const { createNotificationPortraitService } = await import("./notificationPortraitService")
+  const portraits = createNotificationPortraitService({ secret: randomBytes(32).toString("base64url"), publicOrigin: "https://api.example.test" })
+  // Server state: the sender's stored loadout, with items no rig has art for (they draw as the starter pieces).
+  const storedLoadout = {
+    ...DEFAULT_FEMALE_AVATAR_LOADOUT,
+    hairId: "avatar_v2_hair_never_existed",
+    topId: "avatar_v2_top_never_existed"
+  }
+  const { service, sent, queued } = setup({
+    resolvePushSender: createPushSenderResolver({
+      findMessage: async () => ({ senderUserId: "user_ada", body: messageText }),
+      findRoomInvite: async () => null,
+      findAccount: async (userId) => userId === "user_ada"
+        ? { profile: { displayName: "Ada", avatar: { loadout: storedLoadout } } }
+        : null,
+      portraits
+    })
+  })
+  await service.registerDevice("user_bora", { platform: "ios", pushToken: "token_bora" })
+  await service.sendPushToUser("user_bora", {
+    title: "x", body: "y", data: { type: "chat.message", threadId: "thread_1", messageId: "message_1" }
+  })
+
+  const outbox = JSON.stringify(queued)
+  assert.equal(queued.length, 1)
+  assert.ok(!outbox.includes(messageText), "the outbox keeps no message text")
+  assert.ok(!outbox.includes("notification-portraits"), "the outbox keeps no portrait link")
+  assert.ok(!outbox.includes("never_existed") && !outbox.includes("avatar_v2_"), "the outbox keeps no loadout")
+
+  await service.dispatchDue()
+  const imageUrl = sent[0]?.data?.senderImage
+  assert.ok(imageUrl?.startsWith("https://api.example.test/v1/notification-portraits/"), "the picture is the server's own link")
+  const portrait = await portraits.render(imageUrl.split("/").at(-1)!, new Date())
+  assert.ok(portrait && portrait.body.length > 0, "the link draws a picture for a sender wearing items without rig art")
+  assert.equal(portrait.mimeType, "image/png")
 })
