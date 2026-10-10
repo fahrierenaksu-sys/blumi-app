@@ -6,6 +6,7 @@ import test from "node:test"
 import { Pool } from "pg"
 import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 import { createPostgresSmsAdmission, SMS_ADMISSION_MIGRATION_ID, type SmsAdmissionEvent } from "./firebaseSmsAdmission"
+import { createSmsOutcomeObserver } from "./firebaseSmsOutcomes"
 
 const checksum = createHash("sha256").update(readFileSync(resolve(
   __dirname, "../../db/migrations", SMS_ADMISSION_MIGRATION_ID
@@ -44,7 +45,8 @@ async function fixture() {
     VALUES (true, true, 10, 50, 1500, 50, 6000000, 20000000, to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM'), 0) ON CONFLICT (singleton) DO UPDATE SET
     enabled = true, ip_limit_15_minutes = 10, ip_limit_24_hours = 50, project_limit_24_hours = 1500,
     project_limit_15_minutes = 50, cost_limit_24_hours_microusd = 6000000,
-    cost_limit_month_microusd = 20000000, opening_month_utc = to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM'), opening_cost_microusd = 0`)
+    cost_limit_month_microusd = 20000000, opening_month_utc = to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM'), opening_cost_microusd = 0,
+    verification_outcomes_enabled = false`)
   await pools[0]!.query(`INSERT INTO blumi_sms_country_policy
     (country, enabled, price_microusd, price_valid_until, limit_24_hours, cost_limit_24_hours_microusd)
     VALUES ('US', true, 10000, clock_timestamp() + interval '7 days', 1500, 2000000)`)
@@ -116,11 +118,13 @@ test("one phone has three reservations per rolling 24 hours across instances and
 test("rotating destination numbers exhausts one shared IP budget", disposablePostgresSkip(), async () => {
   const f = await fixture()
   try {
+    // Isolate the hard IP budget below the adaptive step-up threshold.
+    await f.pools[0]!.query("UPDATE blumi_sms_admission_config SET ip_limit_15_minutes = 4")
     const results = await Promise.all(Array.from({ length: 20 }, (_, i) => f.reserve[i % 2]!(input(i + 1))))
-    assert.equal(results.filter(result => result.allowed).length, 10)
+    assert.equal(results.filter(result => result.allowed).length, 4)
     assert.ok(results.filter(result => !result.allowed).every(result => result.reason === "ip_limit"))
     assert.equal((await f.reserve[0]!({ ...input(100), ipAddress: "198.51.100.1" })).allowed, true)
-    await f.pools[0]!.query("UPDATE blumi_sms_admission_config SET ip_limit_24_hours = 10")
+    await f.pools[0]!.query("UPDATE blumi_sms_admission_config SET ip_limit_24_hours = 4")
     await f.pools[0]!.query("UPDATE blumi_sms_send_admissions SET admitted_at = admitted_at - interval '16 minutes'")
     assert.equal((await f.reserve[1]!(input(101))).reason, "ip_limit")
   } finally { await f.close() }
@@ -254,5 +258,108 @@ test("a project burst cannot consume the full monthly budget in parallel", dispo
     assert.ok(results.filter(result => !result.allowed).every(result => result.reason === "project_burst_limit"))
     await f.pools[0]!.query("UPDATE blumi_sms_send_admissions SET admitted_at = admitted_at - interval '16 minutes'")
     assert.equal((await f.reserve[1]!(input(30))).allowed, true)
+  } finally { await f.close() }
+})
+
+test("normal traffic has no hourly dollar ceiling while daily and monthly budgets remain", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  try {
+    await f.pools[0]!.query("UPDATE blumi_sms_country_policy SET price_microusd = 600000")
+    assert.equal((await f.reserve[0]!(input())).allowed, true)
+    assert.equal((await f.reserve[1]!(input(2))).allowed, true)
+    assert.equal((await f.pools[0]!.query("SELECT sum(charge_microusd)::text AS spent FROM blumi_sms_send_admissions")).rows[0].spent, "1200000")
+  } finally { await f.close() }
+})
+
+async function provisionProjectSurge(f: Awaited<ReturnType<typeof fixture>>) {
+  const results = await Promise.all(Array.from({ length: 20 }, (_, i) =>
+    f.reserve[i % 2]!({ ...input(i + 1), ipAddress: `198.51.100.${i + 1}` })))
+  assert.ok(results.every(result => result.allowed))
+  await f.pools[0]!.query("UPDATE blumi_sms_send_admissions SET admitted_at = clock_timestamp() - interval '2 minutes'")
+}
+
+test("project surge requires genuine provider bot confidence and rejects missing or malformed scores", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  try {
+    await provisionProjectSurge(f)
+    for (const recaptchaScore of [undefined, null, "0.9", {}, NaN, Infinity, -1, 1.1, 0.699]) {
+      assert.equal((await f.reserve[0]!({ ...input(30), recaptchaScore })).reason, "risk_verification_required")
+    }
+    assert.equal((await f.pools[0]!.query("SELECT count(*)::int AS total FROM blumi_sms_send_admissions")).rows[0].total, 20)
+    assert.equal((await f.pools[0]!.query("SELECT count(*)::int AS total FROM blumi_sms_device_permits WHERE consumed_at IS NOT NULL")).rows[0].total, 20)
+    assert.equal((await f.reserve[1]!({ ...input(30), recaptchaScore: 0.7 })).allowed, true)
+    // Step-up approval cannot bypass the original phone cooldown or budget.
+    assert.equal((await f.reserve[0]!({ ...input(30), recaptchaScore: 1 })).reason, "phone_cooldown")
+    await f.pools[0]!.query("UPDATE blumi_sms_admission_config SET cost_limit_24_hours_microusd = 210000")
+    assert.equal((await f.reserve[0]!({ ...input(31), recaptchaScore: 1 })).reason, "daily_cost_limit")
+  } finally { await f.close() }
+})
+
+test("surge pacing is atomic across devices and instances and relaxes when traffic subsides", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  try {
+    await provisionProjectSurge(f)
+    const results = await Promise.all(Array.from({ length: 12 }, (_, i) =>
+      f.reserve[i % 2]!({ ...input(i + 30), ipAddress: `203.0.113.${i + 30}`, recaptchaScore: 0.9 })))
+    assert.equal(results.filter(result => result.allowed).length, 6)
+    assert.ok(results.filter(result => !result.allowed).every(result => result.reason === "adaptive_rate_limit"))
+    await f.pools[0]!.query("UPDATE blumi_sms_send_admissions SET admitted_at = clock_timestamp() - interval '6 minutes'")
+    assert.equal((await f.reserve[1]!(input(60))).allowed, true)
+  } finally { await f.close() }
+})
+
+test("an IP surge steps up and slows only that source, not unrelated normal traffic", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  try {
+    for (let i = 1; i <= 5; i++) assert.equal((await f.reserve[i % 2]!(input(i))).allowed, true)
+    assert.equal((await f.reserve[0]!(input(6))).reason, "risk_verification_required")
+    assert.equal((await f.reserve[1]!({ ...input(6), recaptchaScore: 0.9 })).reason, "adaptive_rate_limit")
+    assert.equal((await f.reserve[1]!({ ...input(7), ipAddress: "198.51.100.1" })).allowed, true)
+    await f.pools[0]!.query("UPDATE blumi_sms_send_admissions SET admitted_at = clock_timestamp() - interval '61 seconds'")
+    assert.equal((await f.reserve[0]!({ ...input(8), recaptchaScore: 0.9 })).allowed, true)
+    assert.equal((await f.reserve[1]!({ ...input(9), recaptchaScore: 0.9 })).reason, "adaptive_rate_limit")
+  } finally { await f.close() }
+})
+
+test("only fresh signed phone completion credits the latest send once, without refunding costs", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  const restricted = new Pool({ connectionString: process.env.DATABASE_URL, options: "-c role=blumi_sms_observer", max: 1 })
+  try {
+    const record = createSmsOutcomeObserver({ pool: restricted, projectId: "fixture-project", hmacSecret: fixtureSecret, expectedMigrationChecksum: checksum })
+    const sent = input()
+    await f.reserve[0]!(sent)
+    await f.pools[0]!.query("UPDATE blumi_sms_send_admissions SET admitted_at = clock_timestamp() - interval '2 minutes'")
+    await f.reserve[0]!(input())
+    const event = { resource: sent.resource, eventId: randomUUID(), timestamp: new Date().toISOString(), providerId: "phone", phoneNumber: sent.phoneNumber }
+    for (const change of [{ providerId: "password" }, { resource: "projects/other-project" },
+      { timestamp: new Date(Date.now() - 360_000).toISOString() }, { phoneNumber: input(2).phoneNumber }]) {
+      assert.equal(await record({ ...event, ...change }), false)
+    }
+    assert.equal(await record(event), true)
+    assert.equal(await record(event), false)
+    assert.equal(await record({ ...event, eventId: randomUUID() }), false)
+    assert.equal((await f.pools[0]!.query("SELECT count(*)::int AS total FROM blumi_sms_send_admissions WHERE verified_at IS NOT NULL")).rows[0].total, 1)
+    assert.equal((await f.pools[0]!.query("SELECT sum(charge_microusd)::text AS spent FROM blumi_sms_send_admissions")).rows[0].spent, "20000")
+    await assert.rejects(restricted.query("DELETE FROM blumi_sms_send_admissions"), /permission denied/)
+    await assert.rejects(restricted.query("UPDATE blumi_sms_admission_config SET enabled = false"), /permission denied/)
+    await assert.rejects(restricted.query("UPDATE blumi_sms_send_admissions SET charge_microusd = 1"), /permission denied/)
+  } finally { await restricted.end(); await f.close() }
+})
+
+test("completion risk waits for ten mature attempts and never treats a single missed completion as abuse", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  try {
+    await f.pools[0]!.query("UPDATE blumi_sms_admission_config SET verification_outcomes_enabled = true")
+    // Spread accepted sends across time to isolate completion risk from surge.
+    for (let i = 1; i <= 10; i++) {
+      assert.equal((await f.reserve[0]!(input(i))).allowed, true)
+      await f.pools[0]!.query("UPDATE blumi_sms_send_admissions SET admitted_at = clock_timestamp() - interval '16 minutes'")
+    }
+    assert.equal((await f.reserve[1]!(input(11))).reason, "risk_verification_required")
+    assert.equal((await f.reserve[1]!({ ...input(11), recaptchaScore: 0.9 })).allowed, true)
+    await f.pools[0]!.query(`UPDATE blumi_sms_send_admissions SET verified_at = clock_timestamp(), verification_key = event_key
+      WHERE event_key IN (SELECT event_key FROM blumi_sms_send_admissions ORDER BY admitted_at LIMIT 3)`)
+    // Seven of ten mature attempts lack completion: below the 80% threshold.
+    assert.equal((await f.reserve[0]!(input(12))).allowed, true)
   } finally { await f.close() }
 })

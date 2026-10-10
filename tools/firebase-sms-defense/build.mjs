@@ -18,7 +18,7 @@ for (const [source, name] of [["firebaseSmsDeviceGate", "device-gate"], ["fireba
     platform: "node", target: "node22", format: "esm", packages: "external"
   })
 }
-const migration = "072_firebase_sms_admission.sql"
+const migration = "073_sms_verification_outcomes.sql"
 const bytes = await readFile(resolve(root, "apps/server/db/migrations", migration))
 await writeFile(resolve(output, "schema-lock.json"), JSON.stringify({
   migration, checksum: createHash("sha256").update(bytes).digest("hex")

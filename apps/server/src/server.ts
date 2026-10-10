@@ -120,6 +120,7 @@ interface CreateServerOptions {
   revenueCatWebhookSigningSecret?: string
   purchaseEnvironment?: "production" | "sandbox"
   sharedRateLimiter?: SharedRateBudget
+  authRateLimiter?: SharedRateBudget
   avatarService?: AvatarService
   notificationService?: NotificationService
   miniRoomService?: MiniRoomService
@@ -337,7 +338,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     : undefined
   app.addHook("onClose", async () => { stopSessionReuseRevocation?.() })
   void app.register(async (instance) => {
-    registerSharedRateBudget(instance, authService, options.sharedRateLimiter ?? createInMemoryRateBudget())
+    registerSharedRateBudget(instance, authService, options.sharedRateLimiter ?? createInMemoryRateBudget(), options.authRateLimiter)
     await registerAuthRoutes(instance, routeServices)
     await registerRealtimeTicketRoutes(instance, {
       authService,

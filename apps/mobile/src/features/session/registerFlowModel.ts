@@ -5,7 +5,8 @@ import {
   getCountryCallingCode,
   parsePhoneNumberFromString,
   type CountryCode
-} from "libphonenumber-js"
+} from "libphonenumber-js/max"
+import { compactPhoneInput, normalizeInternationalSmsPhone } from "./phoneNumberInput"
 
 export type RegisterFlowStage = "phone" | "code"
 
@@ -174,13 +175,17 @@ export function formatLocalPhoneNumber(
   value: string,
   countryCode: PhoneCountryCode
 ): string {
+  const compact = compactPhoneInput(value)
+  // Preserve invalid text so validation can reject it and the user can fix it.
+  if (compact === null) return value
   const trimmed = value.trim()
   if (trimmed.startsWith("+")) {
-    const international = parsePhoneNumberFromString(trimmed)
+    const international = parsePhoneNumberFromString(compact, { extract: false })
     if (international?.country === countryCode) {
       const national = international.formatNational()
       return countryCode === "TR" ? national.replace(/^0/, "") : national
     }
+    return value
   }
   const digits = getLocalDigits(value, countryCode)
   if (!digits) return ""
@@ -214,7 +219,9 @@ function analyzePhoneNumberWithFormattedValue(
   countryCode: PhoneCountryCode,
   formatted: string
 ): LocalPhoneAnalysis {
-  const rawDigits = value.replace(/[^\d]/g, "")
+  const compact = compactPhoneInput(value)
+  if (compact === null) return { formatted, normalizedPhoneNumber: "", valid: false, error: "invalid-number" }
+  const rawDigits = compact.replace(/^\+/, "")
   const digits = getLocalDigits(value, countryCode)
   if (!digits) {
     return {
@@ -241,10 +248,11 @@ function analyzePhoneNumberWithFormattedValue(
     }
   }
 
-  const parsed = parsePhoneNumberFromString(digits, countryCode)
+  const parsed = compact.startsWith("+")
+    ? parsePhoneNumberFromString(compact, { extract: false })
+    : parsePhoneNumberFromString(digits, { defaultCountry: countryCode, extract: false })
   const valid = Boolean(
-    parsed?.isValid() &&
-    (!parsed.country || parsed.country === countryCode)
+    parsed && normalizeInternationalSmsPhone(parsed.number) && parsed.country === countryCode
   )
   return {
     formatted,
@@ -310,9 +318,10 @@ function getLocalDigits(
   value: string,
   countryCode: PhoneCountryCode
 ): string {
-  const trimmed = value.trim()
-  const digits = trimmed.replace(/[^\d]/g, "")
-  if (!trimmed.startsWith("+")) return digits
+  const compact = compactPhoneInput(value)
+  if (compact === null) return ""
+  const digits = compact.replace(/^\+/, "")
+  if (!compact.startsWith("+")) return digits
   const callingCode = getCountryCallingCode(countryCode)
   return digits.startsWith(callingCode)
     ? digits.slice(callingCode.length)

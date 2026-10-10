@@ -18,8 +18,8 @@ test("the adapter uses the provider phone and address, not user agent or arbitra
   const handler = createBeforeSmsHandler(async event => { received = event; return { allowed: false } })
   await handler({ eventId: "fixture", resource: { service: "identitytoolkit.googleapis.com", name: "projects/fixture-project" }, timestamp: "fixture-time",
     smsType: "SIGN_IN_OR_SIGN_UP", ipAddress: "203.0.113.7",
-    additionalUserInfo: { phoneNumber: "+15550000001" }, userAgent: "ignored",
-    phoneNumber: "ignored", accountId: "ignored" })
+    additionalUserInfo: { phoneNumber: "+15550000001", recaptchaScore: 0.3 }, userAgent: "ignored",
+    phoneNumber: "ignored", accountId: "ignored", recaptchaScore: 1 })
   assert.deepEqual(received, { eventId: "fixture", resource: "projects/fixture-project", timestamp: "fixture-time",
-    smsType: "SIGN_IN_OR_SIGN_UP", ipAddress: "203.0.113.7", phoneNumber: "+15550000001" })
+    smsType: "SIGN_IN_OR_SIGN_UP", ipAddress: "203.0.113.7", phoneNumber: "+15550000001", recaptchaScore: 0.3 })
 })

@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto"
 
 export interface RateBudgetResult { allowed: boolean; retryAfterSeconds: number }
-export type UserRateBudgetScope = "general" | "chatSend" | "roomLeave" | "deviceRegistration" | "deviceRemoval"
+export type UserRateBudgetScope = "general" | "chatSend" | "roomLeave" | "deviceRegistration" | "deviceRemoval" |
+  "authVerification" | "accountRecovery" | "accountSecurity"
 export interface SharedRateBudget {
   consumeUser(userId: string, scope?: UserRateBudgetScope): Promise<RateBudgetResult>
   purgeExpired(): Promise<void>
@@ -22,7 +23,10 @@ export const USER_RATE_BUDGET_LIMITS: Readonly<Record<UserRateBudgetScope, numbe
   // Unregistering at sign-out has its own budget (2026-10-02): sharing the
   // registration budget let a looping client 429 the sign-out DELETE, and
   // the phone kept receiving the signed-out account's pushes.
-  deviceRemoval: 30
+  deviceRemoval: 30,
+  authVerification: 10,
+  accountRecovery: 3,
+  accountSecurity: 6
 }
 const WINDOW_MS = 60_000
 

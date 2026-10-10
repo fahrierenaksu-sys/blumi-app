@@ -63,6 +63,19 @@ test("failed device attestation prevents the Firebase SMS call", async () => {
   assert.equal(sends, 0)
 })
 
+test("invalid, formatted or non-mobile destinations cannot spend attestation or SMS calls", async () => {
+  let calls = 0
+  const phoneAuth = loadFirebasePhoneAuth(() => ({
+    getAuth: () => ({ currentUser: null }), signInWithPhoneNumber: async () => { calls += 1 }
+  }), async () => { calls += 1 }, async () => { calls += 1 })
+  const reservedExample = "+1" + "202" + "5550101"
+  for (const input of [reservedExample + "x", reservedExample + "\n", reservedExample + "\u200b",
+    reservedExample.replace("+1", "+1 "), "+1" + "200" + "5550101", "+44" + "20" + "79460000"]) {
+    await assert.rejects(phoneAuth.requestFirebasePhoneCode(input), /valid phone number/)
+  }
+  assert.equal(calls, 0)
+})
+
 test("device attestation completes before any Firebase SMS request", async () => {
   const events: string[] = []
   const phoneAuth = loadFirebasePhoneAuth(() => ({
@@ -111,6 +124,32 @@ test("empty or malformed OTPs never reach Firebase confirmation", async () => {
     await assert.rejects(phoneAuth.confirmFirebasePhoneCode(confirmation, code), /invalid or expired/)
   }
   assert.equal(attempts, 0)
+})
+
+test("one confirmation refuses parallel submissions and stops after five native attempts", async () => {
+  const phoneAuth = loadFirebasePhoneAuth(() => ({ getAuth: () => ({ currentUser: null }) }))
+  let attempts = 0, release: (() => void) | undefined
+  const confirmation = { confirm: async () => {
+    attempts++
+    if (attempts === 1) await new Promise<void>(resolve => { release = resolve })
+    throw new Error("invalid code")
+  } } as unknown as Parameters<FirebasePhoneAuth["confirmFirebasePhoneCode"]>[0]
+  const first = assert.rejects(phoneAuth.confirmFirebasePhoneCode(confirmation, "000000"))
+  await assert.rejects(phoneAuth.confirmFirebasePhoneCode(confirmation, "000000"))
+  assert.equal(attempts, 1)
+  release?.()
+  await first
+  for (let i = 0; i < 8; i++) await assert.rejects(phoneAuth.confirmFirebasePhoneCode(confirmation, "000000"))
+  assert.equal(attempts, 5)
+})
+
+test("a successful confirmation cannot be reused", async () => {
+  const phoneAuth = loadFirebasePhoneAuth(() => ({ getAuth: () => ({ currentUser: null }) }))
+  let attempts = 0
+  const confirmation = { confirm: async () => { attempts++; return { user: { getIdToken: async () => "fixture" } } } } as unknown as Parameters<FirebasePhoneAuth["confirmFirebasePhoneCode"]>[0]
+  assert.equal(await phoneAuth.confirmFirebasePhoneCode(confirmation, "000000"), "fixture")
+  await assert.rejects(phoneAuth.confirmFirebasePhoneCode(confirmation, "000000"))
+  assert.equal(attempts, 1)
 })
 
 test("phone auth uses Firebase when the native module is present", async () => {

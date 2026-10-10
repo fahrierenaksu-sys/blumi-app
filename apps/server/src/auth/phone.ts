@@ -5,9 +5,9 @@ export interface NormalizedPhoneNumber {
 const E164_PHONE_PATTERN = /^\+[1-9]\d{7,14}$/
 
 export function normalizePhoneNumber(value: unknown): NormalizedPhoneNumber | null {
-  if (typeof value !== "string") return null
+  if (typeof value !== "string" || value.length > 64 || /[^0-9+() \u00a0\u202f-]/u.test(value)) return null
 
-  const trimmed = value.replace(/[\s()-]/g, "")
+  const trimmed = value.replace(/[() \u00a0\u202f-]/gu, "")
   if (!E164_PHONE_PATTERN.test(trimmed)) return null
 
   return { e164: trimmed }

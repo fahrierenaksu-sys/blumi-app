@@ -19,8 +19,8 @@ interface SchemaQueryExecutor {
 export const OPTIONAL_READINESS_MIGRATIONS: readonly string[] = Object.freeze([
   CHAT_RECEIPTS_MIGRATION_ID,
   CHAT_HIDE_MIGRATION_ID,
-  // Only the separate beforeSmsSent function uses this schema; its queries
-  // fail closed when it is missing, and it starts disabled when installed.
+  // SMS functions and optional outcome reporting probe their own schema.
+  "072_firebase_sms_admission.sql",
   SMS_ADMISSION_MIGRATION_ID
 ])
 
@@ -48,7 +48,7 @@ export function createSchemaReadinessCheck(
   }
 }
 
-function loadPackagedMigrationManifest(): readonly MigrationIdentity[] {
+export function loadPackagedMigrationManifest(): readonly MigrationIdentity[] {
   const directory = resolve(__dirname, "../../db/migrations")
   return readdirSync(directory).filter(name => name.endsWith(".sql")).sort().map(id => ({
     id, checksum: createHash("sha256").update(readFileSync(join(directory, id), "utf8")).digest("hex")

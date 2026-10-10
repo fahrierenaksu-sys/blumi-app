@@ -3,7 +3,7 @@ import { isIP } from "node:net"
 import { parsePhoneNumberFromString } from "libphonenumber-js/max"
 import type { Pool } from "pg"
 
-export const SMS_ADMISSION_MIGRATION_ID = "072_firebase_sms_admission.sql"
+export const SMS_ADMISSION_MIGRATION_ID = "073_sms_verification_outcomes.sql"
 export const SMS_PHONE_COOLDOWN_MS = 60_000
 export const SMS_PHONE_REQUESTS_PER_DAY = 3
 const DAY_MS = 86_400_000
@@ -16,6 +16,9 @@ export interface SmsAdmissionEvent {
   smsType: string
   phoneNumber: string
   ipAddress: string
+  /** Bot confidence from the signed provider event; never client-supplied.
+   * Higher is more likely legitimate, unlike the separate SMS fraud score. */
+  recaptchaScore?: unknown
 }
 
 export type SmsAdmissionResult = {
@@ -23,6 +26,7 @@ export type SmsAdmissionResult = {
   reason: "admitted" | "invalid_event" | "disabled" | "replay" | "phone_cooldown" |
     "phone_limit" | "ip_limit" | "project_limit" | "project_burst_limit" |
     "country_unavailable" | "country_limit" | "country_cost_limit" | "daily_cost_limit" | "monthly_cost_limit" |
+    "risk_verification_required" | "adaptive_rate_limit" |
     "device_permit_required"
 }
 
@@ -140,11 +144,18 @@ export function createPostgresSmsAdmission(options: {
           count(*) FILTER (WHERE ip_key = $2 AND admitted_at > $3)::int AS ip_short_count,
           count(*) FILTER (WHERE country = $6 AND admitted_at > $4)::int AS country_count,
           coalesce(sum(charge_microusd) FILTER (WHERE admitted_at > $4), 0)::text AS day_cost,
+          count(*) FILTER (WHERE admitted_at > $8)::int AS project_five_minutes,
+          count(*) FILTER (WHERE ip_key = $2 AND admitted_at > $8)::int AS ip_five_minutes,
+          count(*) FILTER (WHERE admitted_at > $9)::int AS project_minute,
+          count(*) FILTER (WHERE ip_key = $2 AND admitted_at > $9)::int AS ip_minute,
+          count(*) FILTER (WHERE ip_key = $2 AND admitted_at > $10 AND admitted_at <= $11)::int AS mature_count,
+          count(*) FILTER (WHERE ip_key = $2 AND admitted_at > $10 AND admitted_at <= $11 AND verified_at IS NULL)::int AS unverified_count,
           coalesce(sum(charge_microusd) FILTER (WHERE admitted_at >= $5), 0)::text AS month_cost,
           coalesce(sum(charge_microusd) FILTER (WHERE country = $6 AND admitted_at > $4), 0)::text AS country_cost
          FROM blumi_sms_send_admissions WHERE admitted_at >= $7`,
         [phoneKey, ipKey, new Date(time - 900_000), daily, month, country,
-          new Date(Math.min(daily.getTime(), month.getTime()))]
+          new Date(Math.min(daily.getTime(), month.getTime())), new Date(time - 300_000), new Date(time - 60_000),
+          new Date(time - 3_600_000), new Date(time - 600_000)]
       )).rows[0]
       if (!recent) throw new Error("SMS admission budget is unavailable.")
       const dayCost = readMicroUsd(recent.day_cost)
@@ -153,6 +164,19 @@ export function createPostgresSmsAdmission(options: {
       if (dayCost === null || monthCost === null || countryCost === null) {
         throw new Error("SMS admission pricing is invalid.")
       }
+      // Only admitted, budgeted sends can raise the protection level. Invalid
+      // requests alone cannot put everyone into an elevated-risk state.
+      const trafficCounts = [recent.project_five_minutes, recent.ip_five_minutes,
+        recent.project_minute, recent.ip_minute, recent.mature_count, recent.unverified_count]
+      if (!trafficCounts.every(value => Number.isSafeInteger(value) && value >= 0)) {
+        throw new Error("SMS admission traffic is unavailable.")
+      }
+      const projectSurge = recent.project_five_minutes >= 20
+      // Give users ten minutes to finish; one failure never triggers this.
+      // Unobserved completion is a risk signal, never proof of abuse.
+      const poorCompletion = config.verification_outcomes_enabled === true && recent.mature_count >= 10 &&
+        recent.unverified_count * 5 >= recent.mature_count * 4
+      const ipSurge = recent.ip_five_minutes >= 5 || poorCompletion
       let reason: SmsAdmissionResult["reason"] | undefined
       if (monthCost + price + (config.opening_month_utc === monthKey ? openingCost : 0n) > monthlyCostLimit) reason = "monthly_cost_limit"
       else if (dayCost + price > dailyCostLimit) reason = "daily_cost_limit"
@@ -165,6 +189,15 @@ export function createPostgresSmsAdmission(options: {
       else if (recent.phone_count >= SMS_PHONE_REQUESTS_PER_DAY) reason = "phone_limit"
       else if (recent.phone_latest instanceof Date &&
         time - recent.phone_latest.getTime() < SMS_PHONE_COOLDOWN_MS) reason = "phone_cooldown"
+      // Require stronger provider bot evidence only during a surge. Missing,
+      // malformed or low-confidence scores cannot silently bypass step-up.
+      // Never return ALLOW to override Google's own fraud protection.
+      else if ((projectSurge || ipSurge) && (typeof event.recaptchaScore !== "number" ||
+        !Number.isFinite(event.recaptchaScore) || event.recaptchaScore < 0.7 || event.recaptchaScore > 1)) {
+        reason = "risk_verification_required"
+      } else if ((projectSurge && recent.project_minute >= 6) || (ipSurge && recent.ip_minute >= 1)) {
+        reason = "adaptive_rate_limit"
+      }
       if (reason) {
         await client.query("ROLLBACK")
         return refuse(reason)
@@ -210,8 +243,11 @@ export function createPostgresSmsAdmission(options: {
 // the client never supplies the country or price used to debit the budget.
 export function smsDestinationCountry(phone: string): string | null {
   try {
-    const parsed = parsePhoneNumberFromString(phone)
-    return parsed?.number === phone && parsed.isPossible() && parsed.country ? parsed.country : null
+    if (typeof phone !== "string" || !/^\+[1-9]\d{7,14}$/.test(phone)) return null
+    const parsed = parsePhoneNumberFromString(phone, { extract: false })
+    const type = parsed?.getType()
+    return parsed?.number === phone && parsed.isValid() && parsed.country &&
+      (type === "MOBILE" || type === "FIXED_LINE_OR_MOBILE") ? parsed.country : null
   } catch { return null }
 }
 

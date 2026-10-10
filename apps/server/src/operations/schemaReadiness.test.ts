@@ -35,7 +35,10 @@ test("only independently guarded additive features are optional for readiness", 
   assert.deepEqual([...OPTIONAL_READINESS_MIGRATIONS], [
     "070_chat_delivery_receipts.sql",
     "071_chat_hide_for_me_and_advisor_fixes.sql",
-    "072_firebase_sms_admission.sql"
+    "072_firebase_sms_admission.sql",
+    // The observer checks this checksum before any update; missing schema
+    // drops optional statistics without preventing application sign-in.
+    "073_sms_verification_outcomes.sql"
   ])
 })
 

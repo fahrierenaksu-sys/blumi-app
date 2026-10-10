@@ -41,6 +41,8 @@ export interface FirebaseAuthVerifierOptions {
   serviceAccountJson?: string
   serviceAccountJsonBase64?: string
   authClient?: FirebaseAdminAuthClient
+  /** Queues optional telemetry; never participates in the login decision. */
+  onVerifiedPhone?: (identity: FirebasePhoneIdentity) => void
   /**
    * Production: refuse to start without a credential (a service account, or
    * GOOGLE_APPLICATION_CREDENTIALS for the default credential). A given
@@ -128,11 +130,15 @@ export function createFirebaseAuthVerifier(
       ) {
         throw new FirebaseIdentityShapeError("Firebase token is not a verified phone identity.")
       }
-      return {
+      const identity = {
         uid: decoded.uid,
         phoneNumber: decoded.phone_number,
         authTime: decoded.auth_time
       }
+      if (isRecentFirebasePhoneProof(identity)) {
+        try { options.onVerifiedPhone?.(identity) } catch { /* Statistics must not prevent login. */ }
+      }
+      return identity
     }
   }
 }

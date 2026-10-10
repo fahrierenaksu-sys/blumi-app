@@ -34,9 +34,9 @@ const readyAvailability = {
   phoneValid: true
 }
 
-test("the resend cooldown lasts thirty seconds and never ticks below zero", () => {
-  assert.equal(RESEND_COOLDOWN_SECONDS, 30)
-  assert.equal(tickResendCooldown(30), 29)
+test("the resend cooldown covers the server's sixty-second interval and never ticks below zero", () => {
+  assert.equal(RESEND_COOLDOWN_SECONDS, 60)
+  assert.equal(tickResendCooldown(60), 59)
   assert.equal(tickResendCooldown(1), 0)
   assert.equal(tickResendCooldown(0), 0)
   assert.equal(tickResendCooldown(-3), 0)

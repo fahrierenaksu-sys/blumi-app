@@ -26,6 +26,7 @@ import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 const config = resolveServerConfig()
 const services = createConfiguredServerServices(config)
 const firebaseAuthVerifier = createFirebaseAuthVerifier({
+  onVerifiedPhone: services.onVerifiedPhone,
   projectId: process.env.FIREBASE_PROJECT_ID ?? "blumi-mobile-eren",
   serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
   serviceAccountJsonBase64: process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64,
@@ -114,6 +115,7 @@ const app = createServer({
   legalPagesEnabled: process.env.BLUMI_LEGAL_PAGES_ENABLED === "1",
   discoverySnapshots: services.discoverySnapshots,
   sharedRateLimiter: services.sharedRateLimiter,
+  authRateLimiter: services.authRateLimiter,
   threadRoomInviteReader: services.threadRoomInviteReader,
   afterResponseTasks: services.afterResponseTasks,
   isAccepting: () => accepting,

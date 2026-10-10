@@ -4,6 +4,25 @@ Durum: **Implemented / Tested; Firebase function/migration kurulumu External ver
 
 ## İncelenecek paket
 
+### Follow-up rollout, 2026-10-10
+
+Owner authorized backend/function deployment plus commit and push to develop
+and main in the current conversation. Migration 073 is applied and locked;
+070/071 remain pending. Fresh dump and restore proof are recorded in
+`DATABASE_RELEASE_RUNBOOK.md`. Backend `BLUMI_SMS_DEFENSE_HMAC_KEY` was copied
+from the existing provider secret using stdin, without rotating it or
+triggering a deployment. Observer-role SET permission was verified; membership
+does not automatically inherit its grants. Firebase readback confirms Phone
+enabled, ENFORCE, fraud threshold 0.5 and `useSmsBotScore=true`; the field-only
+update preserved SMS fraud protection. Function redeployment and branch/server
+deployment are verified below when complete. Native/real SMS proof remains Open.
+
+New admission builds require the 073 checksum. Outcome recording is bounded
+background backend work driven by fresh, server-verified phone tokens; there
+is no added login blocking function. `verification_outcomes_enabled=false`
+until observation health is verified on real clients. API shared budgets and
+callable pre-database work ceilings apply independently of that switch.
+
 - `tools/firebase-sms-defense`: ayrı codebase; Node 22; yalnız iki koruma function'ı.
 - `blumiSmsDeviceGate`: App Check enforced + consume-token callable; platform/Firebase app ID eşleştirmesi, iOS üretim App Attest veya Android Play Integrity kanıtı, challenge/izin.
 - `blumiBeforeSmsSent`: sağlayıcının imzalı olayı; numara izni ve SMS bütçesini aynı transaction'da tüketir; yalnız {} veya BLOCK, asla ALLOW.

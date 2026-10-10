@@ -6,6 +6,9 @@ import { createSmsDeviceGate } from "./lib/device-gate.mjs"
 import { createSmsDeviceProofVerifier } from "./lib/device-proof.mjs"
 import schemaLock from "./schema-lock.json" with { type: "json" }
 import { smsHmacKey as hmacKey } from "./secrets.mjs"
+import { createCallableBudget } from "./callBudget.mjs"
+import { randomBytes } from "node:crypto"
+const withinCallBudget = createCallableBudget({ secret: randomBytes(32), report: counts => console.info(counts) })
 
 const databaseUrl = defineSecret("BLUMI_SMS_DEVICE_GATE_DATABASE_URL")
 const serviceIdentity = defineString("BLUMI_SMS_DEVICE_GATE_SERVICE_ACCOUNT")
@@ -50,6 +53,7 @@ export const blumiSmsDeviceGate = onCall({
       request.app.appId !== (data.platform === "ios" ? appleAppId.value() : androidAppId.value())) {
       throw new Error("Rejected")
     }
+    if (!withinCallBudget(request.rawRequest.ip)) throw new Error("Rejected")
     if (data.action === "challenge") {
       if (data.installationId !== undefined && (typeof data.installationId !== "string" || data.installationId.length > 64)) throw new Error("Rejected")
       return await getGate().challenge({ platform: data.platform, installationId: data.installationId,

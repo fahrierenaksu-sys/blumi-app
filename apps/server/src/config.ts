@@ -9,7 +9,10 @@ import {
 import { createInMemoryRateBudget, createPostgresRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
 import { createPostgresRetentionService } from "./db/postgresRetention"
 import { createLivekitRevocationProvider, createPostgresMediaRevocationService } from "./miniRooms/mediaRevocationService"
-import { createSchemaReadinessCheck } from "./operations/schemaReadiness"
+import { createSchemaReadinessCheck, loadPackagedMigrationManifest } from "./operations/schemaReadiness"
+import { createSmsOutcomeObserver, createPhoneOutcomeReporter } from "./auth/firebaseSmsOutcomes"
+import { SMS_ADMISSION_MIGRATION_ID } from "./auth/firebaseSmsAdmission"
+import type { FirebasePhoneIdentity } from "./auth/firebaseAuth"
 import { createAuthService, type AuthService } from "./auth/authService"
 import { SESSION_CACHE_TTL_MS } from "./auth/sessionCache"
 import { createAvatarService, type AvatarService } from "./avatar/avatarService"
@@ -145,6 +148,7 @@ export interface ServerConfig {
   /** Optional session-capable URL for realtime LISTEN (BLUMI_DB_LISTEN_URL). */
   databaseListenUrl?: string
   otpHmacSecret?: string
+  smsOutcomeTracking?: { projectId: string; hmacSecret: string }
   /**
    * Seals push picture links (BLUMI_NOTIFICATION_IMAGE_SECRET, at least 32
    * characters). Unset: derived from BLUMI_OTP_HMAC_SECRET under its own key label.
@@ -194,6 +198,8 @@ export interface ConfiguredServerServices {
   chatReceiptSchema: ChatReceiptSchemaProbe
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
+  authRateLimiter?: SharedRateBudget
+  onVerifiedPhone?: (identity: FirebasePhoneIdentity) => void
   /** One-statement GET room-invites read (PostgreSQL only; composed from services otherwise). */
   threadRoomInviteReader?: import("./miniRooms/threadRoomInviteRead").ThreadRoomInviteReader
   mediaRevocationService: import("./miniRooms/mediaRevocationService").MediaRevocationService
@@ -275,6 +281,10 @@ export function resolveServerConfig(
   const databasePool = resolveDatabasePoolSettings(env)
   const databaseListenUrl = resolveDatabaseListenUrl(env)
   const otpHmacSecret = env.BLUMI_OTP_HMAC_SECRET?.trim()
+  const smsOutcomeKey = env.BLUMI_SMS_DEFENSE_HMAC_KEY?.trim()
+  if (smsOutcomeKey && Buffer.byteLength(smsOutcomeKey) < 32) {
+    throw new Error("BLUMI_SMS_DEFENSE_HMAC_KEY must contain at least 32 bytes.")
+  }
   const explicitNotificationImageSecret = env.BLUMI_NOTIFICATION_IMAGE_SECRET?.trim()
   if (explicitNotificationImageSecret && explicitNotificationImageSecret.length < 32) {
     throw new Error("BLUMI_NOTIFICATION_IMAGE_SECRET must contain at least 32 characters.")
@@ -464,6 +474,9 @@ export function resolveServerConfig(
     databasePool,
     databaseListenUrl,
     otpHmacSecret,
+    ...(smsOutcomeKey ? { smsOutcomeTracking: {
+      projectId: env.FIREBASE_PROJECT_ID ?? "blumi-mobile-eren", hmacSecret: smsOutcomeKey
+    } } : {}),
     ...(notificationImageSecret ? { notificationImageSecret } : {}),
     ...(publicApiOrigin ? { publicApiOrigin } : {}),
     livekitUrl,
@@ -550,6 +563,11 @@ export function createConfiguredServerServices(
   const revenueCatPurchaseVerifier = createConfiguredRevenueCatPurchaseVerifier(config)
   if (config.authRepositoryMode === "postgres") {
     const { pool, listenPool } = createDatabasePools(config)
+    const onVerifiedPhone = config.smsOutcomeTracking ? createPhoneOutcomeReporter({
+      projectId: config.smsOutcomeTracking.projectId, tasks: afterResponseTasks,
+      record: createSmsOutcomeObserver({ pool, ...config.smsOutcomeTracking,
+        expectedMigrationChecksum: loadPackagedMigrationManifest().find(row => row.id === SMS_ADMISSION_MIGRATION_ID)!.checksum })
+    }) : undefined
     const checkSchemaReadiness = createSchemaReadinessCheck(pool)
     const chatReceiptSchema = createChatReceiptSchemaProbe(pool)
     const capabilityService = createConfiguredCapabilityService(chatReceiptSchema)
@@ -633,6 +651,7 @@ export function createConfiguredServerServices(
     })
     return {
       afterResponseTasks,
+      onVerifiedPhone,
       capabilityService,
       chatReceiptSchema,
       authService,
@@ -687,6 +706,9 @@ export function createConfiguredServerServices(
         await checkSchemaReadiness()
       },
       sharedRateLimiter: config.rateBudgetStore === "postgres" ? createPostgresRateBudget(pool) : createInMemoryRateBudget(),
+      // Authentication controls must remain shared even when ordinary API
+      // traffic uses the optional single-process budget.
+      authRateLimiter: createPostgresRateBudget(pool),
       discoverySnapshots: createDiscoverySnapshotService(createPostgresDiscoverySnapshots(pool)),
       threadRoomInviteReader: createPostgresThreadRoomInviteReader(pool),
       async close() {

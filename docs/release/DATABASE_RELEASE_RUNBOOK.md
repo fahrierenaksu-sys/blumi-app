@@ -5,6 +5,23 @@ founder-facing status remains in `LAUNCH_CONTROL.md`.
 
 ## Current state (2026-10-02)
 
+Superseding OTP update, 2026-10-10: owner authorized deployment and OTP-only
+migration 073 in the current conversation. Fresh owner-only public-schema
+archive `/Users/evrenevren/BlumiReleaseBackups/scheduled-public-2026-10-10T09-41-21-666Z-78432.dump`,
+544820 bytes, SHA-256 `97ba771baf10fed876e2cb4c3874e34eb95c3e52f1cd6966873e7ab83aa76490`,
+restored in a disposable PostgreSQL 17 cluster: 70 prior ledger rows,
+all three pending migrations rehearsed, rerun zero, 24 accounts/22 inventories,
+zero integrity/access findings. Only `073_sms_verification_outcomes.sql` was
+then applied live using an isolated migrator directory; 070/071 remain pending.
+Checksum `5452a289e0abb048ba67d89382105124838226633d16b6833020cb70558082dc`
+matches readback and is locked in `migrations.applied.json`; rerun skipped it.
+Live account/inventory counts remain 24/22. The backend identity was already a
+member of the new observer role but lacked SET permission; its membership was
+configured with INHERIT FALSE, SET TRUE. A read-only transaction using the
+restricted role was verified. Outcome-based enforcement stays false pending
+real-client observation. The restore gate now recreates the NOLOGIN SMS role
+names before restoring policies; it never creates those roles on a live target.
+
 - **Classification (owner decision, 2026-09-30):** Supabase project
   `nkqcbxufbhfibrgvajim` and the Railway `production` environment are the
   release target. Handle the database as production: backup, restore proof and

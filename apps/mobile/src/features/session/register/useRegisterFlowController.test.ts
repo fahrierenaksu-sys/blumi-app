@@ -147,6 +147,23 @@ const trCopy = getAuthEntryCopy("tr")
 const VALID_TR_LOCAL = "5321234567"
 const VALID_TR_E164 = "+905321234567"
 
+test("a pasted phone suffix cannot trigger a code request and correction restores the flow", async () => {
+  const harness = mountController()
+  await harness.act(controller => controller.toggleTermsAccepted())
+  for (const suffix of ["x", "\n", "\u200b", " ext 9"]) {
+    await harness.act(controller => controller.handlePhoneChange(VALID_TR_LOCAL + suffix))
+    assert.equal(harness.controller.primaryDisabled, true)
+    await harness.act(controller => controller.runPrimaryAction())
+    assert.equal(harness.codeRequests.length, 0)
+    assert.equal(harness.controller.isCodeStep, false)
+  }
+  await harness.act(controller => controller.handlePhoneChange(VALID_TR_LOCAL))
+  assert.equal(harness.controller.primaryDisabled, false)
+  await harness.act(controller => controller.runPrimaryAction())
+  assert.equal(harness.codeRequests.length, 1)
+  assert.equal(harness.controller.isCodeStep, true)
+})
+
 function mountController(
   overrides: Partial<RegisterFlowControllerInput> = {},
   options: { firebasePhoneNumber?: string | null } = {}
@@ -301,7 +318,7 @@ test("requesting a code advances to OTP before the provider call and starts the 
   assert.deepEqual(harness.stageChanges, ["phone", "otp"])
   assert.equal(harness.controller.codeRequestStatus, "sent")
   assert.equal(harness.controller.smsNotice, trCopy.codeExpiresSoon)
-  assert.equal(harness.controller.resendCooldownSeconds, 30)
+  assert.equal(harness.controller.resendCooldownSeconds, 60)
   assert.equal(harness.controller.busy, false)
   assert.equal(harness.controller.primaryDisabled, true, "the code is still empty")
 })
@@ -318,8 +335,8 @@ test("resend is blocked during the cooldown and sends a fresh code once it reach
 
   mock.timers.tick(1000)
   harness.rerender()
-  assert.equal(harness.controller.resendCooldownSeconds, 29)
-  for (let second = 0; second < 29; second += 1) {
+  assert.equal(harness.controller.resendCooldownSeconds, 59)
+  for (let second = 0; second < 59; second += 1) {
     mock.timers.tick(1000)
     harness.rerender()
   }
@@ -331,7 +348,7 @@ test("resend is blocked during the cooldown and sends a fresh code once it reach
   await harness.act((controller) => controller.resendCode())
   assert.equal(harness.codeRequests.length, 2)
   assert.equal(harness.controller.smsNotice, trCopy.freshCodeSent)
-  assert.equal(harness.controller.resendCooldownSeconds, 30)
+  assert.equal(harness.controller.resendCooldownSeconds, 60)
 })
 
 test("a parent back request leaves the code step and reports the phone stage once", async () => {
@@ -370,7 +387,7 @@ test("a failed first request marks the code as not sent; a failed resend keeps t
   harness.setRequestOutcome("resolve")
   await harness.act((controller) => controller.resendCode())
   assert.equal(harness.controller.codeRequestStatus, "sent")
-  for (let second = 0; second < 30; second += 1) {
+  for (let second = 0; second < 60; second += 1) {
     mock.timers.tick(1000)
     harness.rerender()
   }

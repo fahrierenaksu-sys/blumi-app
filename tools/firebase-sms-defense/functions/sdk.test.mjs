@@ -52,7 +52,7 @@ test("the signed provider wrapper passes the real SDK event shape to admission",
   const auth = getAuth()
   const payload = { aud: "https://fixture.run.app", event_type: "beforeSendSms",
     event_id: "fixture-event", iat: Math.floor(Date.now() / 1000),
-    sms_type: "SIGN_IN_OR_SIGN_UP", phone_number: "+15550000001", ip_address: "203.0.113.7" }
+    sms_type: "SIGN_IN_OR_SIGN_UP", phone_number: "+15550000001", ip_address: "203.0.113.7", recaptcha_score: 0.7 }
   const jwt = [Buffer.from('{"alg":"RS256"}').toString("base64url"),
     Buffer.from(JSON.stringify(payload)).toString("base64url"), "fixture"].join(".")
   const verification = mock.method(auth, "_verifyAuthBlockingToken", async token => {
@@ -76,6 +76,7 @@ test("the signed provider wrapper passes the real SDK event shape to admission",
     assert.equal(received.phoneNumber, payload.phone_number)
     assert.equal(received.ipAddress, payload.ip_address)
     assert.equal(received.smsType, "SIGN_IN_OR_SIGN_UP")
+    assert.equal(received.recaptchaScore, 0.7)
     assert.equal(res.statusCode, 200)
     assert.equal(res.body.recaptchaActionOverride, "BLOCK")
 

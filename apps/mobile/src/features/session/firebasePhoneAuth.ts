@@ -1,6 +1,7 @@
 import type { ConfirmationResult } from "@react-native-firebase/auth"
 import { requireFirebasePhoneAppCheck } from "./firebasePhoneAppCheck"
 import { requireFirebaseSmsDevicePermission } from "./firebaseSmsDevicePermission"
+import { normalizeInternationalSmsPhone } from "./phoneNumberInput"
 
 export type FirebasePhoneConfirmation = ConfirmationResult
 
@@ -53,6 +54,9 @@ type FirebaseAuthNativeTestingBridge = {
 
 let appVerificationConfiguration: Promise<void> | null = null
 let smsRequestInFlight = false
+// UX protection against repeat taps/guess loops. Firebase still owns the
+// authoritative verification limits; client state cannot enforce security.
+const confirmationAttempts = new WeakMap<FirebasePhoneConfirmation, { count: number; inFlight: boolean; used: boolean }>()
 
 function configureFictionalNumberTesting(auth: FirebaseAuth): Promise<void> {
   if (!disableAppVerificationForTesting) return Promise.resolve()
@@ -87,7 +91,7 @@ export function subscribeToFirebasePhoneNumber(
 export async function requestFirebasePhoneCode(
   phoneNumber: string
 ): Promise<FirebasePhoneConfirmation> {
-  if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber)) throw new Error("Enter a valid phone number with country code.")
+  if (normalizeInternationalSmsPhone(phoneNumber) !== phoneNumber) throw new Error("Enter a valid phone number with country code.")
   const { module, auth } = requireFirebaseAuth()
   if (smsRequestInFlight) throw new Error("A verification request is already in progress. Try again later.")
   smsRequestInFlight = true
@@ -117,12 +121,20 @@ export async function confirmFirebasePhoneCode(
   if (!/^\d{6}$/.test(verificationCode)) {
     throw new Error("That verification code is invalid or expired. Request a new code and try again.")
   }
+  const state = confirmationAttempts.get(confirmation) ?? { count: 0, inFlight: false, used: false }
+  if (state.inFlight || state.used || state.count >= 5) {
+    throw new Error("That verification code is invalid or expired. Request a new code and try again.")
+  }
+  state.count += 1
+  state.inFlight = true
+  confirmationAttempts.set(confirmation, state)
   try {
     const credential = await confirmation.confirm(verificationCode)
+    state.used = true
     return await credential.user.getIdToken(true)
   } catch {
     throw new Error("That verification code is invalid or expired. Request a new code and try again.")
-  }
+  } finally { state.inFlight = false }
 }
 
 export async function signOutFirebasePhoneAuth(): Promise<void> {

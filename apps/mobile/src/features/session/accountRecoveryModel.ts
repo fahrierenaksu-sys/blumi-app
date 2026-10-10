@@ -1,14 +1,13 @@
+import { normalizeInternationalSmsPhone } from "./phoneNumberInput"
+
 export interface AccountRecoveryPhoneValidation {
   normalizedOldPhoneNumber: string
   normalizedNewPhoneNumber: string
   errorMessage: string | null
 }
 
-const E164_PHONE_PATTERN = /^\+[1-9]\d{7,14}$/
-
 export function normalizeRecoveryPhoneNumber(value: string): string {
-  const normalized = value.trim().replace(/[\s()-]/g, "")
-  return E164_PHONE_PATTERN.test(normalized) ? normalized : ""
+  return normalizeInternationalSmsPhone(value) ?? ""
 }
 
 export function validateAccountRecoveryPhones(

@@ -4,7 +4,9 @@ import type { RegisterFlowAvailability } from "../registerFlowModel"
 import { canRequestRegisterPhoneCode } from "../registerPhonePanelModel"
 import type { SetupLayoutMetrics } from "../setupFlow/setupFlowShellModel"
 
-export const RESEND_COOLDOWN_SECONDS = 30
+// Match the server's minimum SMS interval; it remains the authority if the
+// screen is reset, the app is restarted, or the device clock is changed.
+export const RESEND_COOLDOWN_SECONDS = 60
 export const REGISTER_OTP_LENGTH = 6
 
 export type RegisterAuthIntent = "create" | "sign-in"

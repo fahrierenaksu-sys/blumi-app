@@ -33,6 +33,7 @@ const testNames = [
   "preAuthOnboardingStorage",
   "onboardingCompletion",
   "registerFlowModel",
+  "phoneNumberInput",
   "registerPhonePanelModel",
   "profileEditModel",
   "profileSetupLayout",

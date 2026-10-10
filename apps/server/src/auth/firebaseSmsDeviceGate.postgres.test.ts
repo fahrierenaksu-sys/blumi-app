@@ -24,7 +24,7 @@ async function fixture(verifyProof: SmsDeviceProofVerifier = async () => ({ publ
   const options = { projectId: "fixture-project", hmacSecret: "fixture-key-with-at-least-32-bytes-long", expectedMigrationChecksum: checksum }
   const gates = [pool, restricted].map(pool => createSmsDeviceGate({ ...options, pool, verifyProof }))
   const reserve = createPostgresSmsAdmission({ ...options, pool })
-  return { pool, restricted, gates, reserve, close: async () => { await restricted.end(); await pool.end() } }
+  return { pool, restricted, gates, reserve, options, close: async () => { await restricted.end(); await pool.end() } }
 }
 const base = { platform: "android" as const, phoneNumber: phone(), ipAddress: "203.0.113.7" }
 
@@ -77,7 +77,7 @@ test("a challenge is single-use, destination-bound, installation-bound and short
     assert.equal(verifications, 1)
     await f.pool.query("UPDATE blumi_sms_device_challenges SET expires_at = created_at + interval '1 microsecond'")
     await assert.rejects(f.gates[0]!.permit({ ...request, installationId: second.installationId, phoneNumber: phone(2), challenge: second.challenge }), /challenge rejected/)
-    await assert.rejects(f.gates[0]!.challenge({ ...base, installationId: "x".repeat(43) }), /unavailable/)
+    await assert.rejects(f.gates[0]!.challenge({ ...base, phoneNumber: phone(4), installationId: "x".repeat(43) }), /unavailable/)
   } finally { await f.close() }
 })
 
@@ -89,6 +89,44 @@ test("failed attestation burns its challenge and never issues a permit", disposa
     await assert.rejects(f.gates[0]!.permit(request), /rejected proof/)
     await assert.rejects(f.gates[1]!.permit(request), /challenge rejected/)
     assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_device_permits")).rows[0].total, 0)
+    assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_installations")).rows[0].total, 0)
+    const retry = await f.gates[1]!.challenge({ ...base, installationId: challenge.installationId })
+    assert.equal(retry.installationId, challenge.installationId)
+    assert.equal(retry.registrationRequired, true)
+  } finally { await f.close() }
+})
+
+test("Android creates a permanent identity only after valid proof and retains it for later challenges", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  try {
+    const challenge = await f.gates[0]!.challenge(base)
+    assert.equal(challenge.registrationRequired, true)
+    assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_installations")).rows[0].total, 0)
+    await f.gates[1]!.permit({ ...base, ...challenge, proof: "fixture-proof" })
+    assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_installations")).rows[0].total, 1)
+    await f.pool.query("UPDATE blumi_sms_device_permits SET created_at = created_at - interval '61 seconds', expires_at = expires_at - interval '61 seconds'")
+    const retry = await f.gates[0]!.challenge({ ...base, installationId: challenge.installationId })
+    assert.equal(retry.registrationRequired, false)
+    assert.equal(retry.installationId, challenge.installationId)
+  } finally { await f.close() }
+})
+
+test("pending Android identity survives expired challenges but rejects tampering and other project signatures", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  try {
+    const first = await f.gates[0]!.challenge(base)
+    await f.pool.query("UPDATE blumi_sms_device_challenges SET created_at = created_at - interval '49 hours', expires_at = expires_at - interval '49 hours'")
+    await f.pool.query("SELECT blumi_sms_prune_expired()")
+    assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_device_challenges")).rows[0].total, 0)
+    const retry = await f.gates[1]!.challenge({ ...base, installationId: first.installationId })
+    assert.equal(retry.installationId, first.installationId)
+    const bytes = Buffer.from(first.installationId, "base64url")
+    bytes[0] = bytes[0]! ^ 1
+    await assert.rejects(f.gates[1]!.challenge({ ...base, installationId: bytes.toString("base64url") }), /unavailable/)
+    const other = createSmsDeviceGate({ ...f.options, projectId: "different-project", pool: f.restricted,
+      verifyProof: async () => ({ publicKey: null, signCount: 0 }) })
+    await assert.rejects(other.challenge({ ...base, installationId: first.installationId }), /unavailable/)
+    assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_installations")).rows[0].total, 0)
   } finally { await f.close() }
 })
 
@@ -128,8 +166,49 @@ test("iOS assertion counters cannot be reset or committed out of order across in
     const results = [...await olderSettled, { status: "fulfilled" }]
     assert.equal(results.filter(result => result.status === "fulfilled").length, 1)
     assert.equal((await f.pool.query("SELECT sign_count FROM blumi_sms_installations")).rows[0].sign_count, "2")
+    await f.pool.query("UPDATE blumi_sms_device_permits SET created_at = created_at - interval '61 seconds', expires_at = expires_at - interval '61 seconds'")
     const reset = await f.gates[1]!.challenge({ ...ios, phoneNumber: phone(4) })
     await assert.rejects(f.gates[0]!.permit({ ...ios, phoneNumber: phone(4), challenge: reset.challenge, proof: "0" }), /proof rejected/)
     assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_device_permits")).rows[0].total, 2)
   } finally { releaseFirst(); await f.close() }
+})
+
+test("known device and destination cooldowns reject before calling the proof provider", disposablePostgresSkip(), async () => {
+  let proofs = 0
+  const f = await fixture(async () => { proofs += 1; return { publicKey: null, signCount: 0 } })
+  try {
+    const first = await f.gates[0]!.challenge(base)
+    const waiting = await f.gates[1]!.challenge({ ...base, installationId: first.installationId, phoneNumber: phone(2) })
+    await f.gates[0]!.permit({ ...base, ...first, proof: "fixture-proof" })
+    await assert.rejects(f.gates[1]!.challenge({ ...base, installationId: first.installationId, phoneNumber: phone(3) }), /device cooldown/)
+    await assert.rejects(f.gates[1]!.challenge({ ...base, ipAddress: "198.51.100.2" }), /phone cooldown/)
+    await assert.rejects(f.gates[1]!.permit({ ...base, ...waiting, phoneNumber: phone(2), proof: "fixture-proof" }), /device cooldown/)
+    assert.equal(proofs, 1)
+  } finally { await f.close() }
+})
+
+test("abandoned phone permits still count across new installations and IPs", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  try {
+    for (let index = 0; index < 3; index++) {
+      const challenge = await f.gates[index % 2]!.challenge({ ...base, ipAddress: `198.51.100.${index + 1}` })
+      await f.gates[index % 2]!.permit({ ...base, ...challenge, proof: "fixture-proof" })
+      await f.pool.query("UPDATE blumi_sms_device_permits SET created_at = created_at - interval '61 seconds', expires_at = expires_at - interval '61 seconds'")
+    }
+    await assert.rejects(f.gates[1]!.challenge({ ...base, ipAddress: "192.0.2.8" }), /phone limit/)
+    assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_send_admissions")).rows[0].total, 0)
+    await f.pool.query("UPDATE blumi_sms_device_permits SET created_at = created_at - interval '24 hours', expires_at = expires_at - interval '24 hours'")
+    await f.gates[0]!.challenge(base)
+  } finally { await f.close() }
+})
+
+test("a market disabled during external verification cannot receive a new permit", disposablePostgresSkip(), async () => {
+  let disable!: () => Promise<void>
+  const f = await fixture(async () => { await disable(); return { publicKey: null, signCount: 0 } })
+  disable = async () => { await f.pool.query("UPDATE blumi_sms_country_policy SET enabled = false") }
+  try {
+    const challenge = await f.gates[0]!.challenge(base)
+    await assert.rejects(f.gates[1]!.permit({ ...base, ...challenge, proof: "fixture-proof" }), /unavailable/)
+    assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_device_permits")).rows[0].total, 0)
+  } finally { await f.close() }
 })

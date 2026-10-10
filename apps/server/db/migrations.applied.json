@@ -68,5 +68,6 @@
   "067_realtime_connection_leases.sql": "2fe02f804c3288027c7bcef291bb87da3d8dfcb3dd88a87dd99fa9e9725d10fb",
   "068_session_reuse_detection_and_firebase_uid.sql": "a475eecbf15c0cb7d0ee7e06ff84d5cdae9269299590b843b19fc84a3647e0ee",
   "069_moderation_phone_bans.sql": "2fc97b071b0f06fbffa94a85ee4e904b79f3148d53175cc31f76b018f7dceaa1",
-  "072_firebase_sms_admission.sql": "7ce728adc69e7b285d5631440a1da71b807a038a483ce2ce597706906b80c18e"
+  "072_firebase_sms_admission.sql": "7ce728adc69e7b285d5631440a1da71b807a038a483ce2ce597706906b80c18e",
+  "073_sms_verification_outcomes.sql": "5452a289e0abb048ba67d89382105124838226633d16b6833020cb70558082dc"
 }

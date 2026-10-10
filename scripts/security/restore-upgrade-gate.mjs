@@ -39,7 +39,11 @@ try {
   run(join(pgBin, "initdb"), ["-D", data, "-U", "blumi", "--auth-local=trust", "--auth-host=reject", "--no-locale", "-E", "UTF8"])
   run(join(pgBin, "pg_ctl"), ["-D", data, "-l", join(directory, "postgres.log"), "-o", `-F -k ${directory} -h '' -p ${port}`, "-w", "start"])
   started = true
-  run(join(pgBin, "psql"), ["--dbname", url, "--no-psqlrc", "--command", "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;"])
+  // pg_dump omits cluster roles even with --no-privileges. Restored RLS
+  // policies still reference the SMS roles introduced by migration 072.
+  // Reproduce those names only in this disposable, socket-only cluster.
+  run(join(pgBin, "psql"), ["--dbname", url, "--no-psqlrc", "--command",
+    "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE blumi_sms_defense NOLOGIN; CREATE ROLE blumi_sms_device_gate NOLOGIN; CREATE ROLE blumi_sms_observer NOLOGIN;"])
   // The archive owns public; remove only this newly-created cluster's empty default schema.
   run(join(pgBin, "psql"), ["--dbname", url, "--no-psqlrc", "--command", "DROP SCHEMA public CASCADE;"])
   run(join(pgBin, "pg_restore"), ["--dbname", url, "--no-owner", "--no-privileges", "--exit-on-error", archive])

@@ -8,7 +8,8 @@ export function createBeforeSmsHandler(reserve) {
         timestamp: event.timestamp,
         smsType: event.smsType,
         phoneNumber: event.additionalUserInfo?.phoneNumber,
-        ipAddress: event.ipAddress
+        ipAddress: event.ipAddress,
+        recaptchaScore: event.additionalUserInfo?.recaptchaScore
       })
       // Never return ALLOW: it would override Google's fraud assessment.
       if (result.allowed !== true) return { recaptchaActionOverride: "BLOCK" }

@@ -7,6 +7,60 @@ import { AUTHENTICATED_IP_REQUESTS_PER_MINUTE } from "./requestLimits"
 import { createBudgetRefusalLog } from "./sharedRateBudgetHook"
 import { createChatService } from "../chat/chatService"
 
+test("public Firebase verification shares an IP budget across instances and ignores invented bearer identities", async () => {
+  let verifications = 0
+  const authRateLimiter = createInMemoryRateBudget(() => 1_800_000_000_000)
+  const apps = [0, 1].map(() => createServer({ authRateLimiter, firebaseAuthVerifier: {
+    async verifyIdToken() { verifications++; throw Object.assign(new Error("rejected"), { code: "auth/id-token-expired" }) }
+  } }))
+  try {
+    for (let i = 0; i < 12; i++) {
+      const response = await apps[i % 2]!.inject({ method: "POST", url: "/v1/auth/firebase/complete",
+        remoteAddress: i % 2 ? "::ffff:203.0.113.7" : "203.0.113.7",
+        headers: { authorization: `Bearer invented-${i}` }, payload: { idToken: `fixture-${i}`, authIntent: "sign-in" } })
+      assert.equal(response.statusCode, i < 10 ? 401 : 429)
+    }
+    assert.equal(verifications, 10)
+    assert.equal((await apps[0]!.inject({ method: "POST", url: "/v1/auth/firebase/complete", remoteAddress: "198.51.100.1",
+      payload: { idToken: "fixture", authIntent: "sign-in" } })).statusCode, 401)
+  } finally { await Promise.all(apps.map(app => app.close())) }
+})
+
+test("recovery has its own shared source budget and budget outages fail before the provider", async () => {
+  const authRateLimiter = createInMemoryRateBudget(() => 1_800_000_000_000)
+  const apps = [0, 1].map(() => createServer({ authRateLimiter }))
+  try {
+    for (let i = 0; i < 5; i++) {
+      const response = await apps[i % 2]!.inject({ method: "POST", url: "/v1/account/recovery/requests", payload: {} })
+      assert.equal(response.statusCode, i < 3 ? 202 : 429)
+    }
+  } finally { await Promise.all(apps.map(app => app.close())) }
+  const unavailable = createServer({ authRateLimiter: { async consumeUser() { throw new Error("unavailable") }, async purgeExpired() {} },
+    firebaseAuthVerifier: { async verifyIdToken() { assert.fail("must not reach provider") } } })
+  try {
+    assert.equal((await unavailable.inject({ method: "POST", url: "/v1/auth/firebase/complete",
+      payload: { idToken: "fixture", authIntent: "sign-in" } })).statusCode, 503)
+  } finally { await unavailable.close() }
+})
+
+test("sensitive account actions share a verified-user budget even across changing IPs", async () => {
+  const auth = createAuthService({ codeFactory: () => "123456" })
+  await auth.sendCode("+12025550101")
+  const session = await auth.verifyCode("+12025550101", "123456")
+  const authRateLimiter = createInMemoryRateBudget(() => 1_800_000_000_000)
+  const apps = [0, 1].map(() => createServer({ authService: auth, authRateLimiter,
+    firebaseAuthVerifier: { async verifyIdToken() { assert.fail("challenge must not verify tokens") } } }))
+  try {
+    for (let i = 0; i < 8; i++) {
+      const response = await apps[i % 2]!.inject({ method: "POST", url: "/v1/account/firebase/challenge",
+        remoteAddress: `203.0.113.${i + 1}`, headers: { authorization: `Bearer ${session.sessionToken}` },
+        payload: { purpose: i % 2 ? "account_data_export" : "phone_change_current" } })
+      assert.equal(response.statusCode, i < 6 ? 200 : 429)
+    }
+    assert.equal((await apps[0]!.inject({ method: "GET", url: "/v1/users/me", headers: { authorization: `Bearer ${session.sessionToken}` } })).statusCode, 200)
+  } finally { await Promise.all(apps.map(app => app.close())) }
+})
+
 test("chat and leave budgets are independent, bounded per user, and renew with the window", async () => {
   let now = 1_800_000_000_000
   const budget = createInMemoryRateBudget(() => now)

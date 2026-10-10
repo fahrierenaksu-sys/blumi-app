@@ -4,6 +4,7 @@ import { readBearerToken, resolveRequestSession } from "../routes/routeHelpers"
 import { cacheRateBudgetRefusals, type SharedRateBudget, type UserRateBudgetScope } from "./sharedRateBudget"
 import { safeOperationalErrorKind } from "./safeErrorLog"
 import { isMemberApiRequest } from "./requestLimits"
+import { canonicalSmsIp } from "../auth/firebaseSmsAdmission"
 
 /**
  * Per-user budget refusals, counted per scope and logged at most once a
@@ -30,12 +31,33 @@ export function createBudgetRefusalLog(options: {
 }
 
 /** preHandler runs after the existing cheap onRequest/IP limiter. */
-export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService, budget: SharedRateBudget): void {
+export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService, budget: SharedRateBudget,
+  authBudget: SharedRateBudget = budget): void {
   const guardedBudget = cacheRateBudgetRefusals(budget)
+  const guardedAuthBudget = cacheRateBudgetRefusals(authBudget)
   // The first refusal of a quiet period is logged at once (its window began
   // at startup or at the last line), later ones at most once a minute.
   const recordRefusal = createBudgetRefusalLog({ warn: (entry) => app.log.warn(entry, "User request budget refusals") })
   app.addHook("preHandler", async (request, reply) => {
+    const route = request.routeOptions.url
+    const publicScope = request.method === "POST" && route === "/v1/auth/firebase/complete" ? "authVerification"
+      : request.method === "POST" && route === "/v1/account/recovery/requests" ? "accountRecovery" : null
+    if (publicScope) {
+      const ip = canonicalSmsIp(request.ip)
+      if (!ip) return reply.code(400).send({ error: "Request unavailable." })
+      try {
+        // Header/claimed account/target phone cannot buy a new source budget.
+        const result = await guardedAuthBudget.consumeUser(`public-auth-source:${ip}`, publicScope)
+        if (!result.allowed) {
+          recordRefusal(publicScope)
+          return reply.header("Retry-After", String(result.retryAfterSeconds)).code(429)
+            .send({ error: "Too many requests. Try again shortly." })
+        }
+      } catch {
+        return reply.code(503).send({ error: "Service temporarily unavailable." })
+      }
+      return
+    }
     // Public and operator routes do not authenticate member sessions. An
     // irrelevant header must not turn a cheap public request into a DB query.
     if (!isMemberApiRequest(request)) return
@@ -46,7 +68,7 @@ export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService
     if (!resolved) return
     try {
       const scope = requestBudgetScope(request.method, request.routeOptions.url)
-      const result = await guardedBudget.consumeUser(resolved.account.userId, scope)
+      const result = await (scope === "accountSecurity" ? guardedAuthBudget : guardedBudget).consumeUser(resolved.account.userId, scope)
       if (!result.allowed) recordRefusal(scope)
       if (!result.allowed) return reply.header("Retry-After", String(result.retryAfterSeconds)).code(429)
         .send(scope === "chatSend"
@@ -60,6 +82,7 @@ export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService
 }
 
 export function requestBudgetScope(method: string, route: string | undefined): UserRateBudgetScope {
+  if (method === "POST" && route?.startsWith("/v1/account/")) return "accountSecurity"
   if (route === "/v1/devices" && method === "POST") return "deviceRegistration"
   if (route === "/v1/devices" && method === "DELETE") return "deviceRemoval"
   if (method !== "POST") return "general"
