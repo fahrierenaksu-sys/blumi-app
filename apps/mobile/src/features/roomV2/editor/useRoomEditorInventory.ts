@@ -9,10 +9,8 @@ import {
 } from "../../../screens/useRoomEditorInventoryEntries"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import type { PlacedRoomItem, UserRoomDecor } from "../roomV2.types"
-import {
-  ACTIVE_ROOM_FURNITURE_CATALOG,
-  QA_OWNED_ROOM_ITEM_IDS
-} from "./roomEditorCatalog"
+import { QA_OWNED_ROOM_ITEM_IDS } from "./roomEditorCatalog"
+import { ROOM_EDITOR_TRAY_CATALOG } from "./roomEditorTrayCatalog"
 import {
   getDefaultRoomV2FurnitureRotation,
   getRoomV2FurnitureRotationOptions
@@ -44,7 +42,7 @@ export function useRoomEditorInventory(input: {
   const [selectedInventoryRotation, setSelectedInventoryRotation] = useState<PlacedRoomItem["rotation"]>("front")
 
   const inventoryEntries: RoomEditorInventoryEntry[] = useRoomEditorInventoryEntries(
-    ACTIVE_ROOM_FURNITURE_CATALOG,
+    ROOM_EDITOR_TRAY_CATALOG,
     inventory.ownedRoomItemIds,
     QA_OWNED_ROOM_ITEM_IDS
   )

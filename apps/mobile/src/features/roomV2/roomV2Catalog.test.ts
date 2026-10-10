@@ -208,8 +208,24 @@ test("every published room_v2 item and the starter bed keep resolving to one can
   assert.ok(publishedRoomIds.size > 0, "the release catalog lists published room items")
   const catalogIds = new Set(ROOM_V2_FURNITURE_CATALOG.map((item) => item.id))
   assert.equal(catalogIds.size, ROOM_V2_FURNITURE_CATALOG.length, "catalog IDs are unique")
-  for (const itemId of [...publishedRoomIds, STARTER_ROOM_BED_ITEM_ID]) {
+  for (const itemId of publishedRoomIds) {
     assert.ok(catalogIds.has(itemId), `${itemId} must resolve in the live room catalog`)
   }
+  // the starter bed is the domain's reserved free bed: never a retired id; it resolves once its art lands (4.7)
+  const { isLegacyItemId } = require("@blumi/domain") as typeof import("@blumi/domain")
+  assert.equal(isLegacyItemId(STARTER_ROOM_BED_ITEM_ID), false)
 })
 
+
+test("the editor tray never offers a held piece, even to an owner", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- CommonJS fixture loading as above
+  const { filterRoomEditorTrayCatalog } = require("./editor/roomEditorTrayCatalog") as typeof import("./editor/roomEditorTrayCatalog")
+  const offered = filterRoomEditorTrayCatalog([
+    { id: "room_v2_chair_blush" },
+    { id: "room_v3_sofa_japon_cream" },
+    { id: "room_v3_armchair_japon_cream" },
+    { id: "qa_room_probe" },
+    { id: "standin_room_piece" }
+  ]).map((item) => item.id)
+  assert.deepEqual(offered, ["standin_room_piece"])
+})
