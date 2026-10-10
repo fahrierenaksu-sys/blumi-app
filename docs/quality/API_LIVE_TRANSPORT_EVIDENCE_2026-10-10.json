@@ -1,0 +1,84 @@
+{
+  "status": "COMPLETED",
+  "clientDate": "2026-10-10",
+  "target": "https://blumi-app-production.up.railway.app",
+  "authorization": "Owner authorized non-destructive live API penetration checks in this conversation.",
+  "constraints": {
+    "maximumRequests": 12,
+    "minimumStartIntervalMs": 1000,
+    "redirects": "never followed",
+    "accountOrBusinessMutations": false,
+    "volumeOrSlowRequestTests": false,
+    "storeResponseBodiesCredentialsIdentifiersOrPeerAddresses": false,
+    "stopOnUnexpectedPrivateSuccessOrWebSocketUpgrade": true
+  },
+  "plannedRequests": [
+    { "probe": "tls-and-public-security-headers", "method": "HEAD", "path": "/health" },
+    { "probe": "foreign-origin-public-response", "method": "GET", "path": "/health" },
+    { "probe": "foreign-origin-member-preflight", "method": "OPTIONS", "path": "/v1/users/me" },
+    { "probe": "unauthenticated-member-response", "method": "GET", "path": "/v1/users/me" },
+    { "probe": "foreign-origin-unauthenticated-discovery", "method": "GET", "path": "/v1/discover" },
+    { "probe": "public-api-description-counts", "method": "GET", "path": "/v1/docs/openapi.json" },
+    { "probe": "forwarded-header-public-indicators", "method": "HEAD", "path": "/health" },
+    { "probe": "unknown-route-response", "method": "GET", "path": "/security-audit-unknown-route" },
+    { "probe": "foreign-origin-public-preflight", "method": "OPTIONS", "path": "/health" },
+    { "probe": "invalid-ticket-upgrade-one", "method": "GET", "path": "/ws" },
+    { "probe": "invalid-ticket-upgrade-two", "method": "GET", "path": "/ws" }
+  ],
+  "requestCount": 11,
+  "transportErrorCount": 0,
+  "completedAtUtc": "2026-10-09T22:37:00.383Z",
+  "httpResponseHeaderSummary": {
+    "appliesToRequestIndices": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "nosniff": true,
+    "frameProtection": "SAMEORIGIN",
+    "contentSecurityPolicyPresent": true,
+    "strictTransportSecurityPresent": true,
+    "corsAllowOrigin": "absent",
+    "corsAllowsCredentials": false,
+    "cacheNoStore": false,
+    "redirectLocationPresent": false,
+    "setCookiePresent": false,
+    "authorizationAllowedInPreflightRequestIndices": [3]
+  },
+  "tls": {
+    "validated": true,
+    "protocol": "TLSv1.3",
+    "cipher": "TLS_AES_256_GCM_SHA384",
+    "certificateValidFrom": "Sep 27 03:01:43 2026 GMT",
+    "certificateValidTo": "Dec 26 03:01:42 2026 GMT",
+    "certificateFingerprintSha256": "FB:37:0C:A2:68:42:DA:2B:2F:F8:E3:18:2E:0E:8C:FC:6F:B8:EA:C3:2C:DB:57:18:F4:5A:4B:39:B9:E1:40:AF",
+    "certificateIssuerOrganization": "Let's Encrypt"
+  },
+  "results": [
+    { "requestIndex": 1, "probe": "tls-and-public-security-headers", "method": "HEAD", "path": "/health", "status": 200, "responseBytes": 0 },
+    { "requestIndex": 2, "probe": "foreign-origin-public-response", "method": "GET", "path": "/health", "status": 200, "responseBytes": 36 },
+    { "requestIndex": 3, "probe": "foreign-origin-member-preflight", "method": "OPTIONS", "path": "/v1/users/me", "status": 204, "responseBytes": 0 },
+    { "requestIndex": 4, "probe": "unauthenticated-member-response", "method": "GET", "path": "/v1/users/me", "status": 401, "responseBytes": 38 },
+    { "requestIndex": 5, "probe": "foreign-origin-unauthenticated-discovery", "method": "GET", "path": "/v1/discover", "status": 401, "responseBytes": 38 },
+    {
+      "requestIndex": 6,
+      "probe": "public-api-description-counts",
+      "method": "GET",
+      "path": "/v1/docs/openapi.json",
+      "status": 200,
+      "responseBytes": 193130,
+      "apiDescription": { "jsonParsed": true, "pathCount": 89, "operationCount": 101, "operationsWithExplicitSecurityCount": 78, "securitySchemeCount": 2 }
+    },
+    { "requestIndex": 7, "probe": "forwarded-header-public-indicators", "method": "HEAD", "path": "/health", "status": 200, "responseBytes": 0 },
+    { "requestIndex": 8, "probe": "unknown-route-response", "method": "GET", "path": "/security-audit-unknown-route", "status": 404, "responseBytes": 100 },
+    { "requestIndex": 9, "probe": "foreign-origin-public-preflight", "method": "OPTIONS", "path": "/health", "status": 204, "responseBytes": 0 },
+    { "requestIndex": 10, "probe": "invalid-ticket-upgrade-one", "method": "GET", "path": "/ws", "status": 401, "responseBytes": 0 },
+    { "requestIndex": 11, "probe": "invalid-ticket-upgrade-two", "method": "GET", "path": "/ws", "status": 401, "responseBytes": 0 }
+  ],
+  "assessments": [
+    { "state": "EXTERNAL_VERIFIED", "finding": "TLS certificate validation passed and the tested connection used TLS 1.3." },
+    { "state": "EXTERNAL_VERIFIED", "finding": "Unauthenticated member and discovery requests returned 401; both invalid-ticket WebSocket handshakes returned 401." },
+    { "state": "EXTERNAL_VERIFIED", "finding": "The foreign-origin probes never received Access-Control-Allow-Origin. A 204 preflight with authorization in allow-headers does not grant cross-origin access without allow-origin." },
+    { "state": "OBSERVED", "finding": "No tested HTTP response, including the two unauthenticated 401 responses, carried Cache-Control: no-store. This does not establish how authenticated private responses are cached." },
+    { "state": "OBSERVED", "finding": "Forwarded-header spoofing produced no redirect or observable change in public health status or security-header indicators." },
+    { "state": "OPEN", "finding": "Trusted-proxy client-address resolution and rate-limit correctness cannot be proved from these bounded HTTP responses." },
+    { "state": "OPEN", "finding": "Authenticated object authorization, live rate saturation, slow-request handling, load resilience and production SQL timeout configuration were not exercised." },
+    { "state": "NO_CONFIRMED_EXPLOIT_IN_THIS_SCOPE", "finding": "No unexpected private success or invalid-ticket upgrade occurred. This bounded transport check is not a claim that the entire API is secure." }
+  ]
+}

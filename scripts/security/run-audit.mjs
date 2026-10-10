@@ -4,9 +4,13 @@ import { fileURLToPath } from "node:url"
 import { evaluateAudit } from "./audit-policy.mjs"
 
 const policy = JSON.parse(readFileSync(new URL("./audit-policy.json", import.meta.url), "utf8"))
-// npm audit cannot see patch-package fixes. The temporary forge exception is
-// valid only after the installed dependency rejects the malicious structures.
-execFileSync(process.execPath, ["--test", fileURLToPath(new URL("./node-forge-mitigation.test.mjs", import.meta.url))], {
+// npm audit cannot see patch-package fixes. Exercise the installed mitigations
+// before evaluating the narrowly scoped, expiring advisory policy. A failed
+// mitigation test blocks release even if its advisory has an exception.
+execFileSync(process.execPath, ["--test",
+  fileURLToPath(new URL("./node-forge-mitigation.test.mjs", import.meta.url)),
+  fileURLToPath(new URL("./braces-mitigation.test.mjs", import.meta.url))
+], {
   stdio: "inherit",
   timeout: 30_000
 })

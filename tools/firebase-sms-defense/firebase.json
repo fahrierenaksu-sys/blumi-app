@@ -1,0 +1,5 @@
+{
+  "functions": [{ "source": "functions", "codebase": "blumi-sms-defense", "runtime": "nodejs22",
+    "ignore": ["node_modules", ".git", "*.test.mjs", "*-debug.log"],
+    "predeploy": ["node build.mjs"] }]
+}

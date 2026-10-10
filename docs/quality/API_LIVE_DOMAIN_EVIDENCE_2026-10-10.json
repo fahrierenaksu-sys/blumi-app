@@ -1,0 +1,61 @@
+{
+  "assessmentDate": "2026-10-10",
+  "timezone": "Europe/Istanbul",
+  "target": "https://blumi-app-production.up.railway.app",
+  "scope": "Protected read endpoints with absent credentials and a random syntactically valid but nonexistent session token",
+  "totalTransportAttempts": 9,
+  "applicationResponses": 8,
+  "nodeTransportFailuresBeforeFallback": 1,
+  "fallback": "TLS-verifying curl; Node transport failure is not a verified API defect",
+  "minimumRequestStartSpacingMs": 1200,
+  "mutatingRequests": 0,
+  "redirectsFollowed": 0,
+  "tlsVerificationDisabled": false,
+  "credentialsPersisted": false,
+  "rawResponseBodiesPersisted": false,
+  "privateDataObserved": false,
+  "unexpectedPrivateSuccesses": 0,
+  "results": [
+    { "method": "GET", "path": "/v1/users/me", "auth": "absent", "status": 401, "responseBytes": 38, "jsonErrorEnvelope": true },
+    { "method": "GET", "path": "/v1/economy/balance", "auth": "absent", "status": 401, "responseBytes": 38, "jsonErrorEnvelope": true },
+    { "method": "GET", "path": "/v1/threads", "auth": "absent", "status": 401, "responseBytes": 38, "jsonErrorEnvelope": true },
+    { "method": "GET", "path": "/v1/safety/blocks", "auth": "absent", "status": 401, "responseBytes": 38, "jsonErrorEnvelope": true },
+    { "method": "GET", "path": "/v1/notification-preferences", "auth": "absent", "status": 401, "responseBytes": 38, "jsonErrorEnvelope": true },
+    { "method": "GET", "path": "/v1/users/me/room-decor", "auth": "absent", "status": 401, "responseBytes": 38, "jsonErrorEnvelope": true },
+    { "method": "GET", "path": "/v1/users/me", "auth": "syntactically_valid_invalid", "status": 401, "responseBytes": 38, "jsonErrorEnvelope": true },
+    { "method": "GET", "path": "/v1/economy/balance", "auth": "syntactically_valid_invalid", "status": 401, "responseBytes": 38, "jsonErrorEnvelope": true }
+  ],
+  "finding": "All eight protected GET probes denied access with HTTP 401; no authentication bypass or private data exposure was observed in this bounded live scope",
+  "additionalRecheck": {
+    "assessmentDate": "2026-10-10",
+    "target": "https://blumi-app-production.up.railway.app",
+    "scope": "Eight bounded GET authentication-boundary rechecks only; prior results preserved above",
+    "transportAttempts": 8,
+    "applicationResponses": 8,
+    "minimumDelayBetweenRequestsMs": 1200,
+    "redirectsFollowed": 0,
+    "tlsVerificationDisabled": false,
+    "mutatingRequests": 0,
+    "credentialsPersisted": false,
+    "rawResponseBodiesPersisted": false,
+    "stoppedOnUnexpectedPrivateSuccess": false,
+    "results": [
+      { "method": "GET", "path": "/v1/users/me", "authCase": "absent", "transportSucceeded": true, "latencyMs": 223, "status": 401, "denied": true, "cacheControl": null, "responseTopLevelKeys": ["error"], "jsonResponse": true },
+      { "method": "GET", "path": "/v1/economy/balance", "authCase": "absent", "transportSucceeded": true, "latencyMs": 169, "status": 401, "denied": true, "cacheControl": null, "responseTopLevelKeys": ["error"], "jsonResponse": true },
+      { "method": "GET", "path": "/v1/threads", "authCase": "absent", "transportSucceeded": true, "latencyMs": 164, "status": 401, "denied": true, "cacheControl": null, "responseTopLevelKeys": ["error"], "jsonResponse": true },
+      { "method": "GET", "path": "/v1/safety/blocks", "authCase": "absent", "transportSucceeded": true, "latencyMs": 170, "status": 401, "denied": true, "cacheControl": null, "responseTopLevelKeys": ["error"], "jsonResponse": true },
+      { "method": "GET", "path": "/v1/notification-preferences", "authCase": "absent", "transportSucceeded": true, "latencyMs": 170, "status": 401, "denied": true, "cacheControl": null, "responseTopLevelKeys": ["error"], "jsonResponse": true },
+      { "method": "GET", "path": "/v1/users/me", "authCase": "syntactically_valid_nonexistent_session", "transportSucceeded": true, "latencyMs": 207, "status": 401, "denied": true, "cacheControl": null, "responseTopLevelKeys": ["error"], "jsonResponse": true },
+      { "method": "GET", "path": "/v1/threads", "authCase": "syntactically_valid_nonexistent_session", "transportSucceeded": true, "latencyMs": 199, "status": 401, "denied": true, "cacheControl": null, "responseTopLevelKeys": ["error"], "jsonResponse": true },
+      { "method": "GET", "path": "/v1/admin/session", "authCase": "fabricated_admin_jwt", "transportSucceeded": true, "latencyMs": 169, "status": 401, "denied": true, "cacheControl": null, "responseTopLevelKeys": ["error"], "jsonResponse": true }
+    ],
+    "finding": "All eight additional probes returned HTTP 401. No access bypass observed within this scope. Cache-Control was absent on the denial responses; authenticated response caching was not tested."
+  },
+  "combinedRecordedTransportAttempts": 17,
+  "combinedRecordedApplicationResponses": 16,
+  "openEvidence": [
+    "Cross-account BOLA/IDOR requires authorized authenticated test accounts and was not tested live",
+    "Authenticated permissions, writes, purchases, inventory, messages and session revocation were not tested live",
+    "The deployed commit and deployment of local hardening changes are not established by these responses"
+  ]
+}

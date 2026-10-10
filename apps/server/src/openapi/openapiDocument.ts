@@ -1,5 +1,8 @@
 export const OPENAPI_DOCUMENT_PATH = "/v1/docs/openapi.json"
 
+export type OpenApiAudience = "mobile" | "admin" | "infrastructure" | "legacy"
+export type OpenApiScope = "active" | "all" | OpenApiAudience
+
 export interface OpenApiRouteSnapshot {
   method: string | string[]
   url: string
@@ -22,6 +25,12 @@ export interface OpenApiDocument {
         type: "http"
         scheme: "bearer"
       }
+      adminAuth: {
+        type: "http"
+        scheme: "bearer"
+        bearerFormat: "JWT"
+        description: string
+      }
       revenueCatWebhookSignature: {
         type: "apiKey"
         in: "header"
@@ -33,13 +42,17 @@ export interface OpenApiDocument {
 }
 
 export function createOpenApiDocument(
-  routes: readonly OpenApiRouteSnapshot[]
+  routes: readonly OpenApiRouteSnapshot[],
+  options: { scope?: OpenApiScope } = {}
 ): OpenApiDocument {
+  const scope = options.scope ?? "active"
   const paths: OpenApiDocument["paths"] = {}
 
   for (const route of routes) {
     const path = normalizeOpenApiPath(route.url)
     if (path === OPENAPI_DOCUMENT_PATH) continue
+    const audience = routeAudience(path, route.config)
+    if (scope === "active" ? audience === "legacy" : scope !== "all" && scope !== audience) continue
     const methods = Array.isArray(route.method) ? route.method : [route.method]
     for (const methodValue of methods) {
       const method = methodValue.toLowerCase()
@@ -55,7 +68,7 @@ export function createOpenApiDocument(
     info: {
       title: "Blumi API",
       version: "1.0.0",
-      description: "Runtime route contract for the Blumi mobile and server clients."
+      description: `Blumi runtime API catalog (${scope}). Select scope=mobile, admin, infrastructure, legacy or all to inspect each audience. Legacy OTP routes are retained for compatibility and excluded from the default active catalog.`
     },
     servers: [{ url: "/" }],
     paths: Object.fromEntries(
@@ -63,16 +76,22 @@ export function createOpenApiDocument(
     ),
     components: {
       securitySchemes: {
-      bearerAuth: {
-        type: "http",
-        scheme: "bearer"
-      },
-      revenueCatWebhookSignature: {
-        type: "apiKey",
-        in: "header",
-        name: "x-revenuecat-webhook-signature",
-        description: "RevenueCat HMAC-SHA256 signature in t=<unix-seconds>,v1=<hex-hmac> format."
-      }
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer"
+        },
+        adminAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Separate, short-lived operator JWT. Member session tokens do not grant admin access."
+        },
+        revenueCatWebhookSignature: {
+          type: "apiKey",
+          in: "header",
+          name: "x-revenuecat-webhook-signature",
+          description: "RevenueCat HMAC-SHA256 signature in t=<unix-seconds>,v1=<hex-hmac> format."
+        }
       }
     }
   }
@@ -104,9 +123,30 @@ function createOperation(
       : createDefaultResponses()
   }
 
+  const audience = routeAudience(path, routeConfig)
+  operation["x-api-audience"] = audience
+  if (audience === "legacy") {
+    operation.deprecated = true
+    operation.description = "Legacy OTP compatibility route. Firebase-enabled servers return 410 FIREBASE_PHONE_AUTH_REQUIRED; use the current Firebase flow."
+    operation["x-replaced-by"] = legacyReplacements(path)
+    const responses = operation.responses as Record<string, unknown>
+    responses["410"] = {
+      description: "Legacy OTP flow retired on Firebase-enabled servers. Update Blumi to use Firebase phone verification.",
+      content: { "application/json": { schema: {
+        type: "object", required: ["code", "error"],
+        properties: {
+          code: { type: "string", const: "FIREBASE_PHONE_AUTH_REQUIRED" },
+          error: { type: "string" }
+        }
+      } } }
+    }
+  }
+
   const authPolicy = resolveRouteAuthPolicy(routeConfig, path)
   if (authPolicy === "bearer") {
     operation.security = [{ bearerAuth: [] }]
+  } else if (authPolicy === "admin") {
+    operation.security = [{ adminAuth: [] }]
   } else if (authPolicy === "revenuecat-webhook") {
     operation.security = [{ revenueCatWebhookSignature: [] }]
   }
@@ -206,16 +246,32 @@ function responseDescription(statusCode: string): string {
 function resolveRouteAuthPolicy(
   routeConfig: unknown,
   path: string
-): "bearer" | "public" | "revenuecat-webhook" {
+): "bearer" | "admin" | "public" | "revenuecat-webhook" {
   const configuredPolicy = asRecord(routeConfig)?.apiAuth
   if (
-    configuredPolicy === "bearer" ||
     configuredPolicy === "public" ||
     configuredPolicy === "revenuecat-webhook"
   ) {
     return configuredPolicy
   }
+  if (path.startsWith("/v1/admin/")) return "admin"
+  if (configuredPolicy === "bearer") return "bearer"
   return path.startsWith("/v1/") ? "bearer" : "public"
+}
+
+function routeAudience(path: string, config: unknown): OpenApiAudience {
+  if (asRecord(config)?.apiLifecycle === "legacy-otp") return "legacy"
+  if (path === "/admin" || path.startsWith("/admin/") || path.startsWith("/v1/admin/")) return "admin"
+  if (!path.startsWith("/v1/") || path.startsWith("/v1/webhooks/")) return "infrastructure"
+  return "mobile"
+}
+
+function legacyReplacements(path: string): string[] {
+  if (path.startsWith("/v1/auth/") || path === "/v1/accounts/register") {
+    return ["POST /v1/auth/firebase/complete"]
+  }
+  if (path === "/v1/account/recovery/challenge") return ["POST /v1/account/recovery/requests"]
+  return ["POST /v1/account/firebase/challenge", "POST /v1/account/firebase/reauth"]
 }
 
 function tagForPath(path: string): string {

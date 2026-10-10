@@ -2115,13 +2115,13 @@ test("device endpoints register and remove authenticated push tokens", async () 
     },
     payload: {
       platform: "ios",
-      pushToken: "  token_1  "
+      pushToken: "  ExpoPushToken[token_1]  "
     }
   })
   assert.equal(created.statusCode, 201)
   assert.equal(created.json().device.userId, userId)
   assert.equal(created.json().device.platform, "ios")
-  assert.equal(created.json().device.pushToken, "token_1")
+  assert.equal(created.json().device.pushToken, "ExpoPushToken[token_1]")
 
   assert.equal(
     (await notificationService.repository.listDevices(userId)).length,
@@ -2147,7 +2147,7 @@ test("device endpoints register and remove authenticated push tokens", async () 
     headers: {
       authorization: `Bearer ${token}`
     },
-    payload: { pushToken: "token_1" }
+    payload: { pushToken: "ExpoPushToken[token_1]" }
   })
   assert.equal(removed.statusCode, 204)
   assert.equal(

@@ -483,31 +483,32 @@ test("typing clears a session error only when one is shown", async () => {
   assert.equal(harness.controller.flow.selectedCountry, "DE")
 })
 
-test("a phone Firebase already verified completes the account without another code", async () => {
+test("a cached Firebase phone still requires a new code request and OTP", async () => {
   const harness = mountController({}, { firebasePhoneNumber: VALID_TR_E164 })
   await enterValidPhone(harness)
-  assert.equal(harness.controller.verifiedFirebasePhone, true)
   assert.equal(harness.controller.primaryDisabled, true, "create still requires the terms")
 
   await harness.act((controller) => controller.toggleTermsAccepted())
   await harness.act((controller) => controller.runPrimaryAction())
 
-  assert.equal(harness.codeRequests.length, 0)
-  assert.deepEqual(harness.registrations, [{
-    phoneNumber: VALID_TR_E164,
-    verificationCode: "",
-    authIntent: "create",
-    termsAcceptance: { version: LEGAL_DOCUMENT_VERSION, locale: "tr" }
-  }])
+  assert.equal(harness.codeRequests.length, 1)
+  assert.equal(harness.controller.flow.stage, "code")
+  assert.equal(harness.controller.primaryDisabled, true)
+  assert.equal(harness.registrations.length, 0)
+  await harness.act((controller) => controller.handleCodeChange("123456"))
+  assert.equal(harness.registrations.length, 1)
+  assert.equal(harness.registrations[0]?.verificationCode, "123456")
 })
 
-test("Firebase phone changes are observed through the subscription", async () => {
+test("a Firebase auth-state change cannot unlock an empty OTP field", async () => {
   const harness = mountController()
   await enterValidPhone(harness)
-  assert.equal(harness.controller.verifiedFirebasePhone, false)
+  await harness.act((controller) => controller.toggleTermsAccepted())
+  await harness.act((controller) => controller.runPrimaryAction())
   harness.firebase.listener?.(VALID_TR_E164)
   harness.rerender()
-  assert.equal(harness.controller.verifiedFirebasePhone, true)
+  assert.equal(harness.controller.primaryDisabled, true)
+  assert.deepEqual(harness.registrations, [])
 })
 
 test("sign-in needs no legal acceptance, reports no create-flow stage, and submits the sign-in intent", async () => {

@@ -1,0 +1,5 @@
+functions/node_modules/
+functions/lib/
+functions/schema-lock.json
+.firebase/
+*-debug.log

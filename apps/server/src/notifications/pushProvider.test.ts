@@ -2,6 +2,23 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createExpoPushProvider, PushProviderHttpError } from "./pushProvider"
 
+test("Expo token validation admits both documented prefixes and legacy UUIDs before any provider call", async () => {
+  let requests = 0
+  const provider = createExpoPushProvider({ fetcher: async () => {
+    requests++
+    return new Response(JSON.stringify({ data: { status: "ok", id: "synthetic-ticket" } }), { status: 200 })
+  } })
+  const notification = { title: "Blumi", body: "Update" }
+  for (const token of ["ExpoPushToken[a]", "ExponentPushToken[b]", "00000000-0000-0000-0000-000000000001"]) {
+    await provider.sendPush(token, notification)
+  }
+  assert.equal(requests, 3)
+  for (const token of ["fake", "ExpoPushToken[]", "ExpoPushToken[a b]", "ExpoPushToken[nested[value]]", "ExpoPushToken[a\u0000b]"]) {
+    await assert.rejects(provider.sendPush(token, notification), /valid Expo push token/)
+  }
+  assert.equal(requests, 3, "malformed input never reaches the network")
+})
+
 test("expo push provider sends an authenticated Expo push request", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = []
   const provider = createExpoPushProvider({

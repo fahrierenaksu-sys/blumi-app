@@ -1,0 +1,82 @@
+{
+  "target": "https://blumi-app-production.up.railway.app",
+  "reviewDate": "2026-10-10",
+  "scope": "Unauthenticated negative auth and input probes only",
+  "probeCount": 13,
+  "completed": true,
+  "stoppedOnUnexpectedSuccess": false,
+  "ratePolicy": {
+    "sequential": true,
+    "minimumGapMs": 1100,
+    "maximumRequestsOnOneAuthRoute": 7,
+    "redirectsFollowed": false
+  },
+  "dataHandling": {
+    "realPhoneNumbersSubmitted": false,
+    "realCredentialsSubmitted": false,
+    "validIdTokensSubmitted": false,
+    "responseBodiesPersisted": false,
+    "privateValuesPersisted": false,
+    "smsOrAccountMutationsRequested": false,
+    "runtimeCodeChanged": false
+  },
+  "summary": {
+    "responses": 13,
+    "networkErrors": 0,
+    "serverErrors": 0,
+    "redirectResponses": 0,
+    "unexpected2xx": 0,
+    "privateSessionFieldsObserved": 0,
+    "statusCounts": { "400": 5, "401": 6, "410": 2 },
+    "durationMsMin": 53,
+    "durationMsMax": 223,
+    "availabilityConclusion": "All planned negative probes received responses without a network error or 5xx; this is not an uptime or load-test guarantee."
+  },
+  "commonResponseSignals": {
+    "appliesToProbeCount": 13,
+    "jsonResponse": true,
+    "genericErrorFieldPresent": true,
+    "contentTypeJson": true,
+    "contentTypeOptionsNoSniff": true,
+    "frameOptionsPresent": true,
+    "contentSecurityPolicyPresent": true,
+    "strictTransportSecurityPresent": true,
+    "rateLimitHeaderPresent": true,
+    "retryAfterPresent": false,
+    "cacheControlContainsNoStore": false,
+    "privateSessionFieldsPresent": false
+  },
+  "probes": [
+    { "id": "firebase_null_body", "method": "POST", "path": "/v1/auth/firebase/complete", "status": 400, "durationMs": 223 },
+    { "id": "firebase_array_body", "method": "POST", "path": "/v1/auth/firebase/complete", "status": 400, "durationMs": 65 },
+    { "id": "firebase_malformed_json", "method": "POST", "path": "/v1/auth/firebase/complete", "status": 400, "durationMs": 65 },
+    { "id": "firebase_empty_object", "method": "POST", "path": "/v1/auth/firebase/complete", "status": 400, "durationMs": 60 },
+    { "id": "firebase_invalid_token", "method": "POST", "path": "/v1/auth/firebase/complete", "status": 401, "durationMs": 70 },
+    { "id": "firebase_unknown_property", "method": "POST", "path": "/v1/auth/firebase/complete", "status": 401, "durationMs": 60 },
+    { "id": "firebase_prototype_property", "method": "POST", "path": "/v1/auth/firebase/complete", "status": 400, "durationMs": 61 },
+    { "id": "legacy_send_null_phone", "method": "POST", "path": "/v1/auth/send-code", "status": 410, "durationMs": 61 },
+    { "id": "legacy_register_null_phone", "method": "POST", "path": "/v1/accounts/register", "status": 410, "durationMs": 69 },
+    { "id": "refresh_missing_bearer", "method": "POST", "path": "/v1/auth/refresh", "status": 401, "durationMs": 63 },
+    { "id": "realtime_ticket_missing_bearer", "method": "POST", "path": "/v1/auth/realtime-ticket", "status": 401, "durationMs": 59 },
+    { "id": "admin_session_missing_bearer", "method": "GET", "path": "/v1/admin/session", "status": 401, "durationMs": 53 },
+    { "id": "admin_session_invalid_bearer", "method": "GET", "path": "/v1/admin/session", "status": 401, "durationMs": 61 }
+  ],
+  "findings": [
+    {
+      "id": "LIVE-AUTH-01",
+      "severity": "low",
+      "classification": "privacy hardening observation",
+      "verified": "None of the 13 observed auth or input rejection responses included Cache-Control: no-store.",
+      "notProven": "No private-data cache leakage or successful authentication bypass was demonstrated. Successful credential-bearing responses were not tested.",
+      "status": "Open: deployed rejection-response cache policy differs from the locally hardened policy; no live change was made."
+    }
+  ],
+  "unproven": [
+    "Authenticated account access, UID binding and fresh reauthentication",
+    "Rate-limit enforcement thresholds: headers observed, no exhaustion or flood performed",
+    "Firebase provider-outage classification and revocation behavior",
+    "Full prototype-pollution absence: one __proto__ property probe was rejected",
+    "TLS configuration strength and WAF effectiveness: HTTPS response headers alone are insufficient",
+    "Deployed commit identity and authenticated success-response cache policy"
+  ]
+}

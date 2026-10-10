@@ -48,7 +48,6 @@ import {
 import { revokeProductionSessionAfterPushCleanup } from "./sessionPushCleanup"
 import {
   confirmFirebasePhoneCode,
-  getVerifiedFirebasePhoneIdToken,
   requestFirebasePhoneCode,
   signOutFirebasePhoneAuth,
   type FirebasePhoneConfirmation
@@ -177,7 +176,10 @@ export function useSessionState(): UseSessionStateResult {
       capabilities: createFailClosedCapabilityResolution().capabilities
     })
   const sessionActorRef = useRef<SessionActor | null>(null)
-  const firebasePhoneConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
+  const firebasePhoneConfirmationRef = useRef<{
+    phoneNumber: string
+    confirmation: FirebasePhoneConfirmation
+  } | null>(null)
   // Coordinators are created once per mount (stable effect dependencies).
   const [mutationCoordinator] = useState(() => createSessionMutationCoordinator({
     current: () => sessionActorRef.current,
@@ -563,12 +565,12 @@ export function useSessionState(): UseSessionStateResult {
       setIsBootstrapping(true)
       setErrorMessage(null)
       try {
-        const confirmation = firebasePhoneConfirmationRef.current
-        const idToken = await getVerifiedFirebasePhoneIdToken(input.phoneNumber)
-          ?? (confirmation
-            ? await confirmFirebasePhoneCode(confirmation, input.verificationCode)
-            : null)
-        if (!idToken) throw new Error("Request a verification code before continuing.")
+        const pending = firebasePhoneConfirmationRef.current
+        if (!pending || pending.phoneNumber !== input.phoneNumber) {
+          throw new Error("Request a verification code before continuing.")
+        }
+        // A cached Firebase identity does not verify the code entered now.
+        const idToken = await confirmFirebasePhoneCode(pending.confirmation, input.verificationCode)
         const nextSessionActor = await completeFirebaseAccount(
           MOBILE_HTTP_BASE_URL,
           {
@@ -608,12 +610,11 @@ export function useSessionState(): UseSessionStateResult {
         let registrationCapabilities = createFailClosedCapabilityResolution().capabilities
         await replayPreAuthOnboardingDraft(draft, {
           register: async () => {
-            const confirmation = firebasePhoneConfirmationRef.current
-            const idToken = await getVerifiedFirebasePhoneIdToken(input.phoneNumber)
-              ?? (confirmation
-                ? await confirmFirebasePhoneCode(confirmation, input.verificationCode)
-                : null)
-            if (!idToken) throw new Error("Request a verification code before continuing.")
+            const pending = firebasePhoneConfirmationRef.current
+            if (!pending || pending.phoneNumber !== input.phoneNumber) {
+              throw new Error("Request a verification code before continuing.")
+            }
+            const idToken = await confirmFirebasePhoneCode(pending.confirmation, input.verificationCode)
             const actor = await completeFirebaseAccount(
               MOBILE_HTTP_BASE_URL,
               {
@@ -708,10 +709,10 @@ export function useSessionState(): UseSessionStateResult {
     async (input: SendVerificationCodeInput): Promise<void> => {
       setIsBootstrapping(true)
       setErrorMessage(null)
+      firebasePhoneConfirmationRef.current = null
       try {
-        firebasePhoneConfirmationRef.current = await requestFirebasePhoneCode(
-          input.phoneNumber
-        )
+        const confirmation = await requestFirebasePhoneCode(input.phoneNumber)
+        firebasePhoneConfirmationRef.current = { phoneNumber: input.phoneNumber, confirmation }
       } catch (error) {
         setErrorMessage(getErrorMessage(error))
         throw error

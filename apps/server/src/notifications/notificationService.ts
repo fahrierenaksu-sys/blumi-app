@@ -1,5 +1,6 @@
 import {
   createInMemoryNotificationRepository,
+  MAX_DEVICES_PER_ACCOUNT,
   type DeviceRegistration,
   type NotificationPreferences,
   type NotificationPolicyReason,
@@ -50,6 +51,16 @@ const SENDER_LOOKUP_TIMEOUT_MS = 2_000
 export interface PushQueueResult {
   outcome: NotificationPolicyReason | "no_device"
   deliveryCount: number
+}
+
+export class DeviceRegistrationLimitError extends PublicRequestError {
+  readonly code = "DEVICE_REGISTRATION_LIMIT"
+  readonly statusCode = 429
+
+  constructor() {
+    super("Too many devices are registered. Remove an unused device before adding another.")
+    this.name = "DeviceRegistrationLimitError"
+  }
 }
 
 export interface NotificationService {
@@ -232,7 +243,9 @@ export function createNotificationService(
       registrationCache.remember(existing, readEpoch)
       return { device: existing, changed: false }
     }
-    await repository.saveDevice(device)
+    if (await repository.saveDeviceBounded(device) === "limit") {
+      throw new DeviceRegistrationLimitError()
+    }
     const savedEpoch = registrationCache.epoch()
     const current = await findCurrent()
     if (!current) throw new Error("Device registration changed. Please try again.")
@@ -272,6 +285,12 @@ export function createNotificationService(
       }
       const devices = await repository.listDevices(normalizedUserId)
       if (devices.length === 0) return { outcome: "no_device", deliveryCount: 0 }
+      // Historical accounts keep every registration. Only their ten most
+      // recently registered devices receive a push; token order breaks ties.
+      const deliveryDevices = devices.sort((a, b) =>
+        Date.parse(b.registeredAt) - Date.parse(a.registeredAt) ||
+        (a.pushToken < b.pushToken ? -1 : a.pushToken > b.pushToken ? 1 : 0)
+      ).slice(0, MAX_DEVICES_PER_ACCOUNT)
       const normalizedNotification = normalizeNotification(
         notification,
         await resolveLocale(normalizedUserId, notification.data?.type)
@@ -279,7 +298,7 @@ export function createNotificationService(
       const queuedAt = now()
       const availableAt = new Date(queuedAt.getTime() +
         (normalizedNotification.data?.type === "chat.message" ? chatMessagePushHoldMs : 0))
-      const deliveries = devices.map((device) => ({
+      const deliveries = deliveryDevices.map((device) => ({
         deliveryId: normalizeDeliveryId(deliveryIdFactory()),
         userId: normalizedUserId,
         pushToken: device.pushToken,

@@ -1,0 +1,342 @@
+{
+  "reviewDate": "2026-10-10",
+  "targetOrigin": "https://blumi-app-production.up.railway.app",
+  "status": "completed_with_open_gates",
+  "stopReason": null,
+  "cleanupError": null,
+  "fixturesAddedVerified": true,
+  "temporaryFixturesRemovedVerified": true,
+  "noConfigurationMutationAttempted": false,
+  "credentialsRetained": false,
+  "cleanupRecoveryPending": false,
+  "accountCreationResponseLossMayLeaveUnconfirmedAccounts": false,
+  "databaseAbsenceVerified": true,
+  "databaseFreshRowsVerified": 2,
+  "nativeVerificationPerformed": false,
+  "realSmsRequested": false,
+  "foreignAuthorizationTested": false,
+  "accountCreationAuthorized": true,
+  "normalOnboardingOnly": true,
+  "counts": {
+    "googleRequests": 10,
+    "blumiSetupRequests": 14,
+    "blumiCreateResponsesSuccessful": 2,
+    "firebaseNewAccountsConfirmed": 2,
+    "blumiNewAccountsConfirmed": 2,
+    "onboardingAccountsConfirmed": 2
+  },
+  "exclusiveConfigWindowAcknowledged": true,
+  "concurrentConfigPreservationVerified": false,
+  "configAtomicityNotProven": true,
+  "configMapUpdateAtomicityNotProven": true,
+  "outcomes": [
+    {
+      "stage": "CONFIG_READ",
+      "method": "GET",
+      "routeTemplate": "/admin/v2/projects/:projectId/config",
+      "httpStatus": 200
+    },
+    {
+      "stage": "CONFIG_ADD",
+      "method": "PATCH",
+      "routeTemplate": "/admin/v2/projects/:projectId/config",
+      "httpStatus": 200
+    },
+    {
+      "stage": "CONFIG_VERIFY",
+      "method": "GET",
+      "routeTemplate": "/admin/v2/projects/:projectId/config",
+      "httpStatus": 200
+    },
+    {
+      "stage": "PHONE_CHALLENGE",
+      "method": "POST",
+      "routeTemplate": "/v1/accounts:sendVerificationCode",
+      "httpStatus": 200
+    },
+    {
+      "stage": "PHONE_CONFIRM",
+      "method": "POST",
+      "routeTemplate": "/v1/accounts:signInWithPhoneNumber",
+      "httpStatus": 200
+    },
+    {
+      "stage": "BLUMI_CREATE",
+      "method": "POST",
+      "routeTemplate": "/v1/auth/firebase/complete",
+      "httpStatus": 200
+    },
+    {
+      "stage": "PROFILE_SAVE",
+      "method": "PATCH",
+      "routeTemplate": "/v1/users/me",
+      "httpStatus": 200
+    },
+    {
+      "stage": "ONBOARDING_COMPLETE",
+      "method": "PATCH",
+      "routeTemplate": "/v1/users/me/onboarding",
+      "httpStatus": 200
+    },
+    {
+      "stage": "AVATAR_SAVE",
+      "method": "PUT",
+      "routeTemplate": "/v1/users/me/avatar",
+      "httpStatus": 200
+    },
+    {
+      "stage": "ONBOARDING_COMPLETE",
+      "method": "PATCH",
+      "routeTemplate": "/v1/users/me/onboarding",
+      "httpStatus": 200
+    },
+    {
+      "stage": "ROOM_SAVE",
+      "method": "PUT",
+      "routeTemplate": "/v1/users/me/room-decor",
+      "httpStatus": 200
+    },
+    {
+      "stage": "ONBOARDING_COMPLETE",
+      "method": "PATCH",
+      "routeTemplate": "/v1/users/me/onboarding",
+      "httpStatus": 200
+    },
+    {
+      "stage": "PHONE_CHALLENGE",
+      "method": "POST",
+      "routeTemplate": "/v1/accounts:sendVerificationCode",
+      "httpStatus": 200
+    },
+    {
+      "stage": "PHONE_CONFIRM",
+      "method": "POST",
+      "routeTemplate": "/v1/accounts:signInWithPhoneNumber",
+      "httpStatus": 200
+    },
+    {
+      "stage": "BLUMI_CREATE",
+      "method": "POST",
+      "routeTemplate": "/v1/auth/firebase/complete",
+      "httpStatus": 200
+    },
+    {
+      "stage": "PROFILE_SAVE",
+      "method": "PATCH",
+      "routeTemplate": "/v1/users/me",
+      "httpStatus": 200
+    },
+    {
+      "stage": "ONBOARDING_COMPLETE",
+      "method": "PATCH",
+      "routeTemplate": "/v1/users/me/onboarding",
+      "httpStatus": 200
+    },
+    {
+      "stage": "AVATAR_SAVE",
+      "method": "PUT",
+      "routeTemplate": "/v1/users/me/avatar",
+      "httpStatus": 200
+    },
+    {
+      "stage": "ONBOARDING_COMPLETE",
+      "method": "PATCH",
+      "routeTemplate": "/v1/users/me/onboarding",
+      "httpStatus": 200
+    },
+    {
+      "stage": "ROOM_SAVE",
+      "method": "PUT",
+      "routeTemplate": "/v1/users/me/room-decor",
+      "httpStatus": 200
+    },
+    {
+      "stage": "ONBOARDING_COMPLETE",
+      "method": "PATCH",
+      "routeTemplate": "/v1/users/me/onboarding",
+      "httpStatus": 200
+    },
+    {
+      "stage": "CLEANUP_READ",
+      "method": "GET",
+      "routeTemplate": "/admin/v2/projects/:projectId/config",
+      "httpStatus": 200
+    },
+    {
+      "stage": "CLEANUP_REMOVE",
+      "method": "PATCH",
+      "routeTemplate": "/admin/v2/projects/:projectId/config",
+      "httpStatus": 200
+    },
+    {
+      "stage": "CLEANUP_VERIFY",
+      "method": "GET",
+      "routeTemplate": "/admin/v2/projects/:projectId/config",
+      "httpStatus": 200
+    }
+  ],
+  "authenticatedReadEvidence": {
+    "reviewDate": "2026-10-10",
+    "targetOrigin": "https://blumi-app-production.up.railway.app",
+    "status": "completed_with_open_gates",
+    "stopReason": null,
+    "requestsExecuted": 14,
+    "maximumRequests": 20,
+    "minimumRequestGapMs": 1200,
+    "authenticatedAccountsVerified": 2,
+    "unexpectedForeignAuthorizationSuccessObserved": false,
+    "privateDataDisclosureVerified": false,
+    "foreignPrivatePayloadRead": false,
+    "credentialsRetained": false,
+    "productMutationsRequested": false,
+    "requestBudgetAccountingMayWrite": true,
+    "blocked": [
+      "economy_and_inventory_reads",
+      "own_newest_messages",
+      "own_room_invites",
+      "foreign_room_invites_without_independent_expiration_proof",
+      "foreign_messages_B_to_A_not_operator_enabled",
+      "foreign_messages_A_to_B_not_operator_enabled"
+    ],
+    "outcomes": [
+      {
+        "label": "A",
+        "routeTemplate": "/v1/users/me",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "selfIdentityMatches": true,
+        "activeAccount": true,
+        "onboardingComplete": true
+      },
+      {
+        "label": "B",
+        "routeTemplate": "/v1/users/me",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "selfIdentityMatches": true,
+        "activeAccount": true,
+        "onboardingComplete": true
+      },
+      {
+        "label": "A",
+        "routeTemplate": "/v1/threads?limit=10",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "allThreadsIncludeCaller": true,
+        "recordCount": 0
+      },
+      {
+        "label": "B",
+        "routeTemplate": "/v1/threads?limit=10",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "allThreadsIncludeCaller": true,
+        "recordCount": 0
+      },
+      {
+        "label": "A",
+        "routeTemplate": "/v1/users/me/room-decor",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "roomOwnerMatchesCaller": true,
+        "empty": false
+      },
+      {
+        "label": "B",
+        "routeTemplate": "/v1/users/me/room-decor",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "roomOwnerMatchesCaller": true,
+        "empty": false
+      },
+      {
+        "label": "A",
+        "routeTemplate": "/v1/safety/reports",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "recordCount": 0,
+        "ownershipNotIndependentlyProven": true
+      },
+      {
+        "label": "B",
+        "routeTemplate": "/v1/safety/reports",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "recordCount": 0,
+        "ownershipNotIndependentlyProven": true
+      },
+      {
+        "label": "A",
+        "routeTemplate": "/v1/safety/blocks",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "actorMatchesCaller": true,
+        "recordCount": 0
+      },
+      {
+        "label": "B",
+        "routeTemplate": "/v1/safety/blocks",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "actorMatchesCaller": true,
+        "recordCount": 0
+      },
+      {
+        "label": "A",
+        "routeTemplate": "/v1/notification-preferences",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "preferencesShapeValid": true
+      },
+      {
+        "label": "B",
+        "routeTemplate": "/v1/notification-preferences",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "preferencesShapeValid": true
+      },
+      {
+        "label": "A",
+        "routeTemplate": "/v1/chat-preferences",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "preferencesShapeValid": true
+      },
+      {
+        "label": "B",
+        "routeTemplate": "/v1/chat-preferences",
+        "method": "GET",
+        "kind": "own",
+        "status": 200,
+        "noStore": false,
+        "preferencesShapeValid": true
+      }
+    ]
+  }
+}

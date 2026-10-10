@@ -1,0 +1,43 @@
+{
+  "origin": "https://blumi-app-production.up.railway.app",
+  "testedAt": "2026-10-09T22:37:43.872Z",
+  "scope": "authorized, low-volume, non-destructive; no real account writes",
+  "requests": [
+    {
+      "name": "readiness",
+      "path": "/ready",
+      "status": 200,
+      "tlsVerified": true,
+      "cacheControl": null,
+      "responseBytes": 36,
+      "reflectsProbeMarker": false,
+      "unexpectedServerInternals": false
+    },
+    {
+      "name": "unknown-url-reflection",
+      "path": "/blumi-live-audit-missing",
+      "status": 404,
+      "tlsVerified": true,
+      "cacheControl": null,
+      "responseBytes": 126,
+      "reflectsProbeMarker": true,
+      "unexpectedServerInternals": false
+    },
+    {
+      "name": "spoofed-identity-headers",
+      "path": "/v1/users/me",
+      "status": 401,
+      "tlsVerified": true,
+      "cacheControl": null,
+      "responseBytes": 38,
+      "reflectsProbeMarker": false,
+      "unexpectedServerInternals": false
+    }
+  ],
+  "initialPreflight": {
+    "path": "/ready",
+    "status": 200,
+    "tlsVerified": true,
+    "authenticated": false
+  }
+}

@@ -5,10 +5,6 @@ import { LEGAL_DOCUMENT_VERSION } from "../../legal/legalPolicyMetadata"
 import type { AccountRecoveryLocale } from "../accountRecoveryCopy"
 import type { AuthEntryCopy } from "../authEntryCopy"
 import {
-  getFirebaseCurrentPhoneNumber,
-  subscribeToFirebasePhoneNumber
-} from "../firebasePhoneAuth"
-import {
   advanceRegisterFlowToCode,
   analyzeFormattedLocalPhoneNumber,
   createInitialRegisterFlow,
@@ -60,7 +56,7 @@ export interface RegisterFlowControllerInput {
 
 /**
  * Owns the phone -> OTP registration state machine: the flow state, the
- * Firebase auto-verified phone, the code request and verification submits,
+ * code request and verification submits,
  * the resend cooldown, and field feedback. The Register views only render it.
  */
 export function useRegisterFlowController({
@@ -81,10 +77,6 @@ export function useRegisterFlowController({
   const [smsNotice, setSmsNotice] = useState<string | null>(null)
   const [codeRequestStatus, setCodeRequestStatus] =
     useState<RegisterCodeRequestStatus>("idle")
-  const [firebasePhoneNumber, setFirebasePhoneNumber] = useState(
-    getFirebaseCurrentPhoneNumber
-  )
-  useEffect(() => subscribeToFirebasePhoneNumber(setFirebasePhoneNumber), [])
   const [otpFocused, setOtpFocused] = useState(false)
   const [phoneTouched, setPhoneTouched] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -115,12 +107,9 @@ export function useRegisterFlowController({
   const otpEditable = canEditRegisterCode({ busy, codeRequestStatus })
   const { progressTotal, progressCurrent } = resolveRegisterProgress(authIntent, isCodeStep)
   const legalRequirementsMet = resolveLegalRequirementsMet(authIntent, termsAccepted)
-  const verifiedFirebasePhone =
-    firebasePhoneNumber === availability.normalizedPhoneNumber
   const { primaryDisabled } = resolveRegisterPrimaryAction({
     isCodeStep,
     availability,
-    verifiedFirebasePhone,
     legalRequirementsMet,
     busy,
     codeRequestStatus
@@ -212,7 +201,6 @@ export function useRegisterFlowController({
   const requestVerificationCode = async (): Promise<void> => {
     setAttemptedPrimaryAction(true)
     const decision = resolveRegisterCodeRequestDecision({
-      verifiedFirebasePhone,
       phoneValid: availability.phoneValid,
       canRequestCode: availability.canRequestCode,
       legalRequirementsMet,
@@ -220,25 +208,6 @@ export function useRegisterFlowController({
       isCodeStep,
       resendCooldownSeconds
     })
-    if (decision === "complete-verified-phone") {
-      actionInFlightRef.current = true
-      setLocalBusy(true)
-      onClearError()
-      try {
-        await onRegister({
-          phoneNumber: availability.normalizedPhoneNumber,
-          verificationCode: "",
-          authIntent,
-          termsAcceptance: { version: LEGAL_DOCUMENT_VERSION, locale }
-        })
-      } catch {
-        // Session state owns the user-facing account-completion error.
-      } finally {
-        actionInFlightRef.current = false
-        setLocalBusy(false)
-      }
-      return
-    }
     if (decision === "blocked") {
       if (!availability.phoneValid) phoneInputRef.current?.focus()
       return
@@ -286,7 +255,6 @@ export function useRegisterFlowController({
     setAttemptedPrimaryAction(true)
     if (!canSubmitRegisterVerification({
       canVerify: availability.canVerify,
-      verifiedFirebasePhone,
       actionInFlight: actionInFlightRef.current,
       codeRequestStatus
     })) return
@@ -388,7 +356,6 @@ export function useRegisterFlowController({
     maskedPhoneNumber,
     progressTotal,
     progressCurrent,
-    verifiedFirebasePhone,
     primaryDisabled,
     attemptedPrimaryAction,
     codeRequestStatus,

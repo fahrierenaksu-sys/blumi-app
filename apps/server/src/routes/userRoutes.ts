@@ -36,7 +36,8 @@ import type { CompleteAvatarSelection } from "@blumi/contracts"
 import { isAuthError } from "../auth/authErrors"
 import { readProfileUpdateBody } from "./profileUpdateBody"
 import type { AccountRecoveryService } from "../account/accountRecoveryService"
-import type { FirebaseAuthVerifier } from "../auth/firebaseAuth"
+import { isFirebaseTokenRejection, isRecentFirebasePhoneProof, type FirebaseAuthVerifier, type FirebasePhoneIdentity } from "../auth/firebaseAuth"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import {
   announceChatParticipantUpdate,
   type ChatParticipantAnnouncementServices
@@ -177,8 +178,19 @@ export async function registerUserRoutes(
       return reply.code(400).send({ error: "Phone verification could not be completed." })
     }
 
+    let identity: FirebasePhoneIdentity
     try {
-      const identity = await services.firebaseAuthVerifier.verifyIdToken(idToken)
+      identity = await services.firebaseAuthVerifier.verifyIdToken(idToken)
+    } catch (error) {
+      if (isFirebaseTokenRejection(error)) {
+        return reply.code(401).send({ error: "Phone verification could not be completed." })
+      }
+      // Provider outages are not invalid credentials and must not spend the
+      // failed-auth budget of everyone sharing the caller's mobile carrier IP.
+      request.log.error({ errorKind: safeOperationalErrorKind(error) }, "Firebase verification unavailable")
+      return reply.header("Retry-After", "30").code(503).send({ error: "Phone verification is temporarily unavailable." })
+    }
+    try {
       const phoneNumber = readPhoneNumber({ phoneNumber: identity.phoneNumber })
       if (!phoneNumber) return reply.code(401).send({ error: "Phone verification could not be completed." })
       const fresh = await authService.consumeFirebaseActionChallenge({
@@ -186,6 +198,7 @@ export async function registerUserRoutes(
         purpose: purpose as "account_deletion" | "account_data_export" | "phone_change_current" | "phone_change_new",
         challengeId,
         phoneNumber: phoneNumber.e164,
+        firebaseUid: identity.uid,
         authTime: identity.authTime
       })
       if (!fresh) return reply.code(401).send({ error: "Request a fresh verification code and try again." })
@@ -207,7 +220,7 @@ export async function registerUserRoutes(
     } catch (error) {
       if (isPublicRequestError(error)) return reply.code(400).send({ error: error.message })
       if (isAuthError(error)) return reply.code(error.statusCode).send({ code: error.code, error: error.message })
-      return reply.code(401).send({ error: "Phone verification could not be completed." })
+      throw error
     }
   })
 
@@ -417,7 +430,7 @@ export async function registerUserRoutes(
   app.post(
     "/v1/account/deletion/challenge",
     {
-      config: { rateLimit: { max: 5, timeWindow: "5 minutes" } },
+      config: { apiLifecycle: "legacy-otp", rateLimit: { max: 5, timeWindow: "5 minutes" } },
       schema: accountChallengeRouteSchema
     },
     async (request, reply) => {
@@ -440,7 +453,7 @@ export async function registerUserRoutes(
     "/v1/account/deletion/confirm",
     {
       attachValidation: true,
-      config: { requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { apiLifecycle: "legacy-otp", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: accountVerificationRouteSchema
     },
     async (request, reply) => {
@@ -496,7 +509,7 @@ export async function registerUserRoutes(
   })
 
   app.post("/v1/account/export/challenge", {
-    config: { rateLimit: { max: 5, timeWindow: "5 minutes" } },
+    config: { apiLifecycle: "legacy-otp", rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: accountChallengeRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
@@ -514,7 +527,7 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/export/confirm", {
     attachValidation: true,
-    config: { requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
+    config: { apiLifecycle: "legacy-otp", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
     schema: accountVerificationRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
@@ -559,7 +572,7 @@ export async function registerUserRoutes(
   })
 
   app.post("/v1/account/phone-change/current/challenge", {
-    config: { rateLimit: { max: 5, timeWindow: "5 minutes" } },
+    config: { apiLifecycle: "legacy-otp", rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: accountChallengeRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
@@ -577,7 +590,7 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/phone-change/current/confirm", {
     attachValidation: true,
-    config: { requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
+    config: { apiLifecycle: "legacy-otp", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
     schema: accountVerificationRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
@@ -600,7 +613,7 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/phone-change/new/challenge", {
     attachValidation: true,
-    config: { requestValidation: "enforced", rateLimit: { max: 5, timeWindow: "5 minutes" } },
+    config: { apiLifecycle: "legacy-otp", requestValidation: "enforced", rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: {
       body: coreApiJsonSchemas.phoneChangeNewChallenge,
       response: {
@@ -632,7 +645,7 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/phone-change/new/confirm", {
     attachValidation: true,
-    config: { requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
+    config: { apiLifecycle: "legacy-otp", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
     schema: accountVerificationRouteSchema
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)
@@ -685,7 +698,7 @@ export async function registerUserRoutes(
 
   app.post("/v1/account/recovery/challenge", {
     attachValidation: true,
-    config: { apiAuth: "public", requestValidation: "enforced", rateLimit: { max: 5, timeWindow: "5 minutes" } },
+    config: { apiAuth: "public", apiLifecycle: "legacy-otp", requestValidation: "enforced", rateLimit: { max: 5, timeWindow: "5 minutes" } },
     schema: {
       body: coreApiJsonSchemas.phoneNumber,
       response: {
@@ -737,6 +750,7 @@ export async function registerUserRoutes(
     if (!oldPhone || !newPhone || !idToken || !recovery || !services.firebaseAuthVerifier) return reply.code(202).send({ ok: true })
     try {
       const identity = await services.firebaseAuthVerifier.verifyIdToken(idToken)
+      if (!isRecentFirebasePhoneProof(identity)) return reply.code(202).send({ ok: true })
       const verifiedPhone = readPhoneNumber({ phoneNumber: identity.phoneNumber })
       if (!verifiedPhone) return reply.code(202).send({ ok: true })
       await recovery.requestWithVerifiedPhone({

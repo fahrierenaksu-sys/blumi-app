@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { randomUUID } from "node:crypto"
 import test from "node:test"
 import { createInMemoryAuthRepository } from "../auth/authRepository"
 import { createAuthService, type AuthService } from "../auth/authService"
@@ -8,6 +9,21 @@ import { createServer } from "../server"
 import { createFixedWindowLimiter } from "./requestLimits"
 
 const SHARED_IP = "203.0.113.20"
+
+test("unknown paths are limited before malformed JSON can bypass the handler", async () => {
+  const app = createServer()
+  try {
+    for (let index = 0; index < 100; index += 1) {
+      const response = await app.inject({ method: "POST", url: `/missing-${index}`,
+        headers: { "content-type": "application/json" }, payload: "{", remoteAddress: SHARED_IP })
+      assert.equal(response.statusCode, 400)
+    }
+    const response = await app.inject({ method: "POST", url: "/missing-last",
+      headers: { "content-type": "application/json" }, payload: "{", remoteAddress: SHARED_IP })
+    assert.equal(response.statusCode, 429)
+    assert.ok(Number(response.headers["retry-after"]) > 0)
+  } finally { await app.close() }
+})
 
 test("rotating invented bearer tokens cannot escape the per-IP limit on Discover", async () => {
   const app = createServer({ authService: createAuthService() })
@@ -52,13 +68,65 @@ test("an invented bearer on a public route costs no session lookup and keeps the
       statuses.push((await app.inject({
         method: "GET",
         url: "/v1/commerce/coin-packs",
-        headers: { authorization: `Bearer invented-token-${index}` },
+        headers: { authorization: inventedSessionBearer() },
         remoteAddress: SHARED_IP
       })).statusCode)
     }
     assert.deepEqual(statuses.slice(0, 100), Array(100).fill(200))
     assert.equal(statuses[100], 429)
     assert.equal(lookups, 0)
+  } finally {
+    await app.close()
+  }
+})
+
+test("session-shaped invented tokens keep health, API documentation and unknown routes within the anonymous budget", async () => {
+  for (const [url, expectedStatus] of [
+    ["/health", 200],
+    ["/v1/docs/openapi.json", 200],
+    ["/unknown-security-probe", 404]
+  ] as const) {
+    const app = createServer()
+    try {
+      for (let index = 0; index < 101; index += 1) {
+        const response = await app.inject({
+          method: "GET",
+          url,
+          headers: { authorization: inventedSessionBearer() },
+          remoteAddress: SHARED_IP
+        })
+        assert.equal(response.statusCode, index < 100 ? expectedStatus : 429, `${url}: request ${index + 1}`)
+      }
+    } finally {
+      await app.close()
+    }
+  }
+})
+
+test("unknown routes are rate limited without an authorization header", async () => {
+  const app = createServer()
+  try {
+    for (let index = 0; index < 101; index += 1) {
+      const response = await app.inject({ method: "GET", url: "/unknown-security-probe", remoteAddress: SHARED_IP })
+      assert.equal(response.statusCode, index < 100 ? 404 : 429)
+    }
+  } finally {
+    await app.close()
+  }
+})
+
+test("rotating session-shaped invented tokens still exhaust the failed-auth budget on member routes", async () => {
+  const app = createServer()
+  try {
+    for (let index = 0; index < 101; index += 1) {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/discover",
+        headers: { authorization: inventedSessionBearer() },
+        remoteAddress: SHARED_IP
+      })
+      assert.equal(response.statusCode, index < 100 ? 401 : 429)
+    }
   } finally {
     await app.close()
   }
@@ -73,6 +141,17 @@ test("signed-in people behind one shared address are limited per person, not per
       await createReadySession(authService, "+905551117002"),
       await createReadySession(authService, "+905551117003")
     ]
+    // Exhausting the public budget must not apply its lower ceiling to
+    // signed-in people behind the same carrier address.
+    for (let index = 0; index < 101; index += 1) {
+      const publicResponse = await app.inject({
+        method: "GET",
+        url: "/v1/commerce/coin-packs",
+        headers: { authorization: inventedSessionBearer() },
+        remoteAddress: SHARED_IP
+      })
+      assert.equal(publicResponse.statusCode, index < 100 ? 200 : 429)
+    }
     for (let round = 0; round < 60; round += 1) {
       for (const token of tokens) {
         const response = await app.inject({
@@ -88,6 +167,10 @@ test("signed-in people behind one shared address are limited per person, not per
     await app.close()
   }
 })
+
+function inventedSessionBearer(): string {
+  return `Bearer dv_${randomUUID()}_${randomUUID()}`
+}
 
 test("requests without a bearer token keep the strict per-IP limit", async () => {
   const app = createServer({ authService: createAuthService() })

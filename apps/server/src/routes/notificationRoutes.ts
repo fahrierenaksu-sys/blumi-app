@@ -9,7 +9,8 @@ import {
   type NotificationPreferencesPatch
 } from "@blumi/contracts"
 import type { AuthService } from "../auth/authService"
-import type { NotificationService } from "../notifications/notificationService"
+import { DeviceRegistrationLimitError, type NotificationService } from "../notifications/notificationService"
+import { isExpoPushToken } from "../notifications/expoPushToken"
 import type { NotificationPreferences } from "../notifications/notificationRepository"
 import { isPublicRequestError } from "../errors/publicRequestError"
 import { resolveProductSession, schemaValidationFailed } from "./routeHelpers"
@@ -86,7 +87,7 @@ export async function registerNotificationRoutes(
     if (!resolved) return
 
     const parsed = deviceRegistrationRequestSchema.safeParse(request.body)
-    if (!parsed.success || schemaValidationFailed(request)) {
+    if (!parsed.success || schemaValidationFailed(request) || !isExpoPushToken(parsed.data.pushToken.trim())) {
       return reply.code(400).send({ error: "Choose a valid device platform." })
     }
 
@@ -101,6 +102,9 @@ export async function registerNotificationRoutes(
       // 200: already registered to this account on this platform; nothing written.
       return reply.code(changed ? 201 : 200).send({ device })
     } catch (error) {
+      if (error instanceof DeviceRegistrationLimitError) {
+        return reply.code(error.statusCode).send({ code: error.code, error: error.message })
+      }
       if (!isPublicRequestError(error)) throw error
       return reply.code(400).send({
         error: error.message

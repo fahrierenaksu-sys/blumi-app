@@ -3,6 +3,7 @@ import type { AuthService } from "../auth/authService"
 import { readBearerToken, resolveRequestSession } from "../routes/routeHelpers"
 import { cacheRateBudgetRefusals, type SharedRateBudget, type UserRateBudgetScope } from "./sharedRateBudget"
 import { safeOperationalErrorKind } from "./safeErrorLog"
+import { isMemberApiRequest } from "./requestLimits"
 
 /**
  * Per-user budget refusals, counted per scope and logged at most once a
@@ -35,6 +36,9 @@ export function registerSharedRateBudget(app: FastifyInstance, auth: AuthService
   // at startup or at the last line), later ones at most once a minute.
   const recordRefusal = createBudgetRefusalLog({ warn: (entry) => app.log.warn(entry, "User request budget refusals") })
   app.addHook("preHandler", async (request, reply) => {
+    // Public and operator routes do not authenticate member sessions. An
+    // irrelevant header must not turn a cheap public request into a DB query.
+    if (!isMemberApiRequest(request)) return
     const token = readBearerToken(request)
     if (!token) return
     // The route handler reuses this lookup (resolveBearerSession).

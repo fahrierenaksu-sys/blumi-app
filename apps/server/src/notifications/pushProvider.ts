@@ -1,6 +1,7 @@
+import { isExpoPushToken } from "./expoPushToken"
+
 const EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send"
 const EXPO_RECEIPTS_ENDPOINT = "https://exp.host/--/api/v2/push/getReceipts"
-const EXPO_PUSH_TOKEN_PATTERN = /^(?:ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/
 /** Expo accepts at most 1000 receipt ids per getReceipts request. */
 const MAX_RECEIPT_IDS_PER_REQUEST = 1000
 
@@ -98,7 +99,7 @@ export function createExpoPushProvider({
     },
     async sendPush(pushToken, notification, options) {
       const normalizedPushToken = pushToken.trim()
-      if (!EXPO_PUSH_TOKEN_PATTERN.test(normalizedPushToken)) {
+      if (!isExpoPushToken(normalizedPushToken)) {
         throw new Error("A valid Expo push token is required.")
       }
 

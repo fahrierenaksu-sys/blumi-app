@@ -121,6 +121,16 @@ try {
     if (!/^# tests [1-9]\d*$/m.test(output) || !/^# skipped 0$/m.test(output)) {
       throw new Error("PostgreSQL gate must execute tests without skips")
     }
+    // A passed case has no further consumers. Release only its fresh database
+    // instead of accumulating every migrated fixture until the entire run ends.
+    // Failed cases still follow the existing retained-log/shutdown path.
+    if (process.env.BLUMI_PG_KEEP_TEST_DATA !== "1") {
+      run(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
+        import pg from 'pg';
+        const pool=new pg.Pool({connectionString:process.env.DATABASE_URL});
+        try {await pool.query('DROP DATABASE ${name}')} finally {await pool.end()}
+      `])
+    }
   }
 } catch (error) {
   console.error(error instanceof Error ? error.message : "PostgreSQL gate failed")

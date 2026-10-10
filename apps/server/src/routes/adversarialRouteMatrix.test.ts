@@ -213,7 +213,7 @@ test("cross-account ids are refused on every id-bearing member route and the vic
       payload: { reportedUserId: blockedStranger.userId, reason: "spam" }
     })
     assert.equal(aliceReport.statusCode, 201)
-    assert.equal((await call("POST", "/v1/devices", { token: alice.sessionToken, payload: { platform: "ios", pushToken: "alice-device-token" } })).statusCode, 201)
+    assert.equal((await call("POST", "/v1/devices", { token: alice.sessionToken, payload: { platform: "ios", pushToken: "ExpoPushToken[alice-device-token]" } })).statusCode, 201)
     // Alice blocks Mallory so discover reads and decisions must refuse the pair.
     assert.equal((await call("POST", "/v1/safety/blocks", { token: alice.sessionToken, payload: { blockedUserId: mallory.userId } })).statusCode, 201)
 
@@ -258,7 +258,7 @@ test("cross-account ids are refused on every id-bearing member route and the vic
 
     // Actor-scoped writes succeed but only ever touch the caller's own records.
     await expectRefused("DELETE /v1/safety/blocks/:blockedUserId", `/v1/safety/blocks/${blockedStranger.userId}`, [204])
-    await expectRefused("DELETE /v1/devices", "/v1/devices", [204], { payload: { pushToken: "alice-device-token" } })
+    await expectRefused("DELETE /v1/devices", "/v1/devices", [204], { payload: { pushToken: "ExpoPushToken[alice-device-token]" } })
     const malloryReport = await expectRefused("POST /v1/safety/reports", "/v1/safety/reports", [201], {
       headers: { "idempotency-key": "shared-key-1" },
       payload: { reportedUserId: bob.userId, reason: "spam" }
@@ -283,7 +283,7 @@ test("cross-account ids are refused on every id-bearing member route and the vic
     assert.equal(await server.connectionService.repository.findDecision(roomId, mallory.userId), null)
     assert.equal(await server.safetyService.hasBlockBetween(alice.userId, blockedStranger.userId), true)
     const aliceDevices = await server.notificationService.repository.listDevices(alice.userId)
-    assert.deepEqual(aliceDevices.map((device) => device.pushToken), ["alice-device-token"])
+    assert.deepEqual(aliceDevices.map((device) => device.pushToken), ["ExpoPushToken[alice-device-token]"])
 
     // A realtime ticket carries only its issuer's identity.
     const ticket = await call("POST", "/v1/auth/realtime-ticket", { token: m, payload: {} })

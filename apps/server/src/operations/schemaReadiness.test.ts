@@ -31,10 +31,11 @@ test("an optional additive migration may be absent but never applied with anothe
   await assert.rejects(check(), /migration/i)
 })
 
-test("only the chat receipts and chat hide migrations are optional for readiness", () => {
+test("only independently guarded additive features are optional for readiness", () => {
   assert.deepEqual([...OPTIONAL_READINESS_MIGRATIONS], [
     "070_chat_delivery_receipts.sql",
-    "071_chat_hide_for_me_and_advisor_fixes.sql"
+    "071_chat_hide_for_me_and_advisor_fixes.sql",
+    "072_firebase_sms_admission.sql"
   ])
 })
 

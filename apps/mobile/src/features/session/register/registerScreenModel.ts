@@ -10,7 +10,6 @@ export const REGISTER_OTP_LENGTH = 6
 export type RegisterAuthIntent = "create" | "sign-in"
 export type RegisterCodeRequestStatus = "idle" | "sending" | "sent" | "failed"
 export type RegisterCodeRequestDecision =
-  | "complete-verified-phone"
   | "blocked"
   | "request-code"
 export type AccountRecoveryStage = "details" | "code"
@@ -50,7 +49,6 @@ export function resolveLegalRequirementsMet(
 export function resolveRegisterPrimaryAction(input: {
   isCodeStep: boolean
   availability: Pick<RegisterFlowAvailability, "canVerify" | "phoneValid">
-  verifiedFirebasePhone: boolean
   legalRequirementsMet: boolean
   busy: boolean
   codeRequestStatus: RegisterCodeRequestStatus
@@ -58,20 +56,19 @@ export function resolveRegisterPrimaryAction(input: {
   const {
     isCodeStep,
     availability,
-    verifiedFirebasePhone,
     legalRequirementsMet,
     busy,
     codeRequestStatus
   } = input
   const primaryEnabled = isCodeStep
-    ? availability.canVerify || (verifiedFirebasePhone && availability.phoneValid)
+    ? availability.canVerify
     : canRequestRegisterPhoneCode({
       phoneValid: availability.phoneValid,
       termsAccepted: legalRequirementsMet,
       isSubmitting: busy
     })
   const primaryDisabled = busy || !primaryEnabled ||
-    (isCodeStep && codeRequestStatus !== "sent" && !verifiedFirebasePhone)
+    (isCodeStep && codeRequestStatus !== "sent")
   return { primaryEnabled, primaryDisabled }
 }
 
@@ -100,11 +97,10 @@ export function resolveRegisterFieldErrors(input: {
 
 /**
  * Decides what the phone-step primary action (and the resend control) does.
- * A phone that Firebase already verified completes the account directly; every
- * other request must pass the validity, legal, in-flight, and cooldown guards.
+ * Every request must pass the validity, legal, in-flight, and cooldown guards.
+ * A Firebase session left on the device cannot replace fresh verification.
  */
 export function resolveRegisterCodeRequestDecision(input: {
-  verifiedFirebasePhone: boolean
   phoneValid: boolean
   canRequestCode: boolean
   legalRequirementsMet: boolean
@@ -112,10 +108,6 @@ export function resolveRegisterCodeRequestDecision(input: {
   isCodeStep: boolean
   resendCooldownSeconds: number
 }): RegisterCodeRequestDecision {
-  if (input.verifiedFirebasePhone && input.phoneValid && input.legalRequirementsMet &&
-    !input.actionInFlight) {
-    return "complete-verified-phone"
-  }
   if (
     !input.canRequestCode ||
     !input.legalRequirementsMet ||
@@ -129,13 +121,11 @@ export function resolveRegisterCodeRequestDecision(input: {
 
 export function canSubmitRegisterVerification(input: {
   canVerify: boolean
-  verifiedFirebasePhone: boolean
   actionInFlight: boolean
   codeRequestStatus: RegisterCodeRequestStatus
 }): boolean {
-  const { canVerify, verifiedFirebasePhone, actionInFlight, codeRequestStatus } = input
-  if (!(canVerify || verifiedFirebasePhone) || actionInFlight ||
-    (codeRequestStatus !== "sent" && !verifiedFirebasePhone)) return false
+  const { canVerify, actionInFlight, codeRequestStatus } = input
+  if (!canVerify || actionInFlight || codeRequestStatus !== "sent") return false
   return true
 }
 
@@ -171,7 +161,6 @@ export function shouldAutoSubmitRegisterCode(input: {
   if (input.verificationCode === input.lastAutoSubmittedCode) return false
   return canSubmitRegisterVerification({
     canVerify: input.canVerify,
-    verifiedFirebasePhone: false,
     actionInFlight: input.actionInFlight,
     codeRequestStatus: input.codeRequestStatus
   })
@@ -222,19 +211,17 @@ export function resolveResendControl(
 
 export function resolveCreatePrimaryActionLabel(
   isCodeStep: boolean,
-  verifiedFirebasePhone: boolean,
   authCopy: Pick<AuthEntryCopy, "sendCode">
 ): string {
-  return isCodeStep || verifiedFirebasePhone ? "Blumi'ye katil" : authCopy.sendCode
+  return isCodeStep ? "Blumi'ye katil" : authCopy.sendCode
 }
 
 export function resolveSignInPrimaryActionLabel(
   authIntent: RegisterAuthIntent,
   isCodeStep: boolean,
-  verifiedFirebasePhone: boolean,
   authCopy: Pick<AuthEntryCopy, "sendCode" | "signInToBlumi">
 ): string {
-  return isCodeStep || verifiedFirebasePhone
+  return isCodeStep
     ? authIntent === "sign-in" ? authCopy.signInToBlumi : "Blumi’ye katıl"
     : authCopy.sendCode
 }

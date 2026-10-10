@@ -173,15 +173,34 @@ test("PostgreSQL one-statement send: personas, a lost first-insert race, repair 
     // A first insert of the same client message ID that commits after this
     // statement's snapshot is only seen as a conflict: the caller goes stepwise.
     const holder = await pool.connect()
+    let transactionOpen = false
     try {
       await holder.query("BEGIN")
+      transactionOpen = true
       await holder.query(`INSERT INTO blumi_chat_messages (message_id, thread_id, sender_user_id, body, sent_at, client_message_id)
         VALUES ($1, $2, $3, 'racing', now(), 'client-checked-race')`, [`message_${scope}_race_a`, threadId, sender])
       const racing = send(`message_${scope}_race_b`, "racing", "client-checked-race")
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      const holderPid = (await holder.query("SELECT pg_backend_pid() AS pid")).rows[0].pid
+      const deadline = Date.now() + 5_000
+      let waiting = false
+      // Commit only after the competing statement has acquired its snapshot
+      // and is waiting on this transaction. A sleep can instead produce a
+      // perfectly valid post-commit retry on a busy machine.
+      while (!waiting && Date.now() < deadline) {
+        waiting = (await pool.query(`SELECT EXISTS (
+          SELECT 1 FROM pg_locks blocked JOIN pg_locks held
+            ON blocked.locktype = held.locktype AND blocked.transactionid = held.transactionid
+           WHERE blocked.locktype = 'transactionid' AND NOT blocked.granted
+             AND held.granted AND held.pid = $1 AND blocked.pid <> $1
+        ) AS waiting`, [holderPid])).rows[0].waiting
+        if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      assert.equal(waiting, true, "the competing insert must wait on the uncommitted first insert")
       await holder.query("COMMIT")
+      transactionOpen = false
       assert.deepEqual(await racing, { outcome: "raced" })
     } finally {
+      if (transactionOpen) await holder.query("ROLLBACK")
       holder.release()
     }
 

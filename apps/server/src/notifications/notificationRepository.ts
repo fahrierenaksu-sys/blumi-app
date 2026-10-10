@@ -10,6 +10,8 @@ export interface DeviceRegistration {
   registeredAt: string
 }
 
+export const MAX_DEVICES_PER_ACCOUNT = 10
+
 export interface PushDelivery {
   discoveryWatch?: { generation: string; authorization?: DiscoveryWatchAuthorization }
   registrationId?: string
@@ -102,6 +104,8 @@ export interface NotificationRepository {
   removeDeviceRegistration(input: { userId: string; pushToken: string; registrationId: string }): Promise<void>
   listDevices(userId: string): Promise<DeviceRegistration[]>
   saveDevice(device: DeviceRegistration): Promise<void>
+  /** Atomic admission; existing tokens on this account remain usable above the limit. */
+  saveDeviceBounded(device: DeviceRegistration): Promise<"saved" | "limit">
   removeDevice(userId: string, pushToken: string): Promise<void>
   removeAllDevices(userId: string): Promise<void>
   getPreferences(userId: string): Promise<NotificationPreferences>
@@ -166,6 +170,18 @@ export function createInMemoryNotificationRepository(): NotificationRepository {
   const preferences = new Map<string, NotificationPreferences>()
   const policyEvents: Array<NotificationPolicyAudit> = []
   const deviceQueue = createKeyedSerialQueue()
+  const admissionQueue = createKeyedSerialQueue()
+  const persistDevice = (device: DeviceRegistration): void => {
+    const existing = devices.get(deviceKey(device.userId, device.pushToken))
+    const registrationId = existing?.registrationId ?? device.registrationId ?? randomUUID()
+    for (const [id, delivery] of deliveries) {
+      if (delivery.pushToken === device.pushToken && delivery.registrationId !== registrationId) deliveries.delete(id)
+    }
+    for (const [key, registeredDevice] of devices.entries()) {
+      if (registeredDevice.pushToken === device.pushToken && registeredDevice.userId !== device.userId) devices.delete(key)
+    }
+    devices.set(deviceKey(device.userId, device.pushToken), { ...device, registrationId })
+  }
 
   return {
     async withAuthorizedDelivery(delivery, now, send) {
@@ -216,21 +232,19 @@ export function createInMemoryNotificationRepository(): NotificationRepository {
     },
     async saveDevice(device) {
       await deviceQueue(device.pushToken, async () => {
-      const existing = devices.get(deviceKey(device.userId, device.pushToken))
-      const registrationId = existing?.registrationId ?? device.registrationId ?? randomUUID()
-      for (const [id, delivery] of deliveries) {
-        if (delivery.pushToken === device.pushToken && delivery.registrationId !== registrationId) deliveries.delete(id)
-      }
-      for (const [key, registeredDevice] of devices.entries()) {
-        if (
-          registeredDevice.pushToken === device.pushToken &&
-          registeredDevice.userId !== device.userId
-        ) {
-          devices.delete(key)
-        }
-      }
-      devices.set(deviceKey(device.userId, device.pushToken), { ...device, registrationId })
+        persistDevice(device)
       })
+    },
+    async saveDeviceBounded(device) {
+      // Different new tokens must share admission authority, while a transfer
+      // still shares the token lock with dispatch and removal.
+      return admissionQueue(device.userId, () => deviceQueue(device.pushToken, async () => {
+        const existing = devices.get(deviceKey(device.userId, device.pushToken))
+        const count = [...devices.values()].filter((entry) => entry.userId === device.userId).length
+        if (!existing && count >= MAX_DEVICES_PER_ACCOUNT) return "limit" as const
+        persistDevice(device)
+        return "saved" as const
+      }))
     },
     async removeDevice(userId, pushToken) {
       await deviceQueue(pushToken, async () => {

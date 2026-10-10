@@ -25,6 +25,7 @@
         }
       ],
       "@react-native-firebase/app",
+      "@react-native-firebase/app-check",
       "@react-native-firebase/auth",
       "./plugins/withIosDynamicFrameworks",
       "./plugins/withIosRecaptchaEnterprise",
@@ -68,6 +69,7 @@
       "buildNumber": "1",
       "supportsTablet": false,
       "entitlements": {
+        "com.apple.developer.devicecheck.appattest-environment": "production",
         "aps-environment": "production"
       },
       "infoPlist": {

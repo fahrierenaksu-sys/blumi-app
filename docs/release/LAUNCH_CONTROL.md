@@ -2,7 +2,15 @@
 
 **Current verdict: not ready for public release.** The Operations Center is a read-only view of this evidence snapshot, not live provider telemetry or a production admin console. External systems remain unverified until connected. Follow the [reusable release-captain workflow](./RELEASE_CAPTAIN_WORKFLOW.md); detailed infrastructure steps and evidence live in [`railway-supabase-launch.md`](./railway-supabase-launch.md).
 
-Snapshot: 2026-10-02. The At a glance rows were refreshed on 2026-10-02 (each row states its own date). Dated sections below are evidence of what happened then; where a later fact replaced one, it carries a "superseded" note. Recheck volatile statuses before acting.
+Snapshot: 2026-10-10. The OTP security update below is current for 2026-10-10; the other At a glance rows retain their own dated evidence. Recheck volatile statuses before acting.
+
+## Update — 2026-10-10: OTP/SMS abuse protection
+
+- **EXTERNAL VERIFIED:** Firebase remains the provider. Identity Platform upgrade, Phone enabled, Fraud Defense ENFORCE/0.5, 1,500/day API quota, Authentication App Check ENFORCED, 72-country allowlist, two separate constrained runtime identities and deployed SMS guard functions. Invalid App Check is rejected 401; unsigned provider calls 400. No real SMS sent by this audit.
+- **EXTERNAL VERIFIED:** PostgreSQL 17 fresh owner-only backup/restore proof; only 072 applied, checksum locked; 24 accounts/22 inventories preserved. 070/071 remain pending. Enabled policy reserves at most 6 USD/rolling 24h and 20 USD/UTC month at configured tariffs; prior 21 SMS imported at conservative 0.21 USD. Tariffs expire 2026-10-17; this is not a hard cap on the entire Google invoice.
+- **TESTED:** 3,104 mobile checks, 416 PostgreSQL checks without skips, 8 function checks; workspace typecheck, lint (0 errors/2 existing warnings), lock dry-run, exact expiring mitigation audit, Expo Doctor 21/21. Isolated compiled 50-room load passed: steady p95 18.4 ms against 100 ms, burst p95 487.5 ms against 1,500 ms. The earlier failed aggregated run is not represented as passing.
+- **OPEN:** native build/physical attestation/real OTP, Play licensed distribution and real signing certificate, reinstall/new-key/device-farm resistance, request/assessment/function cost and availability under attack. Owner chose to take the new native build later; old binaries cannot produce the required permit. App Store/public-release verdict remains unchanged. Main/Railway source deployment is verified separately after push.
+- Evidence: [OTP review](../quality/OTP_SMS_SECURITY_REVIEW_2026-10-10.md), [Firebase SMS runbook](FIREBASE_SMS_DEFENSE_RUNBOOK.md). Backups/credentials/private operational scripts stay outside Git.
 
 ## Update — 2026-10-02
 

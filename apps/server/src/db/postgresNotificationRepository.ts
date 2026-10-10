@@ -1,7 +1,7 @@
 import type { QueryResultRow } from "pg"
 import { randomUUID } from "node:crypto"
 import { discoveryWatchLockSql } from "./discoveryWatchLock"
-import { DEFAULT_NOTIFICATION_PREFERENCES } from "../notifications/notificationRepository"
+import { DEFAULT_NOTIFICATION_PREFERENCES, MAX_DEVICES_PER_ACCOUNT } from "../notifications/notificationRepository"
 import type {
   DeviceRegistration,
   NotificationPolicyAudit,
@@ -22,7 +22,7 @@ interface QueryConnection {
   ): Promise<{ rows: QueryResultRow[] }>
 }
 interface QueryExecutor extends QueryConnection {
-  connect?: () => Promise<QueryConnection & { release(): void }>
+  connect?: () => Promise<QueryConnection & { release(error?: Error): void }>
 }
 
 export function createPostgresNotificationRepository(
@@ -107,30 +107,44 @@ export function createPostgresNotificationRepository(
       return result.rows.map(mapDevice)
     },
     async saveDevice(device) {
-      await pool.query(
-        `INSERT INTO blumi_push_devices (
-            user_id, platform, push_token, registered_at, registration_id
-          ) VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (push_token) DO UPDATE SET
-            user_id = EXCLUDED.user_id,
-            platform = EXCLUDED.platform,
-            registered_at = EXCLUDED.registered_at,
-            registration_id = CASE
-              WHEN blumi_push_devices.user_id = EXCLUDED.user_id THEN blumi_push_devices.registration_id
-              ELSE EXCLUDED.registration_id END
-          -- A repeat of an unchanged registration writes nothing (no row
-          -- version, no WAL); registered_at is refreshed at most hourly.
-          WHERE blumi_push_devices.user_id IS DISTINCT FROM EXCLUDED.user_id
-             OR blumi_push_devices.platform IS DISTINCT FROM EXCLUDED.platform
-             OR blumi_push_devices.registered_at < EXCLUDED.registered_at - interval '1 hour'`,
-        [
-          device.userId,
-          device.platform,
-          device.pushToken,
-          new Date(device.registeredAt),
-          device.registrationId ?? randomUUID()
-        ]
-      )
+      await persistDevice(pool, device)
+    },
+    async saveDeviceBounded(device) {
+      if (!pool.connect) throw new Error("Device admission requires a dedicated database connection.")
+      const client = await pool.connect()
+      let releaseError: Error | undefined
+      try {
+        await client.query("BEGIN")
+        // Take locks in their own statement: the next READ COMMITTED snapshot
+        // sees admissions that committed while this request was waiting.
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [`blumi:push-device-account:${device.userId}`])
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [`blumi:push-device-token:${device.pushToken}`])
+        const admitted = await client.query(`SELECT
+          EXISTS (SELECT 1 FROM blumi_push_devices WHERE user_id = $1 AND push_token = $2) AS existing,
+          (SELECT count(*)::integer FROM blumi_push_devices WHERE user_id = $1) AS device_count`,
+        [device.userId, device.pushToken])
+        const row = admitted.rows[0]
+        if (!row || typeof row.existing !== "boolean" || !Number.isSafeInteger(Number(row.device_count))) {
+          throw new Error("Device admission state is unavailable.")
+        }
+        if (!row.existing && Number(row.device_count) >= MAX_DEVICES_PER_ACCOUNT) {
+          await client.query("COMMIT")
+          return "limit"
+        }
+        await persistDevice(client, device)
+        await client.query("COMMIT")
+        return "saved"
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => {
+          releaseError = new Error("Device admission rollback failed.")
+        })
+        throw error
+      } finally {
+        // A failed rollback must not return a connection holding locks to the pool.
+        client.release(releaseError)
+      }
     },
     async removeDevice(userId, pushToken) {
       await pool.query(
@@ -561,6 +575,25 @@ function mapAudit(row: QueryResultRow): PushDeliveryAudit {
     occurredAt: new Date(row.occurred_at).toISOString(),
     ...(row.error_code ? { errorCode: String(row.error_code) } : {})
   }
+}
+
+async function persistDevice(executor: QueryConnection, device: DeviceRegistration): Promise<void> {
+  await executor.query(
+    `INSERT INTO blumi_push_devices (
+        user_id, platform, push_token, registered_at, registration_id
+      ) VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (push_token) DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        platform = EXCLUDED.platform,
+        registered_at = EXCLUDED.registered_at,
+        registration_id = CASE
+          WHEN blumi_push_devices.user_id = EXCLUDED.user_id THEN blumi_push_devices.registration_id
+          ELSE EXCLUDED.registration_id END
+      WHERE blumi_push_devices.user_id IS DISTINCT FROM EXCLUDED.user_id
+         OR blumi_push_devices.platform IS DISTINCT FROM EXCLUDED.platform
+         OR blumi_push_devices.registered_at < EXCLUDED.registered_at - interval '1 hour'`,
+    [device.userId, device.platform, device.pushToken, new Date(device.registeredAt), device.registrationId ?? randomUUID()]
+  )
 }
 
 function mapDevice(row: QueryResultRow): DeviceRegistration {

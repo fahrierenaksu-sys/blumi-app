@@ -22,5 +22,11 @@ jobs:
           echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
       - name: Install locked dependencies
         run: npm ci
+      - name: Verify Firebase SMS blocking function
+        run: |
+          npm ci --ignore-scripts --prefix tools/firebase-sms-defense/functions
+          node tools/firebase-sms-defense/build.mjs
+          npm test --prefix tools/firebase-sms-defense/functions
+          npm audit --omit=dev --prefix tools/firebase-sms-defense/functions
       - name: Verify source, tests, PostgreSQL and release checks
         run: npm run verify

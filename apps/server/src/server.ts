@@ -97,6 +97,7 @@ import {
 import {
   createOpenApiDocument,
   OPENAPI_DOCUMENT_PATH,
+  type OpenApiScope,
   type OpenApiRouteSnapshot
 } from "./openapi/openapiDocument"
 
@@ -217,6 +218,8 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     logger: createLoggerOptions(options.logger ?? false, nodeEnv, options.logDestination),
     logController: new PrivateRequestLogController(),
     genReqId: () => randomUUID(),
+    requestTimeout: 30_000,
+    connectionTimeout: 10_000,
     trustProxy:
       trustedProxyAddresses.length > 0 ? trustedProxyAddresses : false
   })
@@ -231,31 +234,59 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       config: route.config
     })
   })
-  app.get(OPENAPI_DOCUMENT_PATH, async () => createOpenApiDocument(openApiRoutes))
-
   registerProductionMiddleware(app, {
     nodeEnv,
     corsOrigins: options.corsOrigins ?? []
   })
   registerErrorHandler(app)
+  app.addHook("onSend", async (request, reply, payload) => {
+    // API credentials and private account state must not be retained by HTTP
+    // caches. Public image routes keep their explicit cache policy.
+    if (request.routeOptions.url?.startsWith("/v1/") && reply.getHeader("cache-control") === undefined) {
+      reply.header("Cache-Control", "no-store")
+    }
+    return payload
+  })
 
   if (options.legalPagesEnabled) {
     void app.register(registerLegalPageRoutes)
   }
 
-  app.get("/health", async () => ({
-    ok: true,
-    service: "blumi-server"
-  }))
-  app.get("/live", async () => ({ ok: true, service: "blumi-server" }))
-  const probe = createReadinessProbe({
-    isAccepting: options.isAccepting ?? (() => true),
-    check: options.checkReadiness ?? (async () => {}),
-    timeoutMs: options.readinessTimeoutMs
-  })
-  app.get("/ready", async (_request, reply) => {
-    const ready = await probe()
-    return reply.code(ready ? 200 : 503).send({ ok: ready, service: "blumi-server" })
+  // rate-limit installs per-route hooks during plugin boot. Registering these
+  // routes synchronously before it boots silently leaves them unprotected.
+  app.after((error) => {
+    if (error) throw error
+    app.get<{ Querystring: { scope?: OpenApiScope } }>(OPENAPI_DOCUMENT_PATH, {
+      config: { apiAuth: "public" },
+      schema: { querystring: {
+        type: "object", additionalProperties: false,
+        properties: { scope: { type: "string", enum: ["active", "mobile", "admin", "infrastructure", "legacy", "all"] } }
+      } }
+    }, async (request) => createOpenApiDocument(openApiRoutes, { scope: request.query.scope }))
+    const limitUnknownRoute = app.rateLimit({ max: 100, timeWindow: "1 minute" })
+    app.addHook("onRequest", async (request, reply) => {
+      // Count unknown paths before JSON parsing, including malformed bodies
+      // that would never reach a not-found preHandler.
+      if (!request.routeOptions.url) await limitUnknownRoute.call(app, request, reply)
+    })
+    app.setNotFoundHandler(async (_request, reply) => {
+      // Never echo an attacker-controlled URL (which may contain private IDs).
+      return reply.code(404).send({ error: "Not found.", statusCode: 404 })
+    })
+    app.get("/health", async () => ({
+      ok: true,
+      service: "blumi-server"
+    }))
+    app.get("/live", async () => ({ ok: true, service: "blumi-server" }))
+    const probe = createReadinessProbe({
+      isAccepting: options.isAccepting ?? (() => true),
+      check: options.checkReadiness ?? (async () => {}),
+      timeoutMs: options.readinessTimeoutMs
+    })
+    app.get("/ready", async (_request, reply) => {
+      const ready = await probe()
+      return reply.code(ready ? 200 : 503).send({ ok: ready, service: "blumi-server" })
+    })
   })
   app.addHook("onRequest", async (request, reply) => {
     if (options.isAccepting?.() === false && !["/health", "/live", "/ready"].includes(request.url.split("?")[0]!)) {

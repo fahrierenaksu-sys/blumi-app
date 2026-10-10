@@ -5,6 +5,41 @@ import {
   normalizeOpenApiPath
 } from "./openapiDocument"
 
+test("catalog scopes keep operation-specific lifecycle and all legacy response contracts", () => {
+  const originalResponses = { 202: { type: "object" } }
+  const routes = [
+    { method: "POST", url: "/v1/example", config: { apiAuth: "public", apiLifecycle: "legacy-otp" }, schema: { response: originalResponses } },
+    { method: "GET", url: "/v1/example" },
+    { method: "POST", url: "/v1/auth/firebase/complete", config: { apiAuth: "public" } },
+    { method: "GET", url: "/v1/admin/users" },
+    { method: "GET", url: "/admin/console.js" },
+    { method: "GET", url: "/ready" },
+    { method: "POST", url: "/v1/webhooks/revenuecat", config: { apiAuth: "revenuecat-webhook" } }
+  ]
+  const active = createOpenApiDocument(routes)
+  assert.ok(active.paths["/v1/example"]?.get)
+  assert.equal(active.paths["/v1/example"]?.post, undefined)
+  const legacy = createOpenApiDocument(routes, { scope: "legacy" })
+  const operation = legacy.paths["/v1/example"]?.post
+  assert.equal(operation?.deprecated, true)
+  assert.ok((operation?.responses as Record<string, unknown>)["202"])
+  assert.ok((operation?.responses as Record<string, unknown>)["410"])
+  assert.equal(legacy.paths["/v1/example"]?.get, undefined)
+  assert.equal("410" in originalResponses, false)
+  const admin = createOpenApiDocument(routes, { scope: "admin" })
+  assert.ok(admin.paths["/admin/console.js"]?.get)
+  assert.deepEqual(admin.paths["/v1/admin/users"]?.get?.security, [{ adminAuth: [] }])
+  assert.equal(admin.components.securitySchemes.adminAuth.bearerFormat, "JWT")
+  const mobile = createOpenApiDocument(routes, { scope: "mobile" })
+  assert.equal(mobile.paths["/ready"], undefined)
+  assert.equal(mobile.paths["/v1/admin/users"], undefined)
+  assert.ok(mobile.paths["/v1/auth/firebase/complete"]?.post)
+  const infrastructure = createOpenApiDocument(routes, { scope: "infrastructure" })
+  assert.ok(infrastructure.paths["/ready"]?.get)
+  assert.deepEqual(infrastructure.paths["/v1/webhooks/revenuecat"]?.post?.security, [{ revenueCatWebhookSignature: [] }])
+  assert.deepEqual(createOpenApiDocument(routes, { scope: "all" }).paths["/v1/example"]?.post, operation)
+})
+
 test("OpenAPI document normalizes Fastify params and records auth by route boundary", () => {
   const document = createOpenApiDocument([
     { method: "GET", url: "/health" },

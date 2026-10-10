@@ -1,0 +1,87 @@
+diff --git a/node_modules/braces/lib/compile.js b/node_modules/braces/lib/compile.js
+--- a/node_modules/braces/lib/compile.js
++++ b/node_modules/braces/lib/compile.js
+@@ -4,7 +4,9 @@
+ const utils = require('./utils');
+ 
+ const compile = (ast, options = {}) => {
+-  const walk = (node, parent = {}) => {
++  const walk = (node, parent = {}, depth = 0) => {
++    // AST callers bypass parse; bound their recursive depth independently.
++    if (depth >= 256) throw new RangeError('Brace nesting exceeds safety limit');
+     const invalidBlock = utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+     const invalid = invalidBlock === true || invalidNode === true;
+@@ -50,7 +52,7 @@
+ 
+     if (node.nodes) {
+       for (const child of node.nodes) {
+-        output += walk(child, node);
++        output += walk(child, node, depth + 1);
+       }
+     }
+ 
+diff --git a/node_modules/braces/lib/expand.js b/node_modules/braces/lib/expand.js
+--- a/node_modules/braces/lib/expand.js
++++ b/node_modules/braces/lib/expand.js
+@@ -35,7 +35,8 @@
+ const expand = (ast, options = {}) => {
+   const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;
+ 
+-  const walk = (node, parent = {}) => {
++  const walk = (node, parent = {}, depth = 0) => {
++    if (depth >= 256) throw new RangeError('Brace nesting exceeds safety limit');
+     node.queue = [];
+ 
+     let p = parent;
+@@ -103,7 +104,7 @@
+       }
+ 
+       if (child.nodes) {
+-        walk(child, node);
++        walk(child, node, depth + 1);
+       }
+     }
+ 
+diff --git a/node_modules/braces/lib/parse.js b/node_modules/braces/lib/parse.js
+--- a/node_modules/braces/lib/parse.js
++++ b/node_modules/braces/lib/parse.js
+@@ -145,6 +145,8 @@
+      */
+ 
+     if (value === CHAR_LEFT_PARENTHESES) {
++      // Bound recursive AST walkers before allocating attacker-controlled depth.
++      if (stack.length >= 256) throw new RangeError('Brace nesting exceeds safety limit');
+       block = push({ type: 'paren', nodes: [] });
+       stack.push(block);
+       push({ type: 'text', value });
+@@ -194,6 +196,7 @@
+      */
+ 
+     if (value === CHAR_LEFT_CURLY_BRACE) {
++      if (stack.length >= 256) throw new RangeError('Brace nesting exceeds safety limit');
+       depth++;
+ 
+       const dollar = prev.value && prev.value.slice(-1) === '$' || block.dollar === true;
+diff --git a/node_modules/braces/lib/stringify.js b/node_modules/braces/lib/stringify.js
+--- a/node_modules/braces/lib/stringify.js
++++ b/node_modules/braces/lib/stringify.js
+@@ -3,7 +3,8 @@
+ const utils = require('./utils');
+ 
+ module.exports = (ast, options = {}) => {
+-  const stringify = (node, parent = {}) => {
++  const stringify = (node, parent = {}, depth = 0) => {
++    if (depth >= 256) throw new RangeError('Brace nesting exceeds safety limit');
+     const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+     let output = '';
+@@ -25,7 +26,7 @@
+ 
+     if (node.nodes) {
+       for (const child of node.nodes) {
+-        output += stringify(child);
++        output += stringify(child, {}, depth + 1);
+       }
+     }
+     return output;

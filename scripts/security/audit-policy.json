@@ -1,6 +1,14 @@
 {
   "allowlist": [
     {
+      "id": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "scope": "Only braces 3.0.3 with patches/braces+3.0.3.patch; every installed copy must pass the bounded-recursion behaviour tests before this exception is evaluated",
+      "owner": "Blumi mobile build tooling",
+      "expiresOn": "2026-10-16",
+      "reason": "No official fixed release exists. The shipped patch bounds both parsing and all public recursive AST walkers, including caller-supplied/cyclic trees. run-audit.mjs makes adversarial and Metro compatibility tests mandatory and verifies the exact installed version for every lockfile copy. The API has no direct braces consumer. Replace this patch and remove the exception when an official fixed release is available."
+    },
+    {
       "id": "GHSA-86w9-cpqp-85rv",
       "package": "node-forge",
       "scope": "Exactly node-forge 1.4.0 patched by patches/node-forge+1.4.0.patch; Expo certificate consumer resolves this single copy",

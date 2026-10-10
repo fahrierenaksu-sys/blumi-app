@@ -23,7 +23,10 @@ test("the Firebase verifier always checks revocation and exposes refresh-token r
     authClient: {
       async verifyIdToken(idToken: string, checkRevoked?: boolean) {
         verifyCalls.push([idToken, checkRevoked])
-        return { uid: "uid_1", phone_number: "+15550000001", auth_time: 1_700_000_000 }
+        return {
+          uid: "uid_1", phone_number: "+15550000001", auth_time: 1_700_000_000,
+          firebase: { sign_in_provider: "phone" }
+        }
       },
       async revokeRefreshTokens(uid: string) { revoked.push(uid) },
       async deleteUser() {}
@@ -34,6 +37,34 @@ test("the Firebase verifier always checks revocation and exposes refresh-token r
   assert.deepEqual(verifyCalls, [["id-token", true]], "revoked or disabled users must be rejected")
   await verifier.revokeRefreshTokens?.("uid_1")
   assert.deepEqual(revoked, ["uid_1"])
+})
+
+test("a linked phone number is not proof of phone authentication", async () => {
+  for (const provider of ["password", "google.com", "custom", "anonymous", undefined]) {
+    const verifier = createFirebaseAuthVerifier({
+      authClient: {
+        async verifyIdToken() {
+          return { uid: "fixture", phone_number: "+15550000001", auth_time: 1_700_000_000,
+            firebase: { sign_in_provider: provider } }
+        }
+      } as unknown as FirebaseAdminAuthClient
+    })
+    await assert.rejects(verifier.verifyIdToken("fixture"), /not a verified phone identity/)
+  }
+})
+
+test("invalid phone authentication timestamps are rejected", async () => {
+  for (const authTime of [NaN, Infinity, -1, 0, 1.5]) {
+    const verifier = createFirebaseAuthVerifier({
+      authClient: {
+        async verifyIdToken() {
+          return { uid: "fixture", phone_number: "+15550000001", auth_time: authTime,
+            firebase: { sign_in_provider: "phone" } }
+        }
+      } as unknown as FirebaseAdminAuthClient
+    })
+    await assert.rejects(verifier.verifyIdToken("fixture"), /not a verified phone identity/)
+  }
 })
 
 test("the revoker revokes only a bound uid and never throws or logs identifiers", async () => {

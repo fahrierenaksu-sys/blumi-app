@@ -54,7 +54,7 @@ export function RegisterCreateView({
   onOpenTerms: () => void
 }) {
   const { setupMetrics } = layout
-  const { busy, isCodeStep, flow, availability, verifiedFirebasePhone } = register
+  const { busy, isCodeStep, flow, availability } = register
   const keyboardLayout = resolveRegisterKeyboardLayout(setupMetrics, isCodeStep)
   const worldHero = useMemo(
     () => <RegisterWorldHero active={motionActive && !isCodeStep} />,
@@ -89,7 +89,7 @@ export function RegisterCreateView({
       onPrimaryAction={register.runPrimaryAction}
       primaryActionBusy={busy}
       primaryActionDisabled={register.primaryDisabled}
-      primaryActionLabel={resolveCreatePrimaryActionLabel(isCodeStep, verifiedFirebasePhone, authCopy)}
+      primaryActionLabel={resolveCreatePrimaryActionLabel(isCodeStep, authCopy)}
       primaryActionTestID={isCodeStep ? "register-submit" : "register-send-code"}
       scrollBottomInset={0}
       stageHeight={resolveRegisterPhoneStageHeight(setupMetrics)}

@@ -12,7 +12,7 @@ function countingRepository(): { repository: NotificationRepository; calls: Reco
     calls,
     repository: {
       ...base,
-      async saveDevice(device) { calls.saveDevice += 1; return base.saveDevice(device) },
+      async saveDeviceBounded(device) { calls.saveDevice += 1; return base.saveDeviceBounded(device) },
       async listDevices(userId) { calls.listDevices += 1; return base.listDevices(userId) }
     }
   }

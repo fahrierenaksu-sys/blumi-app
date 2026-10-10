@@ -3,6 +3,8 @@ import "fastify"
 declare module "fastify" {
   interface FastifyContextConfig {
     apiAuth?: "bearer" | "public" | "revenuecat-webhook"
+    /** Compatibility route excluded from the active API documentation. */
+    apiLifecycle?: "legacy-otp"
     /**
      * Required on every route that sets `attachValidation: true`.
      * "enforced": the handler rejects requests whose JSON Schema validation

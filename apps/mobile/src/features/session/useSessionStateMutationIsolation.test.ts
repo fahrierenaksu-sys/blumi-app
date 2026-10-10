@@ -10,6 +10,7 @@ import * as sessionModel from "./sessionModel"
 import { createDemoSessionActor, type SessionActor } from "./sessionModel"
 import * as sessionMutationCoordinator from "./sessionMutationCoordinator"
 import * as sessionRefresh from "./sessionRefresh"
+import * as preAuthOnboardingDraft from "./preAuthOnboardingDraft"
 import type { UseSessionStateResult } from "./useSessionState"
 
 // Mounts the real useSessionState hook and drives restore, foreground refresh,
@@ -42,6 +43,8 @@ function productionActor(userId: string, token: string): SessionActor {
 const AUTH_EXPIRED = "Sign in again to continue."
 
 interface MountOptions {
+  rejectOtp?: boolean
+  rejectCodeRequest?: boolean
   /** The first account snapshot request fails with an expired-session error. */
   recover?: boolean
   /** shouldRefreshSessionSoon starts true (startup refresh). */
@@ -85,6 +88,7 @@ function mount(options: MountOptions = {}) {
   let profileSignal: AbortSignal | undefined
   let refreshSignal: AbortSignal | undefined
   let nextLogin: SessionActor | null = null
+  const authCalls = { cachedTokens: 0, confirmations: 0, completions: 0 }
 
   const pausedNetwork = async () => {
     network.started.resolve()
@@ -145,6 +149,7 @@ function mount(options: MountOptions = {}) {
             return { profile: "complete", avatar: "complete", room: "complete" }
           },
           completeFirebaseAccount: async () => {
+            authCalls.completions += 1
             assert.ok(nextLogin, "a test login needs an actor")
             return nextLogin
           },
@@ -152,9 +157,19 @@ function mount(options: MountOptions = {}) {
         },
         "./sessionPushCleanup": { revokeProductionSessionAfterPushCleanup: async () => undefined },
         "./firebasePhoneAuth": {
-          getVerifiedFirebasePhoneIdToken: async () => "fixture-id-token",
-          confirmFirebasePhoneCode: async () => null,
-          requestFirebasePhoneCode: async () => null,
+          getVerifiedFirebasePhoneIdToken: async () => {
+            authCalls.cachedTokens += 1
+            return "fixture-id-token"
+          },
+          confirmFirebasePhoneCode: async () => {
+            authCalls.confirmations += 1
+            if (options.rejectOtp) throw new Error("invalid code")
+            return "fixture-id-token"
+          },
+          requestFirebasePhoneCode: async () => {
+            if (options.rejectCodeRequest) throw new Error("provider unavailable")
+            return { confirm: async () => null }
+          },
           signOutFirebasePhoneAuth: async () => undefined
         },
         "./accountModeration": { needsModerationInterruption: () => false },
@@ -195,7 +210,7 @@ function mount(options: MountOptions = {}) {
             stored = next
           }
         },
-        "./preAuthOnboardingDraft": { replayPreAuthOnboardingDraft: async () => undefined },
+        "./preAuthOnboardingDraft": preAuthOnboardingDraft,
         "./sessionPersistence": { getSecureSessionStorageRecoveryMessage: () => null },
         "./sessionErrorCopy": {
           getSessionErrorMessageForDisplay: (error: unknown) => {
@@ -223,7 +238,7 @@ function mount(options: MountOptions = {}) {
   return {
     runtime, actor, rotated, snapshot, profile, profileStarted, refresh, refreshStarted,
     clearing, clearStarted, saveBarrier, saveStarted, network, saves, errors, clears, avatarSaves,
-    result,
+    result, authCalls,
     current: () => result().sessionActor,
     stored: () => stored,
     profileSignal: () => profileSignal,
@@ -238,12 +253,62 @@ function mount(options: MountOptions = {}) {
       reactNative.emitAppState("background")
       reactNative.emitAppState("active")
     },
-    login: async (next: SessionActor) => {
+    login: async (next: SessionActor, requestCode = true) => {
       nextLogin = next
+      if (requestCode) await result().requestVerificationCode({ phoneNumber: "+900000000000" })
       await result().registerSessionActor({ phoneNumber: "+900000000000", verificationCode: "000000" } as never)
     }
   }
 }
+
+test("a cached Firebase identity cannot sign in without a new code request", async () => {
+  const f = mount()
+  await assert.rejects(f.login(f.actor, false), /Request a verification code/)
+  assert.equal(f.authCalls.completions, 0)
+  assert.equal(f.authCalls.cachedTokens, 0)
+  f.runtime.unmount()
+})
+
+test("a cached Firebase identity never bypasses a rejected OTP", async () => {
+  const f = mount({ rejectOtp: true })
+  await assert.rejects(f.login(f.actor), /invalid code/)
+  assert.equal(f.authCalls.confirmations, 1)
+  assert.equal(f.authCalls.completions, 0)
+  assert.equal(f.authCalls.cachedTokens, 0)
+  f.runtime.unmount()
+})
+
+test("account creation also rejects an invalid OTP despite a cached Firebase identity", async () => {
+  const f = mount({ rejectOtp: true })
+  await f.result().requestVerificationCode({ phoneNumber: "+900000000000" })
+  await assert.rejects(f.result().registerSessionActorWithDraft(
+    { phoneNumber: "+900000000000", verificationCode: "000000" } as never,
+    { profile: { displayName: "Fixture", age: 24, gender: "woman" }, avatar: {} as never, room: {} as never },
+    async () => assert.fail("an invalid OTP must not clear the draft")
+  ), /invalid code/)
+  assert.equal(f.authCalls.confirmations, 1)
+  assert.equal(f.authCalls.completions, 0)
+  f.runtime.unmount()
+})
+
+test("a phone confirmation cannot be submitted for a different phone", async () => {
+  const f = mount()
+  await f.result().requestVerificationCode({ phoneNumber: "+900000000000" })
+  await assert.rejects(f.result().registerSessionActor({
+    phoneNumber: "+900000000001", verificationCode: "000000"
+  } as never), /Request a verification code/)
+  assert.equal(f.authCalls.confirmations, 0)
+  assert.equal(f.authCalls.completions, 0)
+  f.runtime.unmount()
+})
+
+test("a failed code request cannot fall back to a cached Firebase identity", async () => {
+  const f = mount({ rejectCodeRequest: true })
+  await assert.rejects(f.login(f.actor), /provider unavailable/)
+  await assert.rejects(f.login(f.actor, false), /Request a verification code/)
+  assert.equal(f.authCalls.completions, 0)
+  f.runtime.unmount()
+})
 
 for (const recover of [true, false]) {
   test(`startup profile publishes server state with latest credentials after ${recover ? "auth recovery" : "external rotation"}`, async () => {

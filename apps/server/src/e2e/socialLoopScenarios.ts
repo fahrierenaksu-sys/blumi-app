@@ -149,14 +149,15 @@ export async function mutualLikeOpensOneThread(context: ScenarioContext): Promis
 
 // Scenario 2 ------------------------------------------------------------------
 
-type SentMessage = { messageId: string; body: string; startedAt: number }
+type SentMessage = { messageId: string; body: string; startedAt: number; sentAt: string }
 
 async function sendOverHttp(user: SimUser, threadId: string, body: string, clientMessageId: string): Promise<SentMessage> {
   const response = await user.http("POST", `/v1/threads/${threadId}/messages`, { body, clientMessageId })
   // 201 is the "sent" tick: the message and its delivery outbox row are committed.
   assert.equal(response.status, 201, JSON.stringify(response.body))
   assert.equal(response.body.message.senderUserId, user.userId)
-  return { messageId: response.body.message.messageId as string, body, startedAt: response.startedAt }
+  return { messageId: response.body.message.messageId as string, body, startedAt: response.startedAt,
+    sentAt: response.body.message.sentAt as string }
 }
 
 function readReceiptsFor(socket: SimSocket, threadId: string, since: number) {
@@ -221,7 +222,13 @@ export async function chatBurstDeliversOnceInOrderWithReceipts(context: Scenario
     "the app's (sentAt, messageId) order of concurrent sends equals the stored order")
   const inArrivalOrder = arrived.every((message, index) => message.messageId === appOrder[index]!.messageId)
   context.report(`10 concurrent sends: live arrival ${inArrivalOrder ? "matched" : "differed from"} the stored order`)
-  assert.deepEqual(storedOrder.filter((id) => !concurrentIds.has(id)), sent.map((message) => message.messageId))
+  // Sequential acknowledgements prove live send order above. Persisted history
+  // uses the same (sentAt, messageId) position as the app, including equal-ms
+  // timestamps; UUID order is not necessarily acknowledgement order.
+  const sequentialHistory = [...sent].sort((left, right) =>
+    Date.parse(left.sentAt) - Date.parse(right.sentAt) || left.messageId.localeCompare(right.messageId))
+  assert.deepEqual(storedOrder.filter((id) => !concurrentIds.has(id)),
+    sequentialHistory.map((message) => message.messageId), "history follows the app's canonical position for sequential sends too")
 
   // Delivered (two ticks): the history read above already acknowledged
   // delivery; an explicit ack from Bora's phone is cumulative and idempotent.

@@ -21,10 +21,9 @@ const MINUTE_MS = 60_000
 const MAX_TRACKED_KEYS = 50_000
 
 /**
- * Whether the request carries a bearer shaped like a session token. Only the
- * shape is checked here (no lookup): an invented or admin bearer keeps the
- * strict unauthenticated ceiling, so a made-up header cannot buy 10x more
- * requests per address.
+ * Only shape is checked here, without a lookup. The route policy below also
+ * requires member authentication: a session-shaped invented token must never
+ * buy a larger budget on an endpoint that does not verify its bearer.
  */
 export function hasBearerAuthorization(request: FastifyRequest): boolean {
   const authorization = request.headers.authorization
@@ -32,9 +31,23 @@ export function hasBearerAuthorization(request: FastifyRequest): boolean {
   return isSessionTokenShape(authorization.slice("Bearer ".length).trim())
 }
 
+export function isMemberApiRequest(request: Pick<FastifyRequest, "routeOptions">): boolean {
+  const route = request.routeOptions.url
+  const policy = request.routeOptions.config.apiAuth
+  // Use the registered template, never a client-controlled URL. Unknown,
+  // public and operator routes cannot earn the member ceiling from a header.
+  return typeof route === "string" &&
+    route.startsWith("/v1/") &&
+    route !== "/v1/docs/openapi.json" &&
+    route !== "/v1/admin" &&
+    !route.startsWith("/v1/admin/") &&
+    policy !== "public" &&
+    policy !== "revenuecat-webhook"
+}
+
 /** Global per-IP ceiling for @fastify/rate-limit. */
 export function ipRequestCeiling(request: FastifyRequest): number {
-  return hasBearerAuthorization(request)
+  return isMemberApiRequest(request) && hasBearerAuthorization(request)
     ? AUTHENTICATED_IP_REQUESTS_PER_MINUTE
     : UNAUTHENTICATED_IP_REQUESTS_PER_MINUTE
 }

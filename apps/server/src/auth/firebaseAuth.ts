@@ -13,6 +13,15 @@ export interface FirebasePhoneIdentity {
   authTime: number
 }
 
+export const FIREBASE_PHONE_PROOF_MAX_AGE_MS = 5 * 60_000
+
+/** Token refresh changes iat, not auth_time; it cannot renew an OTP proof. */
+export function isRecentFirebasePhoneProof(identity: FirebasePhoneIdentity, now = Date.now()): boolean {
+  const authenticatedAt = identity.authTime * 1000
+  return Number.isSafeInteger(identity.authTime) && identity.authTime > 0 &&
+    authenticatedAt <= now + 30_000 && now - authenticatedAt <= FIREBASE_PHONE_PROOF_MAX_AGE_MS
+}
+
 export interface FirebaseAuthVerifier {
   /** Rejects revoked, disabled or deleted Firebase users (`checkRevoked`). */
   verifyIdToken(idToken: string): Promise<FirebasePhoneIdentity>
@@ -114,7 +123,8 @@ export function createFirebaseAuthVerifier(
       if (
         typeof decoded.uid !== "string" ||
         typeof decoded.phone_number !== "string" ||
-        typeof decoded.auth_time !== "number"
+        !Number.isSafeInteger(decoded.auth_time) || decoded.auth_time <= 0 ||
+        decoded.firebase?.sign_in_provider !== "phone"
       ) {
         throw new FirebaseIdentityShapeError("Firebase token is not a verified phone identity.")
       }

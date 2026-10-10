@@ -290,11 +290,12 @@ test("dispatchDue drains a moderate due backlog within one cycle", async () => {
 
   await Promise.all(
     Array.from({ length: 101 }, async (_, index) => {
-      const device = await service.registerDevice("user_a", { platform: "ios", pushToken: `token_${index}` })
+      const userId = `synthetic-backlog-${index}`
+      const device = await service.registerDevice(userId, { platform: "ios", pushToken: `token_${index}` })
       await service.repository.enqueueDelivery({
         registrationId: device.registrationId,
         deliveryId: `backlog_${index}`,
-        userId: "user_a",
+        userId,
         pushToken: `token_${index}`,
         notification: { title: "Blumi", body: "You have an update." },
         attemptCount: 0,

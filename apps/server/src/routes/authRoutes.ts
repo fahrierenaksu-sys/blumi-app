@@ -8,7 +8,7 @@ import {
 import type { AccountRecoveryService } from "../account/accountRecoveryService"
 import { isAuthError } from "../auth/authErrors"
 import { toSessionActor, type AuthService } from "../auth/authService"
-import { isFirebaseTokenRejection, type FirebaseAuthVerifier } from "../auth/firebaseAuth"
+import { isFirebaseTokenRejection, isRecentFirebasePhoneProof, type FirebaseAuthVerifier } from "../auth/firebaseAuth"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import { normalizePhoneNumber } from "../auth/phone"
 import { readBearerToken, schemaValidationFailed } from "./routeHelpers"
@@ -45,7 +45,7 @@ export async function registerAuthRoutes(
     "/v1/auth/send-code",
     {
       attachValidation: true,
-      config: { apiAuth: "public", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { apiAuth: "public", apiLifecycle: "legacy-otp", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: {
         body: coreApiJsonSchemas.authPhone,
         response: sendCodeResponses
@@ -82,7 +82,7 @@ export async function registerAuthRoutes(
     "/v1/auth/verify",
     {
       attachValidation: true,
-      config: { apiAuth: "public", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { apiAuth: "public", apiLifecycle: "legacy-otp", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: {
         body: coreApiJsonSchemas.authVerification,
         response: verificationResponses
@@ -100,7 +100,7 @@ export async function registerAuthRoutes(
     "/v1/accounts/register",
     {
       attachValidation: true,
-      config: { apiAuth: "public", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { apiAuth: "public", apiLifecycle: "legacy-otp", requestValidation: "enforced", rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: {
         body: coreApiJsonSchemas.registerAccount,
         response: verificationResponses
@@ -181,6 +181,10 @@ export async function registerAuthRoutes(
         }
         request.log.error({ errorKind: safeOperationalErrorKind(error) }, "Firebase verification unavailable")
         return reply.code(503).header("Retry-After", "5").send({ error: "Phone verification is temporarily unavailable." })
+      }
+
+      if (!isRecentFirebasePhoneProof(identity)) {
+        return reply.code(401).send({ error: "Request a fresh verification code and try again." })
       }
 
       try {

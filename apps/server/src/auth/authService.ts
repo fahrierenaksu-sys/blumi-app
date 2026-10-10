@@ -97,6 +97,7 @@ export interface AuthService {
     purpose: "account_deletion" | AccountActionPurpose
     challengeId: string
     phoneNumber: string
+    firebaseUid: string
     authTime: number
     now?: Date
   }): Promise<boolean>
@@ -437,6 +438,13 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       const resolved = await this.getSession(input.sessionToken, now)
       if (!resolved || !Number.isSafeInteger(input.authTime) ||
         input.authTime * 1000 > now.getTime() + 30_000) return false
+      // A recycled phone number must not bypass the identity binding that
+      // normal sign-in enforces. New-phone proof intentionally has a new UID.
+      if (!input.firebaseUid) return false
+      if (input.purpose !== "phone_change_new") {
+        const boundUid = await repository.findFirebaseUidByUserId(resolved.account.userId)
+        if (boundUid && boundUid !== input.firebaseUid) return false
+      }
       return repository.consumeFirebaseActionChallenge({
         accountId: resolved.account.accountId,
         purpose: input.purpose,

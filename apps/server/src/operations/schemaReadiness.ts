@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { CHAT_HIDE_MIGRATION_ID } from "../chat/chatHideSchema"
 import { CHAT_RECEIPTS_MIGRATION_ID } from "../chat/chatReceiptSchema"
+import { SMS_ADMISSION_MIGRATION_ID } from "../auth/firebaseSmsAdmission"
 
 interface MigrationIdentity { id: string; checksum: string }
 interface SchemaQueryExecutor {
@@ -17,7 +18,10 @@ interface SchemaQueryExecutor {
  */
 export const OPTIONAL_READINESS_MIGRATIONS: readonly string[] = Object.freeze([
   CHAT_RECEIPTS_MIGRATION_ID,
-  CHAT_HIDE_MIGRATION_ID
+  CHAT_HIDE_MIGRATION_ID,
+  // Only the separate beforeSmsSent function uses this schema; its queries
+  // fail closed when it is missing, and it starts disabled when installed.
+  SMS_ADMISSION_MIGRATION_ID
 ])
 
 /** Read the packaged schema manifest once at service construction, not on each probe. */

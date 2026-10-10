@@ -288,7 +288,6 @@ export function RegisterSignInView({
                   label={resolveSignInPrimaryActionLabel(
                     authIntent,
                     isCodeStep,
-                    register.verifiedFirebasePhone,
                     authCopy
                   )}
                   disabled={register.primaryDisabled}

@@ -87,7 +87,7 @@ test("the phone step primary action needs a valid phone, legal acceptance, and a
   )
 })
 
-test("the code step primary action needs a complete code and a sent request unless Firebase already verified the phone", () => {
+test("the code step primary action always needs a complete code and a sent request", () => {
   const base = {
     isCodeStep: true,
     availability: { canVerify: true, phoneValid: true },
@@ -109,21 +109,19 @@ test("the code step primary action needs a complete code and a sent request unle
       { primaryEnabled: true, primaryDisabled: true }
     )
   }
-  // Firebase auto-verification unlocks the action without a code or a sent request.
+  // A leftover Firebase identity cannot unlock an empty field or failed request.
   assert.deepEqual(
     resolveRegisterPrimaryAction({
       ...base,
       availability: { canVerify: false, phoneValid: true },
-      verifiedFirebasePhone: true,
       codeRequestStatus: "failed"
     }),
-    { primaryEnabled: true, primaryDisabled: false }
+    { primaryEnabled: false, primaryDisabled: true }
   )
   assert.deepEqual(
     resolveRegisterPrimaryAction({
       ...base,
       availability: { canVerify: false, phoneValid: false },
-      verifiedFirebasePhone: true
     }),
     { primaryEnabled: false, primaryDisabled: true }
   )
@@ -176,7 +174,7 @@ test("field errors appear only for non-empty invalid values after blur or a prim
   )
 })
 
-test("a Firebase-verified phone completes the account instead of requesting another code", () => {
+test("a cached Firebase phone cannot skip code requests or bypass the resend cooldown", () => {
   const base = {
     verifiedFirebasePhone: true,
     phoneValid: true,
@@ -186,12 +184,12 @@ test("a Firebase-verified phone completes the account instead of requesting anot
     isCodeStep: false,
     resendCooldownSeconds: 0
   }
-  assert.equal(resolveRegisterCodeRequestDecision(base), "complete-verified-phone")
+  assert.equal(resolveRegisterCodeRequestDecision(base), "request-code")
   assert.equal(
     resolveRegisterCodeRequestDecision({ ...base, isCodeStep: true, resendCooldownSeconds: 12 }),
-    "complete-verified-phone"
+    "blocked"
   )
-  // Terms, validity, and in-flight guards still apply to the verified shortcut.
+  // Terms, validity, and in-flight guards apply to every request.
   assert.equal(resolveRegisterCodeRequestDecision({ ...base, legalRequirementsMet: false }), "blocked")
   assert.equal(resolveRegisterCodeRequestDecision({ ...base, actionInFlight: true }), "blocked")
   assert.equal(
@@ -229,7 +227,7 @@ test("code requests are blocked by invalid input, missing terms, in-flight work,
   )
 })
 
-test("verification submits a complete code only after a code was sent, or a Firebase-verified phone", () => {
+test("verification always submits a complete code only after a code was sent", () => {
   const base = {
     canVerify: true,
     verifiedFirebasePhone: false,
@@ -242,19 +240,18 @@ test("verification submits a complete code only after a code was sent, or a Fire
   for (const codeRequestStatus of ["idle", "sending", "failed"] as const) {
     assert.equal(canSubmitRegisterVerification({ ...base, codeRequestStatus }), false)
     assert.equal(
-      canSubmitRegisterVerification({ ...base, codeRequestStatus, verifiedFirebasePhone: true }),
-      true
+      canSubmitRegisterVerification({ ...base, codeRequestStatus }),
+      false
     )
   }
   assert.equal(
-    canSubmitRegisterVerification({ ...base, canVerify: false, verifiedFirebasePhone: true }),
-    true
+    canSubmitRegisterVerification({ ...base, canVerify: false }),
+    false
   )
   assert.equal(
     canSubmitRegisterVerification({
       ...base,
       canVerify: false,
-      verifiedFirebasePhone: true,
       actionInFlight: true
     }),
     false
@@ -295,10 +292,10 @@ test("the resend control announces and shows the remaining cooldown", () => {
 })
 
 test("primary action labels keep the send-code and sign-in wording", () => {
-  assert.equal(resolveCreatePrimaryActionLabel(false, false, en), en.sendCode)
-  assert.equal(resolveSignInPrimaryActionLabel("sign-in", false, false, en), en.sendCode)
-  assert.equal(resolveSignInPrimaryActionLabel("sign-in", true, false, en), en.signInToBlumi)
-  assert.equal(resolveSignInPrimaryActionLabel("sign-in", false, true, tr), tr.signInToBlumi)
+  assert.equal(resolveCreatePrimaryActionLabel(false, en), en.sendCode)
+  assert.equal(resolveSignInPrimaryActionLabel("sign-in", false, en), en.sendCode)
+  assert.equal(resolveSignInPrimaryActionLabel("sign-in", true, en), en.signInToBlumi)
+  assert.equal(resolveSignInPrimaryActionLabel("sign-in", false, tr), tr.sendCode)
 })
 
 test("the sign-in hero copy follows the code request status", () => {

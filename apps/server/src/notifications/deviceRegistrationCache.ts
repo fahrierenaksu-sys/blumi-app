@@ -85,6 +85,14 @@ export function withDeviceRegistrationInvalidation(
         cache.forgetToken(device.pushToken)
       }
     },
+    async saveDeviceBounded(device) {
+      cache.forgetToken(device.pushToken)
+      try {
+        return await repository.saveDeviceBounded(device)
+      } finally {
+        cache.forgetToken(device.pushToken)
+      }
+    },
     async removeDevice(userId, pushToken) {
       cache.forgetToken(pushToken)
       try {

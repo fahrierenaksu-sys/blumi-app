@@ -52,6 +52,8 @@
     "xcode": {
       "uuid": "11.1.1"
     },
-    "@grpc/grpc-js": "1.14.5"
+    "@grpc/grpc-js": "1.14.5",
+    "shell-quote": "1.11.0",
+    "source-map-js": "1.2.2"
   }
 }

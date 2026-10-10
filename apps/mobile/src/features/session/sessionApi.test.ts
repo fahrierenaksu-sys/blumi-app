@@ -4,22 +4,15 @@ import {
   AccountAccessError,
   acknowledgeAccountModeration,
   deleteProductionAccount,
+  completeFirebaseAccount,
+  requestFirebaseAccountActionChallenge,
+  verifyFirebaseAccountAction,
   downloadAccountDataExport,
   fetchProductionProfile,
-  requestAccountDataExportChallenge,
-  registerAccount,
-  requestAccountDeletionChallenge,
-  requestPhoneChangeCurrentChallenge,
-  requestPhoneChangeNewNumberChallenge,
   revokeProductionSession,
-  sendVerificationCode,
   submitAccountRecoveryRequest,
   updateProductionProfile,
   updateSessionActorProfile,
-  verifyAccountDataExportCode,
-  verifyAccountDeletionCode,
-  verifyPhoneChangeCurrentCode,
-  verifyPhoneChangeNewNumberCode,
   confirmPhoneChange
 } from "./sessionApi"
 import * as sessionApi from "./sessionApi"
@@ -94,265 +87,104 @@ test("identity and discovery preferences update independently from avatar body",
   assert.deepEqual(actor.profile.avatar, originalAvatar)
 })
 
-test("register preserves the server-authoritative incomplete onboarding status", async () => {
-  const fetchCalls: { url: string; init?: RequestInit }[] = []
-  const actor = await registerAccount(
-    "https://api.blumi.test",
-    {
-      phoneNumber: "+905551112233",
-      verificationCode: "482931",
-        termsAcceptance: {
-        version: "2026.08.31",
-        locale: "tr"
-      }
-    },
-    async (url, init) => {
-      fetchCalls.push({ url: String(url), init })
-      return new Response(JSON.stringify({
-        session: {
-          accountId: "account-1",
-          sessionId: "session-1",
-          mode: "production",
-          userId: "user-1",
-          sessionToken: "production-token",
-          expiresAt: "2999-01-01T00:00:00.000Z",
-          onboarding: {
-            profile: "incomplete",
-            avatar: "incomplete",
-            room: "incomplete"
-          }
-        },
-        profile: {
-          userId: "user-1",
-          displayName: "",
-          avatar: { presetId: "dusk" }
-        }
-      }), {
-        status: 200,
-        headers: { "content-type": "application/json" }
-      })
-    }
-  )
-
-  assert.equal(fetchCalls[0]?.url, "https://api.blumi.test/v1/accounts/register")
-  assert.deepEqual(JSON.parse(String(fetchCalls[0]?.init?.body)), {
-    phoneNumber: "+905551112233",
-    verificationCode: "482931",
-    termsAcceptance: {
-      version: "2026.08.31",
-      locale: "tr"
-    }
+test("Firebase completion preserves server identity and incomplete onboarding", async () => {
+  const calls: { url: string; init?: RequestInit }[] = []
+  const input = {
+    idToken: "test-firebase-proof",
+    authIntent: "create" as const,
+    termsAcceptance: TEST_TERMS_ACCEPTANCE
+  }
+  const actor = await completeFirebaseAccount("https://api.blumi.test", input, async (url, init) => {
+    calls.push({ url: String(url), init })
+    return new Response(JSON.stringify({
+      session: {
+        accountId: "account-1",
+        sessionId: "session-1",
+        mode: "production",
+        userId: "user-1",
+        sessionToken: "production-token",
+        expiresAt: "2999-01-01T00:00:00.000Z",
+        onboarding: { profile: "incomplete", avatar: "incomplete", room: "incomplete" }
+      },
+      profile: { userId: "user-1", displayName: "", avatar: { presetId: "dusk" } }
+    }), { status: 200 })
   })
+
+  assert.equal(calls[0]?.url, "https://api.blumi.test/v1/auth/firebase/complete")
+  assert.equal(calls[0]?.init?.method, "POST")
+  assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), input)
   assert.equal(actor.session.mode, "production")
-  assert.equal(actor.session.onboarding.profile, "incomplete")
-  assert.equal(actor.session.onboarding.avatar, "incomplete")
-  assert.equal(actor.session.onboarding.room, "incomplete")
-})
-
-test("verification code request uses the SMS auth boundary", async () => {
-  const fetchCalls: { url: string; init?: RequestInit }[] = []
-  const result = await sendVerificationCode(
-    "https://api.blumi.test",
-    {
-      phoneNumber: "+905551112233"
-    },
-    async (url, init) => {
-      fetchCalls.push({ url: String(url), init })
-      return new Response(JSON.stringify({
-        ok: true,
-        expiresAt: "2999-01-01T00:05:00.000Z"
-      }), {
-        status: 202,
-        headers: { "content-type": "application/json" }
-      })
-    }
-  )
-
-  assert.equal(fetchCalls[0]?.url, "https://api.blumi.test/v1/auth/send-code")
-  assert.deepEqual(JSON.parse(String(fetchCalls[0]?.init?.body)), {
-    phoneNumber: "+905551112233"
+  assert.deepEqual(actor.session.onboarding, {
+    profile: "incomplete", avatar: "incomplete", room: "incomplete"
   })
-  assert.equal(result.expiresAt, "2999-01-01T00:05:00.000Z")
 })
 
-test("verification code request times out instead of leaving the CTA loading forever", async () => {
-  await assert.rejects(
-    sendVerificationCode(
-      "https://api.blumi.test",
-      { phoneNumber: "+905551112233" },
-      (_url, init) => new Promise((_resolve, reject) => {
-        init?.signal?.addEventListener("abort", () => {
-          reject(new Error("aborted"))
-        }, { once: true })
-      }),
-      undefined,
-      10
-    ),
-    /connection.*timed out/i
-  )
-})
-
-test("verification code response parsing also times out", async () => {
-  const hangingResponse = {
-    ok: true,
-    json: () => new Promise<never>(() => undefined)
-  } as unknown as Response
-
-  await assert.rejects(
-    sendVerificationCode(
-      "https://api.blumi.test",
-      { phoneNumber: "+905551112233" },
-      async () => hangingResponse,
-      undefined,
-      10
-    ),
-    /connection.*timed out/i
-  )
-})
-
-test("auth requests never log a full phone number or verification code", {
-  concurrency: false
-}, async () => {
-  const phoneNumber = "+905551112233"
-  const verificationCode = "482931"
-  const consoleEntries: unknown[][] = []
+test("Firebase auth requests never log submitted identity proofs", { concurrency: false }, async () => {
+  const idToken = "test-firebase-proof"
+  const entries: unknown[][] = []
   const originalLog = console.log
   const originalError = console.error
-  console.log = (...args: unknown[]) => {
-    consoleEntries.push(args)
-  }
-  console.error = (...args: unknown[]) => {
-    consoleEntries.push(args)
-  }
-
+  console.log = (...args: unknown[]) => { entries.push(args) }
+  console.error = (...args: unknown[]) => { entries.push(args) }
   try {
-    await sendVerificationCode(
-      "https://api.blumi.test",
-      { phoneNumber },
-      async () => new Response(JSON.stringify({
-        ok: true,
-        expiresAt: "2999-01-01T00:05:00.000Z"
-      }), { status: 202 })
-    )
-    await registerAccount(
-      "https://api.blumi.test",
-      {
-        phoneNumber,
-        verificationCode,
-        termsAcceptance: {
-          version: "2026.08.31",
-          locale: "tr"
-        }
+    await completeFirebaseAccount("https://api.blumi.test", {
+      idToken, authIntent: "sign-in"
+    }, async () => new Response(JSON.stringify({
+      session: {
+        accountId: "account-1", sessionId: "session-1", mode: "production",
+        userId: "user-1", sessionToken: "production-token",
+        expiresAt: "2999-01-01T00:00:00.000Z",
+        onboarding: { profile: "complete", avatar: "complete", room: "complete" }
       },
-      async () => new Response(JSON.stringify({
-        session: {
-          accountId: "account-1",
-          sessionId: "session-1",
-          mode: "production",
-          userId: "user-1",
-          sessionToken: "production-token",
-          expiresAt: "2999-01-01T00:00:00.000Z",
-          onboarding: {
-            profile: "incomplete",
-            avatar: "incomplete",
-            room: "incomplete"
-          }
-        },
-        profile: {
-          userId: "user-1",
-          displayName: "",
-          avatar: { presetId: "dusk" }
-        }
-      }), { status: 200 })
-    )
-    await assert.rejects(
-      sendVerificationCode(
-        "https://api.blumi.test",
-        { phoneNumber },
-        async () => new Response(JSON.stringify({
-          error: `Could not send to ${phoneNumber}.`
-        }), { status: 503 })
-      )
-    )
-    await assert.rejects(
-      registerAccount(
-        "https://api.blumi.test",
-        {
-          phoneNumber,
-          verificationCode,
-          termsAcceptance: {
-            version: "2026.08.31",
-            locale: "tr"
-          }
-        },
-        async () => new Response(JSON.stringify({
-          error: `Code ${verificationCode} is invalid for ${phoneNumber}.`
-        }), { status: 401 })
-      )
-    )
+      profile: { userId: "user-1", displayName: "", avatar: { presetId: "dusk" } }
+    }), { status: 200 }))
+    await assert.rejects(completeFirebaseAccount("https://api.blumi.test", {
+      idToken, authIntent: "sign-in"
+    }, async () => new Response(JSON.stringify({
+      error: `Invalid proof ${idToken}.`
+    }), { status: 401 })))
+    await assert.rejects(verifyFirebaseAccountAction("https://api.blumi.test", "token", {
+      idToken, challengeId: "challenge", purpose: "account_deletion"
+    }, async () => new Response(JSON.stringify({
+      error: `Invalid proof ${idToken}.`
+    }), { status: 401 })))
   } finally {
     console.log = originalLog
     console.error = originalError
   }
-
-  const renderedEntries = consoleEntries
-    .flatMap((entry) => entry.map((value) =>
-      typeof value === "string" ? value : JSON.stringify(value)
-    ))
-    .join(" ")
-  assert.equal(renderedEntries.includes(phoneNumber), false)
-  assert.equal(renderedEntries.includes(verificationCode), false)
+  assert.equal(JSON.stringify(entries).includes(idToken), false)
 })
 
-test("auth errors redact submitted phone numbers and verification codes", async () => {
-  const phoneNumber = "+905551112233"
-  const verificationCode = "482931"
-
-  await assert.rejects(
-    sendVerificationCode(
-      "https://api.blumi.test",
-      { phoneNumber },
-      async () => new Response(JSON.stringify({
-        error: `Could not send to ${phoneNumber}.`
-      }), { status: 503 })
-    ),
-    (error: unknown) => {
-      assert.ok(error instanceof Error)
-      assert.match(error.message, /could not send/i)
-      assert.equal(error.message.includes(phoneNumber), false)
-      return true
-    }
-  )
-
-  await assert.rejects(
-    registerAccount(
-      "https://api.blumi.test",
-      { phoneNumber, verificationCode, termsAcceptance: TEST_TERMS_ACCEPTANCE },
-      async () => new Response(JSON.stringify({
-        error: `Code ${verificationCode} is invalid for ${phoneNumber}.`
-      }), { status: 401 })
-    ),
-    (error: unknown) => {
-      assert.ok(error instanceof Error)
-      assert.match(error.message, /invalid/i)
-      assert.equal(error.message.includes(phoneNumber), false)
-      assert.equal(error.message.includes(verificationCode), false)
-      return true
-    }
-  )
+test("Firebase completion and reauthentication errors redact submitted proofs", async () => {
+  const idToken = "test-firebase-proof"
+  const fetcher: typeof fetch = async () => new Response(JSON.stringify({
+    error: `Invalid proof ${idToken}; repeated ${idToken}.`
+  }), { status: 401 })
+  const rejectsPrivateProof = (error: unknown) => {
+    assert.ok(error instanceof Error)
+    assert.match(error.message, /invalid proof/i)
+    assert.equal(error.message.includes(idToken), false)
+    return true
+  }
+  await assert.rejects(completeFirebaseAccount("https://api.blumi.test", {
+    idToken, authIntent: "sign-in"
+  }, fetcher), rejectsPrivateProof)
+  await assert.rejects(verifyFirebaseAccountAction("https://api.blumi.test", "token", {
+    idToken, challengeId: "challenge", purpose: "account_data_export"
+  }, fetcher), rejectsPrivateProof)
 })
 
-test("verification code request rejects malformed success payloads", async () => {
-  await assert.rejects(
-    sendVerificationCode(
-      "https://api.blumi.test",
-      {
-        phoneNumber: "+905551112233"
-      },
-      async () => new Response(JSON.stringify({ ok: true }), { status: 202 })
-    ),
-    /SMS code window/i
-  )
+test("Firebase sensitive actions reject incomplete challenge and proof responses", async () => {
+  for (const payload of [{ expiresAt: "2999-01-01T00:05:00.000Z" }, { challengeId: "challenge" }]) {
+    await assert.rejects(requestFirebaseAccountActionChallenge("https://api.blumi.test", "token", {
+      purpose: "account_deletion"
+    }, async () => new Response(JSON.stringify(payload), { status: 202 })), /start phone verification/i)
+  }
+  for (const payload of [{ expiresAt: "2999-01-01T00:05:00.000Z" }, { confirmationToken: "proof" }]) {
+    await assert.rejects(verifyFirebaseAccountAction("https://api.blumi.test", "token", {
+      idToken: "test-firebase-proof", challengeId: "challenge", purpose: "account_deletion"
+    }, async () => new Response(JSON.stringify(payload), { status: 200 })), /verify your phone/i)
+  }
 })
 
 test("account deletion calls the production account boundary", async () => {
@@ -378,77 +210,74 @@ test("account deletion calls the production account boundary", async () => {
   })
 })
 
-test("account deletion reauthentication uses dedicated challenge and verify boundaries", async () => {
+test("account deletion reauthentication uses the authenticated Firebase challenge and proof", async () => {
   const calls: { url: string; init?: RequestInit }[] = []
   const fetcher: typeof fetch = async (url, init) => {
     calls.push({ url: String(url), init })
     return calls.length === 1
-      ? new Response(JSON.stringify({ ok: true, expiresAt: "2999-01-01T00:05:00.000Z" }), { status: 202 })
+      ? new Response(JSON.stringify({ challengeId: "delete-challenge", expiresAt: "2999-01-01T00:05:00.000Z" }), { status: 202 })
       : new Response(JSON.stringify({ confirmationToken: "delete-token", expiresAt: "2999-01-01T00:05:00.000Z" }), { status: 200 })
   }
-  await requestAccountDeletionChallenge("https://api.blumi.test", "production-token", fetcher)
-  const confirmation = await verifyAccountDeletionCode("https://api.blumi.test", "production-token", { verificationCode: "482931" }, fetcher)
-  assert.equal(calls[0]?.url, "https://api.blumi.test/v1/account/deletion/challenge")
-  assert.equal(calls[1]?.url, "https://api.blumi.test/v1/account/deletion/confirm")
-  assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), { verificationCode: "482931" })
+  const challenge = await requestFirebaseAccountActionChallenge("https://api.blumi.test", "production-token", {
+    purpose: "account_deletion"
+  }, fetcher)
+  const confirmation = await verifyFirebaseAccountAction("https://api.blumi.test", "production-token", {
+    idToken: "test-firebase-proof", challengeId: challenge.challengeId, purpose: "account_deletion"
+  }, fetcher)
+  assert.equal(calls[0]?.url, "https://api.blumi.test/v1/account/firebase/challenge")
+  assert.equal(calls[1]?.url, "https://api.blumi.test/v1/account/firebase/reauth")
+  for (const call of calls) {
+    assert.equal(call.init?.method, "POST")
+    assert.equal((call.init?.headers as Record<string, string>).authorization, "Bearer production-token")
+  }
+  assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { purpose: "account_deletion" })
+  assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), {
+    idToken: "test-firebase-proof", challengeId: "delete-challenge", purpose: "account_deletion"
+  })
   assert.equal(confirmation.confirmationToken, "delete-token")
 })
 
-test("account data export uses dedicated challenge, verify, and download boundaries", async () => {
+test("account data export uses a Firebase proof before authenticated download", async () => {
   const calls: { url: string; init?: RequestInit }[] = []
   const fetcher: typeof fetch = async (url, init) => {
     calls.push({ url: String(url), init })
     if (calls.length === 1) {
       return new Response(JSON.stringify({
-        ok: true,
-        expiresAt: "2999-01-01T00:05:00.000Z"
+        challengeId: "export-challenge", expiresAt: "2999-01-01T00:05:00.000Z"
       }), { status: 202 })
     }
     if (calls.length === 2) {
       return new Response(JSON.stringify({
-        confirmationToken: "export-token",
-        expiresAt: "2999-01-01T00:05:00.000Z"
+        confirmationToken: "export-token", expiresAt: "2999-01-01T00:05:00.000Z"
       }), { status: 200 })
     }
     return new Response(JSON.stringify({
-      schemaVersion: "2026-07-21",
-      exportedAt: "2026-07-21T10:00:00.000Z",
-      account: { phoneNumber: "+905551112233" },
-      exclusions: ["staff-only records"], data: {}
+      schemaVersion: "2026-07-21", exportedAt: "2026-07-21T10:00:00.000Z",
+      account: { phoneNumber: "[redacted]" }, exclusions: ["staff-only records"], data: {}
     }) + "\n", { status: 200, headers: { "content-type": "application/json", "x-blumi-export-format": "json-v1" } })
   }
-
-  await requestAccountDataExportChallenge(
-    "https://api.blumi.test",
-    "production-token",
-    fetcher
-  )
-  const confirmation = await verifyAccountDataExportCode(
-    "https://api.blumi.test",
-    "production-token",
-    "482931",
-    fetcher
-  )
+  const challenge = await requestFirebaseAccountActionChallenge("https://api.blumi.test", "production-token", {
+    purpose: "account_data_export"
+  }, fetcher)
+  const confirmation = await verifyFirebaseAccountAction("https://api.blumi.test", "production-token", {
+    idToken: "test-firebase-proof", challengeId: challenge.challengeId, purpose: "account_data_export"
+  }, fetcher)
   let downloadedJson = ""
-  const exported = await downloadAccountDataExport(
-    "https://api.blumi.test",
-    "production-token",
-    confirmation.confirmationToken,
-    fetcher,
-    undefined,
+  const exported = await downloadAccountDataExport("https://api.blumi.test", "production-token",
+    confirmation.confirmationToken, fetcher, undefined,
     () => ({ uri: "file:///cache/test-export.json", write: (chunk) => { downloadedJson += new TextDecoder().decode(chunk) },
       close: () => {}, dispose: async () => {} })
   )
-
-  assert.equal(calls[0]?.url, "https://api.blumi.test/v1/account/export/challenge")
-  assert.equal(calls[1]?.url, "https://api.blumi.test/v1/account/export/confirm")
-  assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), { verificationCode: "482931" })
+  assert.equal(calls[0]?.url, "https://api.blumi.test/v1/account/firebase/challenge")
+  assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { purpose: "account_data_export" })
+  assert.equal(calls[1]?.url, "https://api.blumi.test/v1/account/firebase/reauth")
+  assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), {
+    idToken: "test-firebase-proof", challengeId: "export-challenge", purpose: "account_data_export"
+  })
   assert.equal(calls[2]?.url, "https://api.blumi.test/v1/account/export")
   assert.deepEqual(JSON.parse(String(calls[2]?.init?.body)), { confirmationToken: "export-token" })
-  assert.equal(
-    JSON.parse(downloadedJson).account.phoneNumber,
-    "+905551112233"
-  )
+  assert.equal((calls[2]?.init?.headers as Record<string, string>).authorization, "Bearer production-token")
+  assert.equal(JSON.parse(downloadedJson).account.phoneNumber, "[redacted]")
   assert.equal(exported.uri, "file:///cache/test-export.json")
 })
 
@@ -478,64 +307,54 @@ test("lost-phone recovery submits a Firebase ID token for the new number", async
   assert.equal((calls[0]?.init?.headers as Record<string, string>).authorization, undefined)
 })
 
-test("phone change uses current-proof, new-number, and confirm boundaries", async () => {
+test("phone change binds Firebase proofs to current and new-number challenges", async () => {
   const calls: { url: string; init?: RequestInit }[] = []
   const fetcher: typeof fetch = async (url, init) => {
     calls.push({ url: String(url), init })
     return calls.length === 1 || calls.length === 3
-      ? new Response(JSON.stringify({ ok: true, expiresAt: "2999-01-01T00:05:00.000Z" }), { status: 202 })
+      ? new Response(JSON.stringify({ challengeId: `challenge-${calls.length}`, expiresAt: "2999-01-01T00:05:00.000Z" }), { status: 202 })
       : calls.length === 2 || calls.length === 4
         ? new Response(JSON.stringify({ confirmationToken: `token-${calls.length}`, expiresAt: "2999-01-01T00:05:00.000Z" }), { status: 200 })
         : new Response(null, { status: 204 })
   }
+  const currentChallenge = await requestFirebaseAccountActionChallenge("https://api.blumi.test", "production-token", {
+    purpose: "phone_change_current"
+  }, fetcher)
+  const current = await verifyFirebaseAccountAction("https://api.blumi.test", "production-token", {
+    idToken: "test-current-proof", challengeId: currentChallenge.challengeId, purpose: "phone_change_current"
+  }, fetcher)
+  const nextChallenge = await requestFirebaseAccountActionChallenge("https://api.blumi.test", "production-token", {
+    purpose: "phone_change_new", targetPhoneNumber: "+905559998877"
+  }, fetcher)
+  const next = await verifyFirebaseAccountAction("https://api.blumi.test", "production-token", {
+    idToken: "test-new-proof", challengeId: nextChallenge.challengeId, purpose: "phone_change_new",
+    currentPhoneConfirmationToken: current.confirmationToken
+  }, fetcher)
+  await confirmPhoneChange("https://api.blumi.test", "production-token", current.confirmationToken,
+    next.confirmationToken, fetcher)
 
-  await requestPhoneChangeCurrentChallenge(
-    "https://api.blumi.test",
-    "production-token",
-    fetcher
-  )
-  const current = await verifyPhoneChangeCurrentCode(
-    "https://api.blumi.test",
-    "production-token",
-    "482931",
-    fetcher
-  )
-  await requestPhoneChangeNewNumberChallenge(
-    "https://api.blumi.test",
-    "production-token",
-    "+905559998877",
-    current.confirmationToken,
-    fetcher
-  )
-  const next = await verifyPhoneChangeNewNumberCode(
-    "https://api.blumi.test",
-    "production-token",
-    "593804",
-    fetcher
-  )
-  await confirmPhoneChange(
-    "https://api.blumi.test",
-    "production-token",
-    current.confirmationToken,
-    next.confirmationToken,
-    fetcher
-  )
-
-  assert.equal(calls[0]?.url, "https://api.blumi.test/v1/account/phone-change/current/challenge")
-  assert.equal(calls[1]?.url, "https://api.blumi.test/v1/account/phone-change/current/confirm")
-  assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), { verificationCode: "482931" })
-  assert.equal(calls[2]?.url, "https://api.blumi.test/v1/account/phone-change/new/challenge")
+  assert.equal(calls[0]?.url, "https://api.blumi.test/v1/account/firebase/challenge")
+  assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { purpose: "phone_change_current" })
+  assert.equal(calls[1]?.url, "https://api.blumi.test/v1/account/firebase/reauth")
+  assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), {
+    idToken: "test-current-proof", challengeId: "challenge-1", purpose: "phone_change_current"
+  })
+  assert.equal(calls[2]?.url, "https://api.blumi.test/v1/account/firebase/challenge")
   assert.deepEqual(JSON.parse(String(calls[2]?.init?.body)), {
-    phoneNumber: "+905559998877",
+    purpose: "phone_change_new", targetPhoneNumber: "+905559998877"
+  })
+  assert.equal(calls[3]?.url, "https://api.blumi.test/v1/account/firebase/reauth")
+  assert.deepEqual(JSON.parse(String(calls[3]?.init?.body)), {
+    idToken: "test-new-proof", challengeId: "challenge-3", purpose: "phone_change_new",
     currentPhoneConfirmationToken: "token-2"
   })
-  assert.equal(calls[3]?.url, "https://api.blumi.test/v1/account/phone-change/new/confirm")
-  assert.deepEqual(JSON.parse(String(calls[3]?.init?.body)), { verificationCode: "593804" })
   assert.equal(calls[4]?.url, "https://api.blumi.test/v1/account/phone-change/confirm")
   assert.deepEqual(JSON.parse(String(calls[4]?.init?.body)), {
-    currentPhoneConfirmationToken: "token-2",
-    newPhoneConfirmationToken: "token-4"
+    currentPhoneConfirmationToken: "token-2", newPhoneConfirmationToken: "token-4"
   })
+  for (const call of calls) {
+    assert.equal((call.init?.headers as Record<string, string>).authorization, "Bearer production-token")
+  }
 })
 
 test("account deletion surfaces backend errors", async () => {
@@ -841,13 +660,13 @@ test("production profile fetch rejects backend and malformed profile responses",
   )
 })
 
-test("production registration rejects missing account or session identifiers", async () => {
+test("Firebase completion rejects missing account or session identifiers", async () => {
   await assert.rejects(
-    registerAccount(
+    completeFirebaseAccount(
       "https://api.blumi.test",
       {
-        phoneNumber: "+905551112233",
-        verificationCode: "482931",
+        idToken: "test-firebase-proof",
+        authIntent: "create",
         termsAcceptance: TEST_TERMS_ACCEPTANCE
       },
       async () => new Response(JSON.stringify({
@@ -868,13 +687,13 @@ test("production registration rejects missing account or session identifiers", a
   )
 })
 
-test("production registration rejects a response without an explicit mode", async () => {
+test("Firebase completion rejects a response without an explicit mode", async () => {
   await assert.rejects(
-    registerAccount(
+    completeFirebaseAccount(
       "https://api.blumi.test",
       {
-        phoneNumber: "+905551112233",
-        verificationCode: "482931",
+        idToken: "test-firebase-proof",
+        authIntent: "create",
         termsAcceptance: TEST_TERMS_ACCEPTANCE
       },
       async () => new Response(JSON.stringify({
@@ -896,13 +715,13 @@ test("production registration rejects a response without an explicit mode", asyn
   )
 })
 
-test("production registration rejects an explicit demo identity", async () => {
+test("Firebase completion rejects an explicit demo identity", async () => {
   await assert.rejects(
-    registerAccount(
+    completeFirebaseAccount(
       "https://api.blumi.test",
       {
-        phoneNumber: "+905551112233",
-        verificationCode: "482931",
+        idToken: "test-firebase-proof",
+        authIntent: "create",
         termsAcceptance: TEST_TERMS_ACCEPTANCE
       },
       async () => new Response(JSON.stringify({
@@ -930,12 +749,12 @@ test("production registration rejects an explicit demo identity", async () => {
   )
 })
 
-test("returning production registration preserves completed server onboarding", async () => {
-  const actor = await registerAccount(
+test("returning Firebase completion preserves completed server onboarding", async () => {
+  const actor = await completeFirebaseAccount(
     "https://api.blumi.test",
     {
-      phoneNumber: "+905551112233",
-      verificationCode: "482931",
+      idToken: "test-firebase-proof",
+      authIntent: "create",
       termsAcceptance: TEST_TERMS_ACCEPTANCE
     },
     async () => new Response(JSON.stringify({
@@ -965,13 +784,13 @@ test("returning production registration preserves completed server onboarding", 
   assert.equal(actor.session.onboarding.room, "complete")
 })
 
-test("production registration rejects a response without authoritative onboarding", async () => {
+test("Firebase completion rejects a response without authoritative onboarding", async () => {
   await assert.rejects(
-    registerAccount(
+    completeFirebaseAccount(
       "https://api.blumi.test",
       {
-        phoneNumber: "+905551112233",
-        verificationCode: "482931",
+        idToken: "test-firebase-proof",
+        authIntent: "create",
         termsAcceptance: TEST_TERMS_ACCEPTANCE
       },
       async () => new Response(JSON.stringify({
@@ -1059,25 +878,11 @@ const API = "https://api.blumi.test"
 
 registerBoundedRequestTests([
   {
-    name: "register account POST",
-    run: (fetcher) => registerAccount(API, {
-      phoneNumber: "+905551112233",
-      verificationCode: "482931",
-      termsAcceptance: TEST_TERMS_ACCEPTANCE
-    }, fetcher)
-  },
-  {
     name: "Firebase account completion POST",
     run: (fetcher) => sessionApi.completeFirebaseAccount(API, {
       idToken: "firebase-id-token",
       authIntent: "sign-in"
     }, fetcher)
-  },
-  {
-    name: "verification code POST",
-    timeoutMs: 10_000,
-    rejection: { name: "TimeoutError", message: /connection timed out/i },
-    run: (fetcher) => sendVerificationCode(API, { phoneNumber: "+905551112233" }, fetcher)
   },
   {
     name: "account deletion DELETE",
@@ -1098,36 +903,12 @@ registerBoundedRequestTests([
     }, fetcher)
   },
   {
-    name: "deletion challenge POST",
-    run: (fetcher) => requestAccountDeletionChallenge(API, "token", fetcher)
-  },
-  {
-    name: "deletion confirm POST",
-    run: (fetcher) => verifyAccountDeletionCode(API, "token", { verificationCode: "123456" }, fetcher)
-  },
-  {
-    name: "recovery challenge POST",
-    run: (fetcher) => sessionApi.requestAccountRecoveryChallenge(API, "+905551112233", fetcher)
-  },
-  {
     name: "recovery request POST",
     run: (fetcher) => submitAccountRecoveryRequest(API, {
       oldPhoneNumber: "+905551112233",
       newPhoneNumber: "+905551112244",
       idToken: "firebase-id-token"
     }, fetcher)
-  },
-  {
-    name: "account action challenge POST",
-    run: (fetcher) => requestAccountDataExportChallenge(API, "token", fetcher)
-  },
-  {
-    name: "account action confirm POST",
-    run: (fetcher) => verifyAccountDataExportCode(API, "token", "123456", fetcher)
-  },
-  {
-    name: "phone change new-number challenge POST",
-    run: (fetcher) => requestPhoneChangeNewNumberChallenge(API, "token", "+905551112244", "current", fetcher)
   },
   {
     name: "phone change confirm POST",

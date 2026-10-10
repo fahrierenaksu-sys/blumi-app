@@ -1,4 +1,6 @@
 import type { ConfirmationResult } from "@react-native-firebase/auth"
+import { requireFirebasePhoneAppCheck } from "./firebasePhoneAppCheck"
+import { requireFirebaseSmsDevicePermission } from "./firebaseSmsDevicePermission"
 
 export type FirebasePhoneConfirmation = ConfirmationResult
 
@@ -50,6 +52,7 @@ type FirebaseAuthNativeTestingBridge = {
 }
 
 let appVerificationConfiguration: Promise<void> | null = null
+let smsRequestInFlight = false
 
 function configureFictionalNumberTesting(auth: FirebaseAuth): Promise<void> {
   if (!disableAppVerificationForTesting) return Promise.resolve()
@@ -81,19 +84,20 @@ export function subscribeToFirebasePhoneNumber(
   })
 }
 
-export async function getVerifiedFirebasePhoneIdToken(
-  phoneNumber: string
-): Promise<string | null> {
-  const user = loadFirebaseAuth()?.auth.currentUser
-  if (!user || user.phoneNumber !== phoneNumber) return null
-  return user.getIdToken(true)
-}
-
 export async function requestFirebasePhoneCode(
   phoneNumber: string
 ): Promise<FirebasePhoneConfirmation> {
+  if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber)) throw new Error("Enter a valid phone number with country code.")
   const { module, auth } = requireFirebaseAuth()
+  if (smsRequestInFlight) throw new Error("A verification request is already in progress. Try again later.")
+  smsRequestInFlight = true
   try {
+    // Fictional-number testing is explicitly development-only; production
+    // requests cannot skip attestation or select Firebase's debug provider.
+    if (!disableAppVerificationForTesting) {
+      await requireFirebasePhoneAppCheck()
+      await requireFirebaseSmsDevicePermission(phoneNumber)
+    }
     await configureFictionalNumberTesting(auth)
     return await module.signInWithPhoneNumber(auth, phoneNumber)
   } catch (error) {
@@ -103,13 +107,16 @@ export async function requestFirebasePhoneCode(
         __DEV__ && code ? ` (${code})` : ""
       }`
     )
-  }
+  } finally { smsRequestInFlight = false }
 }
 
 export async function confirmFirebasePhoneCode(
   confirmation: FirebasePhoneConfirmation,
   verificationCode: string
 ): Promise<string> {
+  if (!/^\d{6}$/.test(verificationCode)) {
+    throw new Error("That verification code is invalid or expired. Request a new code and try again.")
+  }
   try {
     const credential = await confirmation.confirm(verificationCode)
     return await credential.user.getIdToken(true)
