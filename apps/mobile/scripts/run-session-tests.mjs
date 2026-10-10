@@ -174,7 +174,6 @@ try {
       "src/features/settings/useHiddenPeople.test.ts",
       "src/features/settings/useNotificationSettings.test.ts",
       "src/features/settings/chatPreferencesApi.test.ts",
-      "src/features/dev/blumiDevEntryPolicy.test.ts",
       "src/ui/blumiLoadingScreenHandoff.test.ts",
       "src/ui/uiLocale.test.ts",
       "src/ui/keyboardOpenAmount.test.ts",

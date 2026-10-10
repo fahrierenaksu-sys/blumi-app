@@ -226,19 +226,3 @@ export const BLUMI_REVENUECAT_IOS_API_KEY =
 
 export const BLUMI_REVENUECAT_ANDROID_API_KEY =
   process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY?.trim() || undefined
-
-export type BlumiDevEntryRoute =
-  | "myroom"
-  | "mini-room-rig-preview"
-  | "home-studio-pilot"
-
-const rawDevEntryRoute = process.env.EXPO_PUBLIC_BLUMI_DEV_ENTRY_ROUTE
-  ?.trim()
-  .toLowerCase()
-
-export const BLUMI_DEV_ENTRY_ROUTE: BlumiDevEntryRoute | undefined =
-  rawDevEntryRoute === "myroom" ||
-  rawDevEntryRoute === "mini-room-rig-preview" ||
-  rawDevEntryRoute === "home-studio-pilot"
-    ? rawDevEntryRoute
-    : undefined

@@ -279,7 +279,7 @@ function mountRoot(nativeIdle = true) {
       },
       "../features/inventory/inventoryStore": { useInventoryServerActions: () => inventory },
       "../features/inventory/inventoryHydrationPolicy": { shouldHydrateProductionInventory: () => false },
-      "../config/env": { IS_BLUMI_PAID_COINS_ENABLED: false, BLUMI_DEV_ENTRY_ROUTE: undefined },
+      "../config/env": { IS_BLUMI_PAID_COINS_ENABLED: false },
       "./rootNavigationModel": {
         getChatLocale: () => "en",
         getChatThreadScreenOptions: () => ({}),

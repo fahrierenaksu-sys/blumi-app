@@ -5,7 +5,7 @@ import type {
 } from "@blumi/contracts"
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { StyleSheet, View } from "react-native"
 import { MatchResultModal } from "../components/MatchResultModal"
 import type { CandidateAvatarSnapshot } from "../components/DiscoverCard"
@@ -15,16 +15,10 @@ import {
   useDemoStore
 } from "../features/demo/demoStore"
 import {
-  BLUMI_BUILD_PROFILE,
-  BLUMI_DEV_ENTRY_ROUTE,
   BLUMI_QA_UNLOCK_AVATAR_ITEMS_FLAG,
   IS_BLUMI_PAID_COINS_ENABLED,
   MOBILE_HTTP_BASE_URL
 } from "../config/env"
-import {
-  canApplyBlumiDevEntry,
-  shouldApplyBlumiDevEntryNavigation
-} from "../features/dev/blumiDevEntryPolicy"
 import { resetChatStore } from "../features/chat/chatStore"
 import { resetSettingsServerCache } from "../features/settings/settingsServerCache"
 import { disconnectGlobal } from "../features/realtime/globalRealtimeProvider"
@@ -124,7 +118,6 @@ import {
 } from "./mainTabPager/renderMainTabPage"
 import {
   legalScreenBundle,
-  miniRoomRigPreviewScreenBundle,
   myRoomScreenBundle,
   cosmeticShopScreenBundle,
   myRoomEditorScreenBundle,
@@ -200,7 +193,6 @@ export type RootStackParamList = {
     readyMiniRoom: ReadyMiniRoomRouteParam
     participants: MiniRoomParticipantsRouteParam
   }
-  MiniRoomRigPreview: undefined
   Inbox: undefined
   MyRoom: undefined
   You: undefined
@@ -244,11 +236,6 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 
-const CAN_REGISTER_MINI_ROOM_RIG_PREVIEW = canApplyBlumiDevEntry({
-  route: BLUMI_DEV_ENTRY_ROUTE,
-  buildProfile: BLUMI_BUILD_PROFILE,
-  isDevelopmentRuntime: __DEV__
-}) && BLUMI_DEV_ENTRY_ROUTE === "mini-room-rig-preview"
 
 const IS_FULL_SHOP_CATALOG_QA_PREVIEW = isAvatarQaUnlockEnabled(
   __DEV__,
@@ -351,7 +338,6 @@ export function RootNavigator() {
     setIsBootPreludeReady(true)
   }, [])
   const { latestSessionActorRef, isCurrentSession } = useCurrentSessionGuard(sessionActor)
-  const devEntryAppliedGenerationRef = useRef<number | null>(null)
   const [isNavigationReady, setIsNavigationReady] = useState(false)
   const [navigationReadyGeneration, setNavigationReadyGeneration] = useState(0)
   // The unread badge (MainTabBottomBar) and the connection pill
@@ -545,41 +531,6 @@ export function RootNavigator() {
       preload.cancel()
     }
   }, [isNavigationReady, sessionEntryRoute])
-
-  useEffect(() => {
-    if (
-      !canApplyBlumiDevEntry({
-        route: BLUMI_DEV_ENTRY_ROUTE,
-        buildProfile: BLUMI_BUILD_PROFILE,
-        isDevelopmentRuntime: __DEV__
-      }) ||
-      !navigationRef.isReady() ||
-      !shouldApplyBlumiDevEntryNavigation({
-        route: BLUMI_DEV_ENTRY_ROUTE,
-        buildProfile: BLUMI_BUILD_PROFILE,
-        isDevelopmentRuntime: __DEV__,
-        sessionEntryRoute,
-        hasSessionActor: Boolean(sessionActor),
-        navigationReady: isNavigationReady,
-        appliedNavigationGeneration: devEntryAppliedGenerationRef.current,
-        navigationGeneration: navigationReadyGeneration
-      })
-    ) {
-      return
-    }
-
-    devEntryAppliedGenerationRef.current = navigationReadyGeneration
-
-    if (BLUMI_DEV_ENTRY_ROUTE === "myroom") {
-      navigationRef.navigate("MyRoom")
-      return
-    }
-
-    if (BLUMI_DEV_ENTRY_ROUTE === "mini-room-rig-preview") {
-      navigationRef.navigate("MiniRoomRigPreview")
-      return
-    }
-  }, [isNavigationReady, navigationReadyGeneration, sessionActor, sessionEntryRoute])
 
   // ── Global WS lifecycle ─────────────────────────────────
   // Leaving the authenticated main session leaves demo mode and clears every
@@ -806,19 +757,6 @@ export function RootNavigator() {
                   />
                 )}
               </Stack.Screen>
-              {CAN_REGISTER_MINI_ROOM_RIG_PREVIEW ? (
-                <Stack.Screen
-                  name="MiniRoomRigPreview"
-                  options={{ headerShown: false }}
-                >
-                  {(screenProps) => (
-                    <miniRoomRigPreviewScreenBundle.DeferredScreen
-                      {...screenProps}
-                      sessionActor={sessionActor}
-                    />
-                  )}
-                </Stack.Screen>
-              ) : null}
               <Stack.Screen
                 name="ProfilePreview"
                 options={detailScreenOptions}

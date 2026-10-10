@@ -65,10 +65,6 @@ export const myRoomEditorScreenBundle = createDeferredScreen(
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   () => require("../screens/MyRoomEditorScreen").MyRoomEditorScreen as ComponentType<any>
 )
-export const miniRoomRigPreviewScreenBundle = createDeferredScreen(
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  () => require("../screens/MiniRoomRigPreviewScreen").MiniRoomRigPreviewScreen as ComponentType<any>
-)
 export const settingsScreenBundle = createDeferredScreen(
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   () => require("../screens/SettingsScreen").SettingsScreen as ComponentType<any>
