@@ -293,10 +293,10 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | V11 | Seed data | `SV/matches/matchRepository.ts:489`, `apps/server/scripts/seedTestPersonas.ts` | follow the new defaults | P4 | Open |
 | V12 | Economy catalog and service | `D/economy/economyCatalog.ts`, `SV/economy/economyCatalog.ts`, `economyService.ts` | new entries; `LEGACY_AVATAR_ITEM_REPLACEMENTS` self-heal removed; inventory reads drop legacy IDs | P2 room, P4 avatar | Open |
 | V13 | Coin packs, commerce, rewards | `D/economy/coinPacks.ts`, `SV/commerce/*` | unchanged; inputs to §12 | — | Open |
-| V14 | Personal room decor | `SV/rooms/personalRoomDecorService.ts` | read drops legacy/unknown items; save leaves out retired ids an old client still sends (§10.1 risk 15) and refuses held, unknown or unowned items | P2 | Tested (7611de9a, 1d623341) |
+| V14 | Personal room decor | `SV/rooms/personalRoomDecorService.ts` | read drops legacy/unknown items; save leaves out retired ids an old client still sends (§10.1 risk 15), carries the stored retired placements over untouched, and refuses held, unknown or unowned items | P2 | Tested (7611de9a, 439d5b0e, bf9c5cdd) |
 | V15 | Room showcase | `SV/rooms/roomSnapshotService.ts`, `roomSnapshotRenderer.ts` | renderer v2; an older renderer's row is never served, it is redrawn once when read (same revision); only a newer renderer replaces a same-revision row | P2 | Tested (4180673c, a802cfc0, c0909df2) |
 | V16 | Shared room decor | `SV/miniRooms/miniRoomService.ts`, `miniRoomRepository.ts:191`, `SV/db/postgresMiniRoomRepository.ts:192` | shell literal kept; host decor copied through the V14 projection | P2 | Tested (7611de9a) |
-| V17 | Shared room motion checks | `SV/miniRooms/miniRoomMotionService.ts`, `D/roomWorld/miniRoomFloor.ts` | test: every calibrated walk and seat point is accepted by the server floor rule | P2 | Tested (025adc7f) |
+| V17 | Shared room motion checks | `SV/miniRooms/miniRoomMotionService.ts`, `D/roomWorld/miniRoomFloor.ts` | test: every calibrated walk and seat point is accepted by the server floor rule | P2 | Tested (025adc7f, 0829a846) |
 | V18 | Legacy lobby server code | `SV/rooms/roomService.ts`, presence, `blumi_room_layouts` | left as is (out of scope; retired for clients) | — | Open |
 | V19 | Account data export | `SV/account/accountDataExportStream.ts` | still exports the raw rows (the user's data) | P4 verify | Open |
 | V20 | Release audit | `SV/operations/databaseReleaseAudit.ts`, `apps/server/scripts/auditDatabaseRelease.ts` | legacy IDs counted as ignored | P4 | Open |
@@ -492,7 +492,7 @@ Record of what is current (Phase 2 review L4): `docs/quality/SHOP_CATALOG_PUBLIC
 | Never reused | guard L14: no active or reserved ID is in the registry |
 | Loadout read | coercion (§2.4) |
 | Inventory read | owned arrays are filtered to active IDs in the response; rows untouched; `ownedByDefault` self-heal keeps granting new starters |
-| Room decor read | placed items with a legacy, unknown or unowned ID are dropped in the response; an empty result makes the client build the default room; the stored revision is returned so the next save succeeds |
+| Room decor read | placed items with a legacy, unknown or unowned ID are dropped in the response; an empty result makes the client build the default room; the stored revision is returned so the next save succeeds, and that save carries the stored retired placements over untouched (never shown, drawn or counted as owned) |
 | Purchase, equip, place | refused for legacy, reserved and unknown IDs |
 | Release audit | legacy IDs reported as a separate "ignored" count, exit code 0 |
 
@@ -720,7 +720,7 @@ Before the reset can be called done: a test on the memory server proves that a p
 | 12 | All 27 approved furniture pieces wait for §12 prices, so a launch before §12 has a room with only the starter bed (the chair is held too) | `pricing-pending` scope keeps them refused and hidden; §12 is reviewed after Phase 3, well before Phase 5.6; the TestFlight gate checks that §12 is decided or that the owner accepts a bed-only launch |
 | 13 | Lost first tap after mount and the pager desync are only worked around | Carried as an open issue; cheaper first mount is future work |
 | 14 | Editing `M/package.json` scripts before OTA removal lands would change the native fingerprint | OTA removal is commit 1.2; script edits come after |
-| 15 | Cutover order (Phase 2 review M5): if Railway deploys this server before testers install the new build, the old TestFlight client keeps sending retired room ids (its starter bed `room_v2_cozy_bed`) and reads old rooms as empty | The server leaves retired ids (legacy registry) out of a room save instead of refusing it (`personalRoomDecorService.ts`, a count-only log line); held, unknown and unowned items are still refused, and nothing outside the active catalog is placed. Still land the server deploy and the TestFlight build together in 5.6; remove the tolerance only after X22 |
+| 15 | Cutover order (Phase 2 review M5): if Railway deploys this server before testers install the new build, the old TestFlight client keeps sending retired room ids (its starter bed `room_v2_cozy_bed`) and reads old rooms as empty | The server leaves retired ids (legacy registry) out of a room save instead of refusing it (`personalRoomDecorService.ts`, a count-only log line); held, unknown and unowned items are still refused, and nothing outside the active catalog is placed. The user's stored retired placements are carried over untouched by every save (old or new client), so no old room data is lost until the owner decides F3. Still land the server deploy and the TestFlight build together in 5.6; remove the tolerance only after X22 |
 
 ### 10.2 Behaviour tests to add, and guards to retire or replace
 
