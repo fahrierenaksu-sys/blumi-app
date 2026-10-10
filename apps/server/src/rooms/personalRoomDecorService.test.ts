@@ -3,6 +3,7 @@ import test from "node:test"
 import {
   createPersonalRoomDecorService
 } from "./personalRoomDecorService"
+import { createInMemoryPersonalRoomDecorRepository, type PersonalRoomDecorSnapshot } from "./personalRoomDecorRepository"
 
 const DECOR = {
   schemaVersion: 3,
@@ -309,4 +310,114 @@ test("leaving out a retired item never lets an unowned active item through", asy
     /do not own/i
   )
   assert.equal(await service.repository.get("user_1"), null)
+})
+
+// M5 round 3 (fresh review MEDIUM-2): the read hides a user's stored retired placements, so a client never sends
+// them back. A save must carry them over untouched in storage, never render them and never treat them as owned.
+const STORED_RETIRED_PLACEMENTS = [
+  { instanceId: "table-old", itemId: "room_v2_table_round", x: 0.31, y: 0.64, rotation: "left" as const, depth: 2 },
+  { instanceId: "bench-old", itemId: "universal_bench_a", x: 0.7, y: 0.8, rotation: "front" as const, width: 1.5 }
+]
+
+async function createServiceWithStoredRetiredRoom() {
+  const repository = createInMemoryPersonalRoomDecorRepository()
+  const stored = await repository.save({
+    userId: "user_1",
+    expectedRevision: 0,
+    decor: { ...DECOR, placedItems: [DECOR.placedItems[0], ...STORED_RETIRED_PLACEMENTS] },
+    updatedAt: "2026-09-01T00:00:00.000Z"
+  })
+  assert.equal(stored.kind, "saved")
+  const service = createPersonalRoomDecorService({
+    repository,
+    getOwnedRoomItemIds: async () => ["room_v2_chair_blush", "room_v2_table_round", "universal_bench_a"],
+    isActiveRoomItemId: (itemId) => itemId === "room_v2_chair_blush"
+  })
+  return service
+}
+
+const storedRetired = async (service: ReturnType<typeof createPersonalRoomDecorService>) =>
+  (await service.repository.get("user_1"))?.decor.placedItems.filter((item) => item.itemId !== "room_v2_chair_blush")
+
+test("an old client's save keeps the stored retired placements unchanged in storage", async () => {
+  const service = await createServiceWithStoredRetiredRoom()
+  const read = await service.get("user_1")
+  assert.ok(read)
+  assert.deepEqual(read.decor.placedItems.map((item) => item.itemId), ["room_v2_chair_blush"])
+
+  // the TestFlight client adds its starter bed (retired) to what it was shown
+  const result = await service.save("user_1", {
+    expectedRevision: read.revision,
+    decor: {
+      ...read.decor,
+      placedItems: [...read.decor.placedItems, { ...DECOR.placedItems[0], instanceId: "bed-1", itemId: "room_v2_cozy_bed" }]
+    }
+  })
+  assert.equal(result.kind, "saved")
+  if (result.kind !== "saved") return
+  assert.equal(result.strippedItemCount, 1)
+  assert.deepEqual(await storedRetired(service), STORED_RETIRED_PLACEMENTS)
+  // never handed back or drawn
+  assert.deepEqual(result.snapshot.decor.placedItems.map((item) => item.itemId), ["room_v2_chair_blush"])
+  assert.deepEqual((await service.get("user_1"))?.decor.placedItems.map((item) => item.itemId), ["room_v2_chair_blush"])
+})
+
+test("a new client's save keeps the stored retired placements and draws only its own items", async () => {
+  const drawn: string[][] = []
+  const repository = (await createServiceWithStoredRetiredRoom()).repository
+  const service = createPersonalRoomDecorService({
+    repository,
+    getOwnedRoomItemIds: async () => ["room_v2_chair_blush"],
+    isActiveRoomItemId: (itemId) => itemId === "room_v2_chair_blush",
+    roomSnapshotService: {
+      async publishForRoomSave(room: PersonalRoomDecorSnapshot) {
+        drawn.push(room.decor.placedItems.map((item) => item.itemId))
+        return null as never
+      }
+    } as never
+  })
+  const result = await service.save("user_1", {
+    expectedRevision: 1,
+    decor: { ...DECOR, placedItems: [{ ...DECOR.placedItems[0], x: 0.4 }] }
+  })
+  assert.equal(result.kind, "saved")
+  assert.deepEqual(await storedRetired(service), STORED_RETIRED_PLACEMENTS)
+  assert.deepEqual(drawn, [["room_v2_chair_blush"]])
+})
+
+test("carried retired placements grant nothing and never let a refused item through", async () => {
+  const service = await createServiceWithStoredRetiredRoom()
+  // a client cannot re-place a stored retired id as a new placement: it is left out like any retired id
+  const resent = await service.save("user_1", {
+    expectedRevision: 1,
+    decor: { ...DECOR, placedItems: [{ ...DECOR.placedItems[0], instanceId: "table-new", itemId: "room_v2_table_round", x: 0.1 }] }
+  })
+  assert.equal(resent.kind, "saved")
+  if (resent.kind !== "saved") return
+  assert.deepEqual(resent.snapshot.decor.placedItems, [])
+  assert.deepEqual(await storedRetired(service), STORED_RETIRED_PLACEMENTS)
+  // held/unknown and unowned items are still refused, and a refused save leaves the row as it was
+  const unowned = createPersonalRoomDecorService({
+    repository: service.repository,
+    getOwnedRoomItemIds: async () => [],
+    isActiveRoomItemId: (itemId) => itemId === "room_v2_chair_blush"
+  })
+  await assert.rejects(unowned.save("user_1", { expectedRevision: 2, decor: DECOR }), /do not own/i)
+  await assert.rejects(
+    service.save("user_1", {
+      expectedRevision: 2,
+      decor: { ...DECOR, placedItems: [{ ...DECOR.placedItems[0], itemId: "room_v9_unknown" }] }
+    }),
+    /not available/i
+  )
+  assert.equal((await service.repository.get("user_1"))?.revision, 2)
+  assert.deepEqual(await storedRetired(service), STORED_RETIRED_PLACEMENTS)
+})
+
+test("a revision conflict never hands stored retired placements to the client", async () => {
+  const service = await createServiceWithStoredRetiredRoom()
+  const stale = await service.save("user_1", { expectedRevision: 0, decor: DECOR })
+  assert.equal(stale.kind, "conflict")
+  if (stale.kind !== "conflict") return
+  assert.deepEqual(stale.current.decor.placedItems.map((item) => item.itemId), ["room_v2_chair_blush"])
 })

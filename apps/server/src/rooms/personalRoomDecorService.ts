@@ -59,17 +59,11 @@ export function createPersonalRoomDecorService(options: {
       const stored = await repository.get(normalizedUserId)
       if (!stored) return null
       // Read projection: legacy, unknown, held and unowned items are left out; the row and its revision stay as
-      // stored, so the next save with this revision succeeds.
+      // stored, so the next save with this revision succeeds (and carries the stored retired placements over).
       const ownedItemIds = new Set(
         await options.getOwnedRoomItemIds(normalizedUserId)
       )
-      return {
-        ...stored,
-        decor: projectRoomDecorItems(
-          stored.decor,
-          (itemId) => isActive(itemId) && ownedItemIds.has(itemId)
-        )
-      }
+      return toClientRoom(stored, ownedItemIds)
     },
     async save(userId, input, now = new Date()) {
       const normalizedUserId = normalizeUserId(userId)
@@ -104,25 +98,54 @@ export function createPersonalRoomDecorService(options: {
           "Your room includes an item you do not own."
         )
       }
+      // The read hid the user's stored retired placements, so no client sends them back: they are carried over
+      // untouched (F3 not waived). Only from the revision the client saves over; any other revision conflicts below.
+      const stored = await repository.get(normalizedUserId)
+      const carried = stored?.revision === input.expectedRevision
+        ? stored.decor.placedItems.filter((item) => isStoredRetired(item.itemId))
+        : []
       const result = await repository.save({
         userId: normalizedUserId,
         expectedRevision: input.expectedRevision,
-        decor,
+        decor: { ...decor, placedItems: [...decor.placedItems, ...carried] },
         updatedAt: now.toISOString()
       })
       if (result.kind === "missing") {
         throw new PublicRequestError("Refresh your room and try again.")
       }
-      if (result.kind === "saved" && options.roomSnapshotService) {
+      if (result.kind === "conflict") {
+        return { kind: "conflict", current: toClientRoom(result.current, ownedItemIds) }
+      }
+      const snapshot = toClientRoom(result.snapshot, ownedItemIds)
+      if (options.roomSnapshotService) {
         try {
-          await options.roomSnapshotService.publishForRoomSave(result.snapshot)
+          await options.roomSnapshotService.publishForRoomSave(snapshot)
         } catch (error) {
           // The canonical room save remains successful. The revision check in
           // Discovery hides the old snapshot until this revision is rendered.
-          options.onRoomSnapshotError?.(error, result.snapshot)
+          options.onRoomSnapshotError?.(error, snapshot)
         }
       }
-      return result.kind === "saved" ? { ...result, strippedItemCount } : result
+      return { kind: "saved", snapshot, strippedItemCount }
+    }
+  }
+
+  /** A stored placement of a retired id: kept in the row, never shown, drawn, validated or counted as owned. */
+  function isStoredRetired(itemId: string): boolean {
+    return !isActive(itemId) && isRetiredItemId(itemId)
+  }
+
+  /** What a client may see of a stored room: active, owned items only; the row and its revision stay as stored. */
+  function toClientRoom(
+    room: PersonalRoomDecorSnapshot,
+    ownedItemIds: ReadonlySet<string>
+  ): PersonalRoomDecorSnapshot {
+    return {
+      ...room,
+      decor: projectRoomDecorItems(
+        room.decor,
+        (itemId) => isActive(itemId) && ownedItemIds.has(itemId)
+      )
     }
   }
 }
