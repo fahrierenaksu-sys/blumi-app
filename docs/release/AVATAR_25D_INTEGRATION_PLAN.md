@@ -496,7 +496,7 @@ Default room: created on the client as today (`roomStarterModel.ts`), saved with
 
 ### 5.5 How an item arrives later (boy outfits, hairs, basics, approved furniture)
 
-One commit per batch: (1) new snapshot of the art; (2) rig re-export (`tools/avatar25d/export_rig.py`) and ASTC; (3) `bake-stills.mjs`; (4) `avatarItemArt.ts` entry; (5) domain catalog + economy entry (`ownedByDefault` for free starters); (6) tests green, vgate for that body. Nothing else changes, because every surface reads the catalog and the manifest.
+One commit per batch: (1) new snapshot of the art; (2) rig re-export (`tools/avatar25d/export_rig.py`) and ASTC; (3) `bake-stills.mjs`; (4) `avatarItemArt.ts` entry; (5) domain catalog + economy entry (`ownedByDefault` for free starters); (6) tests green including `npm run verify:avatar-rigs` (exporter tests, blink gate for both rigs, `bake-stills.mjs --check`), vgate for that body. Nothing else changes, because every surface reads the catalog and the manifest.
 
 ## 6. Deletion list in commit order (G)
 

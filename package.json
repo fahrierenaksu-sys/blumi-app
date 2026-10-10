@@ -15,6 +15,7 @@
     "verify:source-hygiene": "node --test scripts/security/source-hygiene.test.mjs scripts/security/navigation-dependency.test.mjs scripts/security/legal-preflight.test.mjs apps/mobile/scripts/sentry-debug-plugin.test.mjs",
     "verify:operations-center": "node --test tools/operations-center/build.test.mjs",
     "verify:workbench-tools": "node --test tools/workbench/archive-from-manifest.test.mjs tools/workbench/remove-archived-from-manifest.test.mjs",
+    "verify:avatar-rigs": "python3 tools/avatar25d/test_export_rig.py && python3 tools/avatar25d/blink_gate.py apps/mobile/src/features/avatar/rigs/girl && python3 tools/avatar25d/blink_gate.py apps/mobile/src/features/avatar/rigs/boy && node tools/avatar25d/bake-stills.mjs --check",
     "ops:center": "node tools/operations-center/build.mjs && node tools/operations-center/serve.mjs",
     "verify:postgres": "node scripts/security/postgres-gate.mjs",
     "verify:release-infra": "node --import tsx --test .railway/railway.test.ts",
@@ -31,7 +32,7 @@
     "doctor": "expo-doctor apps/mobile",
     "test": "npm run build:packages && npm --workspaces --if-present run test",
     "audit:release": "node scripts/security/run-audit.mjs",
-    "verify": "npm run verify:source-hygiene && npm run verify:operations-center && npm run verify:workbench-tools && node --test scripts/security/audit-policy.test.mjs scripts/automation/local-backup.test.mjs scripts/automation/ci-db-backup.test.mjs && npm run verify:release-infra && npm run build:packages && npm run typecheck && npm run lint && npm run test && npm run verify:postgres && npm run audit:release && npm run doctor",
+    "verify": "npm run verify:source-hygiene && npm run verify:operations-center && npm run verify:workbench-tools && npm run verify:avatar-rigs && node --test scripts/security/audit-policy.test.mjs scripts/automation/local-backup.test.mjs scripts/automation/ci-db-backup.test.mjs && npm run verify:release-infra && npm run build:packages && npm run typecheck && npm run lint && npm run test && npm run verify:postgres && npm run audit:release && npm run doctor",
     "clean-clone:verify": "npm ci && npm run verify"
   },
   "devDependencies": {
