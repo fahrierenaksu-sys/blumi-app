@@ -16,7 +16,7 @@ const HAIR_SHAPES: Readonly<Record<AvatarStillRigId, string>> = {
 }
 
 function fallbackSvg(rig: AvatarStillRigId, size: number): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 192 192"><g fill="${INK}" fill-opacity="${INK_OPACITY}"><ellipse cx="96" cy="206" rx="78" ry="62"/><rect x="84" y="118" width="24" height="30" rx="8"/><ellipse cx="96" cy="94" rx="36" ry="40"/>${HAIR_SHAPES[rig]}</g></svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 192 192"><g fill="${INK}" opacity="${INK_OPACITY}"><ellipse cx="96" cy="206" rx="78" ry="62"/><rect x="84" y="118" width="24" height="30" rx="8"/><ellipse cx="96" cy="94" rx="36" ry="40"/>${HAIR_SHAPES[rig]}</g></svg>`
 }
 
 export async function drawFallbackPortrait(rig: AvatarStillRigId, background: string, size: number): Promise<Buffer> {
