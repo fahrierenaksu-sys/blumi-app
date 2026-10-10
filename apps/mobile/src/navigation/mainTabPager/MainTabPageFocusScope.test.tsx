@@ -44,9 +44,9 @@ function renderPage(isPageFocused: boolean): string {
     {
       navigation: pageNavigation,
       route: { key: `${screen.route.key}:Lobby`, name: "Lobby" },
-      slotKey: screen.route.key,
-      children: createElement(FocusProbe)
-    }
+      slotKey: screen.route.key
+    },
+    createElement(FocusProbe)
   )
   return renderToString(createElement(
     core.BaseNavigationContainer,
