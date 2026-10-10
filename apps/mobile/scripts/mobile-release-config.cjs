@@ -65,9 +65,16 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
     if (devEntryRoute) {
       throw new Error("Development entry routes cannot be enabled in connected builds.")
     }
-    if (localQaAuth !== "0" || normalizeValue(environment.EXPO_PUBLIC_BLUMI_LOCAL_QA_PHONES) || normalizeValue(environment.EXPO_PUBLIC_BLUMI_LOCAL_QA_CODE)) {
-      throw new Error("Local QA sign-in cannot be enabled in connected builds.")
-    }
+  }
+
+  // Only a plain dev-client build may carry the QA variables: not a connected profile, not an internal
+  // simulator build (native-ui-test), and not a production-mode bundle such as a local Release or `expo export`.
+  const hasLocalQaSettings =
+    localQaAuth !== "0" ||
+    Boolean(normalizeValue(environment.EXPO_PUBLIC_BLUMI_LOCAL_QA_PHONES)) ||
+    Boolean(normalizeValue(environment.EXPO_PUBLIC_BLUMI_LOCAL_QA_CODE))
+  if (hasLocalQaSettings && (buildProfile !== "development" || normalizeValue(environment.NODE_ENV) === "production")) {
+    throw new Error("Local QA sign-in is only allowed in development builds.")
   }
 
   if (isExternalBuild) {

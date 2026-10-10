@@ -54,9 +54,9 @@ import {
 } from "./firebasePhoneAuth"
 import {
   completeLocalQaPhoneSignIn,
-  isLocalQaPhoneAuthAllowed,
   requestLocalQaPhoneCode
 } from "./localQaPhoneAuth"
+import { IS_LOCAL_QA_ENVIRONMENT, LOCAL_QA_CODE, LOCAL_QA_PHONE_LIST } from "./localQaEnvironment"
 import { useLocalQaDeepLinkSignIn, type LocalQaCredentials } from "./useLocalQaDeepLinkSignIn"
 import { LEGAL_DOCUMENT_VERSION } from "../legal/legalPolicyMetadata"
 import {
@@ -170,12 +170,8 @@ function isAuthSessionError(error: unknown): boolean {
   )
 }
 
-// Dev-only Simulator QA against the local in-memory API (see localQaPhoneAuth).
-const IS_LOCAL_QA_PHONE_AUTH = isLocalQaPhoneAuthAllowed({
-  isDevBuild: __DEV__,
-  flag: process.env.EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH,
-  apiBaseUrl: MOBILE_HTTP_BASE_URL
-})
+// Dev-only Simulator QA against the local in-memory API (see localQaEnvironment).
+const IS_LOCAL_QA_PHONE_AUTH = IS_LOCAL_QA_ENVIRONMENT
 
 type PendingPhoneCode =
   | { phoneNumber: string; kind: "firebase"; confirmation: FirebasePhoneConfirmation }
@@ -1130,8 +1126,8 @@ export function useSessionState(): UseSessionStateResult {
   }, [clearSessionActor, registerSessionActor, requestVerificationCode])
   useLocalQaDeepLinkSignIn({
     enabled: IS_LOCAL_QA_PHONE_AUTH,
-    phoneList: process.env.EXPO_PUBLIC_BLUMI_LOCAL_QA_PHONES,
-    code: process.env.EXPO_PUBLIC_BLUMI_LOCAL_QA_CODE,
+    phoneList: LOCAL_QA_PHONE_LIST,
+    code: LOCAL_QA_CODE,
     signIn: signInAsLocalQaUser
   })
 

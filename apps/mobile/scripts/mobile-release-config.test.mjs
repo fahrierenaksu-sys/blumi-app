@@ -134,19 +134,30 @@ test("server-test requires public TLS endpoints and disables local test bypasses
   )
   assert.throws(
     () => resolveMobileReleaseEnvironment({ ...base, EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH: "1" }),
-    /Local QA sign-in cannot be enabled/
+    /Local QA sign-in is only allowed in development builds/
   )
   assert.throws(
     () => resolveMobileReleaseEnvironment({ ...base, EXPO_PUBLIC_BLUMI_LOCAL_QA_CODE: "135790" }),
-    /Local QA sign-in cannot be enabled/
+    /Local QA sign-in is only allowed in development builds/
   )
   for (const profile of ["preview", "production"]) {
     assert.throws(
       () => resolveMobileReleaseEnvironment({ ...base, EAS_BUILD_PROFILE: profile, EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH: "1" }),
-      /Local QA sign-in cannot be enabled/,
+      /Local QA sign-in is only allowed in development builds/,
       profile
     )
   }
+  // The internal simulator build and a production-mode bundle (local Release, expo export) refuse it too.
+  const qaPhones = { EXPO_PUBLIC_BLUMI_LOCAL_QA_PHONES: "+12025550101,+12025550102" }
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({ ...base, EAS_BUILD_PROFILE: "native-ui-test", ...qaPhones }),
+    /only allowed in development builds/
+  )
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({ EAS_BUILD_PROFILE: "development", NODE_ENV: "production", ...qaPhones }),
+    /only allowed in development builds/
+  )
+  assert.doesNotThrow(() => resolveMobileReleaseEnvironment({ ...base, EAS_BUILD_PROFILE: "development", EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH: "1", ...qaPhones }))
 })
 
 test("every EAS profile ships with voice and paid coin sales disabled", () => {

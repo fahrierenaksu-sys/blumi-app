@@ -69,3 +69,39 @@ test("the QA deep link picks a configured test user by slot and nothing else", (
   assert.equal(resolveLocalQaCredentials(1, "2025550101", "135790"), null)
   assert.equal(resolveLocalQaCredentials(1, undefined, "135790"), null)
 })
+
+test("the QA environment is read only in a dev build, so a release bundle carries none of it", async () => {
+  const globals = globalThis as { __DEV__?: boolean }
+  const variables = {
+    EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH: "1",
+    EXPO_PUBLIC_BLUMI_LOCAL_QA_PHONES: `${QA_PHONE},+12025550102`,
+    EXPO_PUBLIC_BLUMI_LOCAL_QA_CODE: "135790"
+  }
+  const savedEnv = Object.fromEntries(Object.keys(variables).map((key) => [key, process.env[key]]))
+  const savedDev = globals.__DEV__
+  const load = (isDev: boolean | undefined, tag: string) => {
+    if (isDev === undefined) delete globals.__DEV__
+    else globals.__DEV__ = isDev
+    return import(`./localQaEnvironment?case=${tag}`) as Promise<typeof import("./localQaEnvironment")>
+  }
+  try {
+    Object.assign(process.env, variables)
+    const dev = await load(true, "dev")
+    assert.equal(dev.IS_LOCAL_QA_ENVIRONMENT, true)
+    assert.equal(dev.LOCAL_QA_PHONE_LIST, variables.EXPO_PUBLIC_BLUMI_LOCAL_QA_PHONES)
+    assert.equal(dev.LOCAL_QA_CODE, "135790")
+    for (const [isDev, tag] of [[false, "release"], [undefined, "node"]] as const) {
+      const released = await load(isDev, tag)
+      assert.equal(released.IS_LOCAL_QA_ENVIRONMENT, false, tag)
+      assert.equal(released.LOCAL_QA_PHONE_LIST, undefined, tag)
+      assert.equal(released.LOCAL_QA_CODE, undefined, tag)
+    }
+  } finally {
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    if (savedDev === undefined) delete globals.__DEV__
+    else globals.__DEV__ = savedDev
+  }
+})
