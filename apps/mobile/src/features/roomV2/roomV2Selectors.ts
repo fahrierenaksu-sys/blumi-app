@@ -25,11 +25,11 @@ import {
   type RoomPoint2D
 } from "./roomV2.types"
 import {
-  getRoomV3FootprintForRotation,
-  getRoomV3PlacementFootprintForRotation,
-  getRoomV3SeatPoints
-} from "./roomV3Contracts"
-import { getRoomVNextDirectionalVisual } from "./roomVNextContracts"
+  getFurnitureDirectionalVisual,
+  getFurnitureFootprintForRotation,
+  getFurniturePlacementFootprintForRotation,
+  getFurnitureSeatPoints
+} from "./roomV2FurnitureGeometry"
 import { validateRoomV2FurnitureSurfacePlacement } from "./roomV2PlacementSurface"
 import { getRoomV2FurnitureMobileRenderScale } from "./roomV2RenderSurface"
 import { getRoomV2ShellFloorPlacementPolygon } from "./roomV2FloorGrid"
@@ -263,7 +263,7 @@ export function resolvePlacedFurnitureRenderItem(
   item: FurnitureItem
 ): RoomV2FurnitureRenderItem | null {
   const visual = item.visualContract
-    ? getRoomVNextDirectionalVisual(item.visualContract, placed.rotation)
+    ? getFurnitureDirectionalVisual(item.visualContract, placed.rotation)
     : undefined
   const rotationRenderSize =
     visual?.normalizedRenderSize ?? item.renderSizeByRotation?.[placed.rotation]
@@ -299,8 +299,8 @@ export function resolvePlacedFurnitureRenderItem(
       item.anchor ??
       DEFAULT_ROOM_V2_ANCHOR,
     depth: placed.depth ?? placed.y,
-    footprint: getRoomV3FootprintForRotation(item, placed.rotation),
-    placementFootprint: getRoomV3PlacementFootprintForRotation(item, placed.rotation),
+    footprint: getFurnitureFootprintForRotation(item, placed.rotation),
+    placementFootprint: getFurniturePlacementFootprintForRotation(item, placed.rotation),
     placementSurface: item.visualContract?.placementSurface ?? item.placementSurface ?? "floor",
     surfacePlacementPolicy: item.surfacePlacementPolicy,
     surfaceSupports: item.surfaceSupports?.map((support) => ({
@@ -333,7 +333,7 @@ export function resolvePlacedFurnitureRenderItem(
     interactionType: item.interactionType ?? "none",
     seatPoints: item.seatPoints,
     seatSpec: item.seatSpec,
-    seatWorldPoints: getRoomV3SeatPoints({
+    seatWorldPoints: getFurnitureSeatPoints({
       seatSpec: item.seatSpec,
       x: placed.x,
       y: placed.y,

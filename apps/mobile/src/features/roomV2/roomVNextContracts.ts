@@ -1,11 +1,11 @@
 import type {
   FurnitureItem,
-  RoomFurnitureDirectionalVisual,
   RoomFurnitureRotation,
   RoomFurnitureVisualContract,
   RoomPoint2D,
   RoomV2AssetRef
 } from "./roomV2.types"
+import { getFurnitureDirectionalVisual } from "./roomV2FurnitureGeometry"
 
 export const ROOM_VNEXT_DIRECTIONS: readonly RoomFurnitureRotation[] = [
   "front",
@@ -128,13 +128,6 @@ export function validateRoomFurnitureVisualContract(
   }
 }
 
-export function getRoomVNextDirectionalVisual(
-  contract: RoomFurnitureVisualContract,
-  direction: RoomFurnitureRotation
-): RoomFurnitureDirectionalVisual | undefined {
-  return contract.directions?.[direction]
-}
-
 /**
  * Adds a validated VNext world-kit contract to a legacy FurnitureItem. The
  * returned value is a deep copy of mutable metadata; the catalog source is
@@ -200,7 +193,7 @@ export function getRoomVNextDirectionalLayerAssets(
   contactShadowAsset?: RoomV2AssetRef
   foregroundOcclusionAsset?: RoomV2AssetRef
 } | undefined {
-  const visual = getRoomVNextDirectionalVisual(contract, direction)
+  const visual = getFurnitureDirectionalVisual(contract, direction)
   if (!visual) return undefined
   return {
     bodyAsset: visual.bodyAsset,

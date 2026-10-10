@@ -1,6 +1,9 @@
-/** The canonical avatar is 170 cm tall in the 0.30 normalized room stage. */
-export const ROOM_VNEXT_CANONICAL_STAGE_UNITS_PER_CM = 0.3 / 170
-export const ROOM_VNEXT_FLOOR_DEPTH_UNITS_PER_CM = 0.075 / 100
+import {
+  ROOM_FLOOR_DEPTH_UNITS_PER_CM as ROOM_VNEXT_FLOOR_DEPTH_UNITS_PER_CM,
+  ROOM_STAGE_UNITS_PER_CM as ROOM_VNEXT_CANONICAL_STAGE_UNITS_PER_CM
+} from "./roomV2FurnitureGeometry"
+
+export { ROOM_VNEXT_CANONICAL_STAGE_UNITS_PER_CM, ROOM_VNEXT_FLOOR_DEPTH_UNITS_PER_CM }
 
 /**
  * Converts a physical extent into the square sprite canvas required by the
