@@ -242,6 +242,90 @@ class BlinkItemCutTest(unittest.TestCase):
         # an item with no eye copy gives no patch
         self.assertFalse(ex.blink_item_cut(head, [closed, closed], np.zeros_like(item)).any())
 
+    def test_a_bang_hanging_over_the_eye_and_the_hair_around_it_keep_every_pixel(self):
+        import numpy as np
+        ex = load_exporter()
+        h, w = 40, 60
+        skin, iris, hair = (250, 210, 185, 255), (210, 125, 70, 255), (110, 70, 58, 255)
+        head = np.zeros((h, w, 4), np.uint8); head[:] = skin
+        head[12:28, 24:40] = iris
+        closed = np.zeros((h, w, 4), np.uint8); closed[:] = skin
+        closed[24:26, 20:44] = (30, 18, 14, 255)
+        item = np.zeros((h, w, 4), np.uint8)
+        item[0:9, :] = hair                                      # bangs ending 3 px above the eye
+        item[0:20, 30:35] = hair                                 # one bang strand hanging 8 px into the eye
+        item[12:28, 24:30] = (195, 115, 62, 255); item[12:28, 35:40] = (195, 115, 62, 255)   # the eye copy around it
+        item[20:28, 30:35] = (195, 115, 62, 255)
+        item[12, 24:30] = item[12, 35:40] = (70, 22, 10, 255)    # its upper lash line (vivid dark)
+        item[9:12, 24:30] = hair                                 # bang tips reaching down onto the lashes, over the eye
+        head[9:13, 24:30] = head[12, 35:40] = (60, 30, 20, 255)  # ... where the head draws its own upper lashes
+        item[30, 45] = (40, 25, 20, 255)                         # a loose lash dot of the copy, near the eye
+        cut = ex.blink_item_cut(head, [closed, closed], item)
+        self.assertFalse(cut[0:12].any(), 'the bangs above the eye keep every pixel, also over its lashes (no growth into them)')
+        self.assertFalse(cut[0:20, 30:35].any(), 'the strand hanging into the eye stays')
+        copy = np.zeros((h, w), bool); copy[12:28, 24:30] = copy[12:28, 35:40] = copy[20:28, 30:35] = True
+        strand = np.zeros((h, w), bool); strand[0:20, 30:35] = True
+        self.assertTrue(cut[13:28, 25:29].all() and cut[20:28, 30:35].all(), 'the eye copy goes')
+        self.assertGreater(cut[copy & ~ex._dilate(strand, 1)].mean(), 0.98, '... bar a corner px (no 1 px slivers)')
+        self.assertTrue(cut[30, 45], 'a loose bit of the copy goes')
+
+
+APP_RIG = HERE.parents[1] / 'apps/mobile/src/features/avatar/rigs'
+
+
+def load_gate():
+    sys.path.insert(0, str(HERE))
+    import blink_gate
+    return blink_gate
+
+
+@unittest.skipUnless((APP_RIG / 'girl/rig25.json').exists(), 'app rig not exported')
+class BlinkGateTest(unittest.TestCase):
+    """A blink changes only eye pixels: no hair or skin outside the eyes, no hole, no speck (blink_gate.py)."""
+
+    def assert_gate(self, rigdir):
+        cases = load_gate().check(rigdir)
+        self.assertTrue(cases, 'the rig has a blink')
+        bad = [c for c in cases if not c['ok']]
+        self.assertEqual(bad, [], bad[:2])
+        return cases
+
+    def test_the_app_rigs_blink_only_in_the_eyes(self):
+        cases = self.assert_gate(APP_RIG / 'girl')
+        self.assertEqual({(c['outfit'], c['frame'], c['mirror']) for c in cases},
+                         {(o, f, m) for o in ('bare', 'dressed') for f in ('half', 'closed') for m in (False, True)})
+        self.assert_gate(APP_RIG / 'boy')
+
+    def test_the_gate_fails_when_a_patch_erases_hair_or_leaves_a_speck(self):
+        import shutil
+        import numpy as np
+        from PIL import Image
+        rig = json.loads((APP_RIG / 'girl/rig25.json').read_text())
+        v = rig['views']['front']; it = v['blink']['items'][0]
+        with Image.open(APP_RIG / 'girl' / v['pages'][it['page']]) as im:
+            sc = im.width / v['pageSize'][0]
+        (x, y, w, h), (dx, dy) = it['rect'], it['offset']
+        for broken in ('hair', 'speck'):
+            with tempfile.TemporaryDirectory() as tmp:
+                for name in ['rig25.json'] + v['pages']:
+                    shutil.copy(APP_RIG / 'girl' / name, tmp)
+                page = pathlib.Path(tmp) / v['pages'][it['page']]
+                a = np.asarray(Image.open(page).convert('RGBA')).copy()
+                px, py, pw, ph = (int((x + dx) * sc), int((y + dy) * sc), int(w * sc), int(h * sc))
+                patch, orig = a[py:py + ph, px:px + pw], a[int(y * sc):int(y * sc) + ph, int(x * sc):int(x * sc) + pw]
+                if broken == 'hair':        # the patch also clears the bang texels at the top of the eye rect
+                    patch[0:3][patch[0:3, ..., 3] > 200] = 0
+                else:                       # a dark dot left inside the cleared eye copy
+                    cut = (patch[..., 3] == 0) & (orig[..., 3] > 200)
+                    inner = cut[1:-1, 1:-1] & cut[:-2, 1:-1] & cut[2:, 1:-1] & cut[1:-1, :-2] & cut[1:-1, 2:]
+                    ys, xs = np.nonzero(inner)
+                    k = len(ys) // 2
+                    patch[ys[k] + 1, xs[k] + 1] = (40, 25, 20, 255)
+                Image.fromarray(a).save(page)
+                cases = load_gate().check(tmp, scales=(1.0,))
+                key = 'outsideEye' if broken == 'hair' else 'specks'
+                self.assertTrue(any(c[key] for c in cases if c['outfit'] == 'dressed'), broken)
+
 
 if __name__ == '__main__':
     unittest.main()

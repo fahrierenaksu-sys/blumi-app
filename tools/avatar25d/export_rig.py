@@ -296,7 +296,10 @@ BLINK_ITEM_SKIN_DIST = 60    # an item pixel this close to the skin colour is fa
 BLINK_HAIR_DARK = 45         # mean RGB at most this: a dark hair strand
 BLINK_EDGE_TRANSITION = 3    # light pixels a hair strand's run may cross after its dark body (its soft inner edge)
 BLINK_EDGE_EYE_CAP = 6       # px a strand's run may reach into the eye drawing (side locks overlap the outer lashes)
-BLINK_CUT_GROW = 3           # the cut grows this far around the eye drawing into unprotected item pixels (copy fringe)
+BLINK_HAIR_MISMATCH = 90     # an item pixel this far (RGB) from the head's open pixel it covers is hair, not the eye copy
+BLINK_LASH_SAT = 0.65        # an eye copy's lash line: HSV saturation above this (hair brown is ~0.45-0.5) ...
+BLINK_LASH_VALUE = 90        # ... and its brightest channel below this (dark)
+BLINK_COPY_REACH = 4         # px around the eye drawing that still hold the copy's fringe (its outer rim, lash dots)
 
 
 def _dilate(mask, n):
@@ -309,10 +312,21 @@ def _dilate(mask, n):
     return out
 
 
+def _flood(seed, through):
+    """Pixels of `through` 4-connected to `seed` (seed included)."""
+    out = seed.copy()
+    while True:
+        grown = _dilate(out, 1) & (through | seed)
+        if (grown == out).all():
+            return out
+        out = grown
+
+
 def blink_item_cut(head_open, frames, item):
     """Item pixels (same size crops of the eye rect, RGBA uint8) that copy the open eye: True = cleared in the patch.
-    Hair strands that enter the rect from its sides or top keep their pixels (runs from the edge), so the bangs and
-    side locks stay drawn over the closed eyes."""
+    Only the eye copy goes: item pixels at the head's eye drawing (iris, sclera, lashes, its rim and loose dots) that
+    are not hair. Hair keeps every pixel: strands that enter the rect from its sides or top (runs from the edge) and
+    item pixels joined by a thick path to the item outside the eye (bang tips, side locks hanging into it)."""
     import numpy as np
     O = head_open.astype(float); P = item.astype(float); F = [f.astype(float) for f in frames]
     h, w = O.shape[:2]
@@ -344,8 +358,27 @@ def blink_item_cut(head_open, frames, item):
                 if light > BLINK_EDGE_TRANSITION:
                     break
             protect[y, x] = True
-    core = eye & drawn & opaque & ~protect
-    return core | (_dilate(core, BLINK_CUT_GROW) & drawn & opaque & ~protect)
+    # hair = item pixels joined to the item outside the eye zone by a path at least 3 px thick (thinner threads vanish
+    # on the half-size page); inside the eye drawing only pixels above the copy's upper lash line or ones that do not
+    # look like the head's eye there count as a path (the copy's lashes touch the dark side lock). The rest of the zone is the copy: iris, lashes, rim, dots.
+    zone = _dilate(eye, BLINK_COPY_REACH)
+    mismatch = np.sqrt(((P[..., :3] - O[..., :3]) ** 2).sum(-1)) > BLINK_HAIR_MISMATCH
+    rgb = P[..., :3]; mx = rgb.max(-1)
+    lash = drawn & eye & ((mx - rgb.min(-1)) > BLINK_LASH_SAT * np.maximum(mx, 1)) & (mx < BLINK_LASH_VALUE)
+    has = lash.any(0)
+    top = np.where(has, lash.argmax(0), 0)                 # per column: the copy's upper lash line (vivid dark brown)
+    above = np.arange(h)[:, None] < top[None, :]          # item px above it are the bangs over the eye, never the eye
+    path = drawn & (~eye | mismatch | above)
+    thick = path & _dilate(~_dilate(~path, 1), 1)
+    border = np.zeros((h, w), bool); border[0] = border[-1] = border[:, 0] = border[:, -1] = True
+    outside = _flood(border & drawn & ~zone, drawn & ~zone)
+    hair = _flood(outside, thick & zone)
+    hair |= path & zone & _dilate(hair, 1) | protect    # the strand's own edge px (the thickness test rounds them off)
+    cut = zone & drawn & opaque & ~hair
+    cut &= _dilate(~_dilate(~cut, 1), 1)              # no 1-2 px slivers cut into a strand (they blur into its edge)
+    kept = drawn & ~cut
+    loose = kept & ~_flood(outside, kept) & opaque    # bits left with no tie to the item outside: specks
+    return cut | loose
 
 
 def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pages, page_taken):
@@ -385,9 +418,28 @@ def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pag
             pages[page].paste(tile, spot)
             page_taken[page].append((spot[0], spot[1], tile.width, tile.height))
             pad = max(0, min(BLINK_REDIRECT_PAD, ox, oy, img.width - ox - rw, img.height - oy - rh))   # never leaves the part
+            full_cut = np.zeros((tile.height, tile.width), bool); full_cut[M:M + rh, M:M + rw] = cut
             out.append({'item': iid, 'page': page, 'rect': [ix + ox, iy + oy, rw, rh], 'pad': pad,
-                        'offset': [spot[0] + M - (ix + ox), spot[1] + M - (iy + oy)], 'cutPx': int(cut.sum())})
+                        'offset': [spot[0] + M - (ix + ox), spot[1] + M - (iy + oy)], 'cutPx': int(cut.sum()),
+                        '_keep': (page, (ix + ox - M, iy + oy - M), spot, full_cut)})
     return out
+
+
+def restore_blink_item_hair(stored, scale, keeps):
+    """The page is resized as a whole (LANCZOS spreads a cleared pixel ~3 stored px), so a patch's hair would drift
+    a few levels next to the cut. Give every stored patch texel that no cut source px falls in the item's own stored
+    texel instead: during a blink only the cut's texels read differently."""
+    import numpy as np
+    a = np.asarray(stored).copy()
+    for (sx, sy), (tx, ty), cut in keeps:
+        h, w = cut.shape
+        x0, y0 = int(sx * scale), int(sy * scale); X0, Y0 = int(tx * scale), int(ty * scale)
+        sw, sh = int(np.ceil(w * scale)), int(np.ceil(h * scale))
+        foot = np.zeros((sh, sw), bool)
+        ys, xs = np.nonzero(cut)
+        foot[(ys * scale).astype(int), (xs * scale).astype(int)] = True
+        a[Y0:Y0 + sh, X0:X0 + sw][~foot] = a[y0:y0 + sh, x0:x0 + sw][~foot]
+    return Image.fromarray(a, stored.mode)
 
 
 def export_motion(M, bone_names):
@@ -529,12 +581,15 @@ def export_view(name, v, motion=None):
         items[iid] = {'slot': it['slot'], 'lift': it.get('lift', 0), 'page': page,
                       'hasWalk': has_walk, 'mesh': im.dump()}
 
+    blink_keeps = {}   # stored page -> the item patches whose untouched texels are copied back after resizing
     if blink is not None:
         head = v['blink'].get('layer')
         head_box = next((L['box'] for L in v['layers'] if L['name'] == head), None)   # the head layer in sheet px
         patches = pack_blink_items(v['blink'], layer_images[head], head_box, items_src,
                                    item_rects, pages, page_taken) if head_box is not None else []
         # no item copies an eye: the entry stays exactly as before (rigs without one export byte-identically)
+        for pt in patches:
+            blink_keeps.setdefault(pt['_keep'][0], []).append(pt.pop('_keep')[1:])
         if patches:
             blink['items'] = patches
 
@@ -544,6 +599,8 @@ def export_view(name, v, motion=None):
         # UVs are normalised, so only the stored resolution changes. Pillow resizes RGBA premultiplied.
         stored = pg if PAGE_STORE_SCALE == 1 else pg.resize(
             (round(pg.width * PAGE_STORE_SCALE), round(pg.height * PAGE_STORE_SCALE)), Image.LANCZOS)
+        if k in blink_keeps:
+            stored = restore_blink_item_hair(stored, PAGE_STORE_SCALE, blink_keeps[k])
         stored.save(OUT / page_names[-1], optimize=True)
 
     if wl:

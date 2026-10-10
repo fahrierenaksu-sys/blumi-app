@@ -177,10 +177,10 @@
     "front_page1.png",
     "front_page2.png"
    ],
-   "sha256": "a2ad7895c2d8ef1865a7d386c84cef252f45a773c6dbb20f7b5926c360d0998a",
+   "sha256": "a1d831140a2f9a59e13ccc278ac3d9ac3605f13269a1578a515a99712443c475",
    "sourceSha256": {
     "front_page0.png": "aed6b1439a5d0109d3bcf8b0e9d6db8505ba4a3b70883bbdb99b17de5ec4a18c",
-    "front_page1.png": "5fab1d9cd079ed27bb3c5f2b873259609ba30df0e246eb2ed3cf7bddb85e2914",
+    "front_page1.png": "0b34130e5f4f83f8edac3c22741e3fd636f161190f9e8a66963dda2ee91f9f0c",
     "front_page2.png": "984184d418043a3ccf3c5247f505c0d3021eab0f0199518fa922093067fe2186"
    },
    "width": 1024
