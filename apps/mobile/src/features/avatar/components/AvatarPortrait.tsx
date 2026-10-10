@@ -5,8 +5,11 @@ import { AvatarStill } from "./AvatarStill"
 
 /** Portraits at or below this size (pt) show a face-tight crop of the bust (plan 2.2: tiny). */
 export const AVATAR_PORTRAIT_TINY_PT = 40
-/** The face-tight window inside the 256 px bust. */
-const FACE_WINDOW: AvatarStillRect = [46, 20, 164, 164]
+/**
+ * The face-tight window inside the 256 px bust. Both heads sit at x 73-195, y 20-157 of the bust and turn a little
+ * to the side, so the window is shifted right and down to put the eyes just above the centre of the circle.
+ */
+const FACE_WINDOW: AvatarStillRect = [52, 28, 160, 160]
 const BUST_WINDOW: AvatarStillRect = [0, 0, 256, 256]
 
 export interface AvatarPortraitProps {
