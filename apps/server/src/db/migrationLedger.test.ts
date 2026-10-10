@@ -3,6 +3,7 @@ import { createHash } from "node:crypto"
 import { readFileSync, readdirSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
+import { OPTIONAL_READINESS_MIGRATIONS } from "../operations/schemaReadiness"
 
 // One tree-wide guard for the migration ledger. It needs no database.
 //
@@ -41,6 +42,16 @@ function sha256(file: string): string {
 
 function prefixOf(file: string): number {
   return Number(file.slice(0, 3))
+}
+
+function assertPendingOrder(files: readonly string[], applied: readonly string[]): void {
+  const highestApplied = Math.max(...applied.map(prefixOf))
+  const optional = new Set(OPTIONAL_READINESS_MIGRATIONS)
+  for (const file of files) {
+    if (applied.includes(file)) continue
+    assert.ok(prefixOf(file) > highestApplied || optional.has(file),
+      `${file} is required but pending below applied ${highestApplied}`)
+  }
 }
 
 test("migration files keep the ledger's naming and numbering", () => {
@@ -82,13 +93,21 @@ test("applied migrations stay byte-for-byte what production applied", () => {
     assert.equal(sha256(file), manifest[file], `applied migration ${file} changed; applied migrations are immutable`)
   }
 
-  // A pending migration must sort after everything already applied, or the
-  // migrator would run it out of order on a fresh database.
-  const highestApplied = Math.max(...applied.map(prefixOf))
-  for (const file of files) {
-    if (file in manifest) continue
-    assert.ok(prefixOf(file) > highestApplied, `${file} is pending but numbered below applied ${highestApplied}`)
-  }
+  // Required schema cannot have holes. Independently gated, additive optional
+  // features may remain pending when a later feature is deployed: SMS 072 was
+  // authorized without the pending chat migrations 070/071. Reuse the runtime
+  // contract rather than adding a separate exception list. Checksums above
+  // still protect every applied file, including optional migrations.
+  assertPendingOrder([...files], applied)
+})
+
+test("only runtime-gated optional migrations can remain below an applied migration", () => {
+  const required = "069_moderation_phone_bans.sql"
+  const sms = "072_firebase_sms_admission.sql"
+  const chat = ["070_chat_delivery_receipts.sql", "071_chat_hide_for_me_and_advisor_fixes.sql"]
+  assert.doesNotThrow(() => assertPendingOrder([required, ...chat, sms], [required, sms]))
+  assert.throws(() => assertPendingOrder([required, ...chat, sms], [sms]), /required but pending/)
+  assert.throws(() => assertPendingOrder(["071_unknown_schema.sql", sms], [sms]), /required but pending/)
 })
 
 function stripComments(sql: string): string {
