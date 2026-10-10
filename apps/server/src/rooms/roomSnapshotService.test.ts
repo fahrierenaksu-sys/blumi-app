@@ -3,9 +3,14 @@ import assert from "node:assert/strict"
 import {
   createRoomSnapshotService
 } from "./roomSnapshotService"
-import { createRoomSnapshotRenderer, ROOM_SNAPSHOT_RENDERER_VERSION } from "./roomSnapshotRenderer"
+import sharp from "sharp"
+import {
+  checkRoomSnapshotRenderer,
+  createRoomSnapshotRenderer,
+  ROOM_SNAPSHOT_RENDERER_VERSION
+} from "./roomSnapshotRenderer"
 import { createInMemoryRoomSnapshotRepository } from "./roomSnapshotRepository"
-import type { PersonalRoomDecorSnapshot } from "./personalRoomDecorRepository"
+import type { PersonalRoomDecor, PersonalRoomDecorSnapshot } from "./personalRoomDecorRepository"
 
 function room(revision: number): PersonalRoomDecorSnapshot {
   return {
@@ -203,21 +208,76 @@ test("canonical room renderer produces a non-empty webp snapshot", async () => {
   assert.equal(result.body.subarray(0, 4).toString("hex"), "52494646")
 })
 
-test("canonical room renderer fails closed for an unpromoted placed item", async () => {
-  await assert.rejects(
-    () => createRoomSnapshotRenderer().render({
-      roomRevision: 1,
-      decor: {
-        roomShellId: "room_v2_shell_blumi_world_v1",
-        placedItems: [{
-          instanceId: "unknown",
-          itemId: "room_v2_not_promoted",
-          x: 0.5,
-          y: 0.7,
-          rotation: "front"
-        }]
+test("the room renderer skips legacy and unknown pieces instead of failing", async () => {
+  const renderer = createRoomSnapshotRenderer()
+  const empty = await renderer.render({
+    roomRevision: 1,
+    decor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] }
+  })
+  const legacyOnly = await renderer.render({
+    roomRevision: 2,
+    decor: {
+      roomShellId: "room_v2_shell_blumi_world_v1",
+      placedItems: [
+        { instanceId: "old", itemId: "room_v2_cozy_bed", x: 0.4, y: 0.7, rotation: "front" },
+        { instanceId: "unknown", itemId: "room_v9_not_drawn", x: 0.5, y: 0.7, rotation: "front" }
+      ]
+    }
+  })
+  assert.ok(legacyOnly.body.equals(empty.body))
+})
+
+test("the room renderer draws a placed 2.5D piece from the art pack", async () => {
+  const renderer = createRoomSnapshotRenderer()
+  const decor = (placedItems: PersonalRoomDecor["placedItems"]) =>
+    ({ roomShellId: "room_v2_shell_blumi_world_v1", placedItems })
+  const empty = await sharp((await renderer.render({ roomRevision: 1, decor: decor([]) })).body).raw().toBuffer()
+  const furnished = await sharp((await renderer.render({
+    roomRevision: 2,
+    decor: decor([
+      { instanceId: "sofa", itemId: "room_v3_sofa_japon_cream", x: 0.5, y: 0.7, rotation: "front" },
+      { instanceId: "poster", itemId: "room_v3_poster_oyun_bunny", x: 0.7, y: 0.3, rotation: "front" }
+    ])
+  })).body).raw().toBuffer()
+  assert.equal(furnished.length, empty.length)
+  let changed = 0
+  for (let index = 0; index < empty.length; index += 1) if (empty[index] !== furnished[index]) changed += 1
+  assert.ok(changed > empty.length * 0.02, `changed ${changed}`)
+})
+
+test("a snapshot drawn by another renderer version is never served", async () => {
+  const repository = createInMemoryRoomSnapshotRepository()
+  const service = createRoomSnapshotService({
+    repository,
+    isPublicByDefault: true,
+    renderer: {
+      version: "room-snapshot-v2",
+      async render() {
+        return { body: Buffer.from("new"), mimeType: "image/webp", rendererVersion: "room-snapshot-v2" }
       }
-    }),
-    /not promoted/
-  )
+    }
+  })
+  await repository.save({
+    userId: "user_1",
+    roomRevision: 1,
+    assetKey: "b".repeat(64),
+    mimeType: "image/webp",
+    rendererVersion: "room-snapshot-v1",
+    body: Buffer.from("old"),
+    isPublic: true,
+    headline: null,
+    updatedAt: "2026-10-10T00:00:00.000Z"
+  })
+  const current = room(1)
+  assert.equal(await service.getLatestForUser("user_1", current), null)
+  assert.equal(await service.findByAssetKey("b".repeat(64)), null)
+  const redrawn = await service.publishForRoomSave(current)
+  assert.equal(redrawn.rendererVersion, "room-snapshot-v2")
+  assert.ok(await service.getLatestForUser("user_1", current))
+})
+
+test("the start-up self-check reports the art pack without throwing", async () => {
+  assert.deepEqual(await checkRoomSnapshotRenderer(), { ok: true })
+  const broken = await checkRoomSnapshotRenderer(createRoomSnapshotRenderer({ artDir: "/nonexistent-art-pack" }))
+  assert.equal(broken.ok, false)
 })

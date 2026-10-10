@@ -49,7 +49,12 @@ export function createInMemoryRoomSnapshotRepository(): RoomSnapshotRepository {
     },
     async save(input) {
       const current = snapshots.get(input.userId)
-      if (current && current.roomRevision >= input.roomRevision) {
+      // a newer revision replaces the row; so does the same revision drawn by another renderer version (v1 -> v2)
+      if (
+        current &&
+        (current.roomRevision > input.roomRevision ||
+          (current.roomRevision === input.roomRevision && current.rendererVersion === input.rendererVersion))
+      ) {
         return toRoomShowcaseMetadata(current)
       }
       const next = cloneRoomShowcaseSnapshot({

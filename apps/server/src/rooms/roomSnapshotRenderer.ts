@@ -1,21 +1,13 @@
 import { createHash } from "node:crypto"
-import { access } from "node:fs/promises"
-import { resolve } from "node:path"
+import { existsSync, readFileSync } from "node:fs"
+import { join, resolve } from "node:path"
 import sharp, { type OverlayOptions } from "sharp"
 import type { PersonalRoomDecor } from "./personalRoomDecorRepository"
 
-export const ROOM_SNAPSHOT_RENDERER_VERSION = "room-snapshot-v1"
+/** v2 draws the calibrated 2.5D room from the server art pack; rows of any other version are hidden (service). */
+export const ROOM_SNAPSHOT_RENDERER_VERSION = "room-snapshot-v2"
 export const ROOM_SNAPSHOT_WIDTH = 600
 export const ROOM_SNAPSHOT_HEIGHT = 342
-
-interface RoomRenderAsset {
-  path: string
-  width: number
-  height: number
-  anchorX: number
-  anchorY: number
-  rotations?: Partial<Record<"front" | "back" | "left" | "right", string>>
-}
 
 export interface RoomSnapshotRenderResult {
   body: Buffer
@@ -24,121 +16,124 @@ export interface RoomSnapshotRenderResult {
 }
 
 export interface RoomSnapshotRenderer {
+  /** The version this renderer writes; snapshots of another version are never served. */
+  readonly version?: string
   render(input: {
     decor: PersonalRoomDecor
     roomRevision: number
   }): Promise<RoomSnapshotRenderResult>
 }
 
-const mobileRoomAssetRoot = resolve(
-  __dirname,
-  "../../../mobile/src/features/roomV2/assets/runtime"
-)
-
-const renderAssets: Readonly<Record<string, RoomRenderAsset>> = {
-  room_v2_chair_blush: {
-    path: resolve(mobileRoomAssetRoot, "furniture_world_chair_v1.png"),
-    width: 0.126,
-    height: 0.244,
-    anchorX: 0.5,
-    anchorY: 1
-  },
-  room_v2_table_round: {
-    path: resolve(mobileRoomAssetRoot, "furniture_world_table_v1.png"),
-    width: 0.126,
-    height: 0.168,
-    anchorX: 0.5,
-    anchorY: 1
-  },
-  room_v2_lamp_heart: {
-    path: resolve(mobileRoomAssetRoot, "furniture_world_decor_v1.png"),
-    width: 0.067,
-    height: 0.235,
-    anchorX: 0.5,
-    anchorY: 1
-  },
-  room_v2_cozy_bed: {
-    path: resolve(mobileRoomAssetRoot, "starter-pink-cloud-bed/pink_cloud_bed_front_v2.png"),
-    width: 0.294,
-    height: 0.196,
-    anchorX: 0.5,
-    anchorY: 1,
-    rotations: {
-      front: resolve(mobileRoomAssetRoot, "starter-pink-cloud-bed/pink_cloud_bed_front_v2.png"),
-      right: resolve(mobileRoomAssetRoot, "starter-pink-cloud-bed/pink_cloud_bed_right_v2.png"),
-      back: resolve(mobileRoomAssetRoot, "starter-pink-cloud-bed/pink_cloud_bed_back_v2.png"),
-      left: resolve(mobileRoomAssetRoot, "starter-pink-cloud-bed/pink_cloud_bed_left_v2.png")
-    }
-  },
-  room_v2_cute_bookshelf: {
-    path: resolve(mobileRoomAssetRoot, "furniture_bookshelf_v1.webp"),
-    width: 0.168,
-    height: 0.252,
-    anchorX: 0.5,
-    anchorY: 0.88
-  },
-  room_v2_heart_rug: {
-    path: resolve(mobileRoomAssetRoot, "furniture_heart_rug_v1.webp"),
-    width: 0.21,
-    height: 0.126,
-    anchorX: 0.5,
-    anchorY: 0.75
-  },
-  room_v2_side_table: {
-    path: resolve(mobileRoomAssetRoot, "furniture_side_table_v1.png"),
-    width: 0.126,
-    height: 0.151,
-    anchorX: 0.5,
-    anchorY: 0.85
-  }
+interface RoomDrawOp { path: string; left: number; top: number; width: number; height: number }
+interface RoomDrawListModule {
+  resolveRoomDrawList(
+    placedItems: PersonalRoomDecor["placedItems"],
+    hasFile: (path: string) => boolean
+  ): { canvas: { width: number; height: number }; shellPath: string; ops: RoomDrawOp[]; skipped: number }
+}
+interface RoomArtPack {
+  dir: string
+  files: Readonly<Record<string, string>>
+  drawList: RoomDrawListModule
 }
 
-export function createRoomSnapshotRenderer(): RoomSnapshotRenderer {
+/**
+ * `dist/art`, written by `scripts/build-art-pack.mjs` in the server build: next to the compiled `rooms/` folder, or
+ * the built pack when the server runs from source (`node --import tsx src/index.ts`, build the pack first).
+ */
+export function resolveRoomArtPackDir(): string {
+  const candidates = [resolve(__dirname, "../art"), resolve(__dirname, "../../dist/art")]
+  return candidates.find((dir) => existsSync(join(dir, "manifest.json"))) ?? candidates[0]!
+}
+
+export function loadRoomArtPack(dir = resolveRoomArtPackDir()): RoomArtPack {
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as { files?: Record<string, string> }
+  if (!manifest.files || typeof manifest.files !== "object") throw new Error("Room art pack manifest is invalid.")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- the bundled resolver is plain CommonJS
+  const drawList = require(join(dir, "roomDrawList.cjs")) as RoomDrawListModule
+  return { dir, files: manifest.files, drawList }
+}
+
+export function createRoomSnapshotRenderer(options: { artDir?: string } = {}): RoomSnapshotRenderer {
+  let pack: RoomArtPack | null = null
+  const getPack = () => (pack ??= loadRoomArtPack(options.artDir))
   return {
+    version: ROOM_SNAPSHOT_RENDERER_VERSION,
     async render({ decor }) {
-      const shellPath = resolve(
-        mobileRoomAssetRoot,
-        "room_shell_blumi_world_v1.webp"
-      )
-      await access(shellPath)
-      const shell = await sharp(shellPath)
+      const art = getPack()
+      const list = art.drawList.resolveRoomDrawList(decor.placedItems, (path) => path in art.files)
+      const scaleX = ROOM_SNAPSHOT_WIDTH / list.canvas.width
+      const scaleY = ROOM_SNAPSHOT_HEIGHT / list.canvas.height
+      const shell = await sharp(join(art.dir, list.shellPath))
         .resize(ROOM_SNAPSHOT_WIDTH, ROOM_SNAPSHOT_HEIGHT, { fit: "fill" })
         .ensureAlpha()
         .png()
         .toBuffer()
-
       const composites: OverlayOptions[] = []
-      const placed = [...decor.placedItems]
-        .map((item) => {
-          const asset = renderAssets[item.itemId]
-          if (!asset) {
-            throw new Error(`Room snapshot asset is not promoted: ${item.itemId}`)
-          }
-          return { item, asset }
+      for (const drawOp of list.ops) {
+        const overlay = await renderClippedLayer(join(art.dir, drawOp.path), {
+          left: Math.round(drawOp.left * scaleX),
+          top: Math.round(drawOp.top * scaleY),
+          width: Math.max(1, Math.round(drawOp.width * scaleX)),
+          height: Math.max(1, Math.round(drawOp.height * scaleY))
         })
-        .sort((left, right) => left.item.y - right.item.y)
-
-      for (const entry of placed) {
-        const { item, asset } = entry
-        const assetPath = asset.rotations?.[item.rotation] ?? asset.path
-        await access(assetPath)
-        const width = Math.max(1, Math.round(asset.width * ROOM_SNAPSHOT_WIDTH))
-        const height = Math.max(1, Math.round(asset.height * ROOM_SNAPSHOT_HEIGHT))
-        const left = Math.round(item.x * ROOM_SNAPSHOT_WIDTH - width * asset.anchorX)
-        const top = Math.round(item.y * ROOM_SNAPSHOT_HEIGHT - height * asset.anchorY)
-        composites.push({
-          input: await sharp(assetPath).resize(width, height, { fit: "fill" }).png().toBuffer(),
-          left,
-          top
-        })
+        if (overlay) composites.push(overlay)
       }
-
       return {
         body: await sharp(shell).composite(composites).webp({ quality: 86 }).toBuffer(),
         mimeType: "image/webp",
         rendererVersion: ROOM_SNAPSHOT_RENDERER_VERSION
       }
     }
+  }
+}
+
+/** One layer resized to its rect and cut to the picture (sharp refuses overlays that leave the base image). */
+async function renderClippedLayer(
+  path: string,
+  rect: { left: number; top: number; width: number; height: number }
+): Promise<OverlayOptions | null> {
+  const x0 = Math.max(0, rect.left)
+  const y0 = Math.max(0, rect.top)
+  const x1 = Math.min(ROOM_SNAPSHOT_WIDTH, rect.left + rect.width)
+  const y1 = Math.min(ROOM_SNAPSHOT_HEIGHT, rect.top + rect.height)
+  if (x1 <= x0 || y1 <= y0) return null
+  let image = sharp(path).resize(rect.width, rect.height, { fit: "fill" })
+  if (x0 !== rect.left || y0 !== rect.top || x1 - x0 !== rect.width || y1 - y0 !== rect.height) {
+    image = sharp(await image.png().toBuffer()).extract({
+      left: x0 - rect.left,
+      top: y0 - rect.top,
+      width: x1 - x0,
+      height: y1 - y0
+    })
+  }
+  return { input: await image.png().toBuffer(), left: x0, top: y0 }
+}
+
+let selfCheckState: "unchecked" | "ok" | "failed" = "unchecked"
+
+/** The last start-up self-check result, for the health detail. */
+export function getRoomSnapshotSelfCheckState(): "unchecked" | "ok" | "failed" {
+  return selfCheckState
+}
+
+/**
+ * Start-up self-check: renders the default (empty) room once. Never throws; the result names only the error class,
+ * so it can be logged and shown in the health detail without any user, room or item value.
+ */
+export async function checkRoomSnapshotRenderer(
+  renderer: RoomSnapshotRenderer = createRoomSnapshotRenderer()
+): Promise<{ ok: true } | { ok: false; errorType: string }> {
+  try {
+    const result = await renderer.render({
+      decor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
+      roomRevision: 0
+    })
+    selfCheckState = result.body.length > 0 ? "ok" : "failed"
+    return result.body.length > 0 ? { ok: true } : { ok: false, errorType: "EmptyImage" }
+  } catch (error) {
+    selfCheckState = "failed"
+    return { ok: false, errorType: error instanceof Error ? error.name : typeof error }
   }
 }
 

@@ -81,6 +81,7 @@ import {
 import { registerCapabilityRoutes } from "./routes/capabilityRoutes"
 import { createChatReceiptService } from "./chat/chatReceiptService"
 import { registerChatPreferencesRoutes } from "./routes/chatPreferencesRoutes"
+import { getRoomSnapshotSelfCheckState } from "./rooms/roomSnapshotRenderer"
 import {
   createPersonalRoomDecorService,
   type PersonalRoomDecorService
@@ -287,7 +288,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     })
     app.get("/health", async () => ({
       ok: true,
-      service: "blumi-server"
+      service: "blumi-server",
+      // the room showcase art self-check (start-up); "failed" means Discover room pictures cannot be drawn
+      roomShowcaseArt: getRoomSnapshotSelfCheckState()
     }))
     app.get("/live", async () => ({ ok: true, service: "blumi-server" }))
     const probe = createReadinessProbe({

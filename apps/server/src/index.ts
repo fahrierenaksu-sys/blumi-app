@@ -22,9 +22,14 @@ import { startChatDeliveryWorker } from "./chat/chatDeliveryWorker"
 import { createFirebaseAuthVerifier } from "./auth/firebaseAuth"
 import { createFirebaseUserDeletionDispatch } from "./auth/firebaseUserDeletionWorker"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
+import { checkRoomSnapshotRenderer } from "./rooms/roomSnapshotRenderer"
 
 const config = resolveServerConfig()
 const services = createConfiguredServerServices(config)
+// Discover room pictures come only from dist/art: say so at start-up when they cannot be drawn (error class only)
+void checkRoomSnapshotRenderer().then((result) => {
+  if (!result.ok) console.error("Room showcase art self-check failed", { errorType: result.errorType })
+})
 const firebaseAuthVerifier = createFirebaseAuthVerifier({
   onVerifiedPhone: services.onVerifiedPhone,
   projectId: process.env.FIREBASE_PROJECT_ID ?? "blumi-mobile-eren",

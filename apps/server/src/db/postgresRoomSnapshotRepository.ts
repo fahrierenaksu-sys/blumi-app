@@ -52,6 +52,8 @@ export function createPostgresRoomSnapshotRepository(
            body = EXCLUDED.body,
            updated_at = EXCLUDED.updated_at
          WHERE blumi_room_showcase_snapshots.room_revision < EXCLUDED.room_revision
+            OR (blumi_room_showcase_snapshots.room_revision = EXCLUDED.room_revision
+                AND blumi_room_showcase_snapshots.renderer_version <> EXCLUDED.renderer_version)
          RETURNING ${METADATA_COLUMNS}`,
         [
           input.userId,

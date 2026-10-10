@@ -39,11 +39,14 @@ export function createRoomSnapshotService(options: {
   const repository = options.repository ?? createInMemoryRoomSnapshotRepository()
   const renderer = options.renderer ?? createRoomSnapshotRenderer()
   const isPublicByDefault = options.isPublicByDefault ?? false
+  // a snapshot drawn by another renderer version (the old flat room) is never served and is redrawn on the next save
+  const isCurrent = (snapshot: { rendererVersion: string } | null) =>
+    snapshot !== null && (renderer.version === undefined || snapshot.rendererVersion === renderer.version)
 
   return {
     async publishForRoomSave(room) {
       const current = await repository.getLatest(room.userId)
-      if (roomSnapshotMatchesRoomRevision(current, room)) {
+      if (isCurrent(current) && roomSnapshotMatchesRoomRevision(current, room)) {
         return toRoomShowcaseMetadata(current!)
       }
       try {
@@ -77,12 +80,13 @@ export function createRoomSnapshotService(options: {
     async getLatestForUser(userId, room) {
       if (!room) return null
       const snapshot = await repository.getLatest(userId)
-      return roomSnapshotMatchesRoomRevision(snapshot, room)
+      return isCurrent(snapshot) && roomSnapshotMatchesRoomRevision(snapshot, room)
         ? toRoomShowcaseMetadata(snapshot!)
         : null
     },
     async findByAssetKey(assetKey) {
-      return repository.findByAssetKey(assetKey)
+      const snapshot = await repository.findByAssetKey(assetKey)
+      return isCurrent(snapshot) ? snapshot : null
     },
     async setVisibilityForRoom({ userId, room, isPublic, headline }) {
       if (!room || room.userId !== userId) return null
