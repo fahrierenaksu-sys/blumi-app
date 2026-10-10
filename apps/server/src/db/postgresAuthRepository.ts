@@ -1814,7 +1814,8 @@ function mapAvatarSelection(row: QueryResultRow): CompleteAvatarSelection {
   return normalizeStoredAvatarSelection({
     presetId: row.avatar_preset_id,
     revision: row.avatar_revision,
-    loadout: rawLoadout
+    loadout: rawLoadout,
+    genderHint: row.identity_gender ?? row.gender
   })
 }
 

@@ -11,7 +11,11 @@ export type ChatParticipantAccount = { userId: string; profile: Pick<UserProfile
 /** Batch account lookup (one query for many user IDs); missing IDs are absent. */
 export type ChatParticipantProfileSource = (userIds: readonly string[]) => Promise<readonly ChatParticipantAccount[]>
 
-/** The saved outfit when it is complete and valid; display metadata is optional. */
+/**
+ * The saved outfit, read tolerantly: unknown or retired item IDs are drawn as
+ * the body's starter pieces. Only a broken envelope (no loadout, bad revision)
+ * leaves the avatar out; display metadata is optional.
+ */
 export function completeParticipantAvatar(
   avatar: UserProfile["avatar"] | undefined
 ): ChatParticipantSummary["avatar"] {

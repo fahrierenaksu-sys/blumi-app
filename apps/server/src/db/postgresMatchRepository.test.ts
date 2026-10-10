@@ -83,7 +83,11 @@ test("postgres discovery maps account rows into normalized profiles", async () =
   })
 })
 
-test("postgres discovery skips one invalid avatar without breaking the page", async () => {
+// Was "skips one invalid avatar without breaking the page": a malformed field
+// hid the person. Reads are tolerant now (plan §2.4): a malformed field inside
+// the loadout is drawn as the starter piece; only a loadout that is not an
+// object is still skipped, and it never breaks the page.
+test("postgres discovery lists a malformed avatar as the starter look and skips a broken one without breaking the page", async () => {
   const fake = createFakePool((text) => {
     if (!/\bSELECT\b/i.test(text)) return []
     return [
@@ -98,6 +102,15 @@ test("postgres discovery skips one invalid avatar without breaking the page", as
           ...completeAvatarRow.avatar_selection,
           accessoryIds: "invalid"
         }
+      },
+      {
+        user_id: "broken-envelope",
+        display_name: "Gone",
+        age: 27,
+        gender: "woman",
+        vibe_tags: ["coffee"],
+        ...completeAvatarRow,
+        avatar_selection: "not a loadout"
       },
       {
         user_id: "valid-avatar",
@@ -118,7 +131,8 @@ test("postgres discovery skips one invalid avatar without breaking the page", as
       vibes: []
     })
 
-  assert.deepEqual(profiles.map((profile) => profile.userId), ["valid-avatar"])
+  assert.deepEqual(profiles.map((profile) => profile.userId), ["invalid-avatar", "valid-avatar"])
+  assert.deepEqual(profiles[0]?.avatar.loadout.accessoryIds, [])
 })
 
 test("postgres discovery preserves bios and does not invent vibe tags", async () => {
@@ -146,7 +160,8 @@ test("postgres discovery preserves bios and does not invent vibe tags", async ()
   assert.deepEqual(profile?.vibeTags, [])
 })
 
-test("postgres discovery excludes malformed stored avatar selections", async () => {
+// Was "excludes malformed stored avatar selections" (see the test above).
+test("postgres discovery reads a malformed stored avatar field as the starter piece", async () => {
   const fake = createFakePool((text) => {
     if (/\bSELECT\b/i.test(text)) {
       return [
@@ -167,8 +182,6 @@ test("postgres discovery excludes malformed stored avatar selections", async () 
     return []
   })
 
-  assert.equal(
-    await createPostgresMatchRepository(fake.pool).findDiscoverProfile("malformed_avatar"),
-    null
-  )
+  const profile = await createPostgresMatchRepository(fake.pool).findDiscoverProfile("malformed_avatar")
+  assert.deepEqual(profile?.avatar.loadout.accessoryIds, [])
 })

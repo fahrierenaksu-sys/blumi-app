@@ -127,7 +127,10 @@ test("postgres chat repository groups participants by thread", async () => {
   ])
 })
 
-test("postgres chat repository keeps a legacy malformed avatar optional", async () => {
+// Was "keeps a legacy malformed avatar optional" (a legacy item ID dropped the
+// avatar). Reads are tolerant now (plan §2.4): a legacy ID is drawn as the
+// starter piece (a broken envelope still leaves it out: legacyAvatarReads.test.ts).
+test("postgres chat repository draws legacy avatar IDs as the starter look", async () => {
   const fake = createFakePool((text) => {
     if (text.includes("FROM blumi_chat_thread_participants")) {
       return [
@@ -164,7 +167,8 @@ test("postgres chat repository keeps a legacy malformed avatar optional", async 
   const threads = await repository.listThreads("user_a")
 
   assert.equal(threads[0]?.participants[0]?.avatar?.revision, 1)
-  assert.equal(threads[0]?.participants[1]?.avatar, undefined)
+  assert.equal(threads[0]?.participants[1]?.avatar?.revision, 2)
+  assert.equal(threads[0]?.participants[1]?.avatar?.loadout.faceId, DEFAULT_FEMALE_AVATAR_LOADOUT.faceId)
 })
 
 test("postgres chat repository projects optional message metadata and keeps legacy rows exact", async () => {

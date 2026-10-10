@@ -8,63 +8,43 @@ import {
   isAvatarLoadoutV2
 } from "@blumi/contracts"
 import {
-  AVATAR_LOADOUT_CATALOG,
-  DEFAULT_FEMALE_AVATAR_LOADOUT,
-  DEFAULT_MALE_AVATAR_LOADOUT,
   cloneAvatarLoadout,
-  isRetiredAvatarItemId,
-  toAvatarLoadoutV2,
-  validateAvatarLoadout
+  coerceAvatarLoadout,
+  toAvatarLoadoutV2
 } from "@blumi/domain"
-
-const MAX_PRESET_ID_LENGTH = 120
-const catalogItemIds = AVATAR_LOADOUT_CATALOG.map((item) => item.itemId)
 
 export interface StoredAvatarSelectionInput {
   presetId: unknown
   loadout: unknown
   revision: unknown
+  /**
+   * The profile's gender (`identity_gender`, else `gender`) when the caller
+   * has it. It only picks the body for a legacy preset such as `dusk`.
+   */
+  genderHint?: unknown
 }
 
+/**
+ * Tolerant read of a stored avatar (plan §2.4). It throws only for a broken
+ * envelope: a loadout that is not an object, or a bad revision. Any item ID,
+ * unknown, retired or for the other body, is drawn as that body's starter
+ * piece, and the preset becomes the body. It never writes: the user's next
+ * save stores a loadout that `validateAvatarLoadout` checks strictly.
+ */
 export function normalizeStoredAvatarSelection(
   input: StoredAvatarSelectionInput
 ): CompleteAvatarSelection {
-  if (!isStoredPresetId(input.presetId) || !isAvatarRevision(input.revision)) {
+  if (!isRecord(input.loadout) || !isAvatarRevision(input.revision)) {
     throw invalidStoredAvatarSelection()
   }
-  const loadoutResult = validateAvatarLoadout(
-    sanitizeStoredAvatarLoadout(input.loadout),
-    catalogItemIds
-  )
-  if (!loadoutResult.ok) {
-    throw invalidStoredAvatarSelection()
-  }
-  if (input.presetId !== loadoutResult.loadout.bodyId) {
-    throw invalidStoredAvatarSelection()
-  }
-  return {
+  const loadout = coerceAvatarLoadout(input.loadout, {
     presetId: input.presetId,
-    loadout: loadoutResult.loadout,
-    revision: input.revision
-  }
-}
-
-function sanitizeStoredAvatarLoadout(value: unknown): unknown {
-  if (!isAvatarLoadoutV1(value) && !isAvatarLoadoutV2(value)) return value
-  const retiredTop = isRetiredAvatarItemId(value.topId)
-  const retiredBottom = isRetiredAvatarItemId(value.bottomId)
-  const retiredHair = isRetiredAvatarItemId(value.hairId)
-  const unsupportedOuterwear = value.schemaVersion === 2 && value.outerwearId !== null
-  if (!retiredTop && !retiredBottom && !retiredHair && !unsupportedOuterwear) return value
-  const starter = value.bodyId === DEFAULT_MALE_AVATAR_LOADOUT.bodyId
-    ? DEFAULT_MALE_AVATAR_LOADOUT
-    : DEFAULT_FEMALE_AVATAR_LOADOUT
+    gender: input.genderHint
+  })
   return {
-    ...value,
-    topId: retiredTop ? starter.topId : value.topId,
-    bottomId: retiredBottom ? starter.bottomId : value.bottomId,
-    hairId: retiredHair ? starter.hairId : value.hairId,
-    ...(value.schemaVersion === 2 ? { outerwearId: null } : {})
+    presetId: loadout.bodyId,
+    loadout,
+    revision: input.revision
   }
 }
 
@@ -97,11 +77,8 @@ export function resolveSemanticAvatarWrite(
   } satisfies AvatarLoadoutV2
 }
 
-function isStoredPresetId(value: unknown): value is string {
-  return typeof value === "string" &&
-    value.length > 0 &&
-    value.length <= MAX_PRESET_ID_LENGTH &&
-    value.trim() === value
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function isAvatarRevision(value: unknown): value is number {

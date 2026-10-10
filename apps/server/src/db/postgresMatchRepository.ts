@@ -467,7 +467,8 @@ function mapAccountProfile(row: QueryResultRow): DiscoverProfileRecord {
   const avatar = normalizeStoredAvatarSelection({
     presetId: row.avatar_preset_id,
     loadout: row.avatar_selection,
-    revision: row.avatar_revision
+    revision: row.avatar_revision,
+    genderHint: row.identity_gender ?? row.gender
   })
   return {
     userId: String(row.user_id),

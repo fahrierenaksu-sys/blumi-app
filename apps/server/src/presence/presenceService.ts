@@ -102,7 +102,8 @@ export function createPresenceService(
       const avatar = normalizeStoredAvatarSelection({
         presetId: input.profile.avatar.presetId,
         loadout: input.profile.avatar.loadout,
-        revision: input.profile.avatar.revision
+        revision: input.profile.avatar.revision,
+        genderHint: input.profile.identityGender ?? input.profile.gender
       })
       const maximumReservationAttempts = Math.max(1, layout.spots.length + 1)
 
