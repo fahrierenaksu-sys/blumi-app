@@ -6,6 +6,7 @@ import type {
   UserRoomDecor
 } from "./roomV2.types"
 import {
+  getRoomV2FurnitureRotationChoices,
   resolvePlacedFurnitureRenderItem,
   validateRoomV2FurniturePlacement,
   type RoomV2PlacementValidationResult
@@ -48,9 +49,7 @@ export function resolveRoomV2ExactRotationPreview(input: {
     return { status: "missing_selection" }
   }
 
-  const supportedRotations = furnitureItem.assetsByRotation
-    ? Object.keys(furnitureItem.assetsByRotation) as PlacedRoomItem["rotation"][]
-    : []
+  const supportedRotations = getRoomV2FurnitureRotationChoices(furnitureItem)
   if (!supportedRotations.includes(input.rotation)) {
     return { status: "unsupported_rotation" }
   }

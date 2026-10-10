@@ -1,3 +1,5 @@
+// Fills the room seam with the rigs, the measured room and the layered furniture before any room code runs.
+import "./src/features/avatar/roomAvatarSeamInstall"
 import { useEffect, useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { InteractionManager, StyleSheet } from "react-native"

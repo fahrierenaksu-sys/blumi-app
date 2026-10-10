@@ -1,27 +1,45 @@
 import type { UserRoomDecor } from "./roomV2.types"
 
+/**
+ * The editor's draft and its local history. Undo and redo only move the draft
+ * between snapshots on this device; Save still sends just the final draft and
+ * the server decides what is kept.
+ */
 export interface RoomV2EditorSession {
   /** Snapshot used only to decide whether this editor entry has unsaved work. */
   baselineDecor: UserRoomDecor
   /** Last layout confirmed by the server, when that evidence exists. */
   persistedBaselineDecor?: UserRoomDecor
   draftDecor: UserRoomDecor
+  /** The draft before the last change (the top of `undoStack`). */
   undoDecor?: UserRoomDecor
+  /** Earlier drafts, oldest first, at most `historyLimit`. */
+  undoStack: UserRoomDecor[]
+  /** Undone drafts, the next redo last. Any new change clears it. */
+  redoStack: UserRoomDecor[]
+  /** How many steps undo can go back (1 keeps the single-step undo). */
+  historyLimit: number
   isDirty: boolean
   canUndo: boolean
+  canRedo: boolean
   canResetToPersistedBaseline: boolean
 }
 
+/** The single-step undo every build has had; the 2.5D editor asks for more. */
+export const ROOM_V2_EDITOR_DEFAULT_HISTORY_LIMIT = 1
+
 export function createRoomV2EditorSession(
   entryDecor: UserRoomDecor,
-  persistedBaselineDecor?: UserRoomDecor
+  persistedBaselineDecor?: UserRoomDecor,
+  options?: { historyLimit?: number }
 ): RoomV2EditorSession {
   return buildSession({
     baselineDecor: copyDecor(entryDecor),
     persistedBaselineDecor: persistedBaselineDecor
       ? copyDecor(persistedBaselineDecor)
       : undefined,
-    draftDecor: copyDecor(entryDecor)
+    draftDecor: copyDecor(entryDecor),
+    historyLimit: options?.historyLimit ?? ROOM_V2_EDITOR_DEFAULT_HISTORY_LIMIT
   })
 }
 
@@ -35,19 +53,42 @@ export function applyRoomV2EditorDraft(
     baselineDecor: session.baselineDecor,
     persistedBaselineDecor: session.persistedBaselineDecor,
     draftDecor: nextDecor,
-    undoDecor: session.draftDecor
+    undoStack: [...session.undoStack, session.draftDecor],
+    redoStack: [],
+    historyLimit: session.historyLimit
   })
 }
 
 export function undoRoomV2EditorSession(
   session: RoomV2EditorSession
 ): RoomV2EditorSession {
-  if (!session.undoDecor) return session
+  const previous = session.undoStack[session.undoStack.length - 1]
+  if (!previous) return session
 
   return buildSession({
     baselineDecor: session.baselineDecor,
     persistedBaselineDecor: session.persistedBaselineDecor,
-    draftDecor: session.undoDecor
+    draftDecor: previous,
+    undoStack: session.undoStack.slice(0, -1),
+    // single-step history keeps no redo, exactly as before
+    redoStack: session.historyLimit > 1 ? [...session.redoStack, session.draftDecor] : [],
+    historyLimit: session.historyLimit
+  })
+}
+
+export function redoRoomV2EditorSession(
+  session: RoomV2EditorSession
+): RoomV2EditorSession {
+  const next = session.redoStack[session.redoStack.length - 1]
+  if (!next) return session
+
+  return buildSession({
+    baselineDecor: session.baselineDecor,
+    persistedBaselineDecor: session.persistedBaselineDecor,
+    draftDecor: next,
+    undoStack: [...session.undoStack, session.draftDecor],
+    redoStack: session.redoStack.slice(0, -1),
+    historyLimit: session.historyLimit
   })
 }
 
@@ -65,7 +106,9 @@ export function resetRoomV2EditorSession(
     baselineDecor: session.baselineDecor,
     persistedBaselineDecor: session.persistedBaselineDecor,
     draftDecor: session.persistedBaselineDecor,
-    undoDecor: session.draftDecor
+    undoStack: [...session.undoStack, session.draftDecor],
+    redoStack: [],
+    historyLimit: session.historyLimit
   })
 }
 
@@ -88,19 +131,22 @@ export function updateRoomV2EditorPersistedBaseline(
     baselineDecor: session.baselineDecor,
     persistedBaselineDecor,
     draftDecor: session.draftDecor,
-    undoDecor: session.undoDecor
+    undoStack: session.undoStack,
+    redoStack: session.redoStack,
+    historyLimit: session.historyLimit
   })
 }
 
 /** Call only after persistence has been positively confirmed by the server. */
 export function markRoomV2EditorSessionSaved(
-  _session: RoomV2EditorSession,
+  session: RoomV2EditorSession,
   persistedDecor: UserRoomDecor
 ): RoomV2EditorSession {
   return buildSession({
     baselineDecor: persistedDecor,
     persistedBaselineDecor: persistedDecor,
-    draftDecor: persistedDecor
+    draftDecor: persistedDecor,
+    historyLimit: session.historyLimit
   })
 }
 
@@ -115,22 +161,32 @@ function buildSession(input: {
   baselineDecor: UserRoomDecor
   persistedBaselineDecor?: UserRoomDecor
   draftDecor: UserRoomDecor
-  undoDecor?: UserRoomDecor
+  undoStack?: readonly UserRoomDecor[]
+  redoStack?: readonly UserRoomDecor[]
+  historyLimit: number
 }): RoomV2EditorSession {
+  const historyLimit = Math.max(1, Math.floor(input.historyLimit))
   const baselineDecor = copyDecor(input.baselineDecor)
   const persistedBaselineDecor = input.persistedBaselineDecor
     ? copyDecor(input.persistedBaselineDecor)
     : undefined
   const draftDecor = copyDecor(input.draftDecor)
-  const undoDecor = input.undoDecor ? copyDecor(input.undoDecor) : undefined
+  // the oldest steps fall off the bottom; snapshots are immutable copies
+  const undoStack = (input.undoStack ?? []).slice(-historyLimit).map(copyDecor)
+  const redoStack = (input.redoStack ?? []).slice(-historyLimit).map(copyDecor)
+  const undoDecor = undoStack[undoStack.length - 1]
 
   return {
     baselineDecor,
     persistedBaselineDecor,
     draftDecor,
     undoDecor,
+    undoStack,
+    redoStack,
+    historyLimit,
     isDirty: !areRoomV2DecorEqual(baselineDecor, draftDecor),
     canUndo: Boolean(undoDecor),
+    canRedo: redoStack.length > 0,
     canResetToPersistedBaseline: Boolean(persistedBaselineDecor)
   }
 }

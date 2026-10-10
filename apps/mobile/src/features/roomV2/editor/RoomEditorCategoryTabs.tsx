@@ -33,7 +33,8 @@ const ROOM_EDITOR_CATEGORY_ICONS: Record<
   misc: "cube-outline",
   lighting: "bulb-outline",
   wallDecor: "image-outline",
-  plant: "leaf-outline"
+  plant: "leaf-outline",
+  storage: "file-tray-stacked-outline"
 }
 
 /** Thin-line icon tabs sized like the wardrobe's; the row scrolls sideways. */

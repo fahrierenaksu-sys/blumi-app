@@ -252,7 +252,24 @@ function segmentsIntersect(
   if (secondOrientation === 0 && onSegment(firstStart, secondEnd, firstEnd)) return true
   if (thirdOrientation === 0 && onSegment(secondStart, firstStart, secondEnd)) return true
   if (fourthOrientation === 0 && onSegment(secondStart, firstEnd, secondEnd)) return true
-  return firstOrientation !== secondOrientation && thirdOrientation !== fourthOrientation
+  // Segments that cross always share bounding-box overlap. Two separate segments on one line (pieces lined up
+  // on the same cell edge) can round to mixed orientations; without this check they read as crossing.
+  return firstOrientation !== secondOrientation &&
+    thirdOrientation !== fourthOrientation &&
+    doSegmentBoundsOverlap(firstStart, firstEnd, secondStart, secondEnd)
+}
+
+function doSegmentBoundsOverlap(
+  firstStart: RoomWorldPoint,
+  firstEnd: RoomWorldPoint,
+  secondStart: RoomWorldPoint,
+  secondEnd: RoomWorldPoint
+): boolean {
+  const epsilon = 0.0000001
+  return Math.max(firstStart.x, firstEnd.x) >= Math.min(secondStart.x, secondEnd.x) - epsilon &&
+    Math.max(secondStart.x, secondEnd.x) >= Math.min(firstStart.x, firstEnd.x) - epsilon &&
+    Math.max(firstStart.y, firstEnd.y) >= Math.min(secondStart.y, secondEnd.y) - epsilon &&
+    Math.max(secondStart.y, secondEnd.y) >= Math.min(firstStart.y, firstEnd.y) - epsilon
 }
 
 function orientation(

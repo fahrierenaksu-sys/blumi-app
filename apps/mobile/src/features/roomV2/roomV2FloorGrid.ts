@@ -14,7 +14,14 @@ import type { RoomWorldPoint } from "../roomWorld/roomWorldGeometry"
  * Everything is normalized to the shell canvas (x / width, y / height), which
  * is also the stage coordinate system the renderer and the editor use.
  */
-export type RoomV2FloorGrid = RoomFloorGrid
+export type RoomV2FloorGrid = RoomFloorGrid & {
+  /**
+   * Where the drawn grout lines sit on the lattice, in tile units: at `i + groutPhase` for whole `i` (0 when the
+   * lattice points of whole tiles are the grout crossings). The room calibration puts its lattice
+   * points on cell centres, a quarter tile off the grout.
+   */
+  groutPhase?: number
+}
 
 /**
  * Plain-number form of a floor grid for the UI thread: forward and inverse
@@ -28,6 +35,8 @@ export interface RoomV2FloorGridProjection {
   inverse: number[]
   span: number
   cellsPerTile: number
+  /** The grid's `groutPhase` (0 when unset). */
+  groutPhase: number
   /** The outline's extent in tile coordinates. */
   tileBounds: { minI: number; maxI: number; minJ: number; maxJ: number }
   minColumn: number
@@ -66,7 +75,8 @@ export function createRoomV2FloorGridProjection(grid: RoomV2FloorGrid): RoomV2Fl
     forward,
     inverse,
     span: grid.latticeSpan,
-    cellsPerTile
+    cellsPerTile,
+    groutPhase: grid.groutPhase ?? 0
   }
   const tiles = grid.outline.map((point) =>
     unprojectRoomV2FloorGridPoint(base, point.x, point.y)
@@ -311,8 +321,9 @@ export function getRoomV2FloorGridLines(
   projection: RoomV2FloorGridProjection
 ): RoomV2FloorGridSegment[] {
   const { minI, maxI, minJ, maxJ } = projection.tileBounds
+  const phase = projection.groutPhase
   const segments: RoomV2FloorGridSegment[] = []
-  for (let i = Math.ceil(minI); i <= Math.floor(maxI); i += 1) {
+  for (let i = Math.ceil(minI - phase) + phase; i <= maxI; i += 1) {
     const segment = clipSegmentToConvexPolygon(
       projectRoomV2FloorGridTilePoint(projection, i, minJ),
       projectRoomV2FloorGridTilePoint(projection, i, maxJ),
@@ -320,7 +331,7 @@ export function getRoomV2FloorGridLines(
     )
     if (segment) segments.push(segment)
   }
-  for (let j = Math.ceil(minJ); j <= Math.floor(maxJ); j += 1) {
+  for (let j = Math.ceil(minJ - phase) + phase; j <= maxJ; j += 1) {
     const segment = clipSegmentToConvexPolygon(
       projectRoomV2FloorGridTilePoint(projection, minI, j),
       projectRoomV2FloorGridTilePoint(projection, maxI, j),

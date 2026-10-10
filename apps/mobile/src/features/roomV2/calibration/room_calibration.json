@@ -1,0 +1,1349 @@
+{
+ "version": "blumi-room-calibration-1",
+ "date": "2026-10-08",
+ "shell": {
+  "file": "apps/mobile/src/features/roomV2/assets/runtime/room_shell_blumi_world_v1.webp",
+  "sha256": "c1e9fd13e18a5341dc0df76656d07ea70733ffccaf6762029e3e7080ece597b4",
+  "size_px": [
+   1254,
+   714
+  ],
+  "note": "all px values: this image at zoom 1, x right, y DOWN, pixel i spans [i, i+1)"
+ },
+ "frames": {
+  "world": "lab40/three.js room frame: X = right-down wall direction (along the right wall), Z = left-down (along the left wall), Y = up. 1 unit = 1 painted floor tile.",
+  "blender": "(bx, by, bz) = (X, -Z, Y); item rotation r (0..3) = r*90 deg about Blender +Z == three rotation.y = r*pi/2",
+  "app_note": "see app_comparison in this file for how the mobile app frame maps here"
+ },
+ "camera": {
+  "type": "orthographic",
+  "yaw_deg": 45.0,
+  "pitch_deg": 21.64067231100742,
+  "quaternion_three_xyzw": [
+   -0.17343985734429856,
+   0.37587958157154083,
+   0.07184114116806332,
+   0.9074535836491381
+  ],
+  "quaternion_three_given_in_brief": [
+   -0.17352430332258992,
+   0.375872894478736,
+   0.07187611983755945,
+   0.9074374395789957
+  ],
+  "blender_rotation_euler_xyz_deg": [
+   68.35932768899258,
+   0.0,
+   45.0
+  ],
+  "px_per_world_unit": 97.80870411166724,
+  "vertical_px_per_world_unit_y": 90.91465101397375,
+  "world_origin_shell_px": [
+   600.604100194008,
+   303.4544461408533
+  ],
+  "ortho_width_world": 12.820944837059905,
+  "ortho_height_world": 7.299963806747027,
+  "three_frustum": {
+   "left": -6.140599710924542,
+   "right": 6.680345126135363,
+   "top": 3.102530075384726,
+   "bottom": -4.197433731362302,
+   "position": "camera at dir*D (lookAt origin), dir = (sin yaw cos pitch, sin pitch, cos yaw cos pitch)"
+  },
+  "screen_axes_world": {
+   "right": [
+    0.7071067811865476,
+    0.0,
+    -0.7071067811865475
+   ],
+   "up": [
+    -0.26077000402561074,
+    0.9295149326401195,
+    -0.26077000402561074
+   ]
+  },
+  "accuracy": {
+   "tile_lattice_rms_px": 0.6686034177501354,
+   "tile_lattice_p95_px": 1.3609285181153636,
+   "per_line_mean_abs_max_px": "see qa/camera_lock_report.json",
+   "noise_floor_rms_px": 0.5530488151033977,
+   "lab40_PROJ_rms_px": 0.7465506303106177
+  }
+ },
+ "conversion": {
+  "world_to_px": "px = ox + s*(r . P); py = oy - s*(u . P), P=(X,Y,Z), r/u = camera.screen_axes_world",
+  "world_to_px_expanded": "px = 600.6041 + 69.1612*X + -69.1612*Z ;  py = 303.4544 + 25.5056*X + -90.9147*Y + 25.5056*Z",
+  "px_to_floor": "invert the 2x2 floor part (Y=0): see blumi_room.floor_from_px",
+  "example": {
+   "world": [
+    3.5,
+    0.0,
+    3.5
+   ],
+   "shell_px": [
+    600.604,
+    481.993
+   ],
+   "world_1_unit_up": [
+    3.5,
+    1.0,
+    3.5
+   ],
+   "shell_px_1_unit_up": [
+    600.604,
+    391.079
+   ],
+   "note": "cell (7,7) centre = world (3.75, 0, 3.75); a point 1 unit higher moves straight up by s*cos(pitch) px"
+  }
+ },
+ "floor": {
+  "plane": "Y = 0",
+  "painted_floor_polygon_world_xz": [
+   [
+    -0.6073,
+    -0.6173
+   ],
+   [
+    7.7911,
+    -1.0056
+   ],
+   [
+    7.7918,
+    5.9059
+   ],
+   [
+    7.2643,
+    7.0026
+   ],
+   [
+    6.3762,
+    7.3481
+   ],
+   [
+    -0.7675,
+    7.4784
+   ]
+  ],
+  "painted_floor_polygon_shell_px": [
+   [
+    601.3,
+    272.22
+   ],
+   [
+    1208.99,
+    476.52
+   ],
+   [
+    731.03,
+    652.82
+   ],
+   [
+    618.71,
+    667.34
+   ],
+   [
+    533.39,
+    653.5
+   ],
+   [
+    30.31,
+    474.62
+   ]
+  ],
+  "polygon_order": "back corner, right wall end, right-front edges..., left wall end",
+  "front_edge_fit_rms_px": [
+   0.138,
+   0.196,
+   0.186,
+   0.138
+  ],
+  "walkable_polygon_world_xz": [
+   [
+    -0.4405,
+    -0.4548
+   ],
+   [
+    7.6211,
+    -0.8275
+   ],
+   [
+    7.6217,
+    5.8672
+   ],
+   [
+    7.1402,
+    6.8685
+   ],
+   [
+    6.3428,
+    7.1787
+   ],
+   [
+    -0.5941,
+    7.3052
+   ]
+  ],
+  "foot_radius": 0.17
+ },
+ "walls": {
+  "left": {
+   "plane": "X = at_t0 + per_unit*Z (vertical)",
+   "at_t0": -0.6194883195595663,
+   "per_unit": -0.019794528548887285,
+   "t_range": [
+    -0.4795301897539922,
+    7.353247795009993
+   ],
+   "note": "X = at_t0 + per_unit * Z",
+   "screen_angle_err_vs_tiles_deg": 0.7259300072516339,
+   "base_segment_world_xz": [
+    [
+     -0.7675,
+     7.4784
+    ],
+    [
+     -0.6073,
+     -0.6173
+    ]
+   ]
+  },
+  "right": {
+   "plane": "Z = at_t0 + per_unit*X (vertical)",
+   "at_t0": -0.6453860785663614,
+   "per_unit": -0.04623071539062701,
+   "t_range": [
+    -0.395706837570216,
+    7.63572445784752
+   ],
+   "note": "Z = at_t0 + per_unit * X",
+   "screen_angle_err_vs_tiles_deg": -1.661518849385807,
+   "base_segment_world_xz": [
+    [
+     -0.6073,
+     -0.6173
+    ],
+    [
+     7.7911,
+     -1.0056
+    ]
+   ]
+  },
+  "back_corner_world_xz": [
+   -0.6073,
+   -0.6173
+  ],
+  "back_corner_shell_px": [
+   601.3,
+   272.22
+  ],
+  "height_to_cap_underside": 2.422,
+  "height_to_cap_top": 2.871,
+  "features": {
+   "door": {
+    "wall": "left",
+    "along": [
+     4.151,
+     5.725
+    ],
+    "y": [
+     0.023,
+     2.128
+    ],
+    "shell_px": {
+     "bottom_left": [
+      154,
+      425
+     ],
+     "bottom_right": [
+      265,
+      393
+     ],
+     "top": [
+      210,
+      217.5
+     ]
+    },
+    "along_axis": "Z"
+   },
+   "window": {
+    "wall": "left",
+    "along": [
+     0.975,
+     2.719
+    ],
+    "y": [
+     0.405,
+     2.145
+    ],
+    "shell_px": {
+     "bottom_left": [
+      366,
+      315
+     ],
+     "bottom_right": [
+      489,
+      279
+     ],
+     "top": [
+      427,
+      139
+     ]
+    },
+    "along_axis": "Z"
+   },
+   "lamp_niche": {
+    "wall": "right",
+    "along": [
+     4.788,
+     5.995
+    ],
+    "y": [
+     0.614,
+     1.939
+    ],
+    "shell_px": {
+     "bottom_left": [
+      991.7,
+      348
+     ],
+     "bottom_right": [
+      1079,
+      376.7
+     ],
+     "top": [
+      1035,
+      241.7
+     ]
+    },
+    "along_axis": "X"
+   }
+  },
+  "note": "The painted walls are NOT exactly parallel to the painted tile lattice (left 0.7 deg, right 1.7 deg on screen; right wall drifts from Z=-0.63 at the corner to Z=-1.0 at its far end). Items against a wall must use these measured lines."
+ },
+ "grid": {
+  "tile": 1.0,
+  "cell": 0.5,
+  "origin_world_xz": [
+   0,
+   0
+  ],
+  "origin_shell_px": [
+   600.604100194008,
+   303.4544461408533
+  ],
+  "cell_index": "i = floor(X / 0.5), j = floor(Z / 0.5); cell (i,j) centre = ((i+0.5)*0.5, (j+0.5)*0.5)",
+  "floor_cells": 244,
+  "i_range": [
+   -1,
+   14
+  ],
+  "j_range": [
+   -2,
+   14
+  ],
+  "walkable_centre_cells": 248,
+  "cells_inside_painted_floor": [
+   [
+    -1,
+    -1
+   ],
+   [
+    -1,
+    0
+   ],
+   [
+    -1,
+    1
+   ],
+   [
+    -1,
+    2
+   ],
+   [
+    -1,
+    3
+   ],
+   [
+    -1,
+    4
+   ],
+   [
+    -1,
+    5
+   ],
+   [
+    -1,
+    6
+   ],
+   [
+    -1,
+    7
+   ],
+   [
+    -1,
+    8
+   ],
+   [
+    -1,
+    9
+   ],
+   [
+    -1,
+    10
+   ],
+   [
+    -1,
+    11
+   ],
+   [
+    -1,
+    12
+   ],
+   [
+    -1,
+    13
+   ],
+   [
+    -1,
+    14
+   ],
+   [
+    0,
+    -1
+   ],
+   [
+    0,
+    0
+   ],
+   [
+    0,
+    1
+   ],
+   [
+    0,
+    2
+   ],
+   [
+    0,
+    3
+   ],
+   [
+    0,
+    4
+   ],
+   [
+    0,
+    5
+   ],
+   [
+    0,
+    6
+   ],
+   [
+    0,
+    7
+   ],
+   [
+    0,
+    8
+   ],
+   [
+    0,
+    9
+   ],
+   [
+    0,
+    10
+   ],
+   [
+    0,
+    11
+   ],
+   [
+    0,
+    12
+   ],
+   [
+    0,
+    13
+   ],
+   [
+    0,
+    14
+   ],
+   [
+    1,
+    -1
+   ],
+   [
+    1,
+    0
+   ],
+   [
+    1,
+    1
+   ],
+   [
+    1,
+    2
+   ],
+   [
+    1,
+    3
+   ],
+   [
+    1,
+    4
+   ],
+   [
+    1,
+    5
+   ],
+   [
+    1,
+    6
+   ],
+   [
+    1,
+    7
+   ],
+   [
+    1,
+    8
+   ],
+   [
+    1,
+    9
+   ],
+   [
+    1,
+    10
+   ],
+   [
+    1,
+    11
+   ],
+   [
+    1,
+    12
+   ],
+   [
+    1,
+    13
+   ],
+   [
+    1,
+    14
+   ],
+   [
+    2,
+    -1
+   ],
+   [
+    2,
+    0
+   ],
+   [
+    2,
+    1
+   ],
+   [
+    2,
+    2
+   ],
+   [
+    2,
+    3
+   ],
+   [
+    2,
+    4
+   ],
+   [
+    2,
+    5
+   ],
+   [
+    2,
+    6
+   ],
+   [
+    2,
+    7
+   ],
+   [
+    2,
+    8
+   ],
+   [
+    2,
+    9
+   ],
+   [
+    2,
+    10
+   ],
+   [
+    2,
+    11
+   ],
+   [
+    2,
+    12
+   ],
+   [
+    2,
+    13
+   ],
+   [
+    3,
+    -1
+   ],
+   [
+    3,
+    0
+   ],
+   [
+    3,
+    1
+   ],
+   [
+    3,
+    2
+   ],
+   [
+    3,
+    3
+   ],
+   [
+    3,
+    4
+   ],
+   [
+    3,
+    5
+   ],
+   [
+    3,
+    6
+   ],
+   [
+    3,
+    7
+   ],
+   [
+    3,
+    8
+   ],
+   [
+    3,
+    9
+   ],
+   [
+    3,
+    10
+   ],
+   [
+    3,
+    11
+   ],
+   [
+    3,
+    12
+   ],
+   [
+    3,
+    13
+   ],
+   [
+    4,
+    -1
+   ],
+   [
+    4,
+    0
+   ],
+   [
+    4,
+    1
+   ],
+   [
+    4,
+    2
+   ],
+   [
+    4,
+    3
+   ],
+   [
+    4,
+    4
+   ],
+   [
+    4,
+    5
+   ],
+   [
+    4,
+    6
+   ],
+   [
+    4,
+    7
+   ],
+   [
+    4,
+    8
+   ],
+   [
+    4,
+    9
+   ],
+   [
+    4,
+    10
+   ],
+   [
+    4,
+    11
+   ],
+   [
+    4,
+    12
+   ],
+   [
+    4,
+    13
+   ],
+   [
+    5,
+    -1
+   ],
+   [
+    5,
+    0
+   ],
+   [
+    5,
+    1
+   ],
+   [
+    5,
+    2
+   ],
+   [
+    5,
+    3
+   ],
+   [
+    5,
+    4
+   ],
+   [
+    5,
+    5
+   ],
+   [
+    5,
+    6
+   ],
+   [
+    5,
+    7
+   ],
+   [
+    5,
+    8
+   ],
+   [
+    5,
+    9
+   ],
+   [
+    5,
+    10
+   ],
+   [
+    5,
+    11
+   ],
+   [
+    5,
+    12
+   ],
+   [
+    5,
+    13
+   ],
+   [
+    6,
+    -1
+   ],
+   [
+    6,
+    0
+   ],
+   [
+    6,
+    1
+   ],
+   [
+    6,
+    2
+   ],
+   [
+    6,
+    3
+   ],
+   [
+    6,
+    4
+   ],
+   [
+    6,
+    5
+   ],
+   [
+    6,
+    6
+   ],
+   [
+    6,
+    7
+   ],
+   [
+    6,
+    8
+   ],
+   [
+    6,
+    9
+   ],
+   [
+    6,
+    10
+   ],
+   [
+    6,
+    11
+   ],
+   [
+    6,
+    12
+   ],
+   [
+    6,
+    13
+   ],
+   [
+    7,
+    -1
+   ],
+   [
+    7,
+    0
+   ],
+   [
+    7,
+    1
+   ],
+   [
+    7,
+    2
+   ],
+   [
+    7,
+    3
+   ],
+   [
+    7,
+    4
+   ],
+   [
+    7,
+    5
+   ],
+   [
+    7,
+    6
+   ],
+   [
+    7,
+    7
+   ],
+   [
+    7,
+    8
+   ],
+   [
+    7,
+    9
+   ],
+   [
+    7,
+    10
+   ],
+   [
+    7,
+    11
+   ],
+   [
+    7,
+    12
+   ],
+   [
+    7,
+    13
+   ],
+   [
+    8,
+    -1
+   ],
+   [
+    8,
+    0
+   ],
+   [
+    8,
+    1
+   ],
+   [
+    8,
+    2
+   ],
+   [
+    8,
+    3
+   ],
+   [
+    8,
+    4
+   ],
+   [
+    8,
+    5
+   ],
+   [
+    8,
+    6
+   ],
+   [
+    8,
+    7
+   ],
+   [
+    8,
+    8
+   ],
+   [
+    8,
+    9
+   ],
+   [
+    8,
+    10
+   ],
+   [
+    8,
+    11
+   ],
+   [
+    8,
+    12
+   ],
+   [
+    8,
+    13
+   ],
+   [
+    9,
+    -1
+   ],
+   [
+    9,
+    0
+   ],
+   [
+    9,
+    1
+   ],
+   [
+    9,
+    2
+   ],
+   [
+    9,
+    3
+   ],
+   [
+    9,
+    4
+   ],
+   [
+    9,
+    5
+   ],
+   [
+    9,
+    6
+   ],
+   [
+    9,
+    7
+   ],
+   [
+    9,
+    8
+   ],
+   [
+    9,
+    9
+   ],
+   [
+    9,
+    10
+   ],
+   [
+    9,
+    11
+   ],
+   [
+    9,
+    12
+   ],
+   [
+    9,
+    13
+   ],
+   [
+    10,
+    -1
+   ],
+   [
+    10,
+    0
+   ],
+   [
+    10,
+    1
+   ],
+   [
+    10,
+    2
+   ],
+   [
+    10,
+    3
+   ],
+   [
+    10,
+    4
+   ],
+   [
+    10,
+    5
+   ],
+   [
+    10,
+    6
+   ],
+   [
+    10,
+    7
+   ],
+   [
+    10,
+    8
+   ],
+   [
+    10,
+    9
+   ],
+   [
+    10,
+    10
+   ],
+   [
+    10,
+    11
+   ],
+   [
+    10,
+    12
+   ],
+   [
+    10,
+    13
+   ],
+   [
+    11,
+    -1
+   ],
+   [
+    11,
+    0
+   ],
+   [
+    11,
+    1
+   ],
+   [
+    11,
+    2
+   ],
+   [
+    11,
+    3
+   ],
+   [
+    11,
+    4
+   ],
+   [
+    11,
+    5
+   ],
+   [
+    11,
+    6
+   ],
+   [
+    11,
+    7
+   ],
+   [
+    11,
+    8
+   ],
+   [
+    11,
+    9
+   ],
+   [
+    11,
+    10
+   ],
+   [
+    11,
+    11
+   ],
+   [
+    11,
+    12
+   ],
+   [
+    11,
+    13
+   ],
+   [
+    12,
+    -1
+   ],
+   [
+    12,
+    0
+   ],
+   [
+    12,
+    1
+   ],
+   [
+    12,
+    2
+   ],
+   [
+    12,
+    3
+   ],
+   [
+    12,
+    4
+   ],
+   [
+    12,
+    5
+   ],
+   [
+    12,
+    6
+   ],
+   [
+    12,
+    7
+   ],
+   [
+    12,
+    8
+   ],
+   [
+    12,
+    9
+   ],
+   [
+    12,
+    10
+   ],
+   [
+    12,
+    11
+   ],
+   [
+    12,
+    12
+   ],
+   [
+    12,
+    13
+   ],
+   [
+    13,
+    -2
+   ],
+   [
+    13,
+    -1
+   ],
+   [
+    13,
+    0
+   ],
+   [
+    13,
+    1
+   ],
+   [
+    13,
+    2
+   ],
+   [
+    13,
+    3
+   ],
+   [
+    13,
+    4
+   ],
+   [
+    13,
+    5
+   ],
+   [
+    13,
+    6
+   ],
+   [
+    13,
+    7
+   ],
+   [
+    13,
+    8
+   ],
+   [
+    13,
+    9
+   ],
+   [
+    13,
+    10
+   ],
+   [
+    13,
+    11
+   ],
+   [
+    13,
+    12
+   ],
+   [
+    13,
+    13
+   ],
+   [
+    14,
+    -2
+   ],
+   [
+    14,
+    -1
+   ],
+   [
+    14,
+    0
+   ],
+   [
+    14,
+    1
+   ],
+   [
+    14,
+    2
+   ],
+   [
+    14,
+    3
+   ],
+   [
+    14,
+    4
+   ],
+   [
+    14,
+    5
+   ],
+   [
+    14,
+    6
+   ],
+   [
+    14,
+    7
+   ],
+   [
+    14,
+    8
+   ],
+   [
+    14,
+    9
+   ],
+   [
+    14,
+    10
+   ],
+   [
+    14,
+    11
+   ],
+   [
+    14,
+    12
+   ]
+  ]
+ },
+ "app_comparison": {
+  "source": "packages/domain/src/roomWorld/roomFloorGrid.ts:39-99, apps/mobile/src/features/roomV2/roomV2FloorGrid.ts:116-205, roomV2Catalog.ts:99-206, roomV3PhysicalScaleContract.ts:9-15, roomVNextScale.ts:2-3, roomV2Selectors.ts:356-435, roomV2FloorPlacement.ts:74-90",
+  "projection": "no camera: a 4-corner homography of the 7x7 tile lattice (latticeCorners = lab40 LATTICE), nearly affine (g=-0.0075)",
+  "agrees": [
+   "1 app tile = 1 painted tile = 1 world unit; app i = X, app j = Z; cellsPerTile 2 (= cell 0.5)",
+   "lattice origin within ~2.3 px of this calibration (app (597.9, 303.7) vs here (600.6, 303.5) continuous px); per-tile steps within ~0.6 px",
+   "floor outline matches the measured wall junctions (back corner (-0.63,-0.63), right wall end Z -1.03)",
+   "depth sort by anchor stage-y is consistent with ortho depth (screen y grows with X+Z)"
+  ],
+  "mismatches": [
+   "homography corners are hand-fit LATTICE points (residual up to ~3 px) instead of a camera; heights have no model",
+   "furniture footprints are screen-axis rectangles in stage units (e.g. bed 365x112 px), not diamonds of 0.5 cells on the lattice",
+   "avatar / furniture scale: 1.7 m avatar = 0.3 stage-height; horizontal 221 px/m, floor depth 53.6 px/m, vertical 126 px/m -> 1 m = 2.26 / 1.49 / 1.39 world units on the three axes (inconsistent; one ortho camera needs one scale)",
+   "seats: drop = 47 px + seatHeight*stageHeight (chair seatHeight 0.096 = 68.5 px) - screen-space constants, not a world seat height",
+   "legacy MINI_ROOM_FLOOR walk polygon (miniRoomFloor.ts:13-16) still used as walkablePolygon; it reaches X = 8.67, past the painted front edge",
+   "door marker (0.169, 0.572) stage = world (-0.74, 4.87): on the left wall line but not at the painted door (Z 4.1-5.7, its centre ~4.9 ok)"
+  ]
+ },
+ "avatar": {
+  "height_world": 2.105,
+  "height_shell_px": 191.4,
+  "foot_radius": 0.17,
+  "source": "scale D (Workbench avatar25-v2/scale/SCALE_DECISION.md, 2026-10-09): true vertical height N = door height 2.105 u (card plane P = N x cos(pitch) = 1.957)"
+ }
+}

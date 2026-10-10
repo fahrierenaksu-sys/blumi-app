@@ -1,3 +1,4 @@
+import type { RoomAvatar25dSpec } from "../../features/avatar/roomAvatarSeamContract"
 import type { DimensionValue, ImageSourcePropType } from "react-native"
 import type { RoomV2FloorGrid } from "./roomV2FloorGrid"
 
@@ -82,6 +83,8 @@ export type FurnitureCategory =
   | "lighting"
   | "wallDecor"
   | "misc"
+  /** Cupboards, shelves and drawers (the 2.5D catalog only; every older piece keeps its category). */
+  | "storage"
 
 export type FurnitureInteractionType = "none" | "decor" | "seat"
 
@@ -261,6 +264,11 @@ export interface RoomV2SeatWorldPoint {
   seat: RoomAnchor
   approach: RoomAnchor
   exit: RoomAnchor
+  /**
+   * Layered pieces: this seat's place in the far-to-near draw order of the piece's sitters
+   * (0 = drawn first). Unset: every seat of the piece draws at the same depth.
+   */
+  drawRank?: number
 }
 
 export interface RoomShell {
@@ -431,6 +439,22 @@ export interface RoomV2FurnitureRenderItem extends RoomV2RenderItemBase {
   collisionPolygon?: RoomPoint2D[]
   /** Runtime world polygon including placement clearance. */
   placementPolygon?: RoomPoint2D[]
+  /**
+   * Room calibration: where the drawing is moved from the saved `x`/`y` (stage fractions), e.g.
+   * flush against a back wall's measured base line. Never persisted; `x`/`y` stay the saved spot.
+   */
+  renderOffset?: RoomPoint2D
+  /**
+   * Room calibration: the floor cells the piece stands on (wall-flush moves included), each a
+   * stage quad (back, right, front, left corner). The editor draws them as diamonds while the piece is placed.
+   */
+  footprintCells?: RoomPoint2D[][]
+  /**
+   * Room calibration: a wall piece on the measured back-wall plane under its anchor. Whether it
+   * fits there (wall span, skirting to cap, clear of door, window and niche) and the soft strip of wall the editor
+   * highlights behind it. Never persisted.
+   */
+  wallPlacement?: RoomV2WallPlacement
   interactionType: FurnitureInteractionType
   seatPoints?: RoomSeatPoint[]
   seatSpec?: RoomSeatSpec
@@ -439,6 +463,46 @@ export interface RoomV2FurnitureRenderItem extends RoomV2RenderItemBase {
   visualContract?: RoomFurnitureVisualContract
   contactShadowAsset?: RoomV2AssetRef
   foregroundOcclusionAsset?: RoomV2AssetRef
+  /**
+   * Room calibration: the piece is drawn from layers rendered from the room camera. `asset` is
+   * the back layer (the whole piece), `shadow` goes under every item, and `front` covers a seated avatar.
+   */
+  layered25d?: RoomV2LayeredFurnitureArt
+}
+
+/** A wall piece on a measured back wall (room calibration). */
+export interface RoomV2WallPlacement {
+  wall: "left" | "right"
+  isValid: boolean
+  /** Stage quad: base start, base end, top end, top start (fractions). */
+  strip: RoomPoint2D[]
+}
+
+/** A layered piece's extra art and its seat rules (Workbench `item.json`), for one rotation. */
+export interface RoomV2LayeredFurnitureArt {
+  /** Absent when no seated avatar is ever covered (a piece without seats, or a view whose front layer is empty). */
+  frontAsset?: RoomV2AssetRef
+  /** Absent for a flat piece that casts none (a rug). */
+  shadowAsset?: RoomV2AssetRef
+  /** One entry per seat (`item.json` order; a sofa has two). */
+  seats: RoomV2LayeredSeatArt[]
+}
+
+/** How one seat of a layered piece draws its sitter and the front layer over her. */
+export interface RoomV2LayeredSeatArt {
+  id: string
+  /** The drawing she sits in (a seat may face a diagonal no walking direction maps to). */
+  view: "front" | "back"
+  mirror: boolean
+  /** Front views: the front layer draws only above this share of the box height (her shins and shoes stay on top). */
+  frontVisibleHeight?: number
+  /** Back views: nothing of her is drawn this far (stage-height share) below the hip point. */
+  avatarClipBelowHip?: number
+  /**
+   * How far (stage-height share) below the hip point the floor is where her soles stand seated facing the camera:
+   * just in front of the cushion. Her seated shins lengthen to reach it at any height (2.5D body).
+   */
+  soleDropBelowHip?: number
 }
 
 export interface RoomV2AvatarRenderLayer {
@@ -468,6 +532,11 @@ export interface RoomV2AvatarSeatRig {
   seatId: string
   seatHeight: number
   facing: RoomFurnitureRotation
+  /**
+   * 2.5D: the approach spot in front of the seat relative to the seat point (stage fractions).
+   * The 2.5D avatar stays at the approach spot (its box) while seated there; it draws itself onto the seat.
+   */
+  approach?: { x: number; y: number }
 }
 
 export interface RoomV2AvatarRenderItem extends RoomV2RenderItemBase {
@@ -479,6 +548,8 @@ export interface RoomV2AvatarRenderItem extends RoomV2RenderItemBase {
   state?: RoomV2AvatarMotionState
   motionTreatment?: RoomV2AvatarMotionTreatment
   seatRig?: RoomV2AvatarSeatRig
+  /** 2.5D experiment: set only when the whole avatar has 2.5D art (else avatarV2 draws). */
+  avatar25d?: RoomAvatar25dSpec
   // Future metadata only: chat/reaction rendering is intentionally out of
   // scope for the first room-world proof.
   chatBubbleAnchor?: RoomAnchor

@@ -2,6 +2,7 @@ import { MINI_ROOM_FLOOR } from "@blumi/domain"
 import { roomV2ProductionAssets as roomV2Assets } from "./roomV2ProductionAssets"
 import { ROOM_V2_APPROVED_MY_ROOM_CAMERA } from "./roomV2Camera"
 import { ROOM_V2_BLUMI_WORLD_FLOOR_GRID } from "./roomV2FloorGrid"
+import { roomAvatar25d } from "../../features/avatar/roomAvatarSeam"
 import type {
   FurnitureItem,
   RoomV2AssetRef,
@@ -185,7 +186,8 @@ const LEGACY_ROOM_V2_FURNITURE_CATALOG: FurnitureItem[] = [
     seatPoints: [
       {
         id: "front_edge",
-        x: 0,
+        // the three-quarter armchair's cushion sits right of the image centre (+0.1 width)
+        x: 0.1,
         y: -0.2,
         facing: "front"
       }
@@ -195,7 +197,7 @@ const LEGACY_ROOM_V2_FURNITURE_CATALOG: FurnitureItem[] = [
       seatPoints: [
         {
           id: "front_edge",
-          x: 0,
+          x: 0.1,
           y: -0.2,
           facing: "front",
           approachPoint: { x: 0, y: 0.22 },
@@ -361,8 +363,13 @@ const LEGACY_ROOM_V2_FURNITURE_CATALOG: FurnitureItem[] = [
   }
 ]
 
-export const ROOM_V2_FURNITURE_CATALOG: FurnitureItem[] =
-  LEGACY_ROOM_V2_FURNITURE_CATALOG
+// The layered 2.5D pieces from the room seam (never an existing id; empty in plain Node tests without the seam).
+const LEGACY_ROOM_V2_FURNITURE_IDS = new Set(LEGACY_ROOM_V2_FURNITURE_CATALOG.map((item) => item.id))
+
+export const ROOM_V2_FURNITURE_CATALOG: FurnitureItem[] = [
+  ...LEGACY_ROOM_V2_FURNITURE_CATALOG,
+  ...roomAvatar25d.furnitureCatalog.filter((item) => !LEGACY_ROOM_V2_FURNITURE_IDS.has(item.id))
+]
 
 export const MOCK_USER_ROOM_V2_DECOR: UserRoomDecor = {
   roomShellId: DEFAULT_ROOM_V2_SHELL_ID,

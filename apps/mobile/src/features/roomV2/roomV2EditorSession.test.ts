@@ -4,6 +4,8 @@ import type { UserRoomDecor } from "./roomV2.types"
 import {
   applyRoomV2EditorDraft,
   createRoomV2EditorSession,
+  markRoomV2EditorSessionSaved,
+  redoRoomV2EditorSession,
   resetRoomV2EditorSession,
   undoRoomV2EditorSession,
   updateRoomV2EditorPersistedBaseline
@@ -125,3 +127,78 @@ test("a later server confirmation updates reset without overwriting the active d
     confirmed
   )
 })
+
+function moveFirst(session: ReturnType<typeof createRoomV2EditorSession>, x: number) {
+  return applyRoomV2EditorDraft(session, {
+    ...session.draftDecor,
+    placedItems: session.draftDecor.placedItems.map((item, index) => index === 0 ? { ...item, x } : item)
+  })
+}
+
+test("with a deeper history, undo walks back step by step and redo walks forward again", () => {
+  let session = createRoomV2EditorSession(decor("starter", ["bed"]), undefined, { historyLimit: 30 })
+  for (const x of [0.3, 0.4, 0.5]) session = moveFirst(session, x)
+
+  const back1 = undoRoomV2EditorSession(session)
+  const back2 = undoRoomV2EditorSession(back1)
+  const back3 = undoRoomV2EditorSession(back2)
+  assert.deepEqual([back1, back2, back3].map((step) => step.draftDecor.placedItems[0]!.x), [0.4, 0.3, 0.2])
+  assert.equal(back3.canUndo, false)
+  assert.equal(back3.isDirty, false)
+  assert.equal(back3.canRedo, true)
+
+  const forward1 = redoRoomV2EditorSession(back3)
+  const forward2 = redoRoomV2EditorSession(forward1)
+  const forward3 = redoRoomV2EditorSession(forward2)
+  assert.deepEqual([forward1, forward2, forward3].map((step) => step.draftDecor.placedItems[0]!.x), [0.3, 0.4, 0.5])
+  assert.equal(forward3.canRedo, false)
+  assert.equal(redoRoomV2EditorSession(forward3), forward3)
+})
+
+test("a new change after undo drops the redo branch", () => {
+  let session = createRoomV2EditorSession(decor("starter", ["bed"]), undefined, { historyLimit: 30 })
+  session = moveFirst(moveFirst(session, 0.3), 0.4)
+  const undone = undoRoomV2EditorSession(session)
+  assert.equal(undone.canRedo, true)
+  const branched = moveFirst(undone, 0.6)
+  assert.equal(branched.canRedo, false)
+  assert.equal(undoRoomV2EditorSession(branched).draftDecor.placedItems[0]!.x, 0.3)
+})
+
+test("the history keeps only its newest steps", () => {
+  let session = createRoomV2EditorSession(decor("starter", ["bed"]), undefined, { historyLimit: 3 })
+  for (const x of [0.3, 0.4, 0.5, 0.6, 0.7]) session = moveFirst(session, x)
+  let steps = 0
+  while (session.canUndo) {
+    session = undoRoomV2EditorSession(session)
+    steps += 1
+  }
+  assert.equal(steps, 3)
+  assert.equal(session.draftDecor.placedItems[0]!.x, 0.4)
+})
+
+test("the default single-step undo keeps no redo, as before", () => {
+  const session = moveFirst(moveFirst(createRoomV2EditorSession(decor("starter", ["bed"])), 0.3), 0.4)
+  const undone = undoRoomV2EditorSession(session)
+  assert.equal(undone.draftDecor.placedItems[0]!.x, 0.3)
+  assert.equal(undone.canUndo, false)
+  assert.equal(undone.canRedo, false)
+})
+
+test("history snapshots are private copies and a confirmed save starts a fresh history", () => {
+  let session = createRoomV2EditorSession(decor("starter", ["bed"]), undefined, { historyLimit: 30 })
+  const next = decor("starter", ["bed"])
+  next.placedItems[0]!.x = 0.3
+  session = moveFirst(applyRoomV2EditorDraft(session, next), 0.4)
+  // the caller's object changes later; the history keeps what was applied
+  next.placedItems[0]!.x = 0.99
+  assert.equal(undoRoomV2EditorSession(session).draftDecor.placedItems[0]!.x, 0.3)
+  assert.equal(undoRoomV2EditorSession(undoRoomV2EditorSession(session)).draftDecor.placedItems[0]!.x, 0.2)
+
+  const saved = markRoomV2EditorSessionSaved(session, session.draftDecor)
+  assert.equal(saved.canUndo, false)
+  assert.equal(saved.canRedo, false)
+  assert.equal(saved.historyLimit, 30)
+  assert.equal(saved.isDirty, false)
+})
+

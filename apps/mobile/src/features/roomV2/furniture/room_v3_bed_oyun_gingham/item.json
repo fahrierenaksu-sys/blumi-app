@@ -1,0 +1,550 @@
+{
+ "id": "room_v3_bed_oyun_gingham",
+ "version": 1,
+ "scale_name": "D",
+ "scale": 2.0,
+ "px_per_world_unit": 195.61740822333448,
+ "camera": {
+  "yaw_deg": 45.0,
+  "pitch_deg": 21.64067231100742,
+  "shell_px_per_unit": 97.80870411166724
+ },
+ "footprint": {
+  "w": 5,
+  "d": 4,
+  "cell": 0.5,
+  "note": "cells at rotation 0; odd rotations swap w/d"
+ },
+ "seat_class": "chair",
+ "symmetric": false,
+ "mirrored_rotations": false,
+ "rotation_invariant": false,
+ "interactions": [
+  "lie",
+  "lie2",
+  "sit_edge"
+ ],
+ "wallMount": false,
+ "wallMountHeight": null,
+ "surfaces": [],
+ "pose_pending": [
+  "lie",
+  "lie2"
+ ],
+ "shadow": {
+  "layer": "shadow.png",
+  "light": "style/light.json (azimuth 107.7, elevation 60.7, #7A3B25, cast alpha 0.29, contact 0.435)"
+ },
+ "light_room_frame": [
+  -0.1491,
+  0.872,
+  0.4663
+ ],
+ "runtime_rules": {
+  "card_split": "front views: split the seated card at front_edge_px row; shins/shoes draw above the front layer",
+  "card_clip": "back views: no split; clip the card softly below card_clip_below_px (hip row + 0.05 units)",
+  "draw_order": "shadow, back, avatar(s), front",
+  "multiple_sitters": "draw seated cards far to near: sort by hip_world X + Z ascending (both grow toward the camera)"
+ },
+ "ergonomics": {
+  "standard": "ergonomics.json [D]",
+  "scale": "D",
+  "N": 2.105,
+  "targets": {
+   "bed_edge_height": 0.574,
+   "length": 2.273,
+   "width_double": 1.642,
+   "headboard_top": 1.091,
+   "hip_point_height": 0.5866
+  },
+  "twin_measured": {
+   "overall": [
+    2.273,
+    1.642,
+    1.091
+   ],
+   "zmin": 0.0,
+   "footprint": [
+    5,
+    4
+   ],
+   "params": {
+    "L": 2.2734,
+    "Wd": 1.6419,
+    "Hm": 0.574,
+    "hb_top": 1.0908
+   },
+   "twin": "rodin"
+  },
+  "sheet_vs_ergonomics": {
+   "id": "room_v3_bed_oyun_gingham",
+   "twin": "rodin",
+   "rodin": {
+    "generation": "f11e9a9e-872c-46d0-8d93-c08bb8a7f991",
+    "tier": "Gen-2.5-High",
+    "mesh_mode": "Raw",
+    "quality_override": 200000
+   },
+   "raw": {
+    "raw_size": [
+     1.5503,
+     1.8946,
+     0.8317
+    ],
+    "after_axis_turn": [
+     1.8946,
+     1.5503,
+     0.8317
+    ],
+    "scale_xyz": [
+     1.2,
+     1.059,
+     1.311
+    ],
+    "final": [
+     2.273,
+     1.642,
+     1.091
+    ],
+    "footprint": [
+     5,
+     4
+    ],
+    "yaw": 0.0,
+    "faces": 50000,
+    "fixed": {
+     "height": 1.0908
+    },
+    "plan_wd": [
+     2.2734,
+     1.6419
+    ]
+   },
+   "built_dims": [
+    2.273,
+    1.642,
+    1.091
+   ],
+   "plan_dims": [
+    2.27,
+    1.64,
+    1.05
+   ],
+   "built_footprint": [
+    5,
+    4
+   ],
+   "plan_footprint": [
+    5,
+    4
+   ],
+   "fixed_ergonomic_keys": {
+    "L": 2.2734,
+    "Wd": 1.6419,
+    "Hm": 0.574,
+    "hb_top": 1.0908
+   },
+   "note": "Rodin shape + texture scaled per axis to length 2.273, width 1.642, headboard top 1.091 (raw 1.55x1.89x0.83); head at -x, long side -y",
+   "rule": "ergonomics win over the sheet"
+  }
+ },
+ "coords": {
+  "sprite_px": "continuous px in the layer PNGs (x right, y down); anchor_px = where the footprint centre floor point lands",
+  "hip_world": "[X, Y, Z] room frame, relative to the footprint centre, after rotation",
+  "cells": "[a, b] relative to the footprint min-corner cell at this rotation: room cell = (i + a, j + b)",
+  "place": "layer top-left in shell px (zoom 1) = shell_px(footprint centre) - anchor_px / scale"
+ },
+ "id_colors": {
+  "body": [
+   230,
+   25,
+   75
+  ]
+ },
+ "rotations": {
+  "0": {
+   "size": [
+    555,
+    382
+   ],
+   "anchor_px": [
+    259,
+    285
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    5,
+    4
+   ],
+   "front_groups": [],
+   "seats": [
+    {
+     "id": "s0",
+     "pose": "sit_chair",
+     "hip_px": [
+      213.49,
+      210.42
+     ],
+     "hip_world": [
+      0.15,
+      0.5866,
+      0.479
+     ],
+     "seat_height": 0.5866,
+     "facing_yaw_deg": 0.0,
+     "avatar_view": "front",
+     "approach_cell": [
+      2,
+      4
+     ],
+     "exit_cell": [
+      2,
+      4
+     ],
+     "front_edge_px": [
+      166.19,
+      230.16
+     ],
+     "card_split": true,
+     "ergo": {
+      "hip_height": 0.5866,
+      "hip_from_backrest": 0.113,
+      "hip_to_front_edge": 0.342,
+      "knee_minus_front_edge": -0.028
+     }
+    },
+    {
+     "id": "s1",
+     "pose": "sit_chair",
+     "hip_px": [
+      300.64,
+      242.56
+     ],
+     "hip_world": [
+      0.78,
+      0.5866,
+      0.479
+     ],
+     "seat_height": 0.5866,
+     "facing_yaw_deg": 0.0,
+     "avatar_view": "front",
+     "approach_cell": [
+      4,
+      4
+     ],
+     "exit_cell": [
+      4,
+      4
+     ],
+     "front_edge_px": [
+      253.33,
+      262.3
+     ],
+     "card_split": true,
+     "ergo": {
+      "hip_height": 0.5866,
+      "hip_from_backrest": 0.113,
+      "hip_to_front_edge": 0.342,
+      "knee_minus_front_edge": -0.028
+     }
+    }
+   ],
+   "source": "ChatGPT repaint rep_r0_t1 (twin render + gated sheet), cut with the twin alpha",
+   "silhouette_iou_vs_twin": 1.0
+  },
+  "1": {
+   "size": [
+    553,
+    305
+   ],
+   "anchor_px": [
+    261,
+    206
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    4,
+    5
+   ],
+   "front_groups": [],
+   "seats": [
+    {
+     "id": "s0",
+     "pose": "sit_chair",
+     "hip_px": [
+      348.0,
+      116.12
+     ],
+     "hip_world": [
+      0.479,
+      0.5866,
+      -0.15
+     ],
+     "seat_height": 0.5866,
+     "facing_yaw_deg": 90.0,
+     "avatar_view": "frontM",
+     "approach_cell": [
+      4,
+      2
+     ],
+     "exit_cell": [
+      4,
+      2
+     ],
+     "front_edge_px": [
+      395.31,
+      135.86
+     ],
+     "card_split": true,
+     "ergo": {
+      "hip_height": 0.5866,
+      "hip_from_backrest": 0.113,
+      "hip_to_front_edge": 0.342,
+      "knee_minus_front_edge": -0.028
+     }
+    },
+    {
+     "id": "s1",
+     "pose": "sit_chair",
+     "hip_px": [
+      435.15,
+      83.98
+     ],
+     "hip_world": [
+      0.479,
+      0.5866,
+      -0.78
+     ],
+     "seat_height": 0.5866,
+     "facing_yaw_deg": 90.0,
+     "avatar_view": "frontM",
+     "approach_cell": [
+      4,
+      0
+     ],
+     "exit_cell": [
+      4,
+      0
+     ],
+     "front_edge_px": [
+      482.45,
+      103.72
+     ],
+     "card_split": true,
+     "ergo": {
+      "hip_height": 0.5866,
+      "hip_from_backrest": 0.113,
+      "hip_to_front_edge": 0.342,
+      "knee_minus_front_edge": -0.028
+     }
+    }
+   ],
+   "source": "ChatGPT repaint rep_r1_t2 (twin render + gated sheet), cut with the twin alpha",
+   "silhouette_iou_vs_twin": 1.0
+  },
+  "2": {
+   "size": [
+    608,
+    305
+   ],
+   "anchor_px": [
+    260,
+    205
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    5,
+    4
+   ],
+   "front_groups": [],
+   "seats": [
+    {
+     "id": "s0",
+     "pose": "sit_chair",
+     "hip_px": [
+      305.51,
+      66.25
+     ],
+     "hip_world": [
+      -0.15,
+      0.5866,
+      -0.479
+     ],
+     "seat_height": 0.5866,
+     "facing_yaw_deg": 180.0,
+     "avatar_view": "back",
+     "approach_cell": [
+      2,
+      -1
+     ],
+     "exit_cell": [
+      2,
+      -1
+     ],
+     "front_edge_px": [
+      352.81,
+      51.1
+     ],
+     "card_split": false,
+     "card_clip_below_px": 76.03,
+     "ergo": {
+      "hip_height": 0.5866,
+      "hip_from_backrest": 0.113,
+      "hip_to_front_edge": 0.342,
+      "knee_minus_front_edge": -0.028
+     }
+    },
+    {
+     "id": "s1",
+     "pose": "sit_chair",
+     "hip_px": [
+      218.36,
+      34.12
+     ],
+     "hip_world": [
+      -0.78,
+      0.5866,
+      -0.479
+     ],
+     "seat_height": 0.5866,
+     "facing_yaw_deg": 180.0,
+     "avatar_view": "back",
+     "approach_cell": [
+      0,
+      -1
+     ],
+     "exit_cell": [
+      0,
+      -1
+     ],
+     "front_edge_px": [
+      265.67,
+      18.96
+     ],
+     "card_split": false,
+     "card_clip_below_px": 43.9,
+     "ergo": {
+      "hip_height": 0.5866,
+      "hip_from_backrest": 0.113,
+      "hip_to_front_edge": 0.342,
+      "knee_minus_front_edge": -0.028
+     }
+    }
+   ],
+   "source": "ChatGPT repaint rep_r2_t1 (twin render + gated sheet), cut with the twin alpha",
+   "silhouette_iou_vs_twin": 1.0
+  },
+  "3": {
+   "size": [
+    609,
+    385
+   ],
+   "anchor_px": [
+    260,
+    286
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    4,
+    5
+   ],
+   "front_groups": [],
+   "seats": [
+    {
+     "id": "s0",
+     "pose": "sit_chair",
+     "hip_px": [
+      173.0,
+      162.56
+     ],
+     "hip_world": [
+      -0.479,
+      0.5866,
+      0.15
+     ],
+     "seat_height": 0.5866,
+     "facing_yaw_deg": 270.0,
+     "avatar_view": "backM",
+     "approach_cell": [
+      -1,
+      2
+     ],
+     "exit_cell": [
+      -1,
+      2
+     ],
+     "front_edge_px": [
+      125.69,
+      147.4
+     ],
+     "card_split": false,
+     "card_clip_below_px": 172.34,
+     "ergo": {
+      "hip_height": 0.5866,
+      "hip_from_backrest": 0.113,
+      "hip_to_front_edge": 0.342,
+      "knee_minus_front_edge": -0.028
+     }
+    },
+    {
+     "id": "s1",
+     "pose": "sit_chair",
+     "hip_px": [
+      85.85,
+      194.69
+     ],
+     "hip_world": [
+      -0.479,
+      0.5866,
+      0.78
+     ],
+     "seat_height": 0.5866,
+     "facing_yaw_deg": 270.0,
+     "avatar_view": "backM",
+     "approach_cell": [
+      -1,
+      4
+     ],
+     "exit_cell": [
+      -1,
+      4
+     ],
+     "front_edge_px": [
+      38.55,
+      179.54
+     ],
+     "card_split": false,
+     "card_clip_below_px": 204.47,
+     "ergo": {
+      "hip_height": 0.5866,
+      "hip_from_backrest": 0.113,
+      "hip_to_front_edge": 0.342,
+      "knee_minus_front_edge": -0.028
+     }
+    }
+   ],
+   "source": "ChatGPT repaint rep_r3_t1 (twin render + gated sheet), cut with the twin alpha",
+   "silhouette_iou_vs_twin": 1.0
+  }
+ },
+ "colorways": [
+  "Mint ekose",
+  "Lavanta ekose"
+ ]
+}

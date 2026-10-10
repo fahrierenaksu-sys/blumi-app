@@ -1,0 +1,170 @@
+{
+ "id": "room_v3_rug_oyun_cloud",
+ "version": 1,
+ "scale_name": "D",
+ "scale": 2.0,
+ "px_per_world_unit": 195.61740822333448,
+ "camera": {
+  "yaw_deg": 45.0,
+  "pitch_deg": 21.64067231100742,
+  "shell_px_per_unit": 97.80870411166724
+ },
+ "footprint": {
+  "w": 6,
+  "d": 4,
+  "cell": 0.5,
+  "note": "cells at rotation 0; odd rotations swap w/d"
+ },
+ "kind": "flat_floor",
+ "walkable": true,
+ "draw_layer": "floor (below shadows, items and avatars)",
+ "painted_size_units": [
+  2.64,
+  1.8
+ ],
+ "seat_class": null,
+ "symmetric": false,
+ "interactions": [],
+ "wallMount": false,
+ "wallMountHeight": null,
+ "surfaces": [],
+ "rectify": {
+  "mode": "topdown",
+  "sheet_aspect": 1.466,
+  "painted_size_units": [
+   2.64,
+   1.8
+  ],
+  "plan_box": [
+   3.2,
+   1.8
+  ],
+  "plan_footprint": [
+   7,
+   4
+  ],
+  "footprint": [
+   6,
+   4
+  ],
+  "distortion_pct": 0.0
+ },
+ "shadow": "none (a rug is thin: no cast shadow); draw order: floor, rug, shadows, items, avatars",
+ "coords": {
+  "place": "layer top-left in shell px (zoom 1) = shell_px(footprint centre) - anchor_px / scale"
+ },
+ "rotations": {
+  "0": {
+   "size": [
+    622,
+    234
+   ],
+   "anchor_px": [
+    311,
+    117
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    6,
+    4
+   ],
+   "front_groups": [],
+   "seats": [],
+   "painted_bbox_px": [
+    33,
+    14,
+    589,
+    219
+   ]
+  },
+  "1": {
+   "size": [
+    622,
+    234
+   ],
+   "anchor_px": [
+    311,
+    117
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    4,
+    6
+   ],
+   "front_groups": [],
+   "seats": [],
+   "painted_bbox_px": [
+    33,
+    14,
+    588,
+    219
+   ]
+  },
+  "2": {
+   "size": [
+    622,
+    234
+   ],
+   "anchor_px": [
+    311,
+    117
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    6,
+    4
+   ],
+   "front_groups": [],
+   "seats": [],
+   "painted_bbox_px": [
+    33,
+    15,
+    589,
+    220
+   ]
+  },
+  "3": {
+   "size": [
+    622,
+    234
+   ],
+   "anchor_px": [
+    311,
+    117
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    4,
+    6
+   ],
+   "front_groups": [],
+   "seats": [],
+   "painted_bbox_px": [
+    34,
+    15,
+    589,
+    220
+   ]
+  }
+ },
+ "colorways": {
+  "pembe": "Pembe",
+  "mint": "Mint"
+ }
+}

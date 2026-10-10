@@ -1,0 +1,417 @@
+{
+ "id": "room_v3_frame_japon_sakura",
+ "version": 1,
+ "scale_name": "D",
+ "scale": 2.0,
+ "px_per_world_unit": 195.61740822333448,
+ "vertical_px_per_unit": 181.829,
+ "camera": {
+  "yaw_deg": 45.0,
+  "pitch_deg": 21.64067231100742,
+  "shell_px_per_unit": 97.80870411166724
+ },
+ "kind": "wall_flat",
+ "footprint": null,
+ "seat_class": null,
+ "symmetric": false,
+ "interactions": [],
+ "wallMount": true,
+ "wallMountHeight": [
+  1.0,
+  2.0
+ ],
+ "painted_size_units": [
+  1.0,
+  1.013
+ ],
+ "standoff": 0.035,
+ "surfaces": [],
+ "rectify": {
+  "mode": "frontal",
+  "aspect": 0.988,
+  "h": 1.013
+ },
+ "walls": {
+  "left": [
+   [
+    -0.7675,
+    7.4784
+   ],
+   [
+    -0.6073,
+    -0.6173
+   ]
+  ],
+  "right": [
+   [
+    -0.6073,
+    -0.6173
+   ],
+   [
+    7.7911,
+    -1.0056
+   ]
+  ]
+ },
+ "variants": {
+  "r0": "right wall (faces +Z)",
+  "r1": "left wall (faces +X)",
+  "r2": "not drawn: would face away from the camera",
+  "r3": "not drawn: would face away from the camera"
+ },
+ "shadow": "right wall: cast shadow displaced by the standoff (light.json); left wall: soft AO only",
+ "coords": {
+  "place": "sprite top-left (zoom 1) = shell_px(wall point at the painting centre column, height 0) - anchor_px / scale; shift up by dh * vertical_px_per_unit / scale per unit of height; along the wall = pure translation"
+ },
+ "rotations": {
+  "0": {
+   "size": [
+    186,
+    274
+   ],
+   "anchor_px": [
+    93,
+    410
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    1,
+    1
+   ],
+   "front_groups": [],
+   "seats": [],
+   "wall": "right",
+   "faces": "+Z (right wall)",
+   "painted_bbox_px": [
+    21,
+    22,
+    165,
+    252
+   ],
+   "wall_t0": 3.5,
+   "mount_height_default": 1.5
+  },
+  "1": {
+   "size": [
+    182,
+    275
+   ],
+   "anchor_px": [
+    91,
+    410
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    1,
+    1
+   ],
+   "front_groups": [],
+   "seats": [],
+   "wall": "left",
+   "faces": "+X (left wall)",
+   "painted_bbox_px": [
+    21,
+    22,
+    161,
+    253
+   ],
+   "wall_t0": 3.5,
+   "mount_height_default": 1.5
+  }
+ },
+ "colorways": {
+  "mint": "Mint",
+  "lavanta": "Lavanta"
+ },
+ "wallVariants": {
+  "right": {
+   "rotation": 0,
+   "dir": "r0",
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "size_px": [
+    186,
+    274
+   ],
+   "anchor_px": [
+    93,
+    410
+   ],
+   "anchor_meaning": "wall base line (height 0) under the painting centre column, sprite px at scale 2",
+   "scale": 2.0,
+   "px_per_world_unit": 195.61740822333448,
+   "vertical_px_per_unit": 181.829,
+   "wall_plane": {
+    "equation": "Z = at_t0 + per_unit*X (vertical)",
+    "at_t0": -0.6453860785663614,
+    "per_unit": -0.04623071539062701,
+    "along_axis": "X",
+    "faces": "+Z",
+    "base_segment_world_xz": [
+     [
+      -0.6073,
+      -0.6173
+     ],
+     [
+      7.7911,
+      -1.0056
+     ]
+    ]
+   },
+   "t0": 3.5,
+   "mount_height_default": 1.5,
+   "wallMountHeight": [
+    1.0,
+    2.0
+   ],
+   "width_units_along_wall": 1.0,
+   "height_units": 1.013,
+   "standoff": 0.035,
+   "measured_bbox_px": [
+    21,
+    22,
+    165,
+    252
+   ],
+   "outline_polygon_px": [
+    [
+     21.0,
+     203.0
+    ],
+    [
+     21.0,
+     23.0
+    ],
+    [
+     22.0,
+     22.0
+    ],
+    [
+     23.0,
+     22.0
+    ],
+    [
+     41.0,
+     28.0
+    ],
+    [
+     157.0,
+     67.0
+    ],
+    [
+     162.0,
+     69.0
+    ],
+    [
+     164.0,
+     71.0
+    ],
+    [
+     164.0,
+     251.0
+    ],
+    [
+     161.0,
+     251.0
+    ],
+    [
+     83.0,
+     225.0
+    ],
+    [
+     24.0,
+     205.0
+    ],
+    [
+     22.0,
+     204.0
+    ]
+   ],
+   "shadow": {
+    "layer": "shadow.png",
+    "kind": "cast (displaced by the standoff, light.json)"
+   },
+   "t_range": [
+    -0.395706837570216,
+    7.63572445784752
+   ],
+   "obstacles": [
+    {
+     "name": "lamp_niche",
+     "t": [
+      4.788,
+      5.995
+     ],
+     "y": [
+      0.614,
+      1.939
+     ]
+    }
+   ],
+   "edit_rule": "slide along the wall: sprite shifts by pure translation; the painting occupies t0 +- width/2 and the height range [centre - h/2, centre + h/2]; keep out of every obstacle t-interval x y-interval"
+  },
+  "left": {
+   "rotation": 1,
+   "dir": "r1",
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "size_px": [
+    182,
+    275
+   ],
+   "anchor_px": [
+    91,
+    410
+   ],
+   "anchor_meaning": "wall base line (height 0) under the painting centre column, sprite px at scale 2",
+   "scale": 2.0,
+   "px_per_world_unit": 195.61740822333448,
+   "vertical_px_per_unit": 181.829,
+   "wall_plane": {
+    "equation": "X = at_t0 + per_unit*Z (vertical)",
+    "at_t0": -0.6194883195595663,
+    "per_unit": -0.019794528548887285,
+    "along_axis": "Z",
+    "faces": "+X",
+    "base_segment_world_xz": [
+     [
+      -0.7675,
+      7.4784
+     ],
+     [
+      -0.6073,
+      -0.6173
+     ]
+    ]
+   },
+   "t0": 3.5,
+   "mount_height_default": 1.5,
+   "wallMountHeight": [
+    1.0,
+    2.0
+   ],
+   "width_units_along_wall": 1.0,
+   "height_units": 1.013,
+   "standoff": 0.035,
+   "measured_bbox_px": [
+    21,
+    22,
+    161,
+    253
+   ],
+   "outline_polygon_px": [
+    [
+     21.0,
+     252.0
+    ],
+    [
+     21.0,
+     71.0
+    ],
+    [
+     22.0,
+     70.0
+    ],
+    [
+     24.0,
+     69.0
+    ],
+    [
+     35.0,
+     65.0
+    ],
+    [
+     66.0,
+     54.0
+    ],
+    [
+     145.0,
+     26.0
+    ],
+    [
+     157.0,
+     22.0
+    ],
+    [
+     160.0,
+     22.0
+    ],
+    [
+     160.0,
+     202.0
+    ],
+    [
+     158.0,
+     204.0
+    ],
+    [
+     153.0,
+     206.0
+    ],
+    [
+     139.0,
+     211.0
+    ],
+    [
+     108.0,
+     222.0
+    ],
+    [
+     29.0,
+     250.0
+    ],
+    [
+     23.0,
+     252.0
+    ]
+   ],
+   "shadow": {
+    "layer": "shadow.png",
+    "kind": "soft contact line only (the left wall faces away from the light)"
+   },
+   "t_range": [
+    -0.4795301897539922,
+    7.353247795009993
+   ],
+   "obstacles": [
+    {
+     "name": "door",
+     "t": [
+      4.151,
+      5.725
+     ],
+     "y": [
+      0.023,
+      2.128
+     ]
+    },
+    {
+     "name": "window",
+     "t": [
+      0.975,
+      2.719
+     ],
+     "y": [
+      0.405,
+      2.145
+     ]
+    }
+   ],
+   "edit_rule": "slide along the wall: sprite shifts by pure translation; the painting occupies t0 +- width/2 and the height range [centre - h/2, centre + h/2]; keep out of every obstacle t-interval x y-interval"
+  }
+ }
+}

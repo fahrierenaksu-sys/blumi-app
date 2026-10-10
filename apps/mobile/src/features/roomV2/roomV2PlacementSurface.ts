@@ -35,6 +35,15 @@ export function validateRoomV2FurnitureSurfacePlacement(input: {
     }
   }
 
+  if (surface === "wall" && input.candidate.wallPlacement) {
+    // room calibration: the piece is on a measured back wall, which already decided whether it fits.
+    return {
+      isValid: input.candidate.wallPlacement.isValid,
+      issueIds: input.candidate.wallPlacement.isValid ? [] : ["invalid_placement_surface"],
+      supportingRenderIds: []
+    }
+  }
+
   if (surface === "wall" || surface === "ceiling") {
     const region = input.scene.shell?.surfacePlacementAreas?.[surface]
     const exclusions = input.scene.shell?.surfacePlacementExclusions?.[surface] ?? []

@@ -33,6 +33,10 @@ import { getRoomVNextDirectionalVisual } from "./roomVNextContracts"
 import { validateRoomV2FurnitureSurfacePlacement } from "./roomV2PlacementSurface"
 import { getRoomV2FurnitureMobileRenderScale } from "./roomV2RenderSurface"
 import { getRoomV2ShellFloorPlacementPolygon } from "./roomV2FloorGrid"
+import { roomAvatar25d } from "../../features/avatar/roomAvatarSeam"
+
+/** 2.5D room calibration; null in every other bundle (shapes stay as shipped). */
+const roomCalibration = roomAvatar25d.roomCalibration
 
 /**
  * Returns the stable search key used by the room inventory and editor.
@@ -98,11 +102,12 @@ export interface RoomV2PlacementLaneSnapResult {
 export function resolveRoomV2Scene(
   input: ResolveRoomV2SceneInput
 ): ResolvedRoomV2Scene {
-  const shell = resolveRoomV2Shell(
+  const catalogShell = resolveRoomV2Shell(
     input.roomShellCatalog,
     input.decor.roomShellId,
     input.defaultRoomShellId
   )
+  const shell = catalogShell && roomCalibration ? roomCalibration.calibrateShell(catalogShell) : catalogShell
   if (!shell) {
     return {
       shell: null,
@@ -272,7 +277,7 @@ export function resolvePlacedFurnitureRenderItem(
     : resolveFurnitureAssetForRotation(item, placed.rotation)
   if (!asset) return null
 
-  return {
+  const renderItem: RoomV2FurnitureRenderItem = {
     renderId: placed.instanceId,
     kind: "furniture",
     itemId: item.id,
@@ -342,6 +347,16 @@ export function resolvePlacedFurnitureRenderItem(
     contactShadowAsset: visual?.contactShadowAsset,
     foregroundOcclusionAsset: visual?.foregroundOcclusionAsset
   }
+  return roomCalibration ? roomCalibration.calibrateFurnitureItem(renderItem) : renderItem
+}
+
+/**
+ * The rotations a piece can be placed in: its directional art, or (room calibration only) the four
+ * room-camera rotations of a layered piece.
+ */
+export function getRoomV2FurnitureRotationChoices(item: FurnitureItem): RoomFurnitureRotation[] {
+  return roomCalibration?.furnitureRotations(item.id) ??
+    (item.assetsByRotation ? Object.keys(item.assetsByRotation) as RoomFurnitureRotation[] : [])
 }
 
 function shouldMirrorRoomV2FurnitureRotation(
@@ -594,7 +609,10 @@ export function validateRoomV2DraftPlacements(input: {
     if (validation.isValid) continue
     if (
       isSameRoomV2Placement(untouchedItems.get(placedItem.instanceId), placedItem) &&
-      validation.issueIds.every((issueId) => issueId === "outside_placeable_area")
+      validation.issueIds.every((issueId) =>
+        issueId === "outside_placeable_area" ||
+        // room calibration: a wall piece saved under the shell's old wall band keeps its spot
+        (issueId === "invalid_placement_surface" && renderItem.wallPlacement !== undefined))
     ) {
       continue
     }
@@ -633,12 +651,30 @@ export function createRoomV2FurniturePlacementPreview(input: {
   y: number
 }): RoomV2RenderItem {
   if (input.item.kind !== "furniture") return input.item
+  if (roomCalibration) {
+    // the calibrated footprint (and any wall-flush move) follows the piece to its new cell
+    const { renderOffset: _previousOffset, ...item } = input.item
+    void _previousOffset
+    return roomCalibration.calibrateFurnitureItem({ ...item, x: input.x, y: input.y, depth: input.y })
+  }
   return {
     ...input.item,
     x: input.x,
     y: input.y,
     depth: input.y
   }
+}
+
+/**
+ * The wall magnet (room calibration only): where a wall piece held at a stage point goes, flush on
+ * the measured back wall under it. Null for every other piece and in every other bundle (the shell's wall band).
+ */
+export function snapRoomV2WallPlacementPoint(
+  item: RoomV2RenderItem,
+  point: { x: number; y: number }
+): { x: number; y: number } | null {
+  if (!roomCalibration || item.kind !== "furniture" || item.placementSurface !== "wall") return null
+  return roomCalibration.snapWallItem(item, point)
 }
 
 export function snapRoomV2PointToPlacementLane(input: {

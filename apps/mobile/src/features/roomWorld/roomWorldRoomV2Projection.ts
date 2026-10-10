@@ -13,6 +13,10 @@ import {
   createRoomWorldFloorGeometry,
   ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON
 } from "./roomWorldGeometry"
+import { roomAvatar25d } from "../../features/avatar/roomAvatarSeam"
+
+/** 2.5D room calibration; null in every other bundle (the walk floor stays as shipped). */
+const roomCalibration = roomAvatar25d.roomCalibration
 
 export function createRoomWorldGeometryFromRoomV2Scene(
   scene: ResolvedRoomV2Scene
@@ -22,7 +26,7 @@ export function createRoomWorldGeometryFromRoomV2Scene(
   const floor = scene.shell?.floorGrid
     ? createRoomWorldFloorGeometry(scene.shell.floorGrid, scene.shell.canvasSize)
     : undefined
-  return {
+  const geometry: RoomWorldGeometry = {
     ...(floor ?? {
       walkableAreas: scene.shell?.placeableArea
         ? [createWalkableAreaFromRoomShell(scene.shell)]
@@ -49,7 +53,11 @@ export function createRoomWorldGeometryFromRoomV2Scene(
         }
       })
   }
+  return roomCalibration ? roomCalibration.calibrateWalkGeometry(geometry, scene.shell) : geometry
 }
+
+/** The depth step between the sitters of one piece (a small share of the seated epsilon, so all stay right in front of it). */
+const SEATED_DRAW_RANK_DEPTH_STEP = ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON / 16
 
 export function createRoomWorldHotspotsFromRoomV2Scene(
   scene: ResolvedRoomV2Scene
@@ -66,7 +74,9 @@ export function createRoomWorldHotspotsFromRoomV2Scene(
           y: seatPoint.seat.y,
           facing: seatPoint.facing,
           seatHeight: seatPoint.seatHeight,
-          renderDepth: item.depth + ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON,
+          // sitters on one piece draw far to near (layered pieces carry `drawRank`)
+          renderDepth: item.depth + ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON +
+            (seatPoint.drawRank ?? 0) * SEATED_DRAW_RANK_DEPTH_STEP,
           approachPoint: { ...seatPoint.approach },
           exitPoint: { ...seatPoint.exit },
           sourceRenderId: item.renderId

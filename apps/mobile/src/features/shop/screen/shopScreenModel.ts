@@ -231,7 +231,8 @@ const HOME_CATEGORY_SORT_ORDER: Record<FurnitureCategory, number> = {
   rug: 3,
   wallDecor: 4,
   plant: 5,
-  misc: 6
+  misc: 6,
+  storage: 7
 }
 
 export function sortRoomShopProducts(products: ShopCatalogItem[]): ShopCatalogItem[] {

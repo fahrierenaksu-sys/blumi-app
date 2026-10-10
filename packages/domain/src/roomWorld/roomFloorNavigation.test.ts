@@ -13,6 +13,7 @@ import {
 } from "./roomFloorNavigation"
 import {
   createRoomWorldFloorGeometry,
+  doRoomWorldPolygonsOverlap,
   isRoomWorldPointWalkable,
   isRoomWorldSegmentClear,
   pointInRoomWorldPolygon,
@@ -160,4 +161,20 @@ test("the server accepts every point the client may walk to", () => {
   // Older clients' targets stay valid.
   for (const point of MINI_ROOM_FLOOR) assert.equal(getMiniRoomFloorDistance(point), 0)
   assert.equal(isPointOnMiniRoomFloor({ x: 0.5, y: 0.2 }), false)
+})
+
+test("two footprints lined up on one edge line with a gap between them do not overlap", () => {
+  // a bed and a nightstand of the calibrated room on the same cell edge line (their saved-precision stage
+  // diamonds): along that shared line the rounded orientations are mixed, which once read as crossing edges
+  const bed = [
+    { x: 0.506527, y: 0.479304 }, { x: 0.615729, y: 0.550034 }, { x: 0.478951, y: 0.638624 }, { x: 0.369749, y: 0.567895 }
+  ]
+  const nightstand = [
+    { x: 0.341069, y: 0.58647 }, { x: 0.367543, y: 0.603617 }, { x: 0.313493, y: 0.638624 }, { x: 0.28702, y: 0.621478 }
+  ]
+  assert.equal(doRoomWorldPolygonsOverlap(bed, nightstand), false)
+  assert.equal(doRoomWorldPolygonsOverlap(nightstand, bed), false)
+  // slid along that line into the bed, it overlaps
+  const slid = nightstand.map((point) => ({ x: point.x + 0.05, y: point.y - 0.0326 }))
+  assert.equal(doRoomWorldPolygonsOverlap(bed, slid), true)
 })

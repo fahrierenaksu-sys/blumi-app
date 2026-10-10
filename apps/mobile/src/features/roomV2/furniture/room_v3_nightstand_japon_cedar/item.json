@@ -1,0 +1,268 @@
+{
+ "id": "room_v3_nightstand_japon_cedar",
+ "version": 1,
+ "scale_name": "D",
+ "scale": 2.0,
+ "px_per_world_unit": 195.61740822333448,
+ "camera": {
+  "yaw_deg": 45.0,
+  "pitch_deg": 21.64067231100742,
+  "shell_px_per_unit": 97.80870411166724
+ },
+ "footprint": {
+  "w": 2,
+  "d": 1,
+  "cell": 0.5,
+  "note": "cells at rotation 0; odd rotations swap w/d"
+ },
+ "seat_class": "none",
+ "symmetric": false,
+ "mirrored_rotations": false,
+ "rotation_invariant": false,
+ "interactions": [],
+ "wallMount": false,
+ "wallMountHeight": null,
+ "surfaces": [
+  {
+   "kind": "top",
+   "height": 0.62,
+   "size": [
+    0.55,
+    0.45
+   ],
+   "carried": [
+    "table lamp",
+    "bunny figurine"
+   ],
+   "painted_in_host": true
+  },
+  {
+   "kind": "lower shelf",
+   "height": 0.2,
+   "carried": [
+    "2 books"
+   ],
+   "painted_in_host": true
+  }
+ ],
+ "pose_pending": [],
+ "shadow": {
+  "layer": "shadow.png",
+  "light": "style/light.json (azimuth 107.7, elevation 60.7, #7A3B25, cast alpha 0.29, contact 0.435)"
+ },
+ "light_room_frame": [
+  -0.1491,
+  0.872,
+  0.4663
+ ],
+ "runtime_rules": {
+  "card_split": "front views: split the seated card at front_edge_px row; shins/shoes draw above the front layer",
+  "card_clip": "back views: no split; clip the card softly below card_clip_below_px (hip row + 0.05 units)",
+  "draw_order": "shadow, back, avatar(s), front",
+  "multiple_sitters": "draw seated cards far to near: sort by hip_world X + Z ascending (both grow toward the camera)"
+ },
+ "ergonomics": {
+  "standard": "ergonomics.json [D]",
+  "scale": "D",
+  "N": 2.105,
+  "targets": {
+   "table_top_height": 0.62,
+   "rule": "nightstand top = 1.08 x bed edge 0.574"
+  },
+  "twin_measured": {
+   "overall": [
+    0.6,
+    0.5,
+    1.02
+   ],
+   "zmin": 0.0,
+   "footprint": [
+    2,
+    1
+   ],
+   "params": {
+    "H_top": 0.62
+   },
+   "twin": "rodin"
+  },
+  "sheet_vs_ergonomics": {
+   "id": "nightstand_japon_cedar",
+   "twin": "rodin",
+   "rodin": {
+    "generation": "7a972cb5-0773-42c4-a1e2-d9a21e840392",
+    "tier": "Gen-2.5-High",
+    "mesh_mode": "Raw",
+    "quality_override": 200000
+   },
+   "raw": {
+    "raw_size": [
+     1.3311,
+     1.0091,
+     1.8901
+    ],
+    "after_axis_turn": [
+     0.6,
+     0.5,
+     1.0203
+    ],
+    "scale_xyz": [
+     0.451,
+     0.495,
+     0.601
+    ],
+    "final": [
+     0.6,
+     0.5,
+     1.02
+    ],
+    "footprint": [
+     2,
+     1
+    ],
+    "yaw": 0.0,
+    "faces": 50277,
+    "fixed": {
+     "height": 0.62
+    },
+    "plan_wd": [
+     0.6,
+     0.5
+    ]
+   },
+   "built_dims": [
+    0.6,
+    0.5,
+    1.02
+   ],
+   "plan_dims": [
+    0.6,
+    0.5,
+    0.62
+   ],
+   "built_footprint": [
+    2,
+    1
+   ],
+   "plan_footprint": [
+    2,
+    1
+   ],
+   "fixed_ergonomic_keys": {
+    "H_top": 0.62
+   },
+   "note": "Rodin shape + texture; table top fixed at 0.62 (--cut-top: props above the top plane keep proportions, x0.47), plan 0.6x0.5; total height with lamp 1.02",
+   "rule": "ergonomics win over the sheet"
+  }
+ },
+ "coords": {
+  "sprite_px": "continuous px in the layer PNGs (x right, y down); anchor_px = where the footprint centre floor point lands",
+  "hip_world": "[X, Y, Z] room frame, relative to the footprint centre, after rotation",
+  "cells": "[a, b] relative to the footprint min-corner cell at this rotation: room cell = (i + a, j + b)",
+  "place": "layer top-left in shell px (zoom 1) = shell_px(footprint centre) - anchor_px / scale"
+ },
+ "id_colors": {
+  "body": [
+   230,
+   25,
+   75
+  ]
+ },
+ "rotations": {
+  "0": {
+   "size": [
+    231,
+    241
+   ],
+   "anchor_px": [
+    84,
+    205
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    2,
+    1
+   ],
+   "front_groups": [],
+   "seats": [],
+   "source": "ChatGPT repaint rep_r0_t1 (twin render + gated sheet), cut with the twin alpha",
+   "silhouette_iou_vs_twin": 1.0
+  },
+  "1": {
+   "size": [
+    230,
+    239
+   ],
+   "anchor_px": [
+    86,
+    203
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    1,
+    2
+   ],
+   "front_groups": [],
+   "seats": [],
+   "source": "ChatGPT repaint rep_r1_t2 (twin render + gated sheet), cut with the twin alpha",
+   "silhouette_iou_vs_twin": 1.0
+  },
+  "2": {
+   "size": [
+    231,
+    238
+   ],
+   "anchor_px": [
+    87,
+    201
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    2,
+    1
+   ],
+   "front_groups": [],
+   "seats": [],
+   "source": "ChatGPT repaint rep_r2_t2 (twin render + gated sheet), cut with the twin alpha",
+   "silhouette_iou_vs_twin": 1.0
+  },
+  "3": {
+   "size": [
+    230,
+    240
+   ],
+   "anchor_px": [
+    84,
+    203
+   ],
+   "layers": {
+    "back": "back.png",
+    "front": "front.png",
+    "shadow": "shadow.png"
+   },
+   "footprint_cells": [
+    1,
+    2
+   ],
+   "front_groups": [],
+   "seats": [],
+   "source": "ChatGPT repaint rep_r3_t1 (twin render + gated sheet), cut with the twin alpha",
+   "silhouette_iou_vs_twin": 1.0
+  }
+ },
+ "colorways": [
+  "Açık ahşap",
+  "Krem"
+ ]
+}

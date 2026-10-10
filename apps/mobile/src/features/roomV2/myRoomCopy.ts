@@ -93,6 +93,7 @@ export interface MyRoomEditorCopy {
   title: string
   cancel: string
   undo: string
+  redo: string
   confirmPlacement: string
   removeSelected: string
   rotateSelected: string
@@ -129,7 +130,7 @@ export interface MyRoomEditorCopy {
   fixedSubtitle: string
   defaultInspectorHint: string
   seatInspectorHint: string
-  categoryLabels: Record<"all" | "seating" | "table" | "rug" | "misc" | "lighting" | "wallDecor" | "plant", string>
+  categoryLabels: Record<"all" | "seating" | "table" | "rug" | "misc" | "storage" | "lighting" | "wallDecor" | "plant", string>
   rotationLabels: Record<"front" | "right" | "back" | "left", string>
   piecesReady: (count: number) => string
   trayPage: (page: number, pageCount: number) => string
@@ -184,6 +185,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     title: "Edit your room",
     cancel: "Cancel room editing",
     undo: "Undo last room change",
+    redo: "Redo room change",
     confirmPlacement: "Confirm room placement",
     removeSelected: "Remove selected room item",
     rotateSelected: "Rotate selected room item",
@@ -220,7 +222,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     fixedSubtitle: "Drag to move · then save",
     defaultInspectorHint: "Drag in the room · choose a direction",
     seatInspectorHint: "Turn front to sit · drag to move",
-    categoryLabels: { all: "All", seating: "Seating", table: "Tables", rug: "Rugs", misc: "Media", lighting: "Lighting", wallDecor: "Walls", plant: "Decor" },
+    categoryLabels: { all: "All", seating: "Seating", table: "Tables", rug: "Rugs", misc: "Media", storage: "Storage", lighting: "Lighting", wallDecor: "Walls", plant: "Decor" },
     rotationLabels: { front: "Front", right: "Right", back: "Back", left: "Left" },
     piecesReady: (count) => `${count} pieces ready to place`,
     trayPage: (page, pageCount) => `Page ${page} of ${pageCount}`,
@@ -273,6 +275,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     title: "Odamı düzenle",
     cancel: "Oda düzenlemeyi kapat",
     undo: "Son oda değişikliğini geri al",
+    redo: "Oda değişikliğini yinele",
     confirmPlacement: "Yerleşimi onayla",
     removeSelected: "Seçili eşyayı kaldır",
     rotateSelected: "Seçili eşyayı döndür",
@@ -309,7 +312,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     fixedSubtitle: "Taşımak için sürükle · sonra kaydet",
     defaultInspectorHint: "Odaya sürükle · yönünü seç",
     seatInspectorHint: "Oturmak için öne çevir · taşımak için sürükle",
-    categoryLabels: { all: "Tümü", seating: "Oturma", table: "Masa", rug: "Halı", misc: "Medya", lighting: "Işık", wallDecor: "Duvar", plant: "Dekor" },
+    categoryLabels: { all: "Tümü", seating: "Oturma", table: "Masa", rug: "Halı", misc: "Medya", storage: "Dolap", lighting: "Işık", wallDecor: "Duvar", plant: "Dekor" },
     rotationLabels: { front: "Ön", right: "Sağ", back: "Arka", left: "Sol" },
     piecesReady: (count) => `Yerleştirmeye hazır ${count} eşya`,
     trayPage: (page, pageCount) => `Sayfa ${page} / ${pageCount}`,

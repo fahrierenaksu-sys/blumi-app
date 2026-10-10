@@ -22,6 +22,14 @@ export function getRoomV2DepthPerspectiveScale(y: number): number {
   return 1
 }
 
+/**
+ * A flat layered piece on the floor layer (a 2.5D rug). The room draws it under the layered floor
+ * shadows, every other piece and every avatar; only a calibrated 2.5D piece has `layered25d`.
+ */
+export function isRoomV2LayeredFloorPiece(item: RoomV2RenderItem): boolean {
+  return item.kind === "furniture" && item.layer === "floor" && item.layered25d !== undefined
+}
+
 /** Stable origin: React step/depth commits cannot move the box beneath its transform. */
 export function getRoomV2LiveAvatarFrame(input: {
   liveX: number

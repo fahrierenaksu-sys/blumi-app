@@ -295,6 +295,18 @@ try {
       "src/features/miniRoom/scene/useMiniRoomScrollToLatest.test.ts",
       "src/features/miniRoom/scene/miniRoomSeatRefusalModel.test.ts",
       "src/features/miniRoom/miniRoomNoticeModel.test.ts",
+      // The measured room (room_calibration.json): camera maths against its worked example, taps, walkable
+      // floor, depth, wall-flush floor-cell footprints, size; without the installed seam the room is unchanged
+      "src/features/roomV2/calibration/roomCalibration.test.ts",
+      "src/features/roomV2/calibration/roomCalibrationScene.test.ts",
+      // Layered furniture (item.json): seated layer order, card split / clip, placement, seats, per-collection
+      // catalog ids, bundled layers, cells, rugs, wall pieces per measured wall, a furnished room
+      "src/features/roomV2/furniture/layeredFurniture.test.ts",
+      "src/features/roomV2/furniture/layeredFurnitureSofa.test.ts",
+      "src/features/roomV2/furniture/layeredFurnitureJapon.test.ts",
+      "src/features/roomV2/furniture/layeredFurnitureOyun.test.ts",
+      // My Room floor inset in front of the back walls
+      "src/features/roomWorld/roomWorldWallInset.test.ts",
       // Two phones on the real realtime stack (apps/server e2e harness, in memory).
       "src/features/miniRoom/miniRoomMotionTwoPhones.e2e.test.ts"
     ],
