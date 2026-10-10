@@ -204,7 +204,7 @@ function mountStore(scene: ResolvedRoomV2Scene) {
     "features/miniRoom/scene/miniRoomSceneStore.ts", runtime, {
       modules: {
         "../../avatar/roomAvatarSeam": {
-          roomAvatar25d: { enabled: true, roomCalibration: CALIBRATION, movementTiming: <T>(base: T) => base }
+          roomAvatar25d: { roomCalibration: CALIBRATION, movementTiming: <T>(base: T) => base }
         },
         // the walk floor as the calibrated room has it
         "../../roomWorld/roomWorldRoomV2Projection": {
@@ -344,7 +344,7 @@ test("the avatar layer draws a front layer over each sofa sitter, far to near, a
         "react-native-worklets": { scheduleOnRN: (callback: () => void) => callback() },
         "../../roomV2/components/RoomRenderer2D": { RoomRendererFurnitureSprite: "Sprite" },
         "../../roomV2/components/RoomRendererLayeredFurniture": { RoomRendererLayeredFurnitureFront: "Front" },
-        "../../avatar/roomAvatarSeam": { roomAvatar25d: { enabled: false, roomCalibration: null } },
+        "../../avatar/roomAvatarSeam": { roomAvatar25d: { roomCalibration: null } },
         "../../avatar/components/AvatarLive": { AvatarLive: "AvatarLive" },
         "./RoomSpeechBubbleStack": { RoomSpeechBubbleStack: "RoomSpeechBubbleStack" },
         "./RoomTypingBubble": { RoomTypingBubble: "RoomTypingBubble" }

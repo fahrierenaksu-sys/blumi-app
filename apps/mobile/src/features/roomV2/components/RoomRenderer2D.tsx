@@ -740,7 +740,6 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
           ) : null}
           {item.kind === "avatar" ? (
             <RoomRendererAvatarBody
-              layers={item.layers}
               avatar25d={item.avatar25d}
               calibratedFigureHeightPx={avatar25dKeepsSize
                 ? roomAvatar25d.roomCalibration?.avatarFigureHeightPx(stageHeightPx, item.avatar25d?.rig)

@@ -9,7 +9,6 @@ import type { RoomAvatarSeam } from "./roomAvatarSeamContract"
  * that do not install it, it draws nothing new: no calibration, no layered pieces, no 2.5D spec.
  */
 const NOT_INSTALLED: RoomAvatarSeam = Object.freeze<RoomAvatarSeam>({
-  enabled: false,
   resolveRoomAvatar25d: () => null,
   movementTiming: (base) => base,
   roomCalibration: null,

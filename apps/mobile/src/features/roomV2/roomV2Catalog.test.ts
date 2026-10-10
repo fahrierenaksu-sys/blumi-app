@@ -42,7 +42,6 @@ const { roomAvatar25d: seamStub, installRoomAvatarSeam } = require("../avatar/ro
 /* eslint-enable @typescript-eslint/no-require-imports */
 installRoomAvatarSeam({
   ...seamStub,
-  enabled: true,
   roomCalibration: createRoomAvatar25dRoomCalibration(LAYERED_FURNITURE_ASSETS, LAYERED_WALL_ASSETS),
   furnitureCatalog: createRoomAvatar25dFurnitureCatalog(LAYERED_FURNITURE_ASSETS, LAYERED_WALL_ASSETS)
 })

@@ -40,8 +40,6 @@ export interface RoomAvatar25dRoomCalibration {
 }
 
 export interface RoomAvatarSeam {
-  /** True once the app has installed the room art (`roomAvatarSeamInstall.ts`); false only in plain Node tests. */
-  enabled: boolean
   /** What to draw for one avatar; null only while the seam is not installed. */
   resolveRoomAvatar25d: (input: RoomAvatar25dResolveInput) => RoomAvatar25dSpec | null
   /** The walk timing at the pace of the body this loadout wears (the girl when unset). */

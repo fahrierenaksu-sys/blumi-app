@@ -308,7 +308,7 @@ export function MyRoomScreen({
             facing: seatedHotspot.facing ?? avatarPose.direction,
             // where she actually stands (the walk may end on a fallback beside an approach that another piece
             // covers), relative to the seat point: the 2.5D body draws itself from there onto the seat
-            ...(roomAvatar25d.enabled && seatedHotspot.approachPoint
+            ...(seatedHotspot.approachPoint
               ? { approach: { x: avatarPose.x - seatedHotspot.x, y: avatarPose.y - seatedHotspot.y } }
               : {})
           }

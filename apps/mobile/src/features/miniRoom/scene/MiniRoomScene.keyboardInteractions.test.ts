@@ -63,8 +63,6 @@ function mountTypingScene(messages: { messageId: string; senderUserId: string; b
       useMyRoomStageCover: () => ({ covered: false, markPainted: () => undefined }),
       useStageRevealStyle: () => ({ opacity: 1 })
     },
-    // the dev-only 2.5D avatar switch, as every release bundle gets it (the stub: off)
-    "../../avatar/roomAvatarSeam": { roomAvatar25d: { enabled: false } },
     "./AvatarLayer": { AvatarLayer: avatarLayer },
     "./HotspotLayer": { HotspotLayer: hotspotLayer },
     "./MiniRoomChatPanel": { MiniRoomChatPanel: chatPanel },

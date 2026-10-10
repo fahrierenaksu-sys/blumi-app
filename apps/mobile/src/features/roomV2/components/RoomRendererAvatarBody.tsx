@@ -9,10 +9,9 @@ import Reanimated, {
   withTiming,
   type AnimatedStyle
 } from "react-native-reanimated"
-import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
 import { AvatarLive } from "../../avatar/components/AvatarLive"
 import type { RoomAvatar25dBodyProps, RoomAvatar25dSpec } from "../../avatar/roomAvatarSeamContract"
-import type { RoomV2AvatarMotionState, RoomV2AvatarRenderLayer } from "../roomV2.types"
+import type { RoomV2AvatarMotionState } from "../roomV2.types"
 import type { RoomRendererLiveAvatarPosition } from "./RoomRendererLiveAvatarFrame"
 import {
   advanceRoomAvatarStridePhase,
@@ -34,7 +33,7 @@ const POSE_SIT = 1
 const POSE_STAND = 2
 
 /**
- * The room avatar's body: frames from RoomAvatarRenderer2D plus procedural
+ * The room avatar's body: the 2.5D AvatarLive drawing plus procedural
  * motion on the UI thread (VIS-02/03). A sit or stand plays a short
  * anticipation → drop/rise → settle instead of a frame swap; walk frames
  * follow the distance the live avatar covers, with a stride bob. No shadow
@@ -42,8 +41,7 @@ const POSE_STAND = 2
  * crossfades a pose change. Nothing here renders React per frame.
  */
 export function RoomRendererAvatarBody(props: {
-  layers: RoomV2AvatarRenderLayer[]
-  /** When set, the 2.5D renderer draws the whole avatar instead of the layers. */
+  /** The 2.5D avatar to draw; unset only where the room seam is not installed (plain Node tests): nothing is drawn. */
   avatar25d?: RoomAvatar25dSpec
   /** The motion style already flips the avatar horizontally. */
   outerMirrored?: boolean
@@ -172,13 +170,7 @@ export function RoomRendererAvatarBody(props: {
               boxHeightPx={boxHeightPx}
               onDrawn={props.onAllLayersShown}
             />
-          ) : (
-            <RoomAvatarRenderer2D
-              layers={props.layers}
-              strideProgress={strideWalking ? strideProgress : undefined}
-              onAllLayersShown={props.onAllLayersShown}
-            />
-          )}
+          ) : null}
         </Reanimated.View>
       </Reanimated.View>
     </View>

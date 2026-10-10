@@ -12,7 +12,6 @@ import { coerceAvatarLoadout } from "@blumi/domain"
  * first, by `App.tsx`; never by a test.
  */
 installRoomAvatarSeam({
-  enabled: true,
   // each avatar's own rig from its coerced body (the boy for avatar_v2_body_male_light, else the girl)
   resolveRoomAvatar25d: (input) => resolveAvatarDraw(AVATAR_RIG_DATA, input),
   // each body's own pace (0.2138 × its height); the walk cycle follows the distance, so feet stay planted

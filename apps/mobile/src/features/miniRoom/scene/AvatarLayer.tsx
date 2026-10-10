@@ -386,11 +386,11 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     [avatar.appearance, avatar.facing, avatar.motion]
   )
   const avatar25d = useMemo(
-    () => roomAvatar25d.enabled ? getMiniRoomAvatar25dSpec({
+    () => getMiniRoomAvatar25dSpec({
       appearance: avatar.appearance,
       motion: avatar.motion,
       facing: avatar.facing
-    }) : null,
+    }),
     [avatar.appearance, avatar.facing, avatar.motion]
   )
   const usesAnimatedAvatarFrames = roomAvatarLayers.some(
