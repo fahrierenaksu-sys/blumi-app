@@ -27,9 +27,22 @@ export interface AuthRouteServices {
   accountRecoveryService?: AccountRecoveryService
 }
 
-/** Firebase replaced the server-sent codes, except for local QA builds. */
-function isLegacyOtpRetired(services: AuthRouteServices): boolean {
-  return Boolean(services.firebaseAuthVerifier) && services.localQaOtpEnabled !== true
+const LOOPBACK_HOST_NAMES = new Set(["127.0.0.1", "localhost", "[::1]"])
+
+/** True when the request was addressed to a loopback name. A tunnel forwards its public host name instead. */
+export function isLoopbackHostHeader(hostHeader: string | undefined): boolean {
+  if (!hostHeader) return false
+  try {
+    return LOOPBACK_HOST_NAMES.has(new URL(`http://${hostHeader}`).hostname)
+  } catch {
+    return false
+  }
+}
+
+/** Firebase replaced the server-sent codes, except for local QA builds talking to the API by a loopback name. */
+function isLegacyOtpRetired(services: AuthRouteServices, request: FastifyRequest): boolean {
+  if (!services.firebaseAuthVerifier) return false
+  return !(services.localQaOtpEnabled === true && isLoopbackHostHeader(request.headers.host))
 }
 
 const sendCodeResponses = {
@@ -59,7 +72,7 @@ export async function registerAuthRoutes(
       }
     },
     async (request, reply) => {
-      if (isLegacyOtpRetired(services)) {
+      if (isLegacyOtpRetired(services, request)) {
         return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       }
       const parsed = parseAuthPhoneRequest(request.body)
@@ -96,7 +109,7 @@ export async function registerAuthRoutes(
       }
     },
     async (request, reply) => {
-      if (isLegacyOtpRetired(services)) {
+      if (isLegacyOtpRetired(services, request)) {
         return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       }
       return verifyAndCreateSession({ request, reply, authService })
@@ -114,7 +127,7 @@ export async function registerAuthRoutes(
       }
     },
     async (request, reply) => {
-      if (isLegacyOtpRetired(services)) {
+      if (isLegacyOtpRetired(services, request)) {
         return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       }
       const parsed = parseRegisterAccountRequest(request.body)

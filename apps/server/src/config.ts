@@ -387,7 +387,7 @@ export function resolveServerConfig(
       !isLoopbackHost(host) ||
       qaPhoneNumbers.length === 0 ||
       qaPhoneNumbers.length > MAX_QA_PHONE_NUMBERS ||
-      !qaPhoneNumbers.every((value) => /^\+[1-9]\d{7,14}$/.test(value)) ||
+      !qaPhoneNumbers.every((value) => QA_FICTIONAL_PHONE_PATTERN.test(value)) ||
       !qaOtpCode ||
       !/^\d{6}$/.test(qaOtpCode)
     ) {
@@ -400,7 +400,7 @@ export function resolveServerConfig(
       if (smsProviderMode !== "development") {
         throw new Error("QA auth requires the development SMS provider.")
       }
-      throw new Error("QA auth requires development mode, an E.164 phone, and a six-digit code.")
+      throw new Error("QA auth requires development mode, fictional +1 NXX 555-01XX phones, and a six-digit code.")
     }
   }
 
@@ -517,6 +517,8 @@ export function resolveServerConfig(
 
 const MAX_SESSION_CACHE_TTL_MS = 30_000
 const MAX_QA_PHONE_NUMBERS = 4
+/** NANPA numbers reserved for fiction (+1 NXX 555-0100..0199): never a real subscriber, so never a Firebase test number. */
+const QA_FICTIONAL_PHONE_PATTERN = /^\+1[2-9]\d{2}55501\d{2}$/
 
 export function parseSessionCacheTtlMs(value: string | undefined): number {
   if (value === undefined || value.trim() === "") return SESSION_CACHE_TTL_MS
@@ -881,6 +883,14 @@ function createConfiguredSmsProvider(_config: ServerConfig): SmsProvider {
   return createDevelopmentSmsProvider()
 }
 
+/**
+ * Only a loopback, in-memory development API carries QA auth (resolveServerConfig throws otherwise), so the
+ * server-sent code routes reopen exactly when that config exists.
+ */
+export function isLocalQaOtpEnabled(config: ServerConfig): boolean {
+  return config.qaAuth !== undefined
+}
+
 export function createConfiguredCodeFactory(
   config: ServerConfig
 ): ((phoneNumber: string) => string) | undefined {
@@ -889,7 +899,7 @@ export function createConfiguredCodeFactory(
   const qaAuth = config.qaAuth
 
   return (phoneNumber) =>
-    (qaAuth.phoneNumbers.includes(phoneNumber) || phoneNumber.endsWith("2025550123"))
+    qaAuth.phoneNumbers.includes(phoneNumber)
       ? qaAuth.verificationCode
       : createSixDigitCode()
 }

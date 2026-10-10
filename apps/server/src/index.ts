@@ -1,6 +1,7 @@
 import { createServer } from "./server"
 import {
   createConfiguredServerServices,
+  isLocalQaOtpEnabled,
   resolveServerConfig
 } from "./config"
 import { createRealtimeServer } from "./realtime/realtimeServer"
@@ -132,7 +133,7 @@ const app = createServer({
   capabilityService: services.capabilityService,
   firebaseAuthVerifier,
   // Only a loopback, in-memory development API can carry QA auth (config.ts).
-  localQaOtpEnabled: config.qaAuth !== undefined,
+  localQaOtpEnabled: isLocalQaOtpEnabled(config),
   chatService: services.chatService,
   economyService: services.economyService,
   commerceService: services.commerceService,
