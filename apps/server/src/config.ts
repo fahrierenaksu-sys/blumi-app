@@ -37,6 +37,7 @@ import {
   type RevenueCatPurchaseVerifier
 } from "./commerce/revenueCatPurchaseVerifier"
 import { createMatchService, type MatchService } from "./matches/matchService"
+import { createQaAccountDiscoveryRepository } from "./matches/qaAccountDiscovery"
 import { createAfterResponseTasks, type AfterResponseTasks } from "./operations/afterResponseTasks"
 import { createDiscoverySnapshotService, createInMemoryDiscoverySnapshots, type DiscoverySnapshotService } from "./matches/discoverySnapshot"
 import { createPostgresDiscoverySnapshots } from "./db/postgresDiscoverySnapshots"
@@ -796,7 +797,20 @@ export function createConfiguredServerServices(
     authService,
     economyService
   })
-  const matchService = createMatchService({ economyService, notificationService, deferSideEffects })
+  const matchService = createMatchService({
+    economyService,
+    notificationService,
+    deferSideEffects,
+    // QA auth exists only on a loopback, in-memory development API (see above): let the QA users like each other.
+    ...(config.qaAuth
+      ? {
+          repository: createQaAccountDiscoveryRepository({
+            authRepository: authService.repository,
+            qaPhoneNumbers: config.qaAuth.phoneNumbers
+          })
+        }
+      : {})
+  })
   const referralService = createReferralService()
   const roomService = createRoomService()
   const presenceService = createPresenceService({
