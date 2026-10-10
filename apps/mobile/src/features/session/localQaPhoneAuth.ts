@@ -83,3 +83,29 @@ function readServerError(payload: unknown): string {
   const message = (payload as { error?: unknown } | null)?.error
   return typeof message === "string" && message.length > 0 ? message : GENERIC_FAILURE
 }
+
+export interface LocalQaCredentials {
+  phoneNumber: string
+  verificationCode: string
+}
+
+const QA_SIGN_IN_PATTERN = /^blumi:\/\/qa-sign-in\?slot=([1-9])$/
+const E164_PATTERN = /^\+[1-9]\d{7,14}$/
+const CODE_PATTERN = /^\d{6}$/
+
+export function parseLocalQaSignInSlot(url: string): number | null {
+  const match = QA_SIGN_IN_PATTERN.exec(url.trim())
+  return match ? Number(match[1]) : null
+}
+
+export function resolveLocalQaCredentials(
+  slot: number,
+  phoneList: string | undefined,
+  code: string | undefined
+): LocalQaCredentials | null {
+  const phoneNumber = phoneList?.split(",").map((value) => value.trim())[slot - 1]
+  const verificationCode = code?.trim()
+  if (!phoneNumber || !E164_PATTERN.test(phoneNumber)) return null
+  if (!verificationCode || !CODE_PATTERN.test(verificationCode)) return null
+  return { phoneNumber, verificationCode }
+}

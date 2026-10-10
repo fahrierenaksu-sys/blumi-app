@@ -3,7 +3,9 @@ import test from "node:test"
 import {
   completeLocalQaPhoneSignIn,
   isLocalQaPhoneAuthAllowed,
-  requestLocalQaPhoneCode
+  parseLocalQaSignInSlot,
+  requestLocalQaPhoneCode,
+  resolveLocalQaCredentials
 } from "./localQaPhoneAuth"
 
 const LOCAL_API = "http://127.0.0.1:4001"
@@ -53,4 +55,17 @@ test("a refused code request surfaces the server message", async () => {
   const retired = recordingFetcher(410, { error: "Update Blumi to verify your phone with Firebase." })
   await assert.rejects(requestLocalQaPhoneCode(LOCAL_API, QA_PHONE, retired.fetcher), /verify your phone with Firebase/)
   assert.equal(retired.calls[0]?.url, `${LOCAL_API}/v1/auth/send-code`)
+})
+
+test("the QA deep link picks a configured test user by slot and nothing else", () => {
+  assert.equal(parseLocalQaSignInSlot("blumi://qa-sign-in?slot=2"), 2)
+  for (const url of ["blumi://qa-sign-in", "blumi://qa-sign-in?slot=0", "blumi://room", "https://x/qa-sign-in?slot=1"]) {
+    assert.equal(parseLocalQaSignInSlot(url), null, url)
+  }
+  const phones = `${QA_PHONE}, +12025550102`
+  assert.deepEqual(resolveLocalQaCredentials(2, phones, "135790"), { phoneNumber: "+12025550102", verificationCode: "135790" })
+  assert.equal(resolveLocalQaCredentials(3, phones, "135790"), null)
+  assert.equal(resolveLocalQaCredentials(1, phones, "12345"), null)
+  assert.equal(resolveLocalQaCredentials(1, "2025550101", "135790"), null)
+  assert.equal(resolveLocalQaCredentials(1, undefined, "135790"), null)
 })

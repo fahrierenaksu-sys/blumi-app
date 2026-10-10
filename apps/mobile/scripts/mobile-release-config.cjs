@@ -65,7 +65,7 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
     if (devEntryRoute) {
       throw new Error("Development entry routes cannot be enabled in connected builds.")
     }
-    if (localQaAuth !== "0") {
+    if (localQaAuth !== "0" || normalizeValue(environment.EXPO_PUBLIC_BLUMI_LOCAL_QA_PHONES) || normalizeValue(environment.EXPO_PUBLIC_BLUMI_LOCAL_QA_CODE)) {
       throw new Error("Local QA sign-in cannot be enabled in connected builds.")
     }
   }

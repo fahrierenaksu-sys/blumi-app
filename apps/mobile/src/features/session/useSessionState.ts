@@ -57,6 +57,8 @@ import {
   isLocalQaPhoneAuthAllowed,
   requestLocalQaPhoneCode
 } from "./localQaPhoneAuth"
+import { useLocalQaDeepLinkSignIn, type LocalQaCredentials } from "./useLocalQaDeepLinkSignIn"
+import { LEGAL_DOCUMENT_VERSION } from "../legal/legalPolicyMetadata"
 import {
   needsModerationInterruption,
   type AccountModerationState
@@ -1115,6 +1117,23 @@ export function useSessionState(): UseSessionStateResult {
       }
     }
   }, [capabilitiesForToken, sessionActor])
+
+  // Local QA only: `blumi://qa-sign-in?slot=N` swaps to QA user N.
+  const signInAsLocalQaUser = useCallback(async (credentials: LocalQaCredentials): Promise<void> => {
+    if (sessionActorRef.current) await clearSessionActor()
+    await requestVerificationCode({ phoneNumber: credentials.phoneNumber })
+    await registerSessionActor({
+      ...credentials,
+      authIntent: "sign-in",
+      termsAcceptance: { version: LEGAL_DOCUMENT_VERSION, locale: "tr" }
+    })
+  }, [clearSessionActor, registerSessionActor, requestVerificationCode])
+  useLocalQaDeepLinkSignIn({
+    enabled: IS_LOCAL_QA_PHONE_AUTH,
+    phoneList: process.env.EXPO_PUBLIC_BLUMI_LOCAL_QA_PHONES,
+    code: process.env.EXPO_PUBLIC_BLUMI_LOCAL_QA_CODE,
+    signIn: signInAsLocalQaUser
+  })
 
   return {
     sessionActor,

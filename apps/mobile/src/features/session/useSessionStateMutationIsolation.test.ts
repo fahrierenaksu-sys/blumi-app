@@ -177,6 +177,8 @@ function mount(options: MountOptions = {}) {
           requestLocalQaPhoneCode: async () => assert.fail("Firebase builds never use local QA sign-in"),
           completeLocalQaPhoneSignIn: async () => assert.fail("Firebase builds never use local QA sign-in")
         },
+        "./useLocalQaDeepLinkSignIn": { useLocalQaDeepLinkSignIn: () => undefined },
+        "../legal/legalPolicyMetadata": { LEGAL_DOCUMENT_VERSION: "test-terms-v1" },
         "./accountModeration": { needsModerationInterruption: () => false },
         "./sessionLifecycle": sessionLifecycle,
         "./sessionMutationCoordinator": sessionMutationCoordinator,
