@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { cpSync, mkdtempSync, rmSync } from "node:fs"
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -137,4 +137,17 @@ test("the portrait cache stays within its byte budget and a bad background is re
   const second = await renderer.render({ loadout: female, background })
   assert.ok(first.body.equals(second.body), "redrawn when it does not fit the cache")
   await assert.rejects(renderer.render({ loadout: female, background: "red" }))
+})
+
+test("a truncated art manifest never stops the server: no art, so the fixed busts", async () => {
+  const broken = mkdtempSync(join(tmpdir(), "blumi-art-"))
+  try {
+    writeFileSync(join(broken, "manifest.json"), '{"files": {"avatar/female/bust/bo')
+    assert.equal(loadAvatarPortraitArt(broken), null)
+    const renderer = createAvatarPortraitRenderer({ art: loadAvatarPortraitArt(broken) })
+    assert.equal((await renderer.render({ loadout: female, background: "#D6EEFF" })).level, "fixed")
+    assert.deepEqual(await checkAvatarPortraitRenderer(renderer), { ok: false, errorType: "FallbackPortrait" })
+  } finally {
+    rmSync(broken, { recursive: true, force: true })
+  }
 })

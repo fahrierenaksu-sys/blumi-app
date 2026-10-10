@@ -46,13 +46,20 @@ export interface AvatarPortraitRenderer {
   render(input: { loadout: AvatarLoadout; background: string }): Promise<AvatarPortrait>
 }
 
-/** The art pack files the portrait can name, or null when the pack has no avatar layers (a server never built). */
+/**
+ * The art pack files the portrait can name, or null when the pack has no avatar layers (a server never built) or its
+ * manifest cannot be read. Never throws, so a damaged pack cannot stop the server from starting.
+ */
 export function loadAvatarPortraitArt(dir = resolveRoomArtPackDir()): { dir: string; files: ReadonlySet<string> } | null {
-  const manifestPath = join(dir, "manifest.json")
-  if (!existsSync(manifestPath)) return null
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { files?: Record<string, string> }
-  const files = new Set(Object.keys(manifest.files ?? {}).filter((path) => path.startsWith("avatar/")))
-  return files.size > 0 ? { dir, files } : null
+  try {
+    const manifestPath = join(dir, "manifest.json")
+    if (!existsSync(manifestPath)) return null
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { files?: Record<string, string> }
+    const files = new Set(Object.keys(manifest.files ?? {}).filter((path) => path.startsWith("avatar/")))
+    return files.size > 0 ? { dir, files } : null
+  } catch {
+    return null
+  }
 }
 
 export function createAvatarPortraitRenderer(options: {
@@ -162,9 +169,11 @@ export function getAvatarPortraitSelfCheckState(): "unchecked" | "ok" | "failed"
  * it can be logged and shown in the health detail without any user or loadout value.
  */
 export async function checkAvatarPortraitRenderer(
-  renderer: AvatarPortraitRenderer | null = createDefaultAvatarPortraitRenderer()
+  rendererOrDefault?: AvatarPortraitRenderer | null
 ): Promise<{ ok: true } | { ok: false; errorType: string }> {
   try {
+    // Built inside the try: whatever goes wrong while building it is a failed check, not a start-up crash.
+    const renderer = rendererOrDefault === undefined ? createDefaultAvatarPortraitRenderer() : rendererOrDefault
     if (!renderer) throw Object.assign(new Error("Avatar portrait art pack is missing."), { name: "MissingArtPack" })
     for (const loadout of Object.values(STARTER_LOADOUTS)) {
       const result = await renderer.render({ loadout: loadout as AvatarLoadout, background: "#FFFFFF" })
