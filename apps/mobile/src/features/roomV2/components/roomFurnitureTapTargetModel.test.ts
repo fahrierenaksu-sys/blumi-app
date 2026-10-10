@@ -7,19 +7,21 @@ import {
   ROOM_FURNITURE_MIN_TAP_TARGET_PT
 } from "./roomFurnitureTapTargetModel"
 
-const BED = "room_v2_modeled_pink_cloud_bed_front_body_v29"
-const CHAIR = "room_v2_furniture_world_chair_v1"
+// shipped layered art (the old flat bed and chair were retired in X8): the Japon bed's and the blush chair's
+// front back-layers
+const BED = "room_v3_bed_japon_sakura_layered_r0_back"
+const CHAIR = "room_v2_chair_blush_layered_r0_back"
 
 test("a tap on the drawn bed sits; a tap on the empty canvas around it does not", () => {
-  // The bed's box is its shell-sized canvas, larger than the phone's room.
+  // A wider box than the bed's layer: contained, with empty bands left and right.
   const box = { width: 560, height: 319 }
   const target = getRoomFurnitureTapTarget({ assetKey: BED, boxWidthPx: box.width, boxHeightPx: box.height, fit: "contain", mirrored: false })
   assert.ok(target)
   assert.equal(isRoomFurnitureTapOnSeat(target, box.width * 0.5, box.height * 0.45), true, "the mattress")
-  for (const [x, y] of [[0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95], [0.5, 0.1], [0.5, 0.8], [0.2, 0.45], [0.8, 0.45]] as const) {
+  for (const [x, y] of [[0.03, 0.05], [0.97, 0.05], [0.03, 0.95], [0.97, 0.95]] as const) {
     assert.equal(isRoomFurnitureTapOnSeat(target, box.width * x, box.height * y), false, `empty canvas at ${x},${y}`)
   }
-  assert.ok(target.width < box.width / 2 && target.height < box.height / 2, "the pressable covers the bed, not the canvas")
+  assert.ok(target.width < box.width, "the pressable covers the bed, not the letterbox bands")
 })
 
 test("the chair's empty corners are not part of the seat", () => {
@@ -35,11 +37,11 @@ test("a mirrored image mirrors its seat", () => {
   const plain = getRoomFurnitureTapTarget({ assetKey: CHAIR, boxWidthPx: 200, boxHeightPx: 200, fit: "fill", mirrored: false })
   const mirrored = getRoomFurnitureTapTarget({ assetKey: CHAIR, boxWidthPx: 200, boxHeightPx: 200, fit: "fill", mirrored: true })
   assert.ok(plain && mirrored)
-  // The chair's top-left is drawn and its top-right is empty; mirrored, the reverse.
-  assert.equal(isRoomFurnitureTapOnSeat(plain, 60, 10), true)
-  assert.equal(isRoomFurnitureTapOnSeat(plain, 180, 20), false)
-  assert.equal(isRoomFurnitureTapOnSeat(mirrored, 140, 10), true)
-  assert.equal(isRoomFurnitureTapOnSeat(mirrored, 20, 20), false)
+  // The chair reaches its layer's left edge and stops short of its right; mirrored, the reverse.
+  assert.equal(isRoomFurnitureTapOnSeat(plain, 20, 120), true)
+  assert.equal(isRoomFurnitureTapOnSeat(plain, 180, 120), false)
+  assert.equal(isRoomFurnitureTapOnSeat(mirrored, 180, 120), true)
+  assert.equal(isRoomFurnitureTapOnSeat(mirrored, 20, 120), false)
 })
 
 test("a contained image's seat follows where the image lands in a taller box", () => {
