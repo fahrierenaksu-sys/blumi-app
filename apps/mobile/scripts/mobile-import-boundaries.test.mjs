@@ -95,3 +95,46 @@ test("the shared room never reads the viewer's personal room state or storage", 
   )
   assert.deepEqual(describe(offenders), [], "use resolveSharedRoomDecor for the shared room")
 })
+
+// Review A F2: six room modules read the room seam once, when they load. The app must fill it first, so the
+// install is App.tsx's first import, App.tsx is the only entry (index.js imports expo and ./App only), nothing
+// else installs it, and the install's own import graph reaches none of the modules that read it.
+test("the room seam is installed by the first import of the only app entry, before any module that reads it", () => {
+  const install = "src/features/avatar/roomAvatarSeamInstall"
+  const appSpecifiers = readSpecifiers(join(mobileRoot, "App.tsx"))
+  assert.equal(appSpecifiers[0], `./${install}`, "App.tsx installs the room seam first")
+  assert.deepEqual(readSpecifiers(join(mobileRoot, "index.js")).sort(), ["./App", "expo"])
+
+  const edges = collectImports("")
+  const installers = edges.filter((edge) => edge.to === install && !TEST_FILE.test(edge.from))
+  assert.deepEqual(describe(installers), [], "only App.tsx installs the room seam")
+
+  const withoutExtension = (path) => path.replace(SOURCE_EXTENSION, "")
+  const next = new Map()
+  for (const edge of edges) {
+    const from = withoutExtension(edge.from)
+    next.set(from, [...(next.get(from) ?? []), edge.to])
+  }
+  const reached = new Set([install])
+  const queue = [install]
+  while (queue.length > 0) {
+    for (const target of next.get(queue.pop()) ?? []) {
+      const key = withoutExtension(target)
+      if (reached.has(key)) continue
+      reached.add(key)
+      queue.push(key)
+    }
+  }
+  // the walk is real: the install does load the layered furniture catalog
+  assert.ok(reached.has("src/features/roomV2/furniture/layeredFurnitureCatalog"), "install graph walked")
+  for (const reader of [
+    "src/features/roomV2/roomV2Catalog",
+    "src/features/roomV2/roomV2Selectors",
+    "src/features/roomWorld/roomWorldRoomV2Projection",
+    "src/features/miniRoom/scene/miniRoomSceneStore",
+    "src/features/miniRoom/scene/AvatarLayer",
+    "src/features/roomV2/editor/roomEditorPlaceMotion"
+  ]) {
+    assert.equal(reached.has(reader), false, `${reader} reads the seam at load and must not load before the install`)
+  }
+})
