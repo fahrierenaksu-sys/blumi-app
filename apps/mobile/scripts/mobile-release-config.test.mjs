@@ -47,6 +47,7 @@ test("development keeps explicit local defaults and demo media", () => {
     qaUnlockAvatarItems: "0",
     enableDemo: "1",
     devEntryRoute: undefined,
+    localQaAuth: "0",
     sentryDsn: undefined,
     posthogApiKey: undefined,
     posthogHost: undefined,
@@ -131,6 +132,17 @@ test("server-test requires public TLS endpoints and disables local test bypasses
     () => resolveMobileReleaseEnvironment({ ...base, EXPO_PUBLIC_BLUMI_DEV_ENTRY_ROUTE: "myroom" }),
     /Development entry routes cannot be enabled/
   )
+  assert.throws(
+    () => resolveMobileReleaseEnvironment({ ...base, EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH: "1" }),
+    /Local QA sign-in cannot be enabled/
+  )
+  for (const profile of ["preview", "production"]) {
+    assert.throws(
+      () => resolveMobileReleaseEnvironment({ ...base, EAS_BUILD_PROFILE: profile, EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH: "1" }),
+      /Local QA sign-in cannot be enabled/,
+      profile
+    )
+  }
 })
 
 test("every EAS profile ships with voice and paid coin sales disabled", () => {
@@ -345,6 +357,7 @@ test("production resolves a complete fail-closed environment", () => {
     qaUnlockAvatarItems: "0",
     enableDemo: "0",
     devEntryRoute: undefined,
+    localQaAuth: "0",
     sentryDsn: "https://public@example.ingest.sentry.io/123",
     posthogApiKey: "phc_public",
     posthogHost: "https://eu.i.posthog.com",

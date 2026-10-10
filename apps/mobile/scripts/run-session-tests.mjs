@@ -140,6 +140,7 @@ try {
       "--test",
       "src/features/session/register/useRegisterFlowController.test.ts",
       "src/features/session/firebasePhoneAuth.test.ts",
+      "src/features/session/localQaPhoneAuth.test.ts",
       "src/features/session/firebasePhoneAppCheck.test.ts",
       "src/features/session/firebaseSmsDevicePermission.test.ts",
       "src/features/session/accountRecoveryModel.test.ts",

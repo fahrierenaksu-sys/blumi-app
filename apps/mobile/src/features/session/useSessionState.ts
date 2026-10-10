@@ -53,6 +53,11 @@ import {
   type FirebasePhoneConfirmation
 } from "./firebasePhoneAuth"
 import {
+  completeLocalQaPhoneSignIn,
+  isLocalQaPhoneAuthAllowed,
+  requestLocalQaPhoneCode
+} from "./localQaPhoneAuth"
+import {
   needsModerationInterruption,
   type AccountModerationState
 } from "./accountModeration"
@@ -163,6 +168,40 @@ function isAuthSessionError(error: unknown): boolean {
   )
 }
 
+// Dev-only Simulator QA against the local in-memory API (see localQaPhoneAuth).
+const IS_LOCAL_QA_PHONE_AUTH = isLocalQaPhoneAuthAllowed({
+  isDevBuild: __DEV__,
+  flag: process.env.EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH,
+  apiBaseUrl: MOBILE_HTTP_BASE_URL
+})
+
+type PendingPhoneCode =
+  | { phoneNumber: string; kind: "firebase"; confirmation: FirebasePhoneConfirmation }
+  | { phoneNumber: string; kind: "local-qa" }
+
+async function verifyPendingPhoneCode(
+  pending: PendingPhoneCode | null,
+  input: RegisterAccountInput,
+  completion: { authIntent: "create" | "sign-in"; termsAcceptance?: RegisterAccountInput["termsAcceptance"] }
+): Promise<SessionActor> {
+  if (!pending || pending.phoneNumber !== input.phoneNumber) {
+    throw new Error("Request a verification code before continuing.")
+  }
+  if (pending.kind === "local-qa") {
+    return completeLocalQaPhoneSignIn(MOBILE_HTTP_BASE_URL, {
+      ...input,
+      authIntent: completion.authIntent
+    })
+  }
+  // A cached Firebase identity does not verify the code entered now.
+  const idToken = await confirmFirebasePhoneCode(pending.confirmation, input.verificationCode)
+  return completeFirebaseAccount(MOBILE_HTTP_BASE_URL, {
+    idToken,
+    authIntent: completion.authIntent,
+    ...(completion.termsAcceptance ? { termsAcceptance: completion.termsAcceptance } : {})
+  })
+}
+
 export function useSessionState(): UseSessionStateResult {
   const [sessionActor, setSessionActor] = useState<SessionActor | null>(null)
   const [hasSeenIntro, setHasSeenIntro] = useState(false)
@@ -176,10 +215,7 @@ export function useSessionState(): UseSessionStateResult {
       capabilities: createFailClosedCapabilityResolution().capabilities
     })
   const sessionActorRef = useRef<SessionActor | null>(null)
-  const firebasePhoneConfirmationRef = useRef<{
-    phoneNumber: string
-    confirmation: FirebasePhoneConfirmation
-  } | null>(null)
+  const firebasePhoneConfirmationRef = useRef<PendingPhoneCode | null>(null)
   // Coordinators are created once per mount (stable effect dependencies).
   const [mutationCoordinator] = useState(() => createSessionMutationCoordinator({
     current: () => sessionActorRef.current,
@@ -565,18 +601,10 @@ export function useSessionState(): UseSessionStateResult {
       setIsBootstrapping(true)
       setErrorMessage(null)
       try {
-        const pending = firebasePhoneConfirmationRef.current
-        if (!pending || pending.phoneNumber !== input.phoneNumber) {
-          throw new Error("Request a verification code before continuing.")
-        }
-        // A cached Firebase identity does not verify the code entered now.
-        const idToken = await confirmFirebasePhoneCode(pending.confirmation, input.verificationCode)
-        const nextSessionActor = await completeFirebaseAccount(
-          MOBILE_HTTP_BASE_URL,
-          {
-            idToken,
-            authIntent: input.authIntent ?? "sign-in"
-          }
+        const nextSessionActor = await verifyPendingPhoneCode(
+          firebasePhoneConfirmationRef.current,
+          input,
+          { authIntent: input.authIntent ?? "sign-in" }
         )
         firebasePhoneConfirmationRef.current = null
         await mutationCoordinator.replace(nextSessionActor, replacement)
@@ -610,18 +638,10 @@ export function useSessionState(): UseSessionStateResult {
         let registrationCapabilities = createFailClosedCapabilityResolution().capabilities
         await replayPreAuthOnboardingDraft(draft, {
           register: async () => {
-            const pending = firebasePhoneConfirmationRef.current
-            if (!pending || pending.phoneNumber !== input.phoneNumber) {
-              throw new Error("Request a verification code before continuing.")
-            }
-            const idToken = await confirmFirebasePhoneCode(pending.confirmation, input.verificationCode)
-            const actor = await completeFirebaseAccount(
-              MOBILE_HTTP_BASE_URL,
-              {
-                idToken,
-                authIntent: "create",
-                termsAcceptance: input.termsAcceptance
-              }
+            const actor = await verifyPendingPhoneCode(
+              firebasePhoneConfirmationRef.current,
+              input,
+              { authIntent: "create", termsAcceptance: input.termsAcceptance }
             )
             firebasePhoneConfirmationRef.current = null
             const resolution = await resolveCapabilitiesForSession(
@@ -711,8 +731,13 @@ export function useSessionState(): UseSessionStateResult {
       setErrorMessage(null)
       firebasePhoneConfirmationRef.current = null
       try {
+        if (IS_LOCAL_QA_PHONE_AUTH) {
+          await requestLocalQaPhoneCode(MOBILE_HTTP_BASE_URL, input.phoneNumber)
+          firebasePhoneConfirmationRef.current = { phoneNumber: input.phoneNumber, kind: "local-qa" }
+          return
+        }
         const confirmation = await requestFirebasePhoneCode(input.phoneNumber)
-        firebasePhoneConfirmationRef.current = { phoneNumber: input.phoneNumber, confirmation }
+        firebasePhoneConfirmationRef.current = { phoneNumber: input.phoneNumber, kind: "firebase", confirmation }
       } catch (error) {
         setErrorMessage(getErrorMessage(error))
         throw error

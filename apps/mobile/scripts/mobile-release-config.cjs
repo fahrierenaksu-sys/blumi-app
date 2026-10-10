@@ -26,6 +26,8 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
   const devEntryRoute = normalizeValue(
     environment.EXPO_PUBLIC_BLUMI_DEV_ENTRY_ROUTE
   ) || undefined
+  // Simulator QA against the in-memory API only (features/session/localQaPhoneAuth.ts).
+  const localQaAuth = normalizeValue(environment.EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH) || "0"
   const sentryDsn = normalizeValue(environment.EXPO_PUBLIC_SENTRY_DSN) || undefined
   const posthogApiKey =
     normalizeValue(environment.EXPO_PUBLIC_POSTHOG_API_KEY) || undefined
@@ -44,6 +46,9 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
   if (enableDemo !== "0" && enableDemo !== "1") {
     throw new Error("EXPO_PUBLIC_BLUMI_ENABLE_DEMO must be 0 or 1.")
   }
+  if (localQaAuth !== "0" && localQaAuth !== "1") {
+    throw new Error("EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH must be 0 or 1.")
+  }
   if (paidCoinsEnabled !== "0" && paidCoinsEnabled !== "1") {
     throw new Error("EXPO_PUBLIC_BLUMI_PAID_COINS_ENABLED must be 0 or 1.")
   }
@@ -59,6 +64,9 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
     }
     if (devEntryRoute) {
       throw new Error("Development entry routes cannot be enabled in connected builds.")
+    }
+    if (localQaAuth !== "0") {
+      throw new Error("Local QA sign-in cannot be enabled in connected builds.")
     }
   }
 
@@ -85,6 +93,7 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
     qaUnlockAvatarItems,
     enableDemo,
     devEntryRoute,
+    localQaAuth,
     sentryDsn,
     posthogApiKey,
     posthogHost,
