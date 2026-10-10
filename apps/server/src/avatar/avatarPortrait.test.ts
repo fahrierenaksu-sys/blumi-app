@@ -78,12 +78,36 @@ test("a sender wearing items without rig art still gets a picture: the body's st
   }
 })
 
-test("a layer missing from the art pack never yields a half-drawn chibi", async () => {
+test("a layer missing from the art pack never yields a half-drawn chibi, and never a missing picture", async () => {
   assert.ok(art)
-  const holed = { dir: art.dir, files: new Set([...art.files].filter((path) => !path.includes("avatar_v2_top_coral_wave_polo"))) }
-  // The girl's starter wears that polo too, so the starter fallback cannot draw either: the renderer refuses
-  // (the portrait service then sends the push without a picture) instead of drawing a chibi with a hole.
-  await assert.rejects(createAvatarPortraitRenderer({ art: holed }).render({ loadout: female, background: "#D6EEFF" }))
+  const holed = { dir: art.dir, files: new Set([...art.files].filter((path) => path.includes("avatar/female/") && path.includes("avatar_v2_top_coral_wave_polo") ? false : true)) }
+  const background = "#D6EEFF"
+  // The girl's starter wears that polo too, so neither her look nor her starter can be drawn: the last level is a
+  // fixed per-body bust, a valid link still gets a picture of the right size on the person's colour.
+  const portrait = await createAvatarPortraitRenderer({ art: holed }).render({ loadout: female, background })
+  const whole = await createAvatarPortraitRenderer({ art }).render({ loadout: female, background })
+  const { info, at } = await pixels(portrait.body)
+  assert.deepEqual([info.width, info.height], [AVATAR_PORTRAIT_SIZE, AVATAR_PORTRAIT_SIZE])
+  assert.equal(at(1, 1), background.toUpperCase())
+  assert.notEqual(at(AVATAR_PORTRAIT_SIZE / 2, AVATAR_PORTRAIT_SIZE - 20), background.toUpperCase(), "the fixed bust is drawn")
+  assert.ok(!portrait.body.equals(whole.body), "the fixed bust is not the chibi")
+  // The other body is unaffected by a hole in the girl's files and still gets its own, different bust.
+  const boy = await createAvatarPortraitRenderer({ art: holed }).render({ loadout: male, background })
+  const boyAlone = await createAvatarPortraitRenderer({ art }).render({ loadout: male, background })
+  assert.ok(boy.body.equals(boyAlone.body))
+})
+
+test("without any art pack every body still gets its own fixed bust, never an error", async () => {
+  const renderer = createAvatarPortraitRenderer({ art: null })
+  const background = "#FFD9E8"
+  const girl = await renderer.render({ loadout: female, background })
+  const boy = await renderer.render({ loadout: male, background })
+  assert.ok(!girl.body.equals(boy.body), "one fixed bust per body")
+  for (const portrait of [girl, boy]) {
+    const { info, at } = await pixels(portrait.body)
+    assert.deepEqual([info.width, info.height], [AVATAR_PORTRAIT_SIZE, AVATAR_PORTRAIT_SIZE])
+    assert.equal(at(1, 1), background.toUpperCase())
+  }
 })
 
 test("the start-up self-check draws both default portraits and names only an error class on failure", async () => {
@@ -98,6 +122,8 @@ test("the start-up self-check draws both default portraits and names only an err
     assert.equal(result.ok, false)
     assert.ok(!result.ok && /^[A-Za-z]+$/.test(result.errorType))
     assert.deepEqual(await checkAvatarPortraitRenderer(null), { ok: false, errorType: "MissingArtPack" })
+    const missing = await checkAvatarPortraitRenderer(createAvatarPortraitRenderer({ art: null }))
+    assert.equal(missing.ok, false, "pictures still go out, but the self-check says the art pack is not used")
   } finally {
     rmSync(empty, { recursive: true, force: true })
   }

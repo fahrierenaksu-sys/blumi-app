@@ -12,7 +12,7 @@ import {
 
 /** Sender pictures for pushes: a link when a push is sent, the image when a phone fetches it. */
 export interface NotificationPortraitService {
-  /** Undefined when pictures are off (no public origin, no art pack) or the loadout cannot be sealed. */
+  /** Undefined when pictures are off (no public origin) or the loadout cannot be sealed. */
   urlFor(sender: { userId: string; loadout: AvatarLoadout }, now: Date): string | undefined
   /** Null for an invalid or expired token. */
   render(token: string, now: Date): Promise<AvatarPortrait | null>
@@ -48,7 +48,7 @@ export function createNotificationPortraitService(options: {
       try {
         return await renderer.render(content)
       } catch {
-        // Neither the look nor the body's starter could be drawn: the push simply has no picture.
+        // Only an invalid background can get here (the renderer falls back for every art reason): no picture.
         return null
       }
     }

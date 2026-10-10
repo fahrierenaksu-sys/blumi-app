@@ -12,6 +12,7 @@ import {
   type AvatarStillRigId
 } from "@blumi/domain"
 import { resolveRoomArtPackDir } from "../rooms/roomSnapshotRenderer"
+import { drawFallbackPortrait } from "./avatarPortraitFallback"
 
 /**
  * Small pictures of a user's current 2.5D chibi (the baked head-and-shoulders still on their avatar circle colour),
@@ -30,9 +31,13 @@ const STARTER_LOADOUTS: Readonly<Record<AvatarStillRigId, unknown>> = {
   male: DEFAULT_MALE_AVATAR_LOADOUT
 }
 
+/** Which level of the chain drew the picture: the person's look, their body's starter, or the fixed bust. */
+export type AvatarPortraitLevel = "look" | "starter" | "fixed"
+
 export interface AvatarPortrait {
   body: Buffer
   mimeType: "image/png"
+  level: AvatarPortraitLevel
 }
 
 export interface AvatarPortraitRenderer {
@@ -51,7 +56,8 @@ export function loadAvatarPortraitArt(dir = resolveRoomArtPackDir()): { dir: str
 }
 
 export function createAvatarPortraitRenderer(options: {
-  art: { dir: string; files: ReadonlySet<string> }
+  /** Null when the server has no art pack: every picture is then the fixed bust of the body. */
+  art: { dir: string; files: ReadonlySet<string> } | null
   maxCacheBytes?: number
 }): AvatarPortraitRenderer {
   const { art } = options
@@ -71,9 +77,9 @@ export function createAvatarPortraitRenderer(options: {
     }
   }
 
-  const drawCached = async (still: AvatarStillResolved, background: string): Promise<Buffer> => {
+  const drawCached = async (cacheInput: unknown, background: string, draw: () => Promise<Buffer>): Promise<Buffer> => {
     const key = createHash("sha256")
-      .update(JSON.stringify([AVATAR_PORTRAIT_RENDERER_VERSION, background.toUpperCase(), AVATAR_PORTRAIT_SIZE, still.layers]))
+      .update(JSON.stringify([AVATAR_PORTRAIT_RENDERER_VERSION, background.toUpperCase(), AVATAR_PORTRAIT_SIZE, cacheInput]))
       .digest("hex")
     const cached = cache.get(key)
     if (cached) {
@@ -84,7 +90,7 @@ export function createAvatarPortraitRenderer(options: {
     }
     let pending = inFlight.get(key)
     if (!pending) {
-      pending = drawPortrait(art, still, background).finally(() => inFlight.delete(key))
+      pending = draw().finally(() => inFlight.delete(key))
       inFlight.set(key, pending)
     }
     const body = await pending
@@ -98,15 +104,22 @@ export function createAvatarPortraitRenderer(options: {
     },
     async render({ loadout, background }) {
       if (!HEX_COLOUR.test(background)) throw new Error("Avatar portrait background is invalid.")
-      // Total: the loadout is coerced and unknown items draw as the body's starter pieces.
+      // Total: the loadout is coerced and unknown items draw as the body's starter pieces. A valid link never fails
+      // for an art reason: look, then that body's starter, then the fixed bust of the body.
       const still = resolveAvatarStillLayers(loadout, "bust")
-      try {
-        return { body: await drawCached(still, background), mimeType: "image/png" }
-      } catch {
-        // Fallback: that body's starter look, so a valid link still gets a picture.
-        const starter = resolveAvatarStillLayers(STARTER_LOADOUTS[still.rig], "bust")
-        return { body: await drawCached(starter, background), mimeType: "image/png" }
+      const starter = resolveAvatarStillLayers(STARTER_LOADOUTS[still.rig], "bust")
+      const attempts: readonly (readonly [AvatarPortraitLevel, AvatarStillResolved])[] = [["look", still], ["starter", starter]]
+      if (art) {
+        for (const [level, attempt] of attempts) {
+          try {
+            return { body: await drawCached(attempt.layers, background, () => drawPortrait(art, attempt, background)), mimeType: "image/png", level }
+          } catch {
+            // Try the next level; nothing about the look is logged.
+          }
+        }
       }
+      const body = await drawCached(["fixed", still.rig], background, () => drawFallbackPortrait(still.rig, background, AVATAR_PORTRAIT_SIZE))
+      return { body, mimeType: "image/png", level: "fixed" }
     }
   }
 }
@@ -156,6 +169,8 @@ export async function checkAvatarPortraitRenderer(
     for (const loadout of Object.values(STARTER_LOADOUTS)) {
       const result = await renderer.render({ loadout: loadout as AvatarLoadout, background: "#FFFFFF" })
       if (result.body.length === 0) throw Object.assign(new Error("Empty portrait."), { name: "EmptyImage" })
+      // Pictures still go out from the fixed bust, but a default look that needs it means the art pack is not usable.
+      if (result.level !== "look") throw Object.assign(new Error("Default portrait used a fallback."), { name: "FallbackPortrait" })
     }
     selfCheckState = "ok"
     return { ok: true }
@@ -165,8 +180,7 @@ export async function checkAvatarPortraitRenderer(
   }
 }
 
-/** The renderer over the built art pack, or null when the pack is missing (pushes then go out without a picture). */
-export function createDefaultAvatarPortraitRenderer(): AvatarPortraitRenderer | null {
-  const art = loadAvatarPortraitArt()
-  return art ? createAvatarPortraitRenderer({ art }) : null
+/** The renderer over the built art pack; without the pack it draws only the fixed busts, so pictures never stop. */
+export function createDefaultAvatarPortraitRenderer(): AvatarPortraitRenderer {
+  return createAvatarPortraitRenderer({ art: loadAvatarPortraitArt() })
 }
