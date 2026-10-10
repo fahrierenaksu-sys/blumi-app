@@ -1,3 +1,4 @@
+import { roomAvatar25d } from "../../avatar/roomAvatarSeam"
 import { createInitialAvatars, deriveFacing } from "./miniRoomInitialAvatars"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { omitRoomWorldBlockers } from "../../roomWorld/roomWorldGeometry"
@@ -17,11 +18,19 @@ import {
   isRoomWorldTargetOccupied,
   ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
   ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
-  resolveRoomWorldInteractiveTarget,
-  type RoomWorldOccupant
+  resolveRoomWorldInteractiveTarget
 } from "../../roomWorld/roomWorldRuntime"
 import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import { canMiniRoomAvatarUseMotion } from "../miniRoomAvatarMotion"
+import {
+  chooseMiniRoomSeatFromTap,
+  createMiniRoomLayeredSeats,
+  createMiniRoomOccupants,
+  getMiniRoomLayeredSeatHip,
+  isMiniRoomLayeredSeatTaken,
+  MINI_ROOM_LAYERED_SEAT_PAD,
+  type MiniRoomLayeredSeats
+} from "./miniRoomLayeredSeats"
 import { cozyPinkBedroomScene } from "./roomMaps"
 import { resolveMiniRoomRefusedSeatStand } from "./miniRoomSeatRefusalModel"
 import { createMiniRoomEntryPlan } from "./miniRoomEntryModel"
@@ -64,6 +73,9 @@ import type {
   RoomScene,
   SpeechBubble
 } from "./miniRoomSceneTypes"
+
+/** 2.5D room calibration; null in every other bundle (taps walk to the tapped point as shipped). */
+const roomCalibration = roomAvatar25d.roomCalibration
 
 interface UseMiniRoomSceneStoreInput {
   localUser: {
@@ -133,12 +145,18 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       : createRoomWorldHotspotsFromMiniRoomScene(scene),
     [input.roomDecorScene, scene, usesRoomV2Scene]
   )
+  // layered pieces (room calibration): empty in every other bundle.
+  const layeredSeats = useMemo(
+    () => usesRoomV2Scene ? createMiniRoomLayeredSeats(input.roomDecorScene) : createMiniRoomLayeredSeats(undefined),
+    [input.roomDecorScene, usesRoomV2Scene]
+  )
   const hotspots = useMemo(
     () => usesRoomV2Scene
-      ? createMiniRoomHotspotsFromRoomWorldHotspots(roomWorldHotspots)
+      ? createMiniRoomHotspotsFromRoomWorldHotspots(roomWorldHotspots, layeredSeats)
       : scene.hotspots,
-    [roomWorldHotspots, scene.hotspots, usesRoomV2Scene]
+    [layeredSeats, roomWorldHotspots, scene.hotspots, usesRoomV2Scene]
   )
+  const roomShell = usesRoomV2Scene ? input.roomDecorScene?.shell : undefined
   const [avatars, setAvatars] = useState<Record<string, AvatarState>>(() =>
     createInitialAvatars(
       { localUserId, partnerUserId, participantAvatarSnapshots },
@@ -297,18 +315,30 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       const committedLocalAvatar = currentAvatars[userId]
       if (!committedLocalAvatar) return false
       const motionDriver = getMotionDriver(committedLocalAvatar)
+      const walkerSnapshot = userId === localUserId
+        ? participantAvatarSnapshots.local
+        : participantAvatarSnapshots.partner
+      // 2.5D avatar: each body walks at its own pace (both phones time the same plan identically)
+      const movementTiming = roomAvatar25d.movementTiming(
+        ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
+        walkerSnapshot.appearance.avatarLoadout
+      )
       const entry = options?.entry
       // A retarget during a walk starts from where the avatar is on screen;
       // an arrival starts at the door, standing.
       const localAvatar = entry
         ? { ...committedLocalAvatar, x: entry.door.x, y: entry.door.y, seatedHotspotId: undefined }
         : { ...committedLocalAvatar, ...readMiniRoomAvatarPosition(motionDriver.position) }
-      const occupants = options?.ignoreOccupants ? [] : createMiniRoomOccupants(currentAvatars)
+      const occupants = options?.ignoreOccupants ? [] : createMiniRoomOccupants(currentAvatars, layeredSeats)
       const seatHotspot = options?.roomWorldHotspot?.kind === "seat"
         ? options.roomWorldHotspot
         : undefined
+      // A layered seat (calibration): she walks only to its approach spot, as in My Room, and sits from
+      // there; seated, she is still on that spot, outside the piece, so leaving is an ordinary walk.
+      const layeredSeat = seatHotspot ? layeredSeats[seatHotspot.id] : undefined
       const departingHotspotId = localAvatar.seatedHotspotId ?? options?.departFromHotspotId
-      const currentSeatHotspot = departingHotspotId
+      const leavesLayeredSeat = Boolean(departingHotspotId && layeredSeats[departingHotspotId])
+      const currentSeatHotspot = departingHotspotId && !leavesLayeredSeat
         ? roomWorldHotspots.find((hotspot) => hotspot.id === departingHotspotId)
         : undefined
       const currentSeatExit = currentSeatHotspot?.exitPoint && currentSeatHotspot.sourceRenderId
@@ -322,11 +352,13 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         : point
       if (
         seatHotspot &&
-        isRoomWorldTargetOccupied({
-          target: seatTarget,
-          occupants,
-          movingOccupantId: userId
-        })
+        (layeredSeat
+          ? !options?.ignoreOccupants && isMiniRoomLayeredSeatTaken(layeredSeat, currentAvatars, userId)
+          : isRoomWorldTargetOccupied({
+            target: seatTarget,
+            occupants,
+            movingOccupantId: userId
+          }))
       ) {
         return false
       }
@@ -343,13 +375,23 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           target: seatHotspot.approachPoint,
           seatedFurnitureRenderId: currentSeatExit.furnitureRenderId,
           clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-          timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
+          timing: movementTiming,
           occupants,
           movingOccupantId: userId
         })
         : undefined
       if (seatHotspot?.approachPoint && currentSeatExit && !seatDeparturePlan) return false
-      const seatPlan = seatHotspot?.approachPoint && seatHotspot.sourceRenderId
+      const seatPlan = layeredSeat
+        ? createRoomWorldMovementPlan({
+          geometry: currentSeatGeometry,
+          from: seatDeparturePlan?.target ?? localAvatar,
+          to: layeredSeat.approach,
+          clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
+          timing: movementTiming,
+          occupants,
+          movingOccupantId: userId
+        })
+        : seatHotspot?.approachPoint && seatHotspot.sourceRenderId
         ? createRoomWorldSeatMovementPlan({
           geometry: currentSeatGeometry,
           from: seatDeparturePlan?.target ?? localAvatar,
@@ -357,12 +399,12 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           seat: seatTarget,
           seatedFurnitureRenderId: seatHotspot.sourceRenderId,
           clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-          timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
+          timing: movementTiming,
           occupants,
           movingOccupantId: userId
         })
         : null
-      if (seatHotspot?.approachPoint && !seatPlan) return false
+      if ((layeredSeat || seatHotspot?.approachPoint) && !seatPlan) return false
       // An authoritative target is resolved without occupants, exactly as the
       // sender's phone accepted it, so both phones end at the same point.
       const target = seatPlan?.target ?? resolveRoomWorldInteractiveTarget({
@@ -384,7 +426,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
           target,
           seatedFurnitureRenderId: currentSeatExit.furnitureRenderId,
           clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-          timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
+          timing: movementTiming,
           occupants,
           movingOccupantId: userId
         })
@@ -400,7 +442,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
             entry,
             to: target,
             clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-            timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
+            timing: movementTiming,
             occupants,
             movingOccupantId: userId
           })
@@ -409,7 +451,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
             from: localAvatar,
             to: target,
             clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-            timing: ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
+            timing: movementTiming,
             occupants,
             movingOccupantId: userId
           }))
@@ -448,8 +490,10 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         options?.hotspot?.kind === "seat"
           ? options?.hotspot?.id
           : undefined
-      // Draw order only: sitting down and standing up keep the seat's depth.
+      // Draw order only: sitting down and standing up keep the seat's depth. A layered seat's walk ends on its
+      // approach spot in front of the piece, so the walk itself sorts by her feet.
       const departingSeatHotspotId = currentSeatExit ? departingHotspotId : undefined
+      const pinsArrivalDepth = Boolean(arrivalSeatedHotspotId) && !layeredSeat
       let run: MiniRoomMovementRun | null = null
       run = startMiniRoomMovementRun({
         segments: plan.segments,
@@ -459,7 +503,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
         },
         animator: motionDriver.animator,
         onSegmentStart: (segmentStartPose, segment, index) => {
-          const depthSeatHotspotId = segment.isFinal && arrivalSeatedHotspotId
+          const depthSeatHotspotId = segment.isFinal && pinsArrivalDepth
             ? arrivalSeatedHotspotId
             : index === 0 ? departingSeatHotspotId : undefined
           setAvatars((current) => {
@@ -530,19 +574,27 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       activeMovementRef.current = run
       return true
     },
-    [endArrivalWalk, geometry, getMotionDriver, localUserId, onLocalMove, movementRefFor, roomWorldHotspots]
+    [endArrivalWalk, geometry, getMotionDriver, layeredSeats, localUserId, onLocalMove, movementRefFor,
+      participantAvatarSnapshots, roomWorldHotspots]
   )
 
   const moveLocalAvatar = useCallback(
     (point: RoomPoint): boolean => {
       setSelectedHotspotId(undefined)
-      return runMovement(localUserId, point)
+      // Room calibration: the true floor point under the tap (a tap above a back wall drops straight
+      // down onto the floor in front of it), as My Room walks; every other bundle walks to the tapped point.
+      return runMovement(localUserId, roomCalibration ? roomCalibration.resolveTapTarget(point, roomShell) : point)
     },
-    [localUserId, runMovement]
+    [localUserId, roomShell, runMovement]
   )
 
   const moveLocalAvatarToHotspot = useCallback(
-    (hotspotId: string): boolean => {
+    (tappedHotspotId: string, alternatives?: readonly string[]): boolean => {
+      // A tap on a piece with several seats lists them nearest first: take the first one nobody else holds.
+      const hotspotId = alternatives?.length
+        ? chooseMiniRoomSeatFromTap([tappedHotspotId, ...alternatives], avatarsRef.current, localUserId) ??
+          tappedHotspotId
+        : tappedHotspotId
       const hotspot = hotspots.find((entry) => entry.id === hotspotId)
       if (!hotspot) return false
       const roomWorldHotspot = roomWorldHotspots.find((entry) => entry.id === hotspotId)
@@ -614,7 +666,10 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     const facing = hotspot?.facingOnArrival ?? refused?.facing ?? avatar.facing
     const seated = hotspot?.kind === "seat" &&
       canMiniRoomAvatarUseMotion({ appearance: avatar.appearance, motion: "sitting", facing })
-    const position = seated ? { x: hotspot.x, y: hotspot.y }
+    // A layered seat's sitter stays on its approach spot (the 2.5D body draws her onto the seat from there).
+    const layeredSeat = seated ? layeredSeats[hotspot.id] : undefined
+    const position = layeredSeat ? { ...layeredSeat.approach }
+      : seated ? { x: hotspot.x, y: hotspot.y }
       : resolveRoomWorldInteractiveTarget({ geometry, target }) ?? target
     snapMiniRoomAvatarPosition(driver.position, position)
     setAvatars(current => ({ ...current, [next.userId]: withMiniRoomPresence({ ...current[next.userId]!,
@@ -622,8 +677,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       motion: seated ? "sitting" : "idle", ...(seated || refused ? { facing } : {}),
       seatedHotspotId: seated ? hotspot.id : undefined, depthSeatHotspotId: undefined, enteringFromDoor: undefined
     }, next.present) }))
-  }, [endArrivalWalk, geometry, getMotionDriver, hotspots, localUserId, movementRefFor, resolveRefusedSeatStand,
-    roomWorldHotspots, runMovement])
+  }, [endArrivalWalk, geometry, getMotionDriver, hotspots, layeredSeats, localUserId, movementRefFor,
+    resolveRefusedSeatStand, roomWorldHotspots, runMovement])
 
   const presentArrival = useCallback<MiniRoomStore["presentArrival"]>((next, options) => {
     const avatar = avatarsRef.current[next.userId]
@@ -857,28 +912,29 @@ function toSpeechBubble(line: MiniRoomSpeech): SpeechBubble {
   return bubble
 }
 
-function createMiniRoomOccupants(
-  avatars: Record<string, AvatarState>
-): RoomWorldOccupant[] {
-  return Object.values(avatars).filter(avatar => avatar.present !== false).map((avatar) => ({
-    id: avatar.userId,
-    x: avatar.targetX ?? avatar.x,
-    y: avatar.targetY ?? avatar.y,
-    blocksMovement: true
-  }))
-}
-
 function createMiniRoomHotspotsFromRoomWorldHotspots(
-  hotspots: ReturnType<typeof createRoomWorldHotspotsFromRoomV2Scene>
+  hotspots: ReturnType<typeof createRoomWorldHotspotsFromRoomV2Scene>,
+  layeredSeats: MiniRoomLayeredSeats
 ): RoomHotspot[] {
-  return hotspots.map((hotspot) => ({
-    id: hotspot.id,
-    kind: hotspot.kind === "seat" ? "seat" : "stand",
-    x: hotspot.x,
-    y: hotspot.y,
-    approachPoint: hotspot.approachPoint ?? { x: hotspot.x, y: hotspot.y },
-    facingOnArrival: hotspot.facing,
-    padWidth: hotspot.kind === "seat" ? 0.18 : 0.14,
-    padHeight: hotspot.kind === "seat" ? 0.08 : 0.07
-  }))
+  return hotspots.map((hotspot) => {
+    const layered = layeredSeats[hotspot.id]
+    return {
+      id: hotspot.id,
+      kind: hotspot.kind === "seat" ? "seat" : "stand",
+      x: hotspot.x,
+      y: hotspot.y,
+      approachPoint: hotspot.approachPoint ?? { x: hotspot.x, y: hotspot.y },
+      facingOnArrival: hotspot.facing,
+      // A layered piece's seats share one pad (the seat nearest the tap wins), each part centred on her hip.
+      ...(layered ? {
+        groupId: layered.piece.renderId,
+        padCentre: getMiniRoomLayeredSeatHip(layered),
+        padWidth: MINI_ROOM_LAYERED_SEAT_PAD.width,
+        padHeight: MINI_ROOM_LAYERED_SEAT_PAD.height
+      } : {
+        padWidth: hotspot.kind === "seat" ? 0.18 : 0.14,
+        padHeight: hotspot.kind === "seat" ? 0.08 : 0.07
+      })
+    }
+  })
 }

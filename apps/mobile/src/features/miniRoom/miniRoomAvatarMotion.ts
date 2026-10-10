@@ -1,3 +1,5 @@
+import type { RoomAvatar25dSpec } from "../avatar/roomAvatarSeamContract"
+import { roomAvatar25d } from "../avatar/roomAvatarSeam"
 import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoomCatalog"
 import { getRoomAvatarRenderLayers } from "../avatarV2/room/avatarRoomSelectors"
 import { getRoomV2AvatarMotionAssetDiagnostics } from "../roomV2/roomV2AvatarMotion"
@@ -50,11 +52,22 @@ function resolveAppearanceLayers(
   })
 }
 
+/** 2.5D avatar: the whole avatar's 2.5D spec, or null (the stub, or any item without art). */
+export function getMiniRoomAvatar25dSpec(input: MiniRoomAvatarMotionInput): RoomAvatar25dSpec | null {
+  return roomAvatar25d.resolveRoomAvatar25d({
+    loadout: input.appearance.avatarLoadout,
+    state: toRoomAvatarMotionState(input.motion),
+    direction: input.facing
+  })
+}
+
 export function canMiniRoomAvatarUseMotion(
   input: MiniRoomAvatarMotionInput
 ): boolean {
   const requestedState = toRoomAvatarMotionState(input.motion)
   if (requestedState === "idle") return true
+  // 2.5D avatar: that renderer draws every pose of the whole avatar (the stub never resolves one).
+  if (getMiniRoomAvatar25dSpec(input)) return true
   if (!input.appearance.roomAvatarAppearance) return false
 
   const layers = resolveAppearanceLayers(input, requestedState)

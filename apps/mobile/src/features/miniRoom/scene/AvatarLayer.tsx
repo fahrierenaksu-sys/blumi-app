@@ -8,13 +8,24 @@ import Reanimated, {
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
+import { AvatarLive } from "../../avatar/components/AvatarLive"
+import { roomAvatar25d } from "../../avatar/roomAvatarSeam"
 import { RoomRendererFurnitureSprite } from "../../roomV2/components/RoomRenderer2D"
+import { RoomRendererLayeredFurnitureFront } from "../../roomV2/components/RoomRendererLayeredFurniture"
 import { animateTo, useMotion } from "../../../ui/motion"
 import {
+  getMiniRoomAvatar25dSpec,
   getMiniRoomAvatarRenderLayers,
   getMiniRoomAvatarSittingScaleY
 } from "../miniRoomAvatarMotion"
 import type { MiniRoomAvatarPosition } from "./miniRoomAvatarPositions"
+import {
+  getMiniRoomAvatarLayeredSeat,
+  NO_MINI_ROOM_LAYERED_SEATS,
+  resolveMiniRoomAvatar25dSeatPlacement,
+  resolveMiniRoomFigureZIndices,
+  type MiniRoomLayeredSeat
+} from "./miniRoomLayeredSeats"
 import { resolveMiniRoomAvatarAnchorOffset } from "./miniRoomAvatarStageModel"
 import {
   EMPTY_MINI_ROOM_DEPTH_SCENE,
@@ -55,6 +66,8 @@ interface AvatarLayerProps {
   typingUserId?: string
   /** Furniture drawn among the avatars by floor depth (VIS-04). */
   depthScene?: MiniRoomDepthScene
+  /** 2.5D avatars: keep their GPU surface unmounted while the stage is still fading in. */
+  holdGpuSurfaces?: boolean
 }
 
 type BubblePlacement = RoomSpeechBubblePlacement
@@ -96,9 +109,14 @@ export const AvatarLayer = memo(function AvatarLayer(props: AvatarLayerProps) {
   // ROOM-06: avatars move by transform in room pixels (no per-frame layout).
   const stageWidth = useSharedValue(0)
   const stageHeight = useSharedValue(0)
+  // The same size for React: the calibrated 2.5D figure's height and seat offsets are px. The room
+  // keeps one layout (the keyboard framing is a transform), so this changes only when the stage is laid out.
+  const [stagePx, setStagePx] = useState({ width: 0, height: 0 })
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    stageWidth.value = event.nativeEvent.layout.width
-    stageHeight.value = event.nativeEvent.layout.height
+    const { width, height } = event.nativeEvent.layout
+    stageWidth.value = width
+    stageHeight.value = height
+    setStagePx((current) => current.width === width && current.height === height ? current : { width, height })
   }, [stageHeight, stageWidth])
 
   return (
@@ -108,10 +126,12 @@ export const AvatarLayer = memo(function AvatarLayer(props: AvatarLayerProps) {
         avatarPositions={avatarPositions}
         stageWidth={stageWidth}
         stageHeight={stageHeight}
+        stagePx={stagePx}
         depthScene={depthScene}
         localUserId={localUserId}
         partnerJustJoined={partnerJustJoined}
         motionPolicy={motionPolicy}
+        holdGpuSurfaces={props.holdGpuSurfaces}
       />
       {sortedAvatars.map((avatar) => {
         const position = avatarPositions[avatar.userId]
@@ -155,10 +175,12 @@ const AvatarBodyLayer = memo(function AvatarBodyLayer(props: {
   avatarPositions: AvatarLayerProps["avatarPositions"]
   stageWidth: SharedValue<number>
   stageHeight: SharedValue<number>
+  stagePx: { width: number; height: number }
   depthScene: MiniRoomDepthScene
   localUserId: string
   partnerJustJoined: boolean
   motionPolicy: MiniRoomMotionPolicy
+  holdGpuSurfaces?: boolean
 }) {
   const { avatars, avatarPositions, stageWidth, stageHeight, depthScene, localUserId, partnerJustJoined, motionPolicy } = props
   // A seated (or sitting-down / standing-up) avatar sorts at its seat's depth.
@@ -196,15 +218,38 @@ const AvatarBodyLayer = memo(function AvatarBodyLayer(props: {
     },
     [avatarPositions, neighbours, pinnedDepths]
   )
-  const zIndices = useMemo(
-    () => resolveMiniRoomDepthZIndices(depthOrder, occluders.length),
-    [depthOrder, occluders.length]
-  )
+  // layered pieces (room calibration): a sitter is drawn between the piece's back layer (its
+  // occluder sprite) and its front layer, cut at her own seat's cushion edge. No such piece exists in any other
+  // bundle, so the z-indices there are exactly the depth model's.
+  const layeredSeats = depthScene.layeredSeats ?? NO_MINI_ROOM_LAYERED_SEATS
+  const layeredSitters = useMemo(() => {
+    const sitters: { userId: string; seat: MiniRoomLayeredSeat }[] = []
+    for (const avatar of avatars) {
+      const seat = getMiniRoomAvatarLayeredSeat(avatar, layeredSeats)
+      if (seat) sitters.push({ userId: avatar.userId, seat })
+    }
+    return sitters
+  }, [avatars, layeredSeats])
+  const zIndices = useMemo(() => {
+    const base = resolveMiniRoomDepthZIndices(depthOrder, occluders.length)
+    return layeredSeats === NO_MINI_ROOM_LAYERED_SEATS
+      ? { ...base, fronts: {} as Readonly<Record<string, number>> }
+      : resolveMiniRoomFigureZIndices(base, layeredSitters.map((sitter) => sitter.userId))
+  }, [depthOrder, layeredSeats, layeredSitters, occluders.length])
 
   return (
     <>
       {occluders.map((item, index) => (
         <RoomRendererFurnitureSprite key={item.renderId} item={item} zIndex={zIndices.occluders[index] ?? 0} />
+      ))}
+      {layeredSitters.map(({ userId, seat }) => (
+        <RoomRendererLayeredFurnitureFront
+          key={`${userId}:front`}
+          item={seat.piece}
+          frontVisibleHeight={seat.art.frontVisibleHeight}
+          zIndex={zIndices.fronts[userId] ?? 0}
+          testID={`mini-room-front-${seat.hotspotId}`}
+        />
       ))}
       {avatars.map((avatar) => {
         const position = avatarPositions[avatar.userId]
@@ -217,11 +262,14 @@ const AvatarBodyLayer = memo(function AvatarBodyLayer(props: {
             position={position}
             stageWidth={stageWidth}
             stageHeight={stageHeight}
+            stagePx={props.stagePx}
+            layeredSeat={getMiniRoomAvatarLayeredSeat(avatar, layeredSeats)}
             zIndex={zIndices.avatars[avatar.userId] ?? 0}
             // A walk in from the door is the arrival's one hero; the ring is for a plain
             // fade-in, so it stays off for a walk-in even after it lands.
             showJoinPulse={!isLocal && partnerJustJoined && !avatar.enteringFromDoor && !avatar.arrivedByWalk}
             motionPolicy={motionPolicy}
+            holdGpuSurface={props.holdGpuSurfaces}
           />
         )
       })}
@@ -289,13 +337,24 @@ interface AvatarFigureProps {
   position: MiniRoomAvatarPosition
   stageWidth: SharedValue<number>
   stageHeight: SharedValue<number>
+  stagePx: { width: number; height: number }
+  /** Room calibration: the layered seat she sits on (her hip goes on its hip point). */
+  layeredSeat?: MiniRoomLayeredSeat
   /** Changes only when the depth order flips. */
   zIndex: number
   showJoinPulse: boolean
   motionPolicy: MiniRoomMotionPolicy
+  holdGpuSurface?: boolean
 }
 
 /** The chibi body and its floor ring: sorted among the furniture by depth. */
+/** avatarImageWrap's height: the box the avatar art is fitted into. */
+const MINI_ROOM_AVATAR_BOX_HEIGHT = 108
+/** The room calibration from the installed seam. */
+const roomCalibration = roomAvatar25d.roomCalibration
+/** Where the anchor's room point is, measured up from the anchor box's bottom (its height less marginTop). */
+const MINI_ROOM_ANCHOR_POINT_FROM_BOTTOM = 142 - 130
+
 const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   const {
     avatar,
@@ -326,6 +385,14 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     }),
     [avatar.appearance, avatar.facing, avatar.motion]
   )
+  const avatar25d = useMemo(
+    () => roomAvatar25d.enabled ? getMiniRoomAvatar25dSpec({
+      appearance: avatar.appearance,
+      motion: avatar.motion,
+      facing: avatar.facing
+    }) : null,
+    [avatar.appearance, avatar.facing, avatar.motion]
+  )
   const usesAnimatedAvatarFrames = roomAvatarLayers.some(
     (layer) => (layer.animation?.frames.length ?? 0) > 1
   )
@@ -337,7 +404,11 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   }))
 
   const facingSignX = avatar.facing === "left" ? -1 : 1
-  const facingLean = avatar.facing === "left" || avatar.facing === "right" ? 1 : 0
+  // room calibration with a 2.5D figure (My Room's rules): one world height everywhere (no depth
+  // scale), her soles on the room point the walk, depth and taps use, and no procedural bob, squash or lean, since
+  // the 2.5D drawing moves itself and a seated hip must stay on its seat.
+  const calibrated = Boolean(avatar25d && roomCalibration)
+  const facingLean = !calibrated && (avatar.facing === "left" || avatar.facing === "right") ? 1 : 0
   const isSitting = avatar.motion === "sitting"
 
   const leanRotate = `${facingLean * (avatar.facing === "right" ? 2 : -2)}deg`
@@ -350,7 +421,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     }
   })
   // ROOM-03: a back-facing avatar stays fully opaque (no ghost).
-  const bodyStyle = useAnimatedStyle(() => ({
+  const bodyStyle = useAnimatedStyle(() => calibrated ? { transform: [{ scaleX: facingSignX }] } : ({
     transform: [
       { translateY: -3 * walkBob.value - 1.2 * breathe.value },
       { scaleX: facingSignX },
@@ -361,8 +432,18 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
     ]
   }))
   const depthScaleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.9 + position.y.value * 0.2 }]
+    transform: [{ scale: calibrated ? 1 : 0.9 + position.y.value * 0.2 }]
   }))
+  const { stagePx, layeredSeat } = props
+  const calibratedFigureHeightPx = calibrated && roomCalibration && stagePx.height > 0
+    ? roomCalibration.avatarFigureHeightPx(stagePx.height, avatar25d?.rig)
+    : undefined
+  const seatPlacement = useMemo(() => calibrated ? resolveMiniRoomAvatar25dSeatPlacement({
+    avatar: { x: avatar.x, y: avatar.y },
+    seat: layeredSeat,
+    stageWidthPx: stagePx.width,
+    stageHeightPx: stagePx.height
+  }) : undefined, [avatar.x, avatar.y, calibrated, layeredSeat, stagePx.height, stagePx.width])
 
   return (
     <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight} zIndex={zIndex}
@@ -374,13 +455,27 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
       <Reanimated.View
         style={[
           styles.avatarImageWrap,
-          avatar.motion === "walking" ? styles.avatarWalking : null,
-          isSitting ? styles.avatarSitting : null,
+          calibrated ? styles.avatarOnRoomPoint : avatar.motion === "walking" ? styles.avatarWalking : null,
+          !calibrated && isSitting ? styles.avatarSitting : null,
           depthScaleStyle
         ]}
       >
         <Reanimated.View style={[styles.avatarImageFill, bodyStyle]}>
-          {roomAvatarLayers.length ? (
+          {avatar25d ? (
+            <AvatarLive
+              liveScope="miniRoom"
+              spec={avatar25d}
+              live={position}
+              stageWidthPx={stageWidth}
+              stageHeightPx={stageHeight}
+              outerMirrored={facingSignX < 0}
+              reduceMotion={!motionPolicy.animateBreathe}
+              boxHeightPx={MINI_ROOM_AVATAR_BOX_HEIGHT}
+              calibratedFigureHeightPx={calibratedFigureHeightPx}
+              seatPlacement={seatPlacement}
+              holdCanvas={props.holdGpuSurface}
+            />
+          ) : roomAvatarLayers.length ? (
             <RoomAvatarRenderer2D layers={roomAvatarLayers} allowDownscaling={false} />
           ) : avatar.appearance.fullBodyAsset ? (
             <Image
@@ -466,7 +561,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 22,
     width: 74,
-    height: 108,
+    height: MINI_ROOM_AVATAR_BOX_HEIGHT,
     alignItems: "center",
     justifyContent: "flex-end"
   },
@@ -488,6 +583,9 @@ const styles = StyleSheet.create({
   },
   avatarSitting: {
     bottom: 4
+  },
+  avatarOnRoomPoint: {
+    bottom: MINI_ROOM_ANCHOR_POINT_FROM_BOTTOM
   },
   joinPulse: {
     position: "absolute",

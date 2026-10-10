@@ -16,6 +16,7 @@ import { useReducedMotion } from "../../../ui/animations"
 import { hapticSoft } from "../../../ui/haptics"
 import { RoomFloorTapLayer } from "../../roomV2/components/RoomFloorTapLayer"
 import { useMyRoomStageCover, useStageRevealStyle } from "../../roomV2/components/MyRoomStageVeil"
+import { roomAvatar25d } from "../../avatar/roomAvatarSeam"
 import { AvatarLayer } from "./AvatarLayer"
 import { HotspotLayer } from "./HotspotLayer"
 import { MiniRoomChatPanel } from "./MiniRoomChatPanel"
@@ -154,7 +155,12 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const roomShell = roomDecorScene?.shell
   const { covered: stageCovered, markPainted: handleStageSceneReady } =
     useMyRoomStageCover(!roomShell, MINI_ROOM_STAGE_READY_CAP_MS)
-  const stageRevealStyle = useStageRevealStyle(stageCovered)
+  // 2.5D avatars draw into a GPU surface, which must not appear while the stage fades in from
+  // transparent (the whole stage stayed invisible): they wait for the reveal to finish. The stub (every
+  // release bundle) never asks, so the reveal is exactly as before.
+  const [stageRevealed, setStageRevealed] = useState(false)
+  const markStageRevealed = useCallback(() => setStageRevealed(true), [])
+  const stageRevealStyle = useStageRevealStyle(stageCovered, roomAvatar25d.enabled ? markStageRevealed : undefined)
   // VIS-04: upright furniture is drawn among the avatars by floor depth.
   const depthScene = useMemo(() => createMiniRoomDepthScene(roomDecorScene), [roomDecorScene])
   // Everything the pose depends on except the keyboard (that is a progress).
@@ -251,8 +257,8 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     [moveLocalAvatar]
   )
 
-  const handleHotspotSelect = useCallback((hotspotId: string): void => {
-    moveLocalAvatarToHotspot(hotspotId)
+  const handleHotspotSelect = useCallback((hotspotId: string, alternatives?: readonly string[]): void => {
+    moveLocalAvatarToHotspot(hotspotId, alternatives)
   }, [moveLocalAvatarToHotspot])
 
   const handleSubmitComposer = useCallback((body: string, retryClientMessageId?: string): boolean => {
@@ -335,6 +341,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       typingUserId={props.typing?.partnerTyping ? partnerUser.userId : undefined}
       motionPolicy={motionPolicy}
       depthScene={depthScene}
+      holdGpuSurfaces={roomAvatar25d.enabled && !stageRevealed}
     />
   )
 

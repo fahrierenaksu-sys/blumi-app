@@ -167,6 +167,8 @@ interface PhoneView {
 function createPhone(input: {
   harness: ServerHarness; me: SimUser; partner: SimUser; miniRoomId: string; roomDecorScene: ResolvedRoomV2Scene
   reduceMotion?: boolean
+  /** This phone hears every server frame this much later than the other phone (a busy JS thread). */
+  inboundDelayMs?: number
 }) {
   const runtime = createFakeReactRuntime()
   const sockets: WebSocket[] = []
@@ -181,6 +183,15 @@ function createPhone(input: {
   const createSocket = (url: string, protocols: string[]): RealtimeSocket => {
     const socket = new WebSocket(url, protocols, { headers: { "x-forwarded-for": input.me.clientAddress } })
     socket.on("error", () => undefined)
+    if (input.inboundDelayMs) {
+      const delayMs = input.inboundDelayMs
+      let handler: ((event: { data: unknown }) => void) | null = null
+      Object.defineProperty(socket, "onmessage", { configurable: true, get: () => handler, set: (next) => { handler = next } })
+      socket.on("message", (data, isBinary) => {
+        const text = isBinary ? data : data.toString()
+        setTimeout(() => handler?.({ data: text }), delayMs)
+      })
+    }
     sockets.push(socket)
     return socket as unknown as RealtimeSocket
   }
@@ -219,6 +230,8 @@ function createPhone(input: {
       "./miniRoomAvatarPositions": fakeAvatarPositions
     },
     real: [
+      // the dev-only 2.5D avatar switch: in Node it resolves to the stub every release bundle gets (timing unchanged)
+      "../../avatar/roomAvatarSeam",
       "./miniRoomInitialAvatars",
       "../../roomWorld/roomWorldGeometry",
       "../../roomWorld/roomWorldRoomV2Projection",
@@ -228,6 +241,7 @@ function createPhone(input: {
       "./miniRoomMovementRun",
       "./miniRoomSpeechStack",
       "./miniRoomSeatRefusalModel",
+      "./miniRoomLayeredSeats",
       "./miniRoomEntryModel",
       "./miniRoomPresentation"
     ]
@@ -309,6 +323,15 @@ function settledAvatar(phone: Phone, userId: string) {
   const avatar = phone.view().store.avatars[userId]
   return avatar && avatar.present !== false && avatar.motion !== "walking" && avatar.targetX === undefined
     ? avatar : undefined
+}
+
+/**
+ * As `settledAvatar`, once `phone` has joined the scene. Before its join snapshot a phone shows both avatars at its
+ * own spawn seeds, which are not where the server puts them, and that pose is also still.
+ */
+function settledInJoinedScene(phone: Phone, userId: string) {
+  const joined = phone.view().motion.avatars.some((avatar) => avatar.userId === phone.userId && avatar.present)
+  return joined ? settledAvatar(phone, userId) : undefined
 }
 
 async function bothInScene(a: Phone, b: Phone) {
@@ -460,6 +483,72 @@ test("two phones see each other's MiniRoom walks live, both directions, across r
     "no motion event was dropped as invalid")
 })
 
+/**
+ * The 2.5D room calibration draws the sofa from room-camera layers with two seats. Built here as that
+ * bundle builds it (plain Node has no installed seam).
+ */
+function loadLayeredSofaScene(): { scene: ResolvedRoomV2Scene; seats: [string, string] } {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const catalog = require("../roomV2/roomV2Catalog")
+  const selectors = require("../roomV2/roomV2Selectors")
+  const { createRoomAvatar25dRoomCalibration } = require("../roomV2/calibration/roomAvatar25dRoomCalibration")
+  const layeredCatalog = require("../roomV2/furniture/layeredFurnitureCatalog")
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  const stand = (key: string) => ({ key, source: 0 })
+  const layers = (id: string) => Object.fromEntries([0, 1, 2, 3].map((r) => [r,
+    { back: stand(`${id}_r${r}_back`), front: stand(`${id}_r${r}_front`), shadow: stand(`${id}_r${r}_shadow`) }]))
+  const assets = { [layeredCatalog.ROOM_AVATAR_25D_SOFA_ID]: layers(layeredCatalog.ROOM_AVATAR_25D_SOFA_ID) }
+  const calibration = createRoomAvatar25dRoomCalibration(assets)
+  const plain = selectors.resolveRoomV2Scene({
+    roomShellCatalog: catalog.ROOM_V2_SHELL_CATALOG,
+    furnitureCatalog: [...catalog.ROOM_V2_FURNITURE_CATALOG, ...layeredCatalog.createRoomAvatar25dFurnitureCatalog(assets)],
+    decor: {
+      schemaVersion: 3, geometryVersion: "room_v2", roomShellId: catalog.DEFAULT_ROOM_V2_SHELL_ID,
+      placedItems: [{ instanceId: "sofa", itemId: layeredCatalog.ROOM_AVATAR_25D_SOFA_ID, x: 0.286, y: 0.639, rotation: "front" }]
+    },
+    defaultRoomShellId: catalog.DEFAULT_ROOM_V2_SHELL_ID
+  }) as ResolvedRoomV2Scene
+  const scene = {
+    ...plain,
+    shell: calibration.calibrateShell(plain.shell!),
+    renderItems: plain.renderItems.map((item) => item.kind === "furniture" ? calibration.calibrateFurnitureItem(item) : item)
+  }
+  return { scene, seats: ["sofa:s0", "sofa:s1"] }
+}
+
+test("layered sofa: two phones sit side by side, one on each seat, and both phones agree", async (t) => {
+  const { harness, ada, bora, miniRoomId } = await startServer()
+  const { scene, seats: [s0, s1] } = loadLayeredSofaScene()
+  const phoneA = createPhone({ harness, me: ada, partner: bora, miniRoomId, roomDecorScene: scene })
+  const phoneB = createPhone({ harness, me: bora, partner: ada, miniRoomId, roomDecorScene: scene })
+  t.after(async () => {
+    phoneA.close()
+    phoneB.close()
+    await harness.close()
+  })
+  phoneA.open()
+  phoneB.open()
+  await bothInScene(phoneA, phoneB)
+
+  // Ada sits on one seat; Bora then takes the other, right beside her (the server holds seats per seat)
+  await assertPartnerSeesWalk(phoneA, phoneB, { hotspotId: s0 })
+  await assertPartnerSeesWalk(phoneB, phoneA, { hotspotId: s1 })
+  const poses = (phone: Phone) => [ada.userId, bora.userId].map((userId) => {
+    const avatar = settledAvatar(phone, userId)!
+    return { x: avatar.x, y: avatar.y, seated: avatar.seatedHotspotId, motion: avatar.motion }
+  })
+  const onA = poses(phoneA)
+  assert.deepEqual(onA.map((pose) => [pose.seated, pose.motion]), [[s0, "sitting"], [s1, "sitting"]])
+  assert.deepEqual(poses(phoneB), onA, "both phones show both sitters exactly alike")
+
+  // Ada's seat is hers: Bora's phone refuses a tap on it at once
+  assert.equal(phoneB.view().store.moveLocalAvatarToHotspot(s0), false)
+  // Ada stands up; her seat is free again and Bora's other seat stays hers
+  await assertPartnerSeesWalk(phoneA, phoneB, { x: 0.55, y: 0.8 })
+  assert.equal(settledAvatar(phoneA, bora.userId)?.seatedHotspotId, s1)
+  assert.deepEqual([...phoneA.drops, ...phoneB.drops].filter((drop) => drop.reason !== "unknown_type"), [])
+})
+
 test("a partner on an app without motion sync (TestFlight build 14) never enters the scene: no live walk either way", async (t) => {
   const { harness, ada, bora, miniRoomId } = await startServer()
   const roomDecorScene = loadSharedRoomScene()
@@ -535,9 +624,7 @@ test("a partner who comes in later walks in from the door to where the server pu
     waitUntil("A shows B arrived", () => settledAvatar(phoneA, bora.userId)),
     // The scene's initial local placeholder is already standing. Wait for B's
     // own server join snapshot before comparing its position with A's view.
-    waitUntil("B joined and is settled", () =>
-      phoneB.view().motion.avatars.some((avatar) => avatar.userId === bora.userId && avatar.present)
-        ? settledAvatar(phoneB, bora.userId) : undefined)
+    waitUntil("B joined and is settled", () => settledInJoinedScene(phoneB, bora.userId))
   ])
   assert.deepEqual({ x: onA.x, y: onA.y }, { x: onB.x, y: onB.y }, "both phones show B at the same spot")
   assert.equal(onA.enteringFromDoor, undefined)
@@ -550,7 +637,8 @@ test("under Reduce Motion a later partner fades in at the server's position, wit
   const { harness, ada, bora, miniRoomId } = await startServer()
   const roomDecorScene = loadSharedRoomScene()
   const phoneA = createPhone({ harness, me: ada, partner: bora, miniRoomId, roomDecorScene, reduceMotion: true })
-  const phoneB = createPhone({ harness, me: bora, partner: ada, miniRoomId, roomDecorScene })
+  // B's phone hears the server after A's does, so A shows B's arrival before B's own phone has joined.
+  const phoneB = createPhone({ harness, me: bora, partner: ada, miniRoomId, roomDecorScene, inboundDelayMs: 30 })
   t.after(async () => {
     phoneA.close()
     phoneB.close()
@@ -565,7 +653,7 @@ test("under Reduce Motion a later partner fades in at the server's position, wit
   })
   assert.notEqual(arrived.motion, "walking")
   assert.equal(arrived.enteringFromDoor, undefined)
-  const onB = await waitUntil("B is settled", () => settledAvatar(phoneB, bora.userId))
+  const onB = await waitUntil("B is settled", () => settledInJoinedScene(phoneB, bora.userId))
   assert.deepEqual({ x: arrived.x, y: arrived.y }, { x: onB.x, y: onB.y })
 })
 

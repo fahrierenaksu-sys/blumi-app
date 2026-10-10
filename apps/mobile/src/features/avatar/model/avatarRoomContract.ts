@@ -1,5 +1,6 @@
 import type { SharedValue } from "react-native-reanimated"
 import type { RoomFurnitureRotation, RoomV2AvatarMotionState } from "../../roomV2/roomV2.types"
+import type { AvatarLiveScope } from "./avatarLiveBudget"
 
 /**
  * Types shared by the 2.5D avatar renderer and the screens that draw it (types only, no code). Ported from the
@@ -36,6 +37,11 @@ export interface AvatarDrawInput {
 
 export interface AvatarLiveProps {
   spec: AvatarDrawSpec
+  /**
+   * The live-canvas budget this avatar draws from (`avatarLiveBudget.ts`: one per screen, two in the MiniRoom).
+   * Without a granted slot no GPU surface is mounted.
+   */
+  liveScope: AvatarLiveScope
   /** The live stage point (fractions of the stage) while it walks: the cycle follows the distance covered. */
   live?: { x: SharedValue<number>; y: SharedValue<number> }
   stageWidthPx: SharedValue<number>

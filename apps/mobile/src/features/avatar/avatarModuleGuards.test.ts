@@ -46,3 +46,18 @@ test("only the GPU files import react-native-webgpu, and only components draw wi
     if (/["'][./]+(?:renderer\/)?Avatar25Canvas["']/.test(text)) assert.match(path, /^components\/.*\.tsx$/, `${path} imports the canvas`)
   }
 })
+
+test("every canvas comes out of the live budget: each component that mounts it takes a slot, nothing else mounts it", () => {
+  const drawers = files.filter(({ text }) => /["'][./]+(?:renderer\/)?Avatar25Canvas["']/.test(text))
+  assert.ok(drawers.some(({ path }) => path === "components/AvatarLive.tsx"), "AvatarLive draws with the canvas")
+  for (const { path, text } of drawers) {
+    assert.match(text, /["']\.\/useAvatarLiveSlot["']/, `${path} mounts the canvas without the live budget`)
+    assert.match(text, /useAvatarLiveSlot\(/, `${path} never asks the live budget`)
+  }
+  // outside the avatar module nobody reaches the canvas: rooms and screens draw through AvatarLive / AvatarHero
+  const appSource = join(ROOT, "../..")
+  for (const path of sourceFiles(appSource)) {
+    if (path.startsWith(ROOT)) continue
+    assert.doesNotMatch(readFileSync(path, "utf8"), /avatar\/renderer\/Avatar25Canvas["']/, `${relative(appSource, path)} imports the canvas`)
+  }
+})

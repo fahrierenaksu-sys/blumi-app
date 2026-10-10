@@ -1,3 +1,4 @@
+import { loadoutToUserAvatar, normalizeCompleteAvatarSelection } from "../avatarV2/avatarSelectionModel"
 import {
   createCandidateAvatarAppearance,
   createCandidateAvatarSnapshot,
@@ -22,6 +23,7 @@ export function createMiniRoomPartnerAvatarSnapshot(input: {
     ? "remote_participant_avatar"
     : "partner_preview_fallback"
   const appearance = createCandidateAvatarAppearance(candidate)
+  const completeSelection = normalizeCompleteAvatarSelection(candidate.avatarSelection)
 
   return {
     userId: input.userId,
@@ -32,6 +34,7 @@ export function createMiniRoomPartnerAvatarSnapshot(input: {
       base: candidate.bodyPreset === "male" ? "male_base_01" : "female_base_01",
       snapshotSource,
       roomAvatarAppearance: appearance,
+      ...(completeSelection ? { avatarLoadout: loadoutToUserAvatar(completeSelection.loadout) } : {}),
       roomAvatarLayers: getRoomAvatarRenderLayers({
         appearance,
         catalog: ROOM_AVATAR_CATALOG

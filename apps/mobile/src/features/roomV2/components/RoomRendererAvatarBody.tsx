@@ -161,6 +161,7 @@ export function RoomRendererAvatarBody(props: {
           {props.avatar25d ? (
             <AvatarLive
               spec={props.avatar25d}
+              liveScope="screen"
               live={live}
               stageWidthPx={stageWidth}
               stageHeightPx={stageHeight}

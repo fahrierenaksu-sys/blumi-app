@@ -17,6 +17,11 @@ import {
 import { createRoomWorldHotspotsFromRoomV2Scene } from "../../roomWorld/roomWorldRoomV2Projection"
 import { compareRoomV2RenderItems } from "../../roomV2/roomV2Selectors"
 import {
+  createMiniRoomLayeredSeats,
+  NO_MINI_ROOM_LAYERED_SEATS,
+  type MiniRoomLayeredSeats
+} from "./miniRoomLayeredSeats"
+import {
   ROOM_LAYER_ORDER,
   type ResolvedRoomV2Scene,
   type RoomV2FurnitureRenderItem
@@ -34,13 +39,19 @@ export interface MiniRoomDepthScene {
   neighbours: readonly MyRoomAvatarDepthNeighbour[]
   /** A seated avatar's fixed depth, by seat hotspot id. */
   seatDepthByHotspotId: Readonly<Record<string, number>>
+  /**
+   * layered pieces (room calibration): their seats, by hotspot id. A sitter on one is drawn between
+   * the piece's back layer (the occluder) and its front layer. Empty in every other bundle.
+   */
+  layeredSeats?: MiniRoomLayeredSeats
 }
 
 export const EMPTY_MINI_ROOM_DEPTH_SCENE: MiniRoomDepthScene = Object.freeze({
   occluders: [],
   occluderIds: new Set<string>(),
   neighbours: [],
-  seatDepthByHotspotId: {}
+  seatDepthByHotspotId: {},
+  layeredSeats: NO_MINI_ROOM_LAYERED_SEATS
 })
 
 /**
@@ -70,7 +81,8 @@ export function createMiniRoomDepthScene(scene: ResolvedRoomV2Scene | undefined)
       layer: "furniture",
       renderId: MINI_ROOM_AVATAR_DEPTH_RENDER_ID
     }),
-    seatDepthByHotspotId
+    seatDepthByHotspotId,
+    layeredSeats: createMiniRoomLayeredSeats(scene)
   }
 }
 

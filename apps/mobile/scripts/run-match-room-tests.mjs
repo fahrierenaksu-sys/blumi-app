@@ -312,6 +312,8 @@ try {
       "src/features/roomV2/editor/roomEditorCalibratedDrop.test.ts",
       "src/features/roomV2/editor/roomEditorPlaceMotion.test.ts",
       "src/features/roomV2/editor/roomEditorPhaseD2.test.ts",
+      // MiniRoom on layered furniture: two sitters on one sofa (per-seat claims), far-to-near fronts, armchair, wall tap
+      "src/features/miniRoom/scene/miniRoomLayeredSeats.test.ts",
       // My Room floor inset in front of the back walls
       "src/features/roomWorld/roomWorldWallInset.test.ts",
       // Two phones on the real realtime stack (apps/server e2e harness, in memory).

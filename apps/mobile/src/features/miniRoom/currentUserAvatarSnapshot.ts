@@ -1,3 +1,4 @@
+import { resolveAvatarV2 } from "../avatarV2/avatarV2Selectors"
 import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoomCatalog"
 import { projectAvatarV2ToRoomAvatarAppearance } from "../avatarV2/room/avatarRoomProjection"
 import { getRoomAvatarRenderLayers } from "../avatarV2/room/avatarRoomSelectors"
@@ -24,6 +25,7 @@ export function createCurrentUserAvatarSnapshot(input: {
       base: "avatar_base_01",
       snapshotSource: "avatar_v2_current_user",
       roomAvatarAppearance: appearance,
+      avatarLoadout: resolveAvatarV2(input.avatar, input.avatarCatalog),
       roomAvatarLayers: getRoomAvatarRenderLayers({
         appearance,
         catalog: ROOM_AVATAR_CATALOG

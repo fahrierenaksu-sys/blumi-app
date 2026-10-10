@@ -1,3 +1,4 @@
+import type { RoomAvatar25dLoadout } from "../../avatar/roomAvatarSeamContract"
 import type { ImageSourcePropType } from "react-native"
 import type { RoomAvatarAppearance } from "../../avatarV2/room/avatarRoom.types"
 import type { RoomV2AvatarRenderLayer } from "../../roomV2/roomV2.types"
@@ -47,6 +48,10 @@ export interface RoomHotspot {
   facingOnArrival?: AvatarFacing
   padWidth?: number
   padHeight?: number
+  /** The pad's centre when it is not the hotspot point (a layered seat's hip, calibration). */
+  padCentre?: RoomPoint
+  /** Seats of one piece share one pad; a tap picks the nearest (layered pieces). */
+  groupId?: string
 }
 
 export interface FurniturePlacement {
@@ -73,6 +78,8 @@ export interface AvatarAppearance {
   snapshotSource: MiniRoomParticipantAvatarSnapshotSource
   roomAvatarLayers?: RoomV2AvatarRenderLayer[]
   roomAvatarAppearance?: RoomAvatarAppearance
+  /** The worn avatarV2 loadout, read only by the 2.5D experiment. */
+  avatarLoadout?: RoomAvatar25dLoadout
   fullBodyAsset?: ImageSourcePropType
   fallbackReason?: string
   skinTone?: string
@@ -173,7 +180,11 @@ export interface MiniRoomStore {
   bubbles: SpeechBubble[]
   interaction: InteractionState
   moveLocalAvatar: (point: RoomPoint) => boolean
-  moveLocalAvatarToHotspot: (hotspotId: string) => boolean
+  /**
+   * Walks the local avatar to a hotspot. `alternatives` (the other seats a tap on one piece could mean, nearest
+   * first) let it take the first seat nobody else holds.
+   */
+  moveLocalAvatarToHotspot: (hotspotId: string, alternatives?: readonly string[]) => boolean
   /** Changes whenever the scene is rebuilt with fresh avatars (new participant, scene or appearance). */
   sceneEpoch: number
   applyRemoteAvatar: (avatar: import("@blumi/contracts").MiniRoomAvatarMotion, snap?: boolean) => void

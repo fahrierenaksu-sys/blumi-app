@@ -65,6 +65,8 @@ function mount() {
         }
       },
       real: [
+        // the dev-only 2.5D avatar switch: in Node it resolves to the stub every release bundle gets (timing unchanged)
+        "../../avatar/roomAvatarSeam",
         "./miniRoomInitialAvatars",
         "../../roomWorld/roomWorldGeometry",
         "../../roomWorld/roomWorldRoomV2Projection",
@@ -74,6 +76,7 @@ function mount() {
         "./miniRoomMovementRun",
         "./miniRoomSpeechStack",
         "./miniRoomSeatRefusalModel",
+        "./miniRoomLayeredSeats",
         "./miniRoomEntryModel",
         "./miniRoomPresentation"
       ],

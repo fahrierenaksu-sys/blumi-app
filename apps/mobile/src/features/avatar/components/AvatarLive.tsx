@@ -9,6 +9,7 @@ import { stepBreathWeight } from "../renderer/avatar25Life"
 import { compileMotionStance, motionCyclesForTravel, SIT_CARD_FROM, sitDownWeight } from "../renderer/avatar25Motion"
 import { getAvatar25BoxPlacement } from "../renderer/avatar25Placement"
 import { seatedHipToSoleShare, seatedLegExtensionPx } from "../renderer/avatar25SeatedLegs"
+import { useAvatarLiveSlot } from "./useAvatarLiveSlot"
 
 const POSE_STAND = AVATAR25_POSES.indexOf("stand")
 const POSE_SIT = AVATAR25_POSES.indexOf("sit")
@@ -116,7 +117,8 @@ export function AvatarLive(props: AvatarLiveProps) {
   const bendsToSit = view.motion !== undefined
   const hasSeatPlacement = props.seatPlacement !== undefined
   const previousPose = useRef(spec.pose)
-  const canvasMounted = !props.holdCanvas
+  // every canvas comes out of the live budget: held (MiniRoom fade-in) or over budget, no GPU surface is mounted
+  const canvasMounted = useAvatarLiveSlot(props.liveScope, !props.holdCanvas)
   // facing is live: both drawings stay resident, so a turn shows on the very next frame (no rebuild)
   const mirrored = spec.mirror !== Boolean(props.outerMirrored)
   const viewIndex = useSharedValue(spec.view === "back" ? 1 : 0)
