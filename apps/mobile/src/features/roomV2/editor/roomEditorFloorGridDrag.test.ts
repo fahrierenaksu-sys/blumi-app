@@ -71,7 +71,7 @@ const scene = createScene([
 
 /** A tray finger whose held contact point is on the centre of `cell`. */
 function fingerOverCell(column: number, row: number) {
-  const window = getRoomEditorDragCellWindowPoint({ floor, column, row, stage })
+  const window = getRoomEditorDragCellWindowPoint({ floor, column, row, stage, drawOffsetX: 0, drawOffsetY: 0 })
   return { absoluteX: window.x, absoluteY: window.y + ROOM_EDITOR_TRAY_DRAG_FINGER_LIFT }
 }
 

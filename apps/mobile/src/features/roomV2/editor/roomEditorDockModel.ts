@@ -86,6 +86,24 @@ export function canToggleRoomEditorStageZoom(
   )
 }
 
+/**
+ * Categories that get a tab only once the catalog has a piece in them (the 2.5D catalog's
+ * storage furniture); every other category keeps its tab, owned or not.
+ */
+const CATEGORIES_WITH_TAB_ON_DEMAND: readonly FurnitureCategory[] = ["storage"]
+
+/** "all" plus the category tabs in catalog order: every category, except an on-demand one the catalog has no piece for. */
+export function getRoomEditorCategoryTabIds(
+  categoryOrder: readonly FurnitureCategory[],
+  catalog: readonly { category: FurnitureCategory }[]
+): RoomEditorInventoryCategoryId[] {
+  const present = new Set(catalog.map((item) => item.category))
+  return [
+    "all",
+    ...categoryOrder.filter((category) => !CATEGORIES_WITH_TAB_ON_DEMAND.includes(category) || present.has(category))
+  ]
+}
+
 /** "all" plus, in catalog order, every category the collection really has. */
 export function getRoomEditorVisibleCategoryIds(
   inventoryEntries: readonly RoomEditorInventoryEntry[],

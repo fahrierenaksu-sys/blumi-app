@@ -5,12 +5,20 @@ import type { RoomV2PersistenceState } from "../roomV2EditGate"
 import {
   applyRoomV2EditorDraft,
   createRoomV2EditorSession,
+  redoRoomV2EditorSession,
   resetRoomV2EditorSession,
   undoRoomV2EditorSession,
   updateRoomV2EditorPersistedBaseline
 } from "../roomV2EditorSession"
 import type { UserRoomDecor } from "../roomV2.types"
 import type { RoomEditorSelection } from "./useRoomEditorSelection"
+import { ROOM_EDITOR_PLACE_JUICE } from "./roomEditorPlaceMotion"
+
+/**
+ * Undo depth: the 2.5D editor keeps a sandbox history (local only;
+ * Save still sends the final draft); every other build keeps one step.
+ */
+export const ROOM_EDITOR_HISTORY_LIMIT = ROOM_EDITOR_PLACE_JUICE ? 30 : 1
 
 /**
  * Immutable editor session over RoomV2Provider decor: draft edits, hydration
@@ -31,7 +39,7 @@ export function useRoomEditorSession(input: {
   const { setSelectedInstanceId, setPlacementFeedback, setPlacementPreview } = input.selection
 
   const [editorSession, setEditorSession] = useState(() =>
-    createRoomV2EditorSession(userRoomDecor, confirmedPersistedRoomDecor)
+    createRoomV2EditorSession(userRoomDecor, confirmedPersistedRoomDecor, { historyLimit: ROOM_EDITOR_HISTORY_LIMIT })
   )
   const editorSessionRef = useRef(editorSession)
   const draftDecor = editorSession.draftDecor
@@ -61,7 +69,8 @@ export function useRoomEditorSession(input: {
     if (persistenceState === "loading" || hasHydratedDraft.current) return
     setEditorSession(createRoomV2EditorSession(
       userRoomDecor,
-      confirmedPersistedRoomDecor
+      confirmedPersistedRoomDecor,
+      { historyLimit: ROOM_EDITOR_HISTORY_LIMIT }
     ))
     setSelectedInstanceId(undefined)
     setPlacementFeedback(undefined)
@@ -117,6 +126,19 @@ export function useRoomEditorSession(input: {
     setPlacementPreview(undefined)
   }, [setSelectedInstanceId, setPlacementFeedback, setPlacementPreview])
 
+  const handleRedoDraft = useCallback(() => {
+    if (!editorSessionRef.current.canRedo) return
+    hapticLight()
+    setEditorSession((current) => {
+      const nextSession = redoRoomV2EditorSession(current)
+      editorSessionRef.current = nextSession
+      return nextSession
+    })
+    setSelectedInstanceId(undefined)
+    setPlacementFeedback(undefined)
+    setPlacementPreview(undefined)
+  }, [setSelectedInstanceId, setPlacementFeedback, setPlacementPreview])
+
   return {
     editorSession,
     editorSessionRef,
@@ -124,7 +146,8 @@ export function useRoomEditorSession(input: {
     setDraftDecor,
     isRoomDraftReady,
     handleResetDraft,
-    handleUndoDraft
+    handleUndoDraft,
+    handleRedoDraft
   }
 }
 

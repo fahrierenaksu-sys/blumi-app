@@ -1,8 +1,10 @@
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import {
   createRoomV2FurniturePlacementPreview,
+  getRoomV2FurnitureRotationChoices,
   isRoomV2FurnitureFootprintOnFloor,
   resolvePlacedFurnitureRenderItem,
+  snapRoomV2WallPlacementPoint,
   upsertRoomV2RenderItemSorted,
   validateRoomV2FurniturePlacement,
   type resolveRoomV2Scene
@@ -123,7 +125,7 @@ export function createValidDraftPlacement(input: {
         floorCell.column,
         floorCell.row
       ))
-      : candidate
+      : snapWallPlacementPoint(instanceId, input.item, rotation, candidate)
     const placedItem: PlacedRoomItem = {
       instanceId,
       itemId: input.itemId,
@@ -164,6 +166,24 @@ export function createValidDraftPlacement(input: {
   return null
 }
 
+/**
+ * A new wall piece's spot under the magnet (room calibration), or `point` unchanged: the piece is
+ * resolved at the point to learn its drawn box, then moved flush onto the measured wall.
+ */
+function snapWallPlacementPoint(
+  instanceId: string,
+  item: FurnitureItem,
+  rotation: PlacedRoomItem["rotation"],
+  point: { x: number; y: number }
+): { x: number; y: number } {
+  if (getRoomV2FurniturePlacementSurface(item) !== "wall") return point
+  const renderItem = resolvePlacedFurnitureRenderItem(
+    { instanceId, itemId: item.id, x: point.x, y: point.y, rotation },
+    item
+  )
+  return (renderItem && snapRoomV2WallPlacementPoint(renderItem, point)) ?? point
+}
+
 export function getRoomPlacementSurfaceDropFeedback(
   item: FurnitureItem,
   copy: MyRoomEditorCopy
@@ -183,9 +203,7 @@ export function getDefaultRoomV2FurnitureRotation(
 export function getRoomV2FurnitureRotationOptions(
   item: FurnitureItem
 ): PlacedRoomItem["rotation"][] {
-  return item.assetsByRotation
-    ? (Object.keys(item.assetsByRotation) as PlacedRoomItem["rotation"][])
-    : []
+  return getRoomV2FurnitureRotationChoices(item)
 }
 
 /**
@@ -539,10 +557,11 @@ export function createRoomEditorStagePlacementPreview(input: {
     return createRoomV2CandidatePreview({ copy, scene, candidate: fitted.candidate })
   }
 
-  const normalizedPoint = clampRoomV2PlacementPointForItem({
-    x: eventPoint.x,
-    y: eventPoint.y
-  }, selectedItem, scene.shell, selectedItem.rotation)
+  const normalizedPoint = snapRoomV2WallPlacementPoint(selectedItem, eventPoint) ??
+    clampRoomV2PlacementPointForItem({
+      x: eventPoint.x,
+      y: eventPoint.y
+    }, selectedItem, scene.shell, selectedItem.rotation)
 
   const candidate = createRoomV2FurniturePlacementPreview({
     item: selectedItem,
@@ -624,10 +643,11 @@ export function createRoomEditorTrayPlacementPreview(input: {
     return createRoomV2CandidatePreview({ copy, scene, candidate: fitted.candidate })
   }
 
-  const normalizedPoint = clampRoomV2PlacementPointForItem({
-    x: localX / stageWindowBounds.width,
-    y: localY / stageWindowBounds.height
-  }, input.item, scene.shell, input.rotation)
+  const stagePoint = { x: localX / stageWindowBounds.width, y: localY / stageWindowBounds.height }
+  const wallPoint = snapWallPlacementPoint(input.instanceId, input.item, input.rotation, stagePoint)
+  const normalizedPoint = wallPoint !== stagePoint
+    ? wallPoint
+    : clampRoomV2PlacementPointForItem(stagePoint, input.item, scene.shell, input.rotation)
   const placedItem: PlacedRoomItem = {
     instanceId: input.instanceId,
     itemId: input.item.id,

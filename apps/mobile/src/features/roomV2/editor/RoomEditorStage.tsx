@@ -26,6 +26,8 @@ import {
 } from "./roomEditorDockModel"
 import type { RoomEditorFloorOverlay } from "./roomEditorFloorGridModel"
 import { RoomEditorFloorGridOverlay } from "./RoomEditorFloorGridOverlay"
+import { RoomEditorStageEffects } from "./RoomEditorStageEffects"
+import type { RoomEditorStageEffect } from "./useRoomEditorStageEffects"
 import { styles } from "./roomEditorStyles"
 
 /**
@@ -57,6 +59,11 @@ export function RoomEditorStage(props: {
   undoCount: number
   /** The zoom motion ended: the stage sits at its real place again. */
   onFrameSettled: () => void
+  /** A reward beat above the room: a drop's sparkle or a soft turn. */
+  effect?: RoomEditorStageEffect
+  onEffectDone?: (key: number) => void
+  /** An item's image is on screen (see RoomRenderer2D `onItemDrawn`). */
+  onItemDrawn?: (key: string) => void
 }) {
   const {
     copy,
@@ -74,7 +81,10 @@ export function RoomEditorStage(props: {
     onItemTap,
     zoom,
     undoCount,
-    onFrameSettled
+    onFrameSettled,
+    effect,
+    onEffectDone,
+    onItemDrawn
   } = props
   const motion = useMotion()
   const flipScale = useSharedValue(1)
@@ -160,9 +170,13 @@ export function RoomEditorStage(props: {
           testID="edit-room-v1"
           style={styles.renderer}
           floorUnderlay={<RoomEditorFloorGridOverlay overlay={floorOverlay} />}
+          onItemDrawn={onItemDrawn}
         />
       </Pressable>
     </GestureDetector>
+    {effect && onEffectDone ? (
+      <RoomEditorStageEffects effect={effect} stageSize={{ width, height }} onDone={onEffectDone} />
+    ) : null}
     </Animated.View>
   )
 }

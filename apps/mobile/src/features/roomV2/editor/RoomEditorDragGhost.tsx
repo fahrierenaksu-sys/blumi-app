@@ -2,7 +2,8 @@ import { Image as ExpoImage } from "expo-image"
 import { useCallback, useEffect, useRef } from "react"
 import { StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
-import { ROOM_EDITOR_DRAG_LIFT_HEIGHT } from "./roomEditorDragModel"
+import { getRoomEditorDragShadowFrame, ROOM_EDITOR_DRAG_LIFT_HEIGHT } from "./roomEditorDragModel"
+import { getRoomEditorSquashScale } from "./roomEditorPlaceMotion"
 import type {
   RoomEditorDragGhostContent,
   RoomEditorDragGhostValues
@@ -18,8 +19,10 @@ import { styles } from "./roomEditorStyles"
 export function RoomEditorDragGhost(props: {
   ghost: RoomEditorDragGhostContent | undefined
   values: RoomEditorDragGhostValues
+  /** The room itself draws the held piece right now (a rug on its floor layer): the overlay shows nothing. */
+  hidden?: boolean
 }) {
-  const { ghost, values } = props
+  const { ghost, values, hidden = false } = props
   const { overlayOrigin } = values
   const overlayRef = useRef<View | null>(null)
 
@@ -35,14 +38,20 @@ export function RoomEditorDragGhost(props: {
     if (ghostSession !== undefined) measureOverlay()
   }, [ghostSession, measureOverlay])
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: values.opacity.value,
-    transform: [
-      { translateX: values.x.value - values.overlayOrigin.value.x },
-      { translateY: values.y.value - values.overlayOrigin.value.y },
-      { scale: values.scale.value }
-    ]
-  }))
+  const squashValue = values.squash
+  const animatedStyle = useAnimatedStyle(() => {
+    // the settle on a drop squashes the piece about its floor contact (the transform origin)
+    const squash = getRoomEditorSquashScale(squashValue?.value ?? 0)
+    return {
+      opacity: values.opacity.value,
+      transform: [
+        { translateX: values.x.value - values.overlayOrigin.value.x },
+        { translateY: values.y.value - values.overlayOrigin.value.y },
+        { scaleX: values.scale.value * squash.x },
+        { scaleY: values.scale.value * squash.y }
+      ]
+    }
+  })
 
   // Held: the piece floats over a soft shadow on the floor; dropped: it
   // comes down onto it. Only transform and opacity animate.
@@ -62,7 +71,7 @@ export function RoomEditorDragGhost(props: {
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={StyleSheet.absoluteFill}
+      style={hidden ? hiddenOverlayStyle : StyleSheet.absoluteFill}
     >
       {ghost ? (
         <Animated.View style={[
@@ -78,16 +87,18 @@ export function RoomEditorDragGhost(props: {
           },
           animatedStyle
         ]}>
-          {liftValue ? (
+          {liftValue && !ghost.hangsOnWall ? (
             <Animated.View
               style={[
                 ghostShadowStyles.shadow,
-                {
-                  left: ghost.frame.width * 0.14,
-                  top: ghost.frame.height * 0.94,
-                  width: ghost.frame.width * 0.72,
-                  height: Math.max(6, ghost.frame.height * 0.08)
-                },
+                ghost.shadowSpot
+                  ? { ...getRoomEditorDragShadowFrame(ghost.frame, ghost.shadowSpot), marginTop: 0 }
+                  : {
+                      left: ghost.frame.width * 0.14,
+                      top: ghost.frame.height * 0.94,
+                      width: ghost.frame.width * 0.72,
+                      height: Math.max(6, ghost.frame.height * 0.08)
+                    },
                 shadowStyle
               ]}
             />
@@ -110,6 +121,8 @@ export function RoomEditorDragGhost(props: {
     </View>
   )
 }
+
+const hiddenOverlayStyle = [StyleSheet.absoluteFill, { opacity: 0 }]
 
 const ghostShadowStyles = StyleSheet.create({
   shadow: {

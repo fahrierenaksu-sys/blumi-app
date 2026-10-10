@@ -8,6 +8,8 @@ import { resolvePlacedFurnitureRenderItem, resolveRoomV2Scene } from "../roomV2S
 import * as dragModel from "./roomEditorDragModel"
 import { createRoomEditorFloorOverlay } from "./roomEditorFloorGridModel"
 import * as placementModel from "./roomEditorPlacementModel"
+import * as placeMotion from "./roomEditorPlaceMotion"
+import * as sceneReadiness from "../components/roomSceneReadiness"
 import { getRoomEditorDisplayRenderItems } from "./roomEditorPresentationModel"
 import { createTestFurniture, createTestPlaced, TEST_FLOOR_GRID_SHELL } from "./roomEditorTestFixtures"
 import type { useRoomEditorDragGestures as DragHook } from "./useRoomEditorDragGestures"
@@ -78,7 +80,9 @@ function mountDrag(reduceMotion: boolean) {
         "../roomV2Selectors": { resolvePlacedFurnitureRenderItem },
         "./roomEditorCatalog": { ACTIVE_ROOM_FURNITURE_CATALOG: [chair] },
         "./roomEditorDragModel": dragModel,
-        "./roomEditorPlacementModel": placementModel
+        "./roomEditorPlacementModel": placementModel,
+        "./roomEditorPlaceMotion": placeMotion,
+        "../components/roomSceneReadiness": sceneReadiness
       }
     }
   )
@@ -234,7 +238,8 @@ test("the carried image has a sized native host and scales about its floor conta
         "react-native-reanimated": animated.module,
         "expo-image": { Image: "ExpoImage" },
         "./roomEditorStyles": styles,
-        "./roomEditorDragModel": dragModel
+        "./roomEditorDragModel": dragModel,
+        "./roomEditorPlaceMotion": placeMotion
       }
     }
   )

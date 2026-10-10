@@ -23,7 +23,7 @@ import type { PlacementPreview } from "./roomEditorPlacementModel"
 export const ROOM_EDITOR_FLOOR_SHAPE_BASE = 100
 export const ROOM_EDITOR_FLOOR_LINE_WIDTH = 1
 
-export type RoomEditorFloorTone = "valid" | "invalid"
+export type RoomEditorFloorTone = "valid" | "invalid" | "selected"
 
 export interface RoomEditorFloorLine {
   key: string
@@ -45,7 +45,20 @@ export interface RoomEditorFloorOverlay {
   lines: RoomEditorFloorLine[]
   cells: RoomEditorFloorShape[]
   tone: RoomEditorFloorTone
+  /** The cells are the piece's calibrated floor cells: drawn as soft diamonds. */
+  calibrated?: boolean
+  /** A wall piece on a measured wall: the soft strip of wall it hangs on. */
+  wallStrip?: RoomEditorWallStrip
 }
+
+/** The strip of wall behind a wall piece, floor to cap, and its base line along the skirting (stage px). */
+export interface RoomEditorWallStrip {
+  shape: RoomEditorFloorShape
+  base: RoomEditorFloorLine
+}
+
+/** Height of the wall strip's base line (px). */
+export const ROOM_EDITOR_WALL_STRIP_BASE_WIDTH = 2
 
 interface StageSize {
   width: number
@@ -113,13 +126,95 @@ export function getRoomEditorFootprintCells(
   return cells.length > 0 ? cells : [snapRoomV2FloorGridCell(projection, item.x, item.y)]
 }
 
-/** The overlay for the current preview, or undefined when nothing floor-placed is being previewed. */
+/**
+ * A calibrated piece's own floor cells (each a stage quad: back, right, front, left) as parallelograms in stage
+ * pixels: exactly the cells it stands on, wall-flush moves included.
+ */
+export function getRoomEditorFootprintCellShapes(
+  quads: readonly (readonly { x: number; y: number }[])[],
+  stage: StageSize
+): RoomEditorFloorShape[] {
+  return quads.flatMap((quad, index) => {
+    const [back, right, , left] = quad
+    if (!back || !right || !left || quad.length !== 4) return []
+    const center = {
+      x: (quad.reduce((sum, point) => sum + point.x, 0) / 4) * stage.width,
+      y: (quad.reduce((sum, point) => sum + point.y, 0) / 4) * stage.height
+    }
+    const alongI = { x: (right.x - back.x) * stage.width, y: (right.y - back.y) * stage.height }
+    const alongJ = { x: (left.x - back.x) * stage.width, y: (left.y - back.y) * stage.height }
+    return [toShape(`foot-${index}`, center, alongI, alongJ)]
+  })
+}
+
+/** A wall piece's strip (stage quad: base start, base end, top end, top start) in stage pixels. */
+export function getRoomEditorWallStrip(
+  quad: readonly { x: number; y: number }[],
+  stage: StageSize
+): RoomEditorWallStrip | undefined {
+  const [baseStart, baseEnd, , topStart] = quad
+  if (!baseStart || !baseEnd || !topStart || quad.length !== 4) return undefined
+  const px = (point: { x: number; y: number }) => ({ x: point.x * stage.width, y: point.y * stage.height })
+  const from = px(baseStart)
+  const to = px(baseEnd)
+  const top = px(topStart)
+  const center = {
+    x: (quad.reduce((sum, point) => sum + point.x, 0) / 4) * stage.width,
+    y: (quad.reduce((sum, point) => sum + point.y, 0) / 4) * stage.height
+  }
+  const width = Math.hypot(to.x - from.x, to.y - from.y)
+  return {
+    shape: toShape("wall-strip", center, { x: to.x - from.x, y: to.y - from.y }, { x: top.x - from.x, y: top.y - from.y }),
+    base: {
+      key: "wall-base",
+      left: (from.x + to.x) / 2 - width / 2,
+      top: (from.y + to.y) / 2 - ROOM_EDITOR_WALL_STRIP_BASE_WIDTH / 2,
+      width,
+      rotateRad: Math.atan2(to.y - from.y, to.x - from.x)
+    }
+  }
+}
+
+function createWallStripOverlay(
+  item: RoomV2RenderItem | undefined,
+  tone: RoomEditorFloorTone,
+  stage: StageSize
+): RoomEditorFloorOverlay | undefined {
+  if (item?.kind !== "furniture" || !item.wallPlacement || stage.width <= 0 || stage.height <= 0) return undefined
+  const wallStrip = getRoomEditorWallStrip(item.wallPlacement.strip, stage)
+  return wallStrip ? { lines: [], cells: [], tone, calibrated: true, wallStrip } : undefined
+}
+
+/**
+ * The overlay for the current preview, or undefined when nothing floor-placed is being previewed. In the
+ * 2.5D room a calibrated piece shows its own floor cells: green or warm red while it is placed, and
+ * a quiet pink (no grout) while it is only selected; the old rectangle around the drawing is not drawn there.
+ */
 export function createRoomEditorFloorOverlay(input: {
   shell: RoomShell | null | undefined
   preview: PlacementPreview | undefined
   stage: StageSize
+  /** The selected piece when nothing is previewed (calibrated pieces only show their cells). */
+  selectedItem?: RoomV2RenderItem
 }): RoomEditorFloorOverlay | undefined {
   const { shell, preview, stage } = input
+  const selected = input.selectedItem
+  // 2.5D room: a wall piece lights the strip of measured wall it hangs on
+  const wallOverlay = preview
+    ? createWallStripOverlay(preview.item, preview.isValid ? "valid" : "invalid", stage)
+    : createWallStripOverlay(selected, "selected", stage)
+  if (wallOverlay) return wallOverlay
+  if (
+    !preview && selected?.kind === "furniture" && selected.footprintCells &&
+    stage.width > 0 && stage.height > 0
+  ) {
+    return {
+      lines: [],
+      cells: getRoomEditorFootprintCellShapes(selected.footprintCells, stage),
+      tone: "selected",
+      calibrated: true
+    }
+  }
   const item = preview?.item
   if (
     !shell?.floorGrid || !item || item.kind !== "furniture" ||
@@ -130,6 +225,14 @@ export function createRoomEditorFloorOverlay(input: {
   }
   const projection = getRoomV2FloorGridProjection(shell.floorGrid)
   const toPx = (point: { x: number; y: number }) => ({ x: point.x * stage.width, y: point.y * stage.height })
+  if (item.footprintCells) {
+    return {
+      lines: getRoomEditorFloorGridLines(projection, stage),
+      cells: getRoomEditorFootprintCellShapes(item.footprintCells, stage),
+      tone: preview.isValid ? "valid" : "invalid",
+      calibrated: true
+    }
+  }
   return {
     lines: getRoomEditorFloorGridLines(projection, stage),
     cells: getRoomEditorFootprintCells(projection, item).map((cell) => {

@@ -4,6 +4,7 @@ import {
   canToggleRoomEditorStageZoom,
   getNextRoomEditorTrayRotation,
   getRoomEditorCapsuleMode,
+  getRoomEditorCategoryTabIds,
   getRoomEditorDockColumns,
   getRoomEditorDockRowCount,
   getRoomEditorDockCardWidth,
@@ -171,4 +172,12 @@ test("a zoom plays back from the old frame: the flip maps the new frame onto the
     { scale: 1, translateX: 0, translateY: 0 },
     "the first layout does not animate"
   )
+})
+
+test("the storage tab exists only when the catalog has storage furniture; every other category keeps its tab", () => {
+  const order = ["seating", "table", "rug", "misc", "storage", "lighting", "wallDecor", "plant"] as const
+  const without = getRoomEditorCategoryTabIds(order, [{ category: "seating" }, { category: "misc" }])
+  assert.deepEqual(without, ["all", "seating", "table", "rug", "misc", "lighting", "wallDecor", "plant"])
+  const withStorage = getRoomEditorCategoryTabIds(order, [{ category: "seating" }, { category: "storage" }])
+  assert.deepEqual(withStorage, ["all", "seating", "table", "rug", "misc", "storage", "lighting", "wallDecor", "plant"])
 })

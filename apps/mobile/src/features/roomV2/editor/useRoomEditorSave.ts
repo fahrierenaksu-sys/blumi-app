@@ -21,6 +21,8 @@ import {
   ACTIVE_ROOM_SHELL_CATALOG,
   type MyRoomEditorNavigation
 } from "./roomEditorCatalog"
+import { findRoomEditorNewSeat, offerRoomEditorNewSeat } from "./roomEditorNewSeat"
+import { ROOM_EDITOR_PLACE_JUICE } from "./roomEditorPlaceMotion"
 import {
   EDIT_ROOM_AVATAR_SPAWN,
   getRoomPlacementFeedback
@@ -158,6 +160,14 @@ export function useRoomEditorSave(input: {
       return
     }
     hapticSuccess()
+    // 2.5D room: back in My Room, she walks over and tries a seat this save added (once).
+    if (ROOM_EDITOR_PLACE_JUICE) {
+      offerRoomEditorNewSeat(findRoomEditorNewSeat({
+        before: editorSessionRef.current?.baselineDecor.placedItems ?? [],
+        after: decorToSave.placedItems,
+        furnitureCatalog: ACTIVE_ROOM_FURNITURE_CATALOG
+      }))
+    }
     allowEditorExitRef.current = true
     if (requestedExitAction) {
       navigation.dispatch(requestedExitAction)

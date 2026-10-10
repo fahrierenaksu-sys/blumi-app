@@ -4,6 +4,8 @@ import { hapticLight } from "../../../ui/haptics"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import type { FurnitureCategory } from "../roomV2.types"
 import type { RoomEditorInventoryCategoryId } from "./roomEditorPresentationModel"
+import { ACTIVE_ROOM_FURNITURE_CATALOG } from "./roomEditorCatalog"
+import { getRoomEditorCategoryTabIds } from "./roomEditorDockModel"
 import { roomEditorTheme, styles } from "./roomEditorStyles"
 
 /** Catalog order of the room categories; every category has a tab. */
@@ -12,15 +14,14 @@ export const ROOM_EDITOR_CATEGORY_ORDER: readonly FurnitureCategory[] = [
   "table",
   "rug",
   "misc",
+  "storage",
   "lighting",
   "wallDecor",
   "plant"
 ]
 
-export const ROOM_EDITOR_ALL_CATEGORY_IDS: readonly RoomEditorInventoryCategoryId[] = [
-  "all",
-  ...ROOM_EDITOR_CATEGORY_ORDER
-]
+export const ROOM_EDITOR_ALL_CATEGORY_IDS: readonly RoomEditorInventoryCategoryId[] =
+  getRoomEditorCategoryTabIds(ROOM_EDITOR_CATEGORY_ORDER, ACTIVE_ROOM_FURNITURE_CATALOG)
 
 const ROOM_EDITOR_CATEGORY_ICONS: Record<
   RoomEditorInventoryCategoryId,
@@ -31,10 +32,10 @@ const ROOM_EDITOR_CATEGORY_ICONS: Record<
   table: "cafe-outline",
   rug: "layers-outline",
   misc: "cube-outline",
+  storage: "file-tray-stacked-outline",
   lighting: "bulb-outline",
   wallDecor: "image-outline",
-  plant: "leaf-outline",
-  storage: "file-tray-stacked-outline"
+  plant: "leaf-outline"
 }
 
 /** Thin-line icon tabs sized like the wardrobe's; the row scrolls sideways. */

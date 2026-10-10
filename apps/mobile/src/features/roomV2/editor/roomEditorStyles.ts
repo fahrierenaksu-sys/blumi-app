@@ -41,6 +41,26 @@ export const roomEditorFloorColors = {
   gridLine: "rgba(255,255,255,0.6)"
 } as const
 
+/**
+ * The calibrated floor cells: soft green where a piece may go, a gentle warm red where it
+ * may not, a quiet pink under a selected piece.
+ */
+export const roomEditorFloorDiamondColors = {
+  valid: { fill: "rgba(132,214,166,0.42)", edge: "rgba(58,160,106,0.9)" },
+  invalid: { fill: "rgba(246,138,118,0.4)", edge: "rgba(216,90,80,0.88)" },
+  selected: { fill: "rgba(255,170,200,0.38)", edge: "rgba(222,86,136,0.8)" }
+} as const
+
+/**
+ * The strip of measured wall behind a wall piece: a faint wash floor to cap and a
+ * brighter line along the skirting, in the floor cells' tones.
+ */
+export const roomEditorWallStripColors = {
+  valid: { fill: "rgba(132,214,166,0.16)", edge: "rgba(58,160,106,0.75)" },
+  invalid: { fill: "rgba(246,138,118,0.16)", edge: "rgba(216,90,80,0.75)" },
+  selected: { fill: "rgba(255,170,200,0.14)", edge: "rgba(222,86,136,0.6)" }
+} as const
+
 export const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -226,6 +246,21 @@ export const styles = StyleSheet.create({
     position: "absolute",
     borderWidth: 2,
     borderRadius: 4
+  },
+  /** A calibrated floor cell: the square is shrunk to about a third by its transform, so its edge stays ~1.5 pt. */
+  floorDiamond: {
+    position: "absolute",
+    borderWidth: 4,
+    borderRadius: 12
+  },
+  /** The wall strip: a square shaped by its transform into the wall's parallelogram; no edge (it would stretch). */
+  wallStrip: {
+    position: "absolute"
+  },
+  wallStripBase: {
+    position: "absolute",
+    height: 2,
+    borderRadius: 1
   },
   dragGhostAnchor: {
     position: "absolute",

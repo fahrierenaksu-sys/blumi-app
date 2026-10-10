@@ -1,15 +1,18 @@
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import {
   getRoomV2DepthPerspectiveScale,
-  getRoomV2FurnitureMobileRenderScale
+  getRoomV2FurnitureMobileRenderScale,
+  isRoomV2LayeredFloorPiece
 } from "../roomV2RenderSurface"
 import {
   getRoomV2FloorGridCellPoint,
   getRoomV2FloorGridProjection,
+  roundRoomV2FloorGridPoint,
   snapRoomV2FloorGridCell,
   type RoomV2FloorGridProjection
 } from "../roomV2FloorGrid"
 import { getRoomV2FurniturePlacementSurface } from "../roomV2PlacementSurface"
+import { createRoomV2FurniturePlacementPreview, resolvePlacedFurnitureRenderItem } from "../roomV2Selectors"
 import type {
   FurnitureItem,
   PlacedRoomItem,
@@ -18,6 +21,7 @@ import type {
   RoomV2RenderItem
 } from "../roomV2.types"
 import {
+  arePlacementPreviewsEqual,
   createRoomEditorStagePlacementPreview,
   createRoomEditorTrayPlacementPreview,
   type PlacementPreview,
@@ -33,7 +37,8 @@ import {
  * Floor pieces on a shell with a measured floor grid snap to that grid's
  * cells (half a drawn tile), so the piece lines up with the drawn tiles and
  * the ghost, the preview and the drop all use one cell. Wall, ceiling and
- * tabletop pieces keep the plain stage grid.
+ * tabletop pieces keep the plain stage grid; in the 2.5D room a
+ * wall piece's spot then comes from the wall magnet (snapRoomV2WallPlacementPoint).
  */
 
 /** Hold before a drag lifts the piece; moving 10 pt earlier leaves the touch to taps, scroll and edge back. */
@@ -67,8 +72,25 @@ export interface RoomEditorDragHitRect {
   bottom: number
   anchorX: number
   anchorY: number
+  /**
+   * Where the piece is drawn from its saved anchor (the room calibration's `renderOffset`, else 0):
+   * the ghost shows the piece there, on the spot the drop will draw it.
+   */
+  drawOffsetX: number
+  drawOffsetY: number
+  /**
+   * The draw offset the piece has once it sits on a grid cell (a layered piece is drawn at its footprint's middle,
+   * which depends on where its anchor is in its cell): the snapped ghost uses this one while it moves.
+   */
+  cellDrawOffsetX: number
+  cellDrawOffsetY: number
   /** Floor piece on a floor grid: the drag snaps to grid cells. */
   usesFloorGrid: boolean
+  /**
+   * Wall piece on a measured wall (room calibration): the held piece sits where the wall magnet put
+   * it, not under the finger.
+   */
+  usesWallMagnet: boolean
 }
 
 export interface RoomEditorDragPoint {
@@ -103,6 +125,71 @@ export function getRoomEditorDragFloorGrid(
   return getRoomV2FloorGridProjection(shell.floorGrid)
 }
 
+/**
+ * How far a piece is drawn from its saved anchor (stage fractions): the room calibration's
+ * `renderOffset` (a layered piece's footprint centre, a wall-flush move), else nothing. The renderer draws there.
+ */
+export function getRoomEditorDrawOffset(item: RoomV2RenderItem): { x: number; y: number } {
+  const offset = item.kind === "furniture" ? item.renderOffset : undefined
+  return offset ? { x: offset.x, y: offset.y } : { x: 0, y: 0 }
+}
+
+/** Where a piece is drawn (stage fractions): its saved anchor plus its draw offset. */
+export function getRoomEditorDrawPoint(item: RoomV2RenderItem): { x: number; y: number } {
+  const offset = getRoomEditorDrawOffset(item)
+  return { x: item.x + offset.x, y: item.y + offset.y }
+}
+
+/**
+ * A tray piece's draw offset (stage fractions), read once per card: the offset it has on a cell in the middle of
+ * the floor (it changes only next to a back wall, where JS moves the ghost onto the fitted spot anyway).
+ */
+export function getRoomEditorTrayDrawOffset(
+  item: FurnitureItem,
+  rotation: PlacedRoomItem["rotation"],
+  shell: RoomShell | null | undefined
+): { x: number; y: number } {
+  const floor = getRoomEditorDragFloorGrid(item, shell)
+  const point = floor
+    ? getRoomV2FloorGridCellPoint(
+      floor,
+      Math.round((floor.minColumn + floor.maxColumn) / 2),
+      Math.round((floor.minRow + floor.maxRow) / 2)
+    )
+    : { x: 0.5, y: 0.7 }
+  const renderItem = resolvePlacedFurnitureRenderItem(
+    { instanceId: `${item.id}_tray_offset`, itemId: item.id, x: point.x, y: point.y, rotation },
+    item
+  )
+  return renderItem ? getRoomEditorDrawOffset(renderItem) : { x: 0, y: 0 }
+}
+
+/**
+ * Whether a tray piece goes onto the wall magnet (room calibration: wall pieces resolve with a
+ * measured wall placement); everywhere else a wall piece follows the finger as shipped.
+ */
+export function getRoomEditorTrayUsesWallMagnet(
+  item: FurnitureItem,
+  rotation: PlacedRoomItem["rotation"]
+): boolean {
+  if (getRoomV2FurniturePlacementSurface(item) !== "wall") return false
+  const renderItem = resolvePlacedFurnitureRenderItem(
+    { instanceId: `${item.id}_tray_wall`, itemId: item.id, x: 0.5, y: 0.3, rotation },
+    item
+  )
+  return renderItem?.wallPlacement !== undefined
+}
+
+/** A placed piece's draw offset on the grid cell nearest its saved anchor (where any move of it lands). */
+export function getRoomEditorCellDrawOffset(
+  item: Extract<RoomV2RenderItem, { kind: "furniture" }>,
+  floor: RoomV2FloorGridProjection
+): { x: number; y: number } {
+  const cell = snapRoomV2FloorGridCell(floor, item.x, item.y)
+  const point = roundRoomV2FloorGridPoint(getRoomV2FloorGridCellPoint(floor, cell.column, cell.row))
+  return getRoomEditorDrawOffset(createRoomV2FurniturePlacementPreview({ item, x: point.x, y: point.y }))
+}
+
 /** Hit boxes for the draggable furniture, in render order (last is drawn on top), as RoomRenderer2D lays them out. */
 export function createRoomEditorDragHitRects(
   renderItems: readonly RoomV2RenderItem[],
@@ -111,8 +198,11 @@ export function createRoomEditorDragHitRects(
   return renderItems.flatMap((item) => {
     if (item.kind !== "furniture") return []
     const size = getRenderedSize(item)
-    const left = item.x - size.width * item.anchor.x
-    const top = item.y - size.height * item.anchor.y
+    const offset = getRoomEditorDrawOffset(item)
+    const floor = getRoomEditorDragFloorGrid(item, shell)
+    const cellOffset = floor && item.footprintCells ? getRoomEditorCellDrawOffset(item, floor) : offset
+    const left = item.x + offset.x - size.width * item.anchor.x
+    const top = item.y + offset.y - size.height * item.anchor.y
     return [{
       renderId: item.renderId,
       left,
@@ -121,7 +211,12 @@ export function createRoomEditorDragHitRects(
       bottom: top + size.height,
       anchorX: item.x,
       anchorY: item.y,
-      usesFloorGrid: getRoomEditorDragFloorGrid(item, shell) !== null
+      drawOffsetX: offset.x,
+      drawOffsetY: offset.y,
+      cellDrawOffsetX: cellOffset.x,
+      cellDrawOffsetY: cellOffset.y,
+      usesFloorGrid: floor !== null,
+      usesWallMagnet: item.wallPlacement !== undefined
     }]
   })
 }
@@ -202,12 +297,15 @@ export function getRoomEditorDragCellWindowPoint(input: {
   column: number
   row: number
   stage: StageWindowBounds
+  /** The held piece's draw offset (stage fractions): it is drawn there from its anchor. */
+  drawOffsetX: number
+  drawOffsetY: number
 }): { x: number; y: number } {
   "worklet"
   const point = getRoomV2FloorGridCellPoint(input.floor, input.column, input.row)
   return {
-    x: input.stage.x + point.x * input.stage.width,
-    y: input.stage.y + point.y * input.stage.height
+    x: input.stage.x + (point.x + input.drawOffsetX) * input.stage.width,
+    y: input.stage.y + (point.y + input.drawOffsetY) * input.stage.height
   }
 }
 
@@ -314,9 +412,12 @@ export type RoomEditorDragCellHaptic = "selection" | "rigid"
  */
 export function getRoomEditorDragCellHaptic(
   previous: PlacementPreview | undefined,
-  next: PlacementPreview | undefined
+  next: PlacementPreview | undefined,
+  /** Wall magnet: many finger cells share one wall spot; only a new spot ticks. */
+  quietOnSameSpot = false
 ): RoomEditorDragCellHaptic | null {
   if (next === undefined) return null
+  if (quietOnSameSpot && arePlacementPreviewsEqual(previous, next)) return null
   if (previous !== undefined && previous.isValid !== next.isValid) return "selection"
   return "rigid"
 }
@@ -343,5 +444,72 @@ export function getRoomEditorDragGhostFrame(
     height,
     offsetX: -width * item.anchor.x,
     offsetY: -height * item.anchor.y
+  }
+}
+
+/** A flat layered piece on the floor layer (a 2.5D rug): the room draws it, never the drag overlay. */
+export function isRoomEditorFloorLayerPiece(item: RoomV2RenderItem): boolean {
+  return isRoomV2LayeredFloorPiece(item)
+}
+
+/**
+ * Whether the room itself already draws what a drag overlay stands in for, so the overlay stays hidden. Only a
+ * flat floor-layer piece (a 2.5D rug) qualifies: the room draws it on its floor layer, under furniture
+ * and avatars, once it is placed (a held piece that is already in the room) or has a preview on a cell.
+ * Everything else keeps the floating overlay.
+ */
+export function getRoomEditorGhostIsDrawnByRoom(input: {
+  ghost: { renderId?: string; floorLayer?: boolean } | undefined
+  roomRenderIds: ReadonlySet<string>
+  previewRenderId: string | undefined
+}): boolean {
+  const { ghost, roomRenderIds, previewRenderId } = input
+  if (!ghost?.floorLayer || ghost.renderId === undefined) return false
+  return previewRenderId === ghost.renderId || roomRenderIds.has(ghost.renderId)
+}
+
+/** Where the held piece's soft shadow goes: its floor cells' middle and size, px from the piece's anchor. */
+export interface RoomEditorDragShadowSpot {
+  dx: number
+  dy: number
+  width: number
+  height: number
+}
+
+/**
+ * The shadow spot of a calibrated piece (one with floor cells), or undefined: the shadow then sits under the
+ * drawing as before. The cells, not the drawing, say where the piece stands, whatever padding its art has.
+ */
+export function getRoomEditorDragShadowSpot(
+  item: RoomV2RenderItem,
+  stageSize: { width: number; height: number }
+): RoomEditorDragShadowSpot | undefined {
+  const points = item.kind === "furniture" ? item.footprintCells?.flat() ?? [] : []
+  if (points.length === 0) return undefined
+  const xs = points.map((point) => point.x * stageSize.width)
+  const ys = points.map((point) => point.y * stageSize.height)
+  const draw = getRoomEditorDrawPoint(item)
+  const width = Math.max(...xs) - Math.min(...xs)
+  const height = Math.max(...ys) - Math.min(...ys)
+  return {
+    dx: (Math.min(...xs) + width / 2) - draw.x * stageSize.width,
+    dy: (Math.min(...ys) + height / 2) - draw.y * stageSize.height,
+    width,
+    height
+  }
+}
+
+/** The shadow ellipse in the ghost frame's pixels for a shadow spot: a soft oval a little inside the cells. */
+export function getRoomEditorDragShadowFrame(
+  frame: RoomEditorDragGhostFrame,
+  spot: RoomEditorDragShadowSpot
+): { left: number; top: number; width: number; height: number } {
+  const width = spot.width * 0.8
+  const height = Math.max(6, spot.height * 0.55)
+  return {
+    left: -frame.offsetX + spot.dx - width / 2,
+    top: -frame.offsetY + spot.dy - height / 2,
+    width,
+    height
   }
 }

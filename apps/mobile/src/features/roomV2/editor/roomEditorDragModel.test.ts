@@ -15,6 +15,7 @@ import {
   getRoomEditorDragCellValue,
   getRoomEditorDragFeedback,
   getRoomEditorDragGhostFrame,
+  getRoomEditorGhostIsDrawnByRoom,
   getRoomEditorStageDragPoint,
   getRoomEditorTrayDragPoint,
   hasRoomEditorDragCellChanged,
@@ -247,4 +248,20 @@ test("the ghost frame matches the rendered size and is offset to its anchor", ()
   near(frame.height, 24)
   near(frame.offsetX, -16)
   near(frame.offsetY, -24)
+})
+
+test("a rug's drag overlay hides once the room draws the rug itself; every other piece keeps its overlay", () => {
+  const inRoom = new Set(["placed-rug"])
+  const rug = { renderId: "placed-rug", floorLayer: true }
+  // a placed rug being moved is already in the room
+  assert.equal(getRoomEditorGhostIsDrawnByRoom({ ghost: rug, roomRenderIds: inRoom, previewRenderId: undefined }), true)
+  // a tray rug has nothing in the room until its preview lands on a cell, then the room draws that preview
+  const trayRug = { renderId: "tray-rug", floorLayer: true }
+  assert.equal(getRoomEditorGhostIsDrawnByRoom({ ghost: trayRug, roomRenderIds: inRoom, previewRenderId: undefined }), false)
+  assert.equal(getRoomEditorGhostIsDrawnByRoom({ ghost: trayRug, roomRenderIds: inRoom, previewRenderId: "tray-rug" }), true)
+  // a preview of some other piece does not hide it
+  assert.equal(getRoomEditorGhostIsDrawnByRoom({ ghost: trayRug, roomRenderIds: inRoom, previewRenderId: "other" }), false)
+  // furniture (not a rug) always floats in the overlay, in the room or not
+  assert.equal(getRoomEditorGhostIsDrawnByRoom({ ghost: { renderId: "placed-rug" }, roomRenderIds: inRoom, previewRenderId: "placed-rug" }), false)
+  assert.equal(getRoomEditorGhostIsDrawnByRoom({ ghost: undefined, roomRenderIds: inRoom, previewRenderId: undefined }), false)
 })

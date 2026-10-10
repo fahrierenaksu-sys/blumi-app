@@ -22,6 +22,7 @@ import {
   type MyRoomEditorScreenProps
 } from "../features/roomV2/editor/roomEditorCatalog"
 import { EDIT_ROOM_AVATAR_SPAWN } from "../features/roomV2/editor/roomEditorPlacementModel"
+import { getRoomEditorGhostIsDrawnByRoom } from "../features/roomV2/editor/roomEditorDragModel"
 import { createRoomEditorFloorOverlay } from "../features/roomV2/editor/roomEditorFloorGridModel"
 import {
   getEditRoomWorldStatus,
@@ -46,6 +47,8 @@ import { useRoomEditorStageLayout } from "../features/roomV2/editor/useRoomEdito
 import { useRoomEditorInventory } from "../features/roomV2/editor/useRoomEditorInventory"
 import { useRoomEditorPlacementGestures } from "../features/roomV2/editor/useRoomEditorPlacementGestures"
 import { useRoomEditorDragGestures } from "../features/roomV2/editor/useRoomEditorDragGestures"
+import { useRoomEditorStageEffects } from "../features/roomV2/editor/useRoomEditorStageEffects"
+import { ROOM_EDITOR_PLACE_JUICE } from "../features/roomV2/editor/roomEditorPlaceMotion"
 import { useRoomEditorItemActions } from "../features/roomV2/editor/useRoomEditorItemActions"
 import {
   useShopPlacementIntent,
@@ -125,13 +128,18 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     [placementPreview]
   )
   // Recomputed once per snapped cell (the preview), never per drag frame.
+  const selectedSceneItem = useMemo(
+    () => scene.renderItems.find((item) => item.renderId === selectedInstanceId),
+    [scene.renderItems, selectedInstanceId]
+  )
   const floorOverlay = useMemo(
     () => createRoomEditorFloorOverlay({
       shell: scene.shell,
       preview: placementPreview,
-      stage: stage.roomLayout
+      stage: stage.roomLayout,
+      selectedItem: selectedSceneItem
     }),
-    [placementPreview, scene.shell, stage.roomLayout]
+    [placementPreview, scene.shell, selectedSceneItem, stage.roomLayout]
   )
   const roomWorldGeometry = useMemo(
     () => createRoomWorldGeometryFromRoomV2Scene(scene),
@@ -163,20 +171,36 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     stage,
     inventory: inventoryState
   })
+  const stageEffects = useRoomEditorStageEffects()
   const drag = useRoomEditorDragGestures({
     copy,
     scene,
     placedItems: draftDecor.placedItems,
     canPlaceAnotherRoomItem,
     commitTrayPlacementPreview: gestures.commitTrayPlacementPreview,
+    onPlaced: stageEffects.playSparkle,
     selection,
     stage,
     inventory: inventoryState
   })
-  const heldRenderId = drag.ghost?.renderId
+  // A rug (flat floor-layer piece) is never lifted into the overlay: the room draws it on its floor layer under
+  // furniture and avatars all through the drag and after the drop, so the overlay hides and the room keeps it.
+  const roomRenderIds = useMemo(() => new Set(scene.renderItems.map((item) => item.renderId)), [scene.renderItems])
+  const ghostDrawnByRoom = getRoomEditorGhostIsDrawnByRoom({
+    ghost: drag.ghost,
+    roomRenderIds,
+    previewRenderId: placementPreview?.item.renderId
+  })
+  const heldRenderId = drag.ghost?.floorLayer ? undefined : drag.ghost?.renderId
+  // A turning piece is drawn by its turn overlay alone, never also by the room.
+  const turningRenderId = stageEffects.hiddenRenderId
   const displayRenderItems = useMemo(
-    () => getRoomEditorDisplayRenderItems(scene.renderItems, placementPreview, heldRenderId),
-    [heldRenderId, placementPreview, scene.renderItems]
+    () => getRoomEditorDisplayRenderItems(
+      getRoomEditorDisplayRenderItems(scene.renderItems, placementPreview, heldRenderId),
+      undefined,
+      turningRenderId
+    ),
+    [heldRenderId, placementPreview, scene.renderItems, turningRenderId]
   )
   const itemActions = useRoomEditorItemActions({
     copy,
@@ -185,6 +209,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     setDraftDecor,
     canPlaceAnotherRoomItem,
     ownsRoomItem,
+    onRotated: stageEffects.playTurn,
     selection,
     inventory: inventoryState
   })
@@ -250,14 +275,28 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
   const { cancelActiveDrag } = drag
   const { setSelectedInstanceId, setPlacementPreview, setPlacementFeedback } = selection
   const { measureStageWindow } = stage
+  const { handleItemDrawn: handleDragItemDrawn } = drag
+  const { handleItemDrawn: handleEffectItemDrawn } = stageEffects
+  // The room drew a piece: a drop's or a turn's overlay may be waiting for exactly that one.
+  const handleItemDrawn = useCallback((key: string) => {
+    handleDragItemDrawn(key)
+    handleEffectItemDrawn(key)
+  }, [handleDragItemDrawn, handleEffectItemDrawn])
   const [undoCount, setUndoCount] = useState(0)
-  const { handleUndoDraft } = session
+  const { handleUndoDraft, handleRedoDraft } = session
   const canUndo = editorSession.canUndo
+  const canRedo = editorSession.canRedo
   const handleUndo = useCallback(() => {
     if (!canUndo) return
     handleUndoDraft()
     setUndoCount((count) => count + 1)
   }, [canUndo, handleUndoDraft])
+  // Redo answers with the same small settle as undo.
+  const handleRedo = useCallback(() => {
+    if (!canRedo) return
+    handleRedoDraft()
+    setUndoCount((count) => count + 1)
+  }, [canRedo, handleRedoDraft])
   const handlePickTrayItem = useCallback((itemId: string) => {
     cancelActiveDrag()
     setSelectedInstanceId(undefined)
@@ -339,6 +378,9 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                 zoom={dock.zoom}
                 undoCount={undoCount}
                 onFrameSettled={measureStageWindow}
+                effect={stageEffects.effect}
+                onEffectDone={stageEffects.clearEffect}
+                onItemDrawn={ROOM_EDITOR_PLACE_JUICE ? handleItemDrawn : undefined}
               />
               <RoomEditorStageNotice
                 placementFeedback={placementFeedback}
@@ -351,6 +393,8 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                 canToggleZoom={canToggleRoomEditorStageZoom(stageAreaInput)}
                 onUndo={handleUndo}
                 onToggleZoom={dock.toggleZoom}
+                canRedo={canRedo}
+                onRedo={ROOM_EDITOR_PLACE_JUICE ? handleRedo : undefined}
               />
               {capsuleMode !== "hidden" && capsuleItemName ? (
                 <Animated.View
@@ -429,7 +473,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
           ) : null}
         </View>
       </SafeAreaView>
-      <RoomEditorDragGhost ghost={drag.ghost} values={drag.ghostValues} />
+      <RoomEditorDragGhost ghost={drag.ghost} values={drag.ghostValues} hidden={ghostDrawnByRoom} />
     </View>
   )
 }

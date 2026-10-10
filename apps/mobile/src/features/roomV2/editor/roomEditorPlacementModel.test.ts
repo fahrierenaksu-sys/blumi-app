@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { getMyRoomEditorCopy } from "../myRoomCopy"
-import { resolveRoomV2Scene } from "../roomV2Selectors"
+import { resolveRoomV2Scene, snapRoomV2WallPlacementPoint } from "../roomV2Selectors"
 import type { FurnitureItem, ResolvedRoomV2Scene } from "../roomV2.types"
 import {
   ROOM_V2_PLACEMENT_SNAP_STEP,
@@ -239,6 +239,33 @@ test("surface clamping keeps the anchored box inside its band and centres an imp
   assert.deepEqual(
     clampRoomV2PlacementPointForItem({ x: -1, y: 0.333 }, wallItem, undefined),
     { x: 0, y: 0.333 }
+  )
+})
+
+test("without the 2.5D flag a wall piece keeps the shell's wall band: no wall magnet, no measured wall", () => {
+  const shelf = createTestFurniture({ id: "shelf", placementSurface: "wall", width: 0.1, height: 0.12 })
+  const scene = resolveRoomV2Scene({
+    roomShellCatalog: [TEST_EDITOR_SHELL],
+    furnitureCatalog: [shelf],
+    decor: {
+      roomShellId: TEST_EDITOR_SHELL.id,
+      placedItems: [createTestPlaced({ instanceId: "shelf_1", itemId: "shelf", x: 0.5, y: 0.3 })]
+    },
+    defaultRoomShellId: TEST_EDITOR_SHELL.id
+  })
+  const placed = scene.renderItems.find((item) => item.renderId === "shelf_1")
+  assert.ok(placed?.kind === "furniture")
+  assert.equal(placed.wallPlacement, undefined)
+  assert.equal(snapRoomV2WallPlacementPoint(placed, { x: 0.3, y: 0.2 }), null)
+  const moved = createRoomEditorStagePlacementPreview({
+    copy: en,
+    scene,
+    selectedInstanceId: "shelf_1",
+    point: { x: 0.01, y: 0.9 }
+  })
+  assert.deepEqual(
+    { x: moved?.item.x, y: moved?.item.y },
+    clampRoomV2PlacementPointForItem({ x: 0.01, y: 0.9 }, placed, TEST_EDITOR_SHELL)
   )
 })
 

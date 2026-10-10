@@ -305,6 +305,13 @@ try {
       "src/features/roomV2/furniture/layeredFurnitureSofa.test.ts",
       "src/features/roomV2/furniture/layeredFurnitureJapon.test.ts",
       "src/features/roomV2/furniture/layeredFurnitureOyun.test.ts",
+      // "Odayı düzenle" on the calibrated grid: every drop lands on the cells, spot and drawing its drag previewed;
+      // the held piece's hit box and ghost where it is drawn; floor-cell diamonds while placing; settle, sparkle
+      // and soft turn end at rest; wall pieces on the measured walls (magnet), a turn nudged to the nearest free
+      // cell, and the seat a save added is the one My Room walks her to
+      "src/features/roomV2/editor/roomEditorCalibratedDrop.test.ts",
+      "src/features/roomV2/editor/roomEditorPlaceMotion.test.ts",
+      "src/features/roomV2/editor/roomEditorPhaseD2.test.ts",
       // My Room floor inset in front of the back walls
       "src/features/roomWorld/roomWorldWallInset.test.ts",
       // Two phones on the real realtime stack (apps/server e2e harness, in memory).

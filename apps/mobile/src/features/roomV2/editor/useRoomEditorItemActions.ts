@@ -10,6 +10,7 @@ import { resolveRoomV2ExactRotationPreview } from "../roomV2ExactRotation"
 import type {
   PlacedRoomItem,
   ResolvedRoomV2Scene,
+  RoomV2FurnitureRenderItem,
   UserRoomDecor
 } from "../roomV2.types"
 import {
@@ -21,13 +22,16 @@ import {
   QA_OWNED_ROOM_ITEM_IDS
 } from "./roomEditorCatalog"
 import {
+  createRoomEditorPlacedItemFromPreview,
   createRoomV2PlacementPreviewResult,
   createValidDraftPlacement,
   getRoomPlacementFeedback,
   getRoomPlacementSurfaceDropFeedback,
   getRoomV2FurnitureRotationOptions
 } from "./roomEditorPlacementModel"
+import { ROOM_EDITOR_PLACE_JUICE } from "./roomEditorPlaceMotion"
 import { getSelectedPlacedRotationOptions } from "./roomEditorPresentationModel"
+import { findRoomEditorRotateNudge } from "./roomEditorRotateNudge"
 import type { RoomEditorInventoryState } from "./useRoomEditorInventory"
 import type { RoomEditorSelection } from "./useRoomEditorSelection"
 import type { RoomEditorSessionState } from "./useRoomEditorSession"
@@ -43,6 +47,8 @@ export function useRoomEditorItemActions(input: {
   setDraftDecor: RoomEditorSessionState["setDraftDecor"]
   canPlaceAnotherRoomItem: (itemId: string) => boolean
   ownsRoomItem: (itemId: string) => boolean
+  /** A placed piece turned: its drawing before and after (the stage cross-fades them). */
+  onRotated?: (from: RoomV2FurnitureRenderItem, to: RoomV2FurnitureRenderItem) => void
   selection: RoomEditorSelection
   inventory: Pick<
     RoomEditorInventoryState,
@@ -58,7 +64,8 @@ export function useRoomEditorItemActions(input: {
     draftDecor,
     setDraftDecor,
     canPlaceAnotherRoomItem,
-    ownsRoomItem
+    ownsRoomItem,
+    onRotated
   } = input
   const {
     selectedInstanceId,
@@ -121,13 +128,36 @@ export function useRoomEditorItemActions(input: {
       blockingRenderIds: validation.blockingRenderIds,
       supportingRenderIds: validation.supportingRenderIds
     })
+    const before = scene.renderItems.find((item) => item.renderId === selectedInstanceId)
     if (!preview.isValid) {
+      // 2.5D room: a turn that does not fit here moves the piece to the nearest cell where it does.
+      const nudge = ROOM_EDITOR_PLACE_JUICE
+        ? findRoomEditorRotateNudge({
+          copy,
+          scene,
+          decor: draftDecor,
+          furnitureCatalog: ACTIVE_ROOM_FURNITURE_CATALOG,
+          instanceId: selectedInstanceId,
+          rotation
+        })
+        : null
+      if (nudge && nudge.item.kind === "furniture") {
+        const nudged = nudge.item
+        if (before?.kind === "furniture") onRotated?.(before, nudged)
+        setDraftDecor(current => commitRoomV2PlacedItem(current, createRoomEditorPlacedItemFromPreview(nudge, nudged)))
+        setSelectedInventoryRotation(rotation)
+        setPlacementFeedback(undefined)
+        setPlacementPreview(undefined)
+        hapticLight()
+        return true
+      }
       hapticError()
       setPlacementFeedback(preview.feedback ?? copy.feedback.chooseClearSpot)
       setPlacementPreview(preview)
       return false
     }
 
+    if (before?.kind === "furniture" && before.rotation !== rotation) onRotated?.(before, candidate)
     setDraftDecor(current => patchRoomV2PlacedItem(current, selectedInstanceId, { rotation }))
     setSelectedInventoryRotation(rotation)
     setPlacementFeedback(undefined)
@@ -137,6 +167,7 @@ export function useRoomEditorItemActions(input: {
   }, [
     copy,
     draftDecor,
+    onRotated,
     selectedInstanceId,
     scene,
     setDraftDecor,
