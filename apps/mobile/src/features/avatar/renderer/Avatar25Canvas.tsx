@@ -158,6 +158,13 @@ export function Avatar25Canvas(props: {
   /** Per-instance walk-cycle offsets (spike: avatars out of phase). */
   phaseOffsets?: number[]
   reduceMotion?: boolean
+  /**
+   * The clock starts at the first drawn frame (time 0), so frame 0 is exactly the baked still (AvatarHero swaps
+   * still → live without a jump). Unset: the shared frame clock, as in the room.
+   */
+  clockStartsAtMount?: boolean
+  /** Caps the surface's pixel ratio (plan 2.2: 2x above 250 pt) to bound its memory. */
+  maxPixelRatio?: number
   style?: StyleProp<ViewStyle>
   onStats?: (stats: Avatar25FrameStats) => void
   onReady?: () => void
@@ -167,6 +174,7 @@ export function Avatar25Canvas(props: {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
   const [gpu, setGpu] = useState<GpuState | null>(null)
   const { onReady, onError } = props
+  const maxPixelRatio = props.maxPixelRatio ?? Number.POSITIVE_INFINITY
   const instances = useStableInstances(props.instances)
 
   useEffect(() => {
@@ -177,7 +185,7 @@ export function Avatar25Canvas(props: {
       const shared = await getShared()
       const context = ref.current?.getContext("webgpu")
       if (!context || cancelled) return
-      const ratio = PixelRatio.get()
+      const ratio = Math.min(PixelRatio.get(), maxPixelRatio)
       const widthPx = Math.max(1, Math.round(size.width * ratio))
       const heightPx = Math.max(1, Math.round(size.height * ratio))
       const canvas = context.canvas as unknown as { width: number; height: number }
@@ -224,13 +232,15 @@ export function Avatar25Canvas(props: {
         msaa.destroy()
       }
     }
-  }, [instances, onError, onReady, size])
+  }, [instances, maxPixelRatio, onError, onReady, size])
 
   const stats = useSharedValue({ frames: 0, work: 0, interval: 0, calls: 0 })
   const { driver, onStats } = props
   const phaseOffsets = props.phaseOffsets ?? []
   const reduceMotion = props.reduceMotion ?? false
   const hasStats = Boolean(onStats)
+  const clockFromMount = props.clockStartsAtMount ?? false
+  const clockStartMs = useSharedValue(-1)
 
   useFrameCallback((info) => {
     "worklet"
@@ -250,7 +260,8 @@ export function Avatar25Canvas(props: {
     })
     pass.setPipeline(pipeline)
     const poseName = AVATAR25_POSES[driver.pose.value] ?? "stand"
-    const time = info.timestamp / 1000
+    if (clockFromMount && clockStartMs.value < 0) clockStartMs.value = info.timestamp
+    const time = clockFromMount ? (info.timestamp - clockStartMs.value) / 1000 : info.timestamp / 1000
     const waveStart = driver.waveStartMs.value
     const walkWeight = driver.walkWeight.value
     const sitWeight = driver.sitWeight ? driver.sitWeight.value : 0
