@@ -1,0 +1,120 @@
+"""Derived ASTC 4x4 texture blobs for a baked 2.5D rig (export_rig.py --astc, or standalone on an existing rig folder).
+
+The approved PNG pages are NEVER modified: the blobs are derived artifacts written to <rig>/astc/, each recorded in
+<rig>/astc/manifest.json with its own sha256 plus the sha256 of every source PNG it was derived from (a test recomputes both).
+Compressed formats cannot be render targets, so the full mip chain (2x2 box filter on premultiplied RGBA8) is baked here.
+Blob layout: mip-major, then page (= array layer); every (mip, page) is one block-aligned slab of ceil(w/4)*ceil(h/4)*16 bytes.
+The blobs carry the extension .zip only because it is already a Metro asset extension (adding one needs a Metro restart and
+changes the native fingerprint); the bytes are raw ASTC blocks.
+
+  python compress_pages.py <rig_dir>        # e.g. apps/mobile/src/features/avatar/rigs/girl
+Requires astc-encoder-py==0.1.12 (pinned), numpy, Pillow.
+"""
+import hashlib
+import json
+import re
+import sys
+from importlib import metadata
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+ENCODER_PIN = '0.1.12'
+BLOCK = 4
+FORMAT = 'astc-4x4-unorm'
+PRESET = 'VERYTHOROUGH'
+BLOB_EXT = '.astc.zip'
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _premultiplied(path: Path) -> np.ndarray:
+    a = np.asarray(Image.open(path).convert('RGBA')).astype(np.float32)
+    a[..., :3] = np.round(a[..., :3] * a[..., 3:4] / 255.0)
+    return a.astype(np.uint8)
+
+
+def _mips(a: np.ndarray) -> list:
+    out = [a]
+    while max(a.shape[:2]) > 1:
+        h, w = a.shape[:2]
+        nh, nw = max(1, h // 2), max(1, w // 2)
+        if h == 1:
+            f = a.astype(np.float32)[:, :nw * 2].reshape(1, nw, 2, 4).mean(2)
+        elif w == 1:
+            f = a.astype(np.float32)[:nh * 2].reshape(nh, 2, 1, 4).mean(1)
+        else:
+            f = a[:nh * 2, :nw * 2].astype(np.float32).reshape(nh, 2, nw, 2, 4).mean((1, 3))
+        a = np.round(f).astype(np.uint8)
+        out.append(a)
+    return out
+
+
+def _encode_set(ctx, swizzle, astc, png_paths: list):
+    chains = [_mips(_premultiplied(p)) for p in png_paths]
+    blob, levels, gpu = bytearray(), [], 0
+    for lv in range(len(chains[0])):
+        h, w = chains[0][lv].shape[:2]
+        bw, bh = -(-w // BLOCK), -(-h // BLOCK)
+        for chain in chains:
+            padded = np.zeros((bh * BLOCK, bw * BLOCK, 4), np.uint8)
+            padded[:h, :w] = chain[lv]
+            image = astc.ASTCImage(astc.ASTCType.U8, bw * BLOCK, bh * BLOCK, 1, padded.tobytes())
+            blob += bytes(ctx.compress(image, swizzle))
+        levels.append({'w': w, 'h': h, 'bw': bw, 'bh': bh})
+        gpu += len(chains) * bw * bh * 16
+    return bytes(blob), levels, gpu
+
+
+def compress_rig(rig_dir: Path) -> dict:
+    import astc_encoder as astc
+    version = metadata.version('astc-encoder-py')
+    if version != ENCODER_PIN:
+        raise SystemExit(f'astc-encoder-py=={ENCODER_PIN} is pinned for reproducible blobs (found {version})')
+    cfg = astc.ASTCConfig(astc.ASTCProfile.LDR, BLOCK, BLOCK, 1, getattr(astc.ASTCQualityPreset, PRESET))
+    ctx = astc.ASTCContext(cfg, threads=2)
+    swizzle = astc.ASTCSwizzle.from_str('RGBA')
+    out_dir = rig_dir / 'astc'
+    out_dir.mkdir(exist_ok=True)
+    for old in out_dir.glob('*' + BLOB_EXT):
+        old.unlink()
+    sets = {}
+    for view in ('front', 'back'):
+        names = sorted((p.name for p in rig_dir.glob(f'{view}_page*.png')), key=lambda n: int(re.search(r'page(\d+)', n).group(1)))
+        if not names:
+            continue
+        paths = [rig_dir / n for n in names]
+        sizes = {Image.open(p).size for p in paths}
+        if len(sizes) != 1:
+            raise SystemExit(f'{view}: pages differ in size {sizes}')
+        w, h = sizes.pop()
+        if w % BLOCK or h % BLOCK:
+            raise SystemExit(f'{view}: {w}x{h} is not a multiple of the {BLOCK}px block (UVs would shift)')
+        blob, levels, gpu = _encode_set(ctx, swizzle, astc, paths)
+        (out_dir / f'{view}{BLOB_EXT}').write_bytes(blob)
+        sets[view] = {
+            'file': f'{view}{BLOB_EXT}', 'sha256': _sha256(blob), 'fileBytes': len(blob), 'gpuBytes': gpu,
+            'width': w, 'height': h, 'layers': len(names), 'levels': levels,
+            'pages': names, 'sourceSha256': {n: _sha256((rig_dir / n).read_bytes()) for n in names},
+        }
+        print(f'{rig_dir.name}/{view}: {len(blob) / 1e6:.2f} MB, {len(levels)} mips', flush=True)
+    manifest = {'version': 1, 'format': FORMAT, 'block': [BLOCK, BLOCK], 'premultiplied': True, 'preset': PRESET,
+                'encoder': {'name': 'astc-encoder-py', 'version': version}, 'sets': sets}
+    (out_dir / 'manifest.json').write_text(json.dumps(manifest, indent=1, sort_keys=True) + '\n')
+    # header kept from the exporter's old home so re-exports stay byte-identical to the approved files
+    lines = ['/* Generated by tools/room-avatar-lab/bake25/compress_pages.py (export_rig.py --astc). Do not edit. */',
+             'export const ROOM_AVATAR_25D_ASTC_MANIFEST = require("./manifest.json") as unknown',
+             'export const ROOM_AVATAR_25D_ASTC_FILES: Record<string, number> = {']
+    lines += [f'  "{s["file"]}": require("./{s["file"]}"),' for s in sets.values()]
+    lines += ['}', '']
+    (out_dir / 'astcAssets.ts').write_text('\n'.join(lines))
+    return manifest
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        raise SystemExit(__doc__)
+    compress_rig(Path(sys.argv[1]))
