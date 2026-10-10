@@ -38,14 +38,14 @@ for (const environment of ["staging", "production"] as const) {
 const repositoryFile = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8")
 const pinnedNodeVersion = repositoryFile(".nvmrc").trim()
 
-test("one Node version is pinned for local, CI, OTA publish and Railway", () => {
+test("one Node version is pinned for local, CI and Railway", () => {
   assert.match(pinnedNodeVersion, /^22\.\d+\.\d+$/)
   // Node 22.23.2 (2026-07-28) is the newest 22.x security release; never pin below it.
   const [, minor, patch] = pinnedNodeVersion.split(".").map(Number)
   assert.ok(minor > 23 || (minor === 23 && patch >= 2), `Node ${pinnedNodeVersion} predates the 22.23.2 security release`)
   const engines = JSON.parse(repositoryFile("package.json")).engines.node
   assert.equal(engines, `>=${pinnedNodeVersion} <23`)
-  for (const workflow of [".github/workflows/verify.yml", ".github/workflows/develop-ota-publish.yml"]) {
+  for (const workflow of [".github/workflows/verify.yml"]) {
     const source = repositoryFile(workflow)
     assert.match(source, /node-version-file: \.nvmrc/, workflow)
     assert.doesNotMatch(source, /node-version: /, workflow)

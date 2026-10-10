@@ -54,7 +54,6 @@
       "distribution": "store",
       "autoIncrement": true,
       "environment": "production",
-      "channel": "preview",
       "env": {
         "EAS_BUILD_PROFILE": "preview",
         "EXPO_PUBLIC_BLUMI_BUILD_PROFILE": "preview",
@@ -69,7 +68,6 @@
       "node": "22.22.2",
       "autoIncrement": true,
       "environment": "production",
-      "channel": "production",
       "env": {
         "EAS_BUILD_PROFILE": "production",
         "EXPO_PUBLIC_BLUMI_BUILD_PROFILE": "production",

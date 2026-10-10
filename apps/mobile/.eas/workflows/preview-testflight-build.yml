@@ -1,7 +1,6 @@
-# Manual only: builds the owner's development binary (channel `preview`) and
-# uploads it to the same App Store Connect app (TestFlight). Install it on the
-# devices that should receive development OTA updates. Run it once to start, and again only when
-# develop-preview-update.yml reports a native change. It never runs on push.
+# Manual only: builds the owner's preview binary and uploads it to the same
+# App Store Connect app (TestFlight). There are no OTA updates: run it again
+# for every change that testers should get. It never runs on push.
 name: Blumi preview build to TestFlight
 
 on:

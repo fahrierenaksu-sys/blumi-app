@@ -35,7 +35,7 @@ Blumi is an Expo / React Native social app built around sweet 2.5D chibi avatars
 Get an explicit yes from the owner in the current conversation before any of these:
 
 - pushing or merging to `main` (the release branch; CI and Railway build from it, and TestFlight builds from it when started by hand);
-- a Railway deploy, redeploy or variable change, an EAS build or submit, a TestFlight upload, an OTA publish or an App Store submission;
+- a Railway deploy, redeploy or variable change, an EAS build or submit, a TestFlight upload or an App Store submission;
 - `npm run db:migrate` or any SQL write or DDL against a real database (`.env.local` can point at production);
 - buying anything (plans, or licences such as Spine Pro) or changing third-party account state;
 - shipping a visible change to the characters' drawn look. Show visuals first.
@@ -47,7 +47,7 @@ These rules protect the data:
   - The server refuses to start under `NODE_ENV=production` unless `BLUMI_TRUST_PROXY` is set (`100.64.0.0/10` on Railway).
   - Simulator and QA sessions hit this database. Run locally with `BLUMI_AUTH_REPOSITORY=memory`. Against the live database use the owner's existing test accounts, and never seed, bulk-create or delete data there.
 - Before a schema change on it, take a PostgreSQL 17 dump and prove it restores. Migrations are additive and backward compatible. Migrate first, then deploy, unless the migration is listed in `OPTIONAL_READINESS_MIGRATIONS`. The procedure is in `docs/release/DATABASE_RELEASE_RUNBOOK.md`.
-- Applied migrations in `apps/server/db/migrations` are immutable because their checksums gate `/ready`. Never edit, rename or renumber them. Two files share prefix `032` and there is no `044`. A new migration takes the number after the highest existing file (`071` next). Never fill the `044` gap or reuse a prefix.
+- Applied migrations in `apps/server/db/migrations` are immutable because their checksums gate `/ready`. Never edit, rename or renumber them. Two files share prefix `032` and there is no `044`. A new migration takes the number after the highest existing file (`074` next). Never fill the `044` gap or reuse a prefix.
 - Preserve user data and stable IDs.
   - Each cosmetic or furniture item keeps one canonical ID through Shop → Purchase → Inventory → Wardrobe → Avatar → Room → MiniRoom → remote participant.
   - Never rename, reuse or fork an ID or entitlement when art or runtime changes. Hide an item with `RETIRED_AVATAR_ITEM_IDS` instead of deleting it.
@@ -66,7 +66,6 @@ These rules protect the data:
 ## Strict: conventions
 
 - Use conventional commits (`<type>: <description>`), one purpose per commit, ending with the attribution footer your harness supplies.
-- `apps/mobile/package.json` scripts are part of the native fingerprint (`runtimeVersion.policy: fingerprint`), so editing one blocks OTA updates until a new native build exists. Put a new mobile test in an existing `apps/mobile/scripts/run-*.mjs` runner (its group need not match; add the file to the runner's tsc list where it has one). Change the scripts, including the inline test groups, only together with a planned native build.
 - Never delete, skip or weaken a test, or grow a ratchet allowlist, just to get a green gate. If an exception is really justified, change the allowlist in the same commit and give the reason.
   - Tests guard the strict rules (security, privacy, money, user data, release safety) and bugs that keep coming back; everything else is tested by behaviour. Do not add tests that pin implementation text, copy, pixels or counts; a rule that must hold everywhere becomes one tree-wide guard. Older source-text tests that remain pin today's code, not requirements: when you replace that code, replace them in the same commit with behaviour tests that keep their intent. That is not weakening a test. See `docs/quality/ENGINEERING_RULES.md`.
 - The owner is non-technical and writes in Turkish. Reply in Turkish, in plain words. When the owner has to run something, give one command, wait for its output, then give the next. Never combine a check with a write that depends on its result.
@@ -81,7 +80,7 @@ Branches and release:
   - Railway builds the API from `main` but has not reliably auto-deployed, so check which commit is actually live.
   - TestFlight (`apps/mobile/.eas/workflows/testflight.yml`) starts by hand only.
 - Codex works on the owner's Mac (`codex/*` branches; it has the iOS Simulator and the art Workbench). Claude works in a Linux cloud container (`claude/*` and `worktree-*` branches) with no Simulator. Native visual checks happen on the Mac or the owner's phone. Until then, report them as Open.
-- Develop OTA updates are manual only. EAS Update accepts at most 1,000 assets; the iOS bundle has 888 since room motion frames that no receipt binds were packed into atlases (`apps/mobile/scripts/build-room-motion-atlases.mjs`, run it after adding room motion art). A new native module (for example Skia) needs a new TestFlight build. See `docs/release/OTA_AND_TESTFLIGHT.md`.
+- There are no OTA updates (owner decision 2026-10-08, ported with the 2.5D work on 2026-10-10): every change reaches testers in a new TestFlight build, and `apps/mobile/package.json` scripts may change freely. `mobile-bundled-asset-bytes.test.mjs` caps the bytes of bundled assets. See `docs/release/OTA_AND_TESTFLIGHT.md`.
 - Status and backlog: `docs/release/LAUNCH_CONTROL.md` is the release ledger, and the operations-center gate parses its table, so keep the column layout. `docs/quality/SESSION_INVENTORY_2026-10-01.md` is the newest full backlog. Dated docs are snapshots, and current code wins.
 
 Avatar and room (current state, not a mandate):

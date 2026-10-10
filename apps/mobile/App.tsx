@@ -10,7 +10,6 @@ import { useFonts } from "expo-font"
 import * as SplashScreen from "expo-splash-screen"
 import { RootNavigator } from "./src/navigation/RootNavigator"
 import { AppKeyboardProvider } from "./src/ui/keyboard"
-import { useOtaUpdates } from "./src/features/appUpdates/useOtaUpdates"
 import { ErrorBoundary } from "./src/ui/errorBoundary"
 import {
   initializeCrashReporting,
@@ -41,7 +40,6 @@ assertLegalReleaseReady({
 })
 
 function App() {
-  useOtaUpdates()
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {

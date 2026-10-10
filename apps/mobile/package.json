@@ -75,7 +75,6 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "expo-system-ui": "~57.0.4",
-    "expo-updates": "~57.0.25",
     "expo-web-browser": "~57.0.3",
     "libphonenumber-js": "^1.13.12",
     "posthog-react-native": "^4.66.2",

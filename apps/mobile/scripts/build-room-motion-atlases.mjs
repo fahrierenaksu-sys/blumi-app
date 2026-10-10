@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Packs room avatar motion frames into sprite atlases so the iOS bundle stays
-// under EAS Update's 1,000-asset limit (docs/quality/OTA_ASSET_BUDGET_2026-10-02.md).
+// Packs room avatar motion frames into sprite atlases so the iOS bundle carries
+// fewer files and decodes (first written for the retired EAS Update 1,000-asset
+// limit, docs/quality/OTA_ASSET_BUDGET_2026-10-02.md).
 //
 // Input: the original 256x384 frame PNGs in assets/room/motion (they stay in
 // the repo as the source of truth) and the motion asset modules that name them.
