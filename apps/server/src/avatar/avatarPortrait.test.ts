@@ -162,39 +162,42 @@ test("a truncated art manifest never stops the server: no art, so the fixed bust
 /**
  * The baked manifest holds only each body's starter outfit today (the rigs have no other items; every catalog item
  * outside it, even the default girl's own, draws as a starter piece), so the "saved outfit changes the picture"
- * proof bakes a real second girl top (a stock catalog item) into a copy of it: same files, other pieces.
+ * proof bakes a real second girl top (a stock catalog item) into a copy of it. That top owns no layers: it draws
+ * the bare body, so the picture must differ from the polo and show no polo or sleeve pixel at all.
  */
 const OTHER_TOP = "avatar_v2_top_sage_ribbon_knit_jacket"
-const girlWithOtherTop = (): AvatarStillManifest => {
+const girlManifest = (options: { otherTop: boolean; starterTop: boolean }): AvatarStillManifest => {
   const female = AVATAR_STILL_MANIFEST.bodies.female
-  const polo = "avatar_v2_top_coral_wave_polo"
-  const frontOnly = female.layers.bust.filter((entry) => entry.owner === polo && entry.key.includes("__o0"))
+  const { top: _starterTop, ...starterWithoutTop } = female.starter
   return {
     ...AVATAR_STILL_MANIFEST,
     bodies: {
       ...AVATAR_STILL_MANIFEST.bodies,
       female: {
         ...female,
-        items: { ...female.items, [OTHER_TOP]: { slot: "top", rigItemId: "top_sage_ribbon_knit_jacket", thumb: polo } },
-        layers: {
-          ...female.layers,
-          bust: [...female.layers.bust, ...frontOnly.map((entry, index) => ({ ...entry, owner: OTHER_TOP, seq: 9000 + index }))]
-        }
+        starter: options.starterTop ? female.starter : starterWithoutTop,
+        items: options.otherTop
+          ? { ...female.items, [OTHER_TOP]: { slot: "top", rigItemId: "top_sage_ribbon_knit_jacket", thumb: OTHER_TOP } }
+          : female.items
       }
     }
   }
 }
 
-test("the saved outfit decides the picture: another worn item draws other layers, the same outfit the same bytes", async () => {
+test("the saved outfit decides the picture: a bare top draws no top or sleeve pixel, the same outfit the same bytes", async () => {
   assert.ok(art)
-  const renderer = createAvatarPortraitRenderer({ art, manifest: girlWithOtherTop() })
+  const renderer = createAvatarPortraitRenderer({ art, manifest: girlManifest({ otherTop: true, starterTop: true }) })
   const background = "#FFD9E8"
   const starter = await renderer.render({ loadout: female, background })
-  const other = await renderer.render({ loadout: { ...female, topId: OTHER_TOP }, background })
-  const otherAgain = await renderer.render({ loadout: { ...female, topId: OTHER_TOP }, background })
-  assert.equal(other.level, "look")
-  assert.ok(!other.body.equals(starter.body), "a different worn top is a different picture")
-  assert.ok(other.body.equals(otherAgain.body))
+  const bare = await renderer.render({ loadout: { ...female, topId: OTHER_TOP }, background })
+  const bareAgain = await renderer.render({ loadout: { ...female, topId: OTHER_TOP }, background })
+  assert.equal(bare.level, "look")
+  assert.ok(!bare.body.equals(starter.body), "a different worn top is a different picture")
+  assert.ok(bare.body.equals(bareAgain.body))
+  // A girl with no top at all (no worn top, no starter top) is the same picture: only the body's own layers.
+  const noTopAnywhere = createAvatarPortraitRenderer({ art, manifest: girlManifest({ otherTop: false, starterTop: false }) })
+  const none = await noTopAnywhere.render({ loadout: female, background })
+  assert.ok(bare.body.equals(none.body), "no polo layer, and so no sleeve fragment, is drawn without its top")
   // The real manifest bakes no such top: the same loadout there is the starter picture.
   const real = await createAvatarPortraitRenderer({ art }).render({ loadout: { ...female, topId: OTHER_TOP }, background })
   assert.ok(real.body.equals(starter.body))
