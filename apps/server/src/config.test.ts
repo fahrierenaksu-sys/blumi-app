@@ -322,19 +322,20 @@ test("local QA auth requires a complete loopback-only development setup", async 
   })
 
   assert.deepEqual(config.qaAuth, {
-    phoneNumber: "+12025550123",
+    phoneNumbers: ["+12025550123"],
     verificationCode: "246810"
   })
 
   const service = createConfiguredServerServices(config).authService
   const now = new Date("2026-07-14T10:00:00.000Z")
-  await service.sendCode(config.qaAuth.phoneNumber, now)
+  const qaPhoneNumber = config.qaAuth!.phoneNumbers[0]!
+  await service.sendCode(qaPhoneNumber, now)
   const signedIn = await service.verifyCode(
-    config.qaAuth.phoneNumber,
-    config.qaAuth.verificationCode,
+    qaPhoneNumber,
+    config.qaAuth!.verificationCode,
     now
   )
-  assert.equal(signedIn.account.phoneNumber, config.qaAuth.phoneNumber)
+  assert.equal(signedIn.account.phoneNumber, qaPhoneNumber)
 })
 
 test("default development auth delegates OTP creation to the normal random factory", () => {
@@ -407,7 +408,7 @@ test("local QA auth fails closed outside its exact development boundary", () => 
     ...validQa
   })
   assert.deepEqual(firebaseOnlyDevelopment.qaAuth, {
-    phoneNumber: "+12025550123",
+    phoneNumbers: ["+12025550123"],
     verificationCode: "246810"
   })
   assert.throws(

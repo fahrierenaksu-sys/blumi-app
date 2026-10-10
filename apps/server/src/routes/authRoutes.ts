@@ -22,7 +22,14 @@ import {
 export interface AuthRouteServices {
   authService: AuthService
   firebaseAuthVerifier?: FirebaseAuthVerifier
+  /** Local Simulator QA only (see CreateServerOptions.localQaOtpEnabled). */
+  localQaOtpEnabled?: boolean
   accountRecoveryService?: AccountRecoveryService
+}
+
+/** Firebase replaced the server-sent codes, except for local QA builds. */
+function isLegacyOtpRetired(services: AuthRouteServices): boolean {
+  return Boolean(services.firebaseAuthVerifier) && services.localQaOtpEnabled !== true
 }
 
 const sendCodeResponses = {
@@ -52,7 +59,7 @@ export async function registerAuthRoutes(
       }
     },
     async (request, reply) => {
-      if (services.firebaseAuthVerifier) {
+      if (isLegacyOtpRetired(services)) {
         return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       }
       const parsed = parseAuthPhoneRequest(request.body)
@@ -89,7 +96,7 @@ export async function registerAuthRoutes(
       }
     },
     async (request, reply) => {
-      if (services.firebaseAuthVerifier) {
+      if (isLegacyOtpRetired(services)) {
         return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       }
       return verifyAndCreateSession({ request, reply, authService })
@@ -107,7 +114,7 @@ export async function registerAuthRoutes(
       }
     },
     async (request, reply) => {
-      if (services.firebaseAuthVerifier) {
+      if (isLegacyOtpRetired(services)) {
         return reply.code(410).send({ code: "FIREBASE_PHONE_AUTH_REQUIRED", error: "Update Blumi to verify your phone with Firebase." })
       }
       const parsed = parseRegisterAccountRequest(request.body)

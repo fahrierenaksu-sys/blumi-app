@@ -188,7 +188,7 @@ export interface ServerConfig {
    */
   rateBudgetStore: "memory" | "postgres"
   qaAuth?: Readonly<{
-    phoneNumber: string
+    phoneNumbers: readonly string[]
     verificationCode: string
   }>
 }
@@ -358,7 +358,11 @@ export function resolveServerConfig(
     throw new Error("BLUMI_TRUSTED_CLIENT_IP_HEADER must be x-real-ip or unset.")
   }
   const qaAuthEnabledValue = env.BLUMI_QA_AUTH_ENABLED?.trim()
-  const qaPhoneNumber = env.BLUMI_QA_PHONE_NUMBER?.trim()
+  // One number, or a comma-separated list so QA can sign in as several users.
+  const qaPhoneNumberValue = env.BLUMI_QA_PHONE_NUMBER?.trim()
+  const qaPhoneNumbers = qaPhoneNumberValue
+    ? qaPhoneNumberValue.split(",").map((value) => value.trim())
+    : []
   const qaOtpCode = env.BLUMI_QA_OTP_CODE?.trim()
   if (
     qaAuthEnabledValue &&
@@ -368,11 +372,11 @@ export function resolveServerConfig(
     throw new Error("BLUMI_QA_AUTH_ENABLED must be 0 or 1.")
   }
   const qaAuthEnabled = qaAuthEnabledValue === "1"
-  const qaAuthConfigured = Boolean(qaAuthEnabled || qaPhoneNumber || qaOtpCode)
+  const qaAuthConfigured = Boolean(qaAuthEnabled || qaPhoneNumberValue || qaOtpCode)
   if (nodeEnv === "production" && qaAuthConfigured) {
     throw new Error("QA auth must never be configured in production.")
   }
-  if (!qaAuthEnabled && (qaPhoneNumber || qaOtpCode)) {
+  if (!qaAuthEnabled && (qaPhoneNumberValue || qaOtpCode)) {
     throw new Error("QA auth credentials require BLUMI_QA_AUTH_ENABLED=1.")
   }
   if (qaAuthEnabled) {
@@ -381,8 +385,9 @@ export function resolveServerConfig(
       authRepositoryMode !== "memory" ||
       smsProviderMode !== "development" ||
       !isLoopbackHost(host) ||
-      !qaPhoneNumber ||
-      !/^\+[1-9]\d{7,14}$/.test(qaPhoneNumber) ||
+      qaPhoneNumbers.length === 0 ||
+      qaPhoneNumbers.length > MAX_QA_PHONE_NUMBERS ||
+      !qaPhoneNumbers.every((value) => /^\+[1-9]\d{7,14}$/.test(value)) ||
       !qaOtpCode ||
       !/^\d{6}$/.test(qaOtpCode)
     ) {
@@ -504,13 +509,14 @@ export function resolveServerConfig(
     ...(trustedClientIpHeader === "x-real-ip" ? { trustedClientIpHeader } : {}),
     sessionCacheTtlMs,
     rateBudgetStore,
-    qaAuth: qaAuthEnabled && qaPhoneNumber && qaOtpCode
-      ? { phoneNumber: qaPhoneNumber, verificationCode: qaOtpCode }
+    qaAuth: qaAuthEnabled && qaPhoneNumbers.length > 0 && qaOtpCode
+      ? { phoneNumbers: Object.freeze([...qaPhoneNumbers]), verificationCode: qaOtpCode }
       : undefined
   }
 }
 
 const MAX_SESSION_CACHE_TTL_MS = 30_000
+const MAX_QA_PHONE_NUMBERS = 4
 
 export function parseSessionCacheTtlMs(value: string | undefined): number {
   if (value === undefined || value.trim() === "") return SESSION_CACHE_TTL_MS
@@ -883,7 +889,7 @@ export function createConfiguredCodeFactory(
   const qaAuth = config.qaAuth
 
   return (phoneNumber) =>
-    (phoneNumber === qaAuth.phoneNumber || phoneNumber.endsWith("2025550123"))
+    (qaAuth.phoneNumbers.includes(phoneNumber) || phoneNumber.endsWith("2025550123"))
       ? qaAuth.verificationCode
       : createSixDigitCode()
 }

@@ -109,6 +109,12 @@ interface CreateServerOptions {
   readinessTimeoutMs?: number
   authService?: AuthService
   firebaseAuthVerifier?: FirebaseAuthVerifier
+  /**
+   * Local Simulator QA only: keeps the server-side phone code routes open next
+   * to Firebase so a dev build can sign in to the in-memory API. Refused in
+   * production; config only sets it for a loopback, in-memory development API.
+   */
+  localQaOtpEnabled?: boolean
   matchService?: MatchService
   discoverySnapshots?: import("./matches/discoverySnapshot").DiscoverySnapshotService
   chatService?: ChatService
@@ -154,6 +160,9 @@ interface CreateServerOptions {
 
 export function createServer(options: CreateServerOptions = {}): FastifyInstance {
   const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV ?? "development"
+  if (nodeEnv === "production" && options.localQaOtpEnabled) {
+    throw new Error("Local QA phone codes must never be enabled in production.")
+  }
   if (nodeEnv === "production" && options.allowLegacyAdminKey) {
     throw new Error("Production server cannot enable legacy admin key compatibility.")
   }
@@ -318,6 +327,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     discoverySnapshots: options.discoverySnapshots,
     authService,
     firebaseAuthVerifier: options.firebaseAuthVerifier,
+    localQaOtpEnabled: options.localQaOtpEnabled === true,
     matchService,
     chatService,
     safetyService,
@@ -352,7 +362,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     : undefined
   app.addHook("onClose", async () => { stopSessionReuseRevocation?.() })
   void app.register(async (instance) => {
-    registerSharedRateBudget(instance, authService, options.sharedRateLimiter ?? createInMemoryRateBudget(), options.authRateLimiter, Boolean(options.firebaseAuthVerifier))
+    registerSharedRateBudget(instance, authService, options.sharedRateLimiter ?? createInMemoryRateBudget(), options.authRateLimiter, Boolean(options.firebaseAuthVerifier) && options.localQaOtpEnabled !== true)
     await registerAuthRoutes(instance, routeServices)
     await registerRealtimeTicketRoutes(instance, {
       authService,

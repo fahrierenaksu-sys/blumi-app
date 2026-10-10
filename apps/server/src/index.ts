@@ -131,6 +131,8 @@ const app = createServer({
   authService: services.authService,
   capabilityService: services.capabilityService,
   firebaseAuthVerifier,
+  // Only a loopback, in-memory development API can carry QA auth (config.ts).
+  localQaOtpEnabled: config.qaAuth !== undefined,
   chatService: services.chatService,
   economyService: services.economyService,
   commerceService: services.commerceService,
@@ -195,6 +197,10 @@ async function start() {
     host: config.host
   })
   accepting = true
+  if (config.qaAuth) {
+    // Modes only: never the QA numbers or code.
+    console.info(`Local QA auth on (auth repository: ${config.authRepositoryMode}, QA users: ${config.qaAuth.phoneNumbers.length})`)
+  }
 }
 
 const shutdown = createGracefulShutdown({
