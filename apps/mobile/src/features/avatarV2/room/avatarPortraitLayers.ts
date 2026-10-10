@@ -9,9 +9,9 @@ import { pickAvatarSwatch } from "../../../ui/avatarSwatch"
 
 /**
  * The still, front-facing layers of a user's chibi as every portrait shows it
- * (chat rows, invite cards, push notification pictures). The server bundles
- * this module (apps/server/scripts/build-avatar-portrait-layers.mjs), so the
- * notification picture is drawn from exactly the layers and order the app uses.
+ * (chat rows, invite cards). Push notification pictures no longer follow this
+ * module: the server draws them from the baked 2.5D bust layers in its art pack
+ * (apps/server/src/avatar/avatarPortrait.ts), so changes here do not reach them.
  */
 export function resolveAvatarPortraitRenderLayers(loadout: AvatarLoadout): RoomV2AvatarRenderLayer[] {
   const { appearance } = projectAvatarV2ToRoomAvatarAppearance({
