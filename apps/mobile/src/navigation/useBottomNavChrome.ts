@@ -22,7 +22,7 @@ import {
   settleRootNavigationChromeReturnPreview
 } from "./rootNavigationChromeStore"
 import { MAIN_TAB_PAGER_ENABLED } from "./mainTabPager/mainTabPagerConfig"
-import { requestMainTabPagerPage } from "./mainTabPager/mainTabPagerController"
+import { isMainTabPagerShowingPage, requestMainTabPagerPage } from "./mainTabPager/mainTabPagerController"
 import { shouldDispatchMainTabNavigation } from "./rootNavigationModel"
 import { navigationRef } from "./rootNavigationRef"
 import { getRootRouteBeneathSheets } from "./nativeSheets/rootRouteBeneathSheets"
@@ -79,8 +79,15 @@ export function useBottomNavChrome({
           ? "MyRoom"
           : "CosmeticShop"
     // Tapping the already-focused tab is a reselect: the page scrolls to top
-    // (iOS convention) and nothing navigates.
-    if (!shouldDispatchMainTabNavigation(navigationRef.getCurrentRoute()?.name, destination)) {
+    // (iOS convention) and nothing navigates. "Focused" is what the pager shows:
+    // it follows the route on the UI thread, and after a reload it showed
+    // Discover while the route already said My Room, so the My Room tab did
+    // nothing. A tab the route names but the pager is not showing is a normal
+    // selection, which lands the pager on it.
+    if (
+      !shouldDispatchMainTabNavigation(navigationRef.getCurrentRoute()?.name, destination) &&
+      (!MAIN_TAB_PAGER_ENABLED || isMainTabPagerShowingPage(key))
+    ) {
       publishMainTabReselect(key)
       return
     }

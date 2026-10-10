@@ -118,13 +118,15 @@ function createNavigationRef({ ready = true, routeName = "Lobby", params } = {})
 // ── Bottom navigation dispatch ─────────────────────────────
 
 // `pager` models the main-page pager: undefined means the rollback path
-// (MAIN_TAB_PAGER_ENABLED = false); otherwise it answers pager requests.
-function bottomNavPress(navigationRef, events, pager) {
+// (MAIN_TAB_PAGER_ENABLED = false); otherwise it answers pager requests. `shownPage` is the page the pager
+// shows (its UI thread's view, which can lag the navigation route); by default it agrees with the route.
+function bottomNavPress(navigationRef, events, pager, shownPage) {
   return evaluate(findInitializer(OWNER.bottomNav, "handleBottomNavPress"), {
     navigationRef,
     CommonActions,
     shouldDispatchMainTabNavigation,
     MAIN_TAB_PAGER_ENABLED: pager !== undefined,
+    isMainTabPagerShowingPage: (key) => shownPage === undefined || shownPage === key,
     requestMainTabPagerPage: (key) => {
       events.push(["pager", key])
       return pager?.(key) ?? false
@@ -192,6 +194,22 @@ test("bottom tabs ignore presses before readiness and turn a focused-tab tap int
       "a focused-tab reselect only publishes the reselect: no pager request, the match modal is left alone"
     )
   }
+})
+
+// After a reload the pager showed Discover while navigation already said My Room, and the My Room tab did
+// nothing (a "reselect" of the route). A tab the pager is not showing is a normal selection, whatever the route says.
+test("a tab the route names but the pager is not showing selects that page through the pager", () => {
+  const navigationRef = createNavigationRef({ routeName: "MyRoom" })
+  const events = []
+  bottomNavPress(navigationRef, events, () => true, "discover")("myroom")
+  assert.deepEqual(events, [["setGlobalMatch", null], ["pager", "myroom"]], "the pager is asked, not a reselect published")
+  assert.deepEqual(navigationRef.calls, [], "one navigation per tap: the pager's own commit")
+
+  // when the pager does show it, that is a reselect again
+  const shown = createNavigationRef({ routeName: "MyRoom" })
+  const shownEvents = []
+  bottomNavPress(shown, shownEvents, () => true, "myroom")("myroom")
+  assert.deepEqual(shownEvents, [["reselect", "myroom"]])
 })
 
 // ── Ready MiniRoom routing ─────────────────────────────────

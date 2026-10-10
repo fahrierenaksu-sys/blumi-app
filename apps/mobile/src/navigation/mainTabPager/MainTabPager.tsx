@@ -594,7 +594,9 @@ export const MainTabPager = memo(function MainTabPager({
         applyTransition(reduceMainTabPagerTap(ui.value, tappedIndex))
       }, index)
       return true
-    }
+    },
+    // A low-frequency read at a tap, like the warm-up's admission checks: the UI thread's view of the page.
+    isPageShown: (key: BottomNavKey) => ui.value.committedIndex === MAIN_TAB_PAGES.findIndex((page) => page.key === key)
   }), [applyTransition, navigation, ui])
 
   // ── Interruptions ───────────────────────────────────────────────────
