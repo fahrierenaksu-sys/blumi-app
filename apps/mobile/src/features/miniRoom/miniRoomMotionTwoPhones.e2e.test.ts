@@ -533,7 +533,11 @@ test("a partner who comes in later walks in from the door to where the server pu
   assert.equal(phoneA.view().store.deferUntilArrivalLands(bora.userId, () => undefined), true)
   const [onA, onB] = await Promise.all([
     waitUntil("A shows B arrived", () => settledAvatar(phoneA, bora.userId)),
-    waitUntil("B is settled", () => settledAvatar(phoneB, bora.userId))
+    // The scene's initial local placeholder is already standing. Wait for B's
+    // own server join snapshot before comparing its position with A's view.
+    waitUntil("B joined and is settled", () =>
+      phoneB.view().motion.avatars.some((avatar) => avatar.userId === bora.userId && avatar.present)
+        ? settledAvatar(phoneB, bora.userId) : undefined)
   ])
   assert.deepEqual({ x: onA.x, y: onA.y }, { x: onB.x, y: onB.y }, "both phones show B at the same spot")
   assert.equal(onA.enteringFromDoor, undefined)
