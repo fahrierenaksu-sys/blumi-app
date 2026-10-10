@@ -39,14 +39,15 @@ function renderPage(isPageFocused: boolean): string {
     isFocused: () => isPageFocused,
     addListener: () => () => undefined
   }
+  // eslint-disable-next-line react/no-children-prop -- the props type requires children
   const SlotScreen = (screen: { route: { key: string } }) => createElement(
     MainTabPageFocusScope,
     {
       navigation: pageNavigation,
       route: { key: `${screen.route.key}:Lobby`, name: "Lobby" },
-      slotKey: screen.route.key
-    },
-    createElement(FocusProbe)
+      slotKey: screen.route.key,
+      children: createElement(FocusProbe)
+    }
   )
   return renderToString(createElement(
     core.BaseNavigationContainer,
