@@ -9,7 +9,7 @@ import {
   type StyleProp,
   type ViewStyle
 } from "react-native"
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import Reanimated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { RoomRendererAvatarBody } from "./RoomRendererAvatarBody"
@@ -30,9 +30,16 @@ import type {
   RoomShell,
   RoomPlacementLane,
   RoomV2FurnitureRenderItem,
+  RoomV2LayeredSeatArt,
   RoomV2RenderItem
 } from "../roomV2.types"
-import { getRenderableRoomV2AvatarMotionProfile, getRoomV2AvatarSittingTranslateY } from "../roomV2AvatarMotion"
+import { roomAvatar25d } from "../../avatar/roomAvatarSeam"
+import { RoomRendererLayeredFurnitureFront, RoomRendererLayeredFurnitureShadow } from "./RoomRendererLayeredFurniture"
+import {
+  getRenderableRoomV2AvatarMotionProfile,
+  getRoomV2AvatarSittingTranslateY,
+  ROOM_V2_DEFAULT_SITTING_TRANSLATE_Y_PX
+} from "../roomV2AvatarMotion"
 import {
   getAvatarMotionRotate,
   getAvatarMotionScaleY,
@@ -56,7 +63,8 @@ import {
   getRoomV2DepthPerspectiveScale,
   getRoomV2FurnitureImageResizeMode,
   getRoomV2FurnitureMobileRenderScale,
-  getRoomV2SeatedFurnitureRenderIds
+  getRoomV2SeatedFurnitureRenderIds,
+  isRoomV2LayeredFloorPiece
 } from "../roomV2RenderSurface"
 import type { RoomVNextRuntimeMode } from "../roomVNextRuntimeGate"
 import { ROOM_V2_OUTSIDE_COLOR } from "../roomV2Camera"
@@ -115,6 +123,11 @@ interface RoomRenderer2DProps {
    */
   onSceneReady?: () => void
   /**
+   * An item's image is on screen (its readiness key, `furniture:<renderId>`), every time an item mounts. The
+   * room editor hands a dropped piece back from its drag overlay on it. Unset: items render as before.
+   */
+  onItemDrawn?: (key: string) => void
+  /**
    * Furniture another layer draws (MiniRoom sorts these among its avatars).
    * Their contact shadows stay here, on the floor under everything.
    */
@@ -149,6 +162,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     liveAvatarPosition,
     floorUnderlay,
     onSceneReady,
+    onItemDrawn,
     hiddenItemRenderIds
   } = props
   const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 })
@@ -164,6 +178,15 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     getRoomSceneReadinessKeys({ renderItems, hiddenRenderIds: hiddenItemRenderIds, drawsContactShadows }),
     onSceneReady
   )
+  const handleItemDrawn = useMemo(
+    () => markDrawn && onItemDrawn
+      ? (key: string) => {
+        markDrawn(key)
+        onItemDrawn(key)
+      }
+      : markDrawn ?? onItemDrawn,
+    [markDrawn, onItemDrawn]
+  )
   const handleShellDrawn = useMemo(
     () => markDrawn ? () => markDrawn(ROOM_SCENE_SHELL_KEY) : undefined,
     [markDrawn]
@@ -175,6 +198,68 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
 
   const aspectRatio = shell.canvasSize.width / shell.canvasSize.height
   const seatedFurnitureRenderIds = getRoomV2SeatedFurnitureRenderIds(renderItems)
+  const seats25dFurnitureRenderIds = new Set(renderItems.flatMap((item) =>
+    item.kind === "avatar" && item.avatar25d && item.seatRig ? [item.seatRig.furnitureRenderId] : []))
+  // room calibration: a 2.5D avatar seated in a layered piece draws between its back and front layers;
+  // a piece with several seats gives each sitter its own seat's rules (her drawing, the front layer's split)
+  const getLayeredSeat = (item: RoomV2RenderItem): { piece: RoomV2FurnitureRenderItem; seat: RoomV2LayeredSeatArt } | undefined => {
+    if (item.kind !== "avatar" || !item.avatar25d || !item.seatRig) return undefined
+    const piece = renderItems.find((candidate) => candidate.renderId === item.seatRig?.furnitureRenderId)
+    if (piece?.kind !== "furniture" || !piece.layered25d || hiddenItemRenderIds?.has(piece.renderId)) return undefined
+    const seatId = item.seatRig.seatId
+    const seat = piece.layered25d.seats.find((candidate) => candidate.id === seatId) ?? piece.layered25d.seats[0]
+    return seat ? { piece, seat } : undefined
+  }
+  const renderMainItem = (item: RoomV2RenderItem) => {
+    if ((item.kind !== "furniture" && item.kind !== "avatar") || hiddenItemRenderIds?.has(item.renderId)) return null
+    const layeredSeat = getLayeredSeat(item)
+    return (
+      <Fragment key={item.renderId}>
+        <RoomRendererItem
+          item={item}
+          layeredSeat={layeredSeat?.seat}
+          isSelected={selectedInstanceId === item.renderId}
+          placementState={placementStateByRenderId?.[item.renderId]}
+          onItemTap={shouldRoomV2ItemReceiveTap({
+            kind: item.kind,
+            mode: itemInteractionMode,
+            interactionType: item.kind === "furniture" ? item.interactionType : undefined
+          }) ? onItemTap : undefined}
+          onItemLongPress={item.kind === "furniture" ? onItemLongPress : undefined}
+          onItemLongPressMove={item.kind === "furniture" ? onItemLongPressMove : undefined}
+          onItemLongPressRelease={item.kind === "furniture" ? onItemLongPressRelease : undefined}
+          onStagePress={item.kind === "furniture" ? onStagePress : undefined}
+          itemInteractionMode={itemInteractionMode}
+          debugPlacement={debugPlacement}
+          reduceMotion={reduceMotion || !motionEnabled}
+          // Only avatars run motion loops; furniture keeps one value so a
+          // focus change re-renders the avatars, not every item.
+          motionPaused={item.kind === "avatar" ? motionPaused : false}
+          liveAvatarPosition={liveAvatarPosition?.renderId === item.renderId ? liveAvatarPosition : undefined}
+          stageWidthPx={layoutSize.width}
+          stageHeightPx={layoutSize.height}
+          onDrawn={handleItemDrawn}
+          seatedFurnitureName={
+            item.kind === "avatar" && item.seatRig
+              ? renderItems.find(
+                  (candidate) =>
+                    candidate.kind === "furniture" &&
+                    candidate.renderId === item.seatRig?.furnitureRenderId
+                )?.name
+              : undefined
+          }
+          testID={testID ? `${testID}-item-${item.renderId}` : undefined}
+        />
+        {layeredSeat ? (
+          <RoomRendererLayeredFurnitureFront
+            item={layeredSeat.piece}
+            frontVisibleHeight={layeredSeat.seat.frontVisibleHeight}
+            testID={testID ? `${testID}-item-${layeredSeat.piece.renderId}-front-${layeredSeat.seat.id}` : undefined}
+          />
+        ) : null}
+      </Fragment>
+    )
+  }
   // Keep the floor hit target behind furniture. A root Pressable swallows
   // nested furniture taps on iOS, which makes a seat look like a walk target.
   const Root = View
@@ -228,49 +313,22 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
             ) : null
           )
         : null}
-      {renderItems.map((item) => (
-        (item.kind === "furniture" || item.kind === "avatar") && !hiddenItemRenderIds?.has(item.renderId) ? (
-          <RoomRendererItem
-            key={item.renderId}
-            item={item}
-            isSelected={selectedInstanceId === item.renderId}
-            placementState={placementStateByRenderId?.[item.renderId]}
-            onItemTap={shouldRoomV2ItemReceiveTap({
-              kind: item.kind,
-              mode: itemInteractionMode,
-              interactionType: item.kind === "furniture" ? item.interactionType : undefined
-            }) ? onItemTap : undefined}
-            onItemLongPress={item.kind === "furniture" ? onItemLongPress : undefined}
-            onItemLongPressMove={item.kind === "furniture" ? onItemLongPressMove : undefined}
-            onItemLongPressRelease={item.kind === "furniture" ? onItemLongPressRelease : undefined}
-            onStagePress={item.kind === "furniture" ? onStagePress : undefined}
-            itemInteractionMode={itemInteractionMode}
-            debugPlacement={debugPlacement}
-            reduceMotion={reduceMotion || !motionEnabled}
-            // Only avatars run motion loops; furniture keeps one value so a
-            // focus change re-renders the avatars, not every item.
-            motionPaused={item.kind === "avatar" ? motionPaused : false}
-            liveAvatarPosition={liveAvatarPosition?.renderId === item.renderId ? liveAvatarPosition : undefined}
-            stageWidthPx={layoutSize.width}
-            stageHeightPx={layoutSize.height}
-            onDrawn={markDrawn}
-            seatedFurnitureName={
-              item.kind === "avatar" && item.seatRig
-                ? renderItems.find(
-                    (candidate) =>
-                      candidate.kind === "furniture" &&
-                      candidate.renderId === item.seatRig?.furnitureRenderId
-                  )?.name
-                : undefined
-            }
-            testID={testID ? `${testID}-item-${item.renderId}` : undefined}
-          />
+      {/* a layered rug lies on the floor under the layered shadows, so a piece standing on it keeps its shadow */}
+      {renderItems.filter(isRoomV2LayeredFloorPiece).map(renderMainItem)}
+      {/* a layered piece's floor shadow stays here even when another layer draws the piece (MiniRoom), like the
+          contact shadows: on the floor, under everything */}
+      {renderItems.map((item) =>
+        item.kind === "furniture" && item.layered25d?.shadowAsset ? (
+          <RoomRendererLayeredFurnitureShadow key={`${item.renderId}-layered-shadow`} item={item} />
         ) : null
-      ))}
+      )}
+      {renderItems.filter((item) => !isRoomV2LayeredFloorPiece(item)).map(renderMainItem)}
       {renderItems.map((item) => (
         item.kind === "furniture" &&
         (item.frontOcclusion || item.foregroundOcclusionAsset) &&
-        seatedFurnitureRenderIds.has(item.renderId) ? (
+        seatedFurnitureRenderIds.has(item.renderId) &&
+        // a 2.5D avatar's seated drawing hangs its legs in front of the seat: no front crop over it
+        !seats25dFurnitureRenderIds.has(item.renderId) ? (
           <RoomRendererFurnitureFrontOcclusion
             key={`${item.renderId}-front-occlusion`}
             item={item}
@@ -294,8 +352,9 @@ export const RoomRendererFurnitureSprite = memo(function RoomRendererFurnitureSp
   const mobileFurnitureScale = getRoomV2FurnitureMobileRenderScale(item.kind)
   const renderedWidth = item.width * perspectiveScale * mobileFurnitureScale
   const renderedHeight = item.height * perspectiveScale * mobileFurnitureScale
-  const left = item.x - renderedWidth * item.anchor.x
-  const top = item.y - renderedHeight * item.anchor.y
+  const drawPoint = getRoomRendererItemDrawPoint(item)
+  const left = drawPoint.x - renderedWidth * item.anchor.x
+  const top = drawPoint.y - renderedHeight * item.anchor.y
   return (
     <View
       pointerEvents="none"
@@ -344,8 +403,9 @@ const RoomRendererFurnitureFrontOcclusion = memo(function RoomRendererFurnitureF
   const mobileFurnitureScale = getRoomV2FurnitureMobileRenderScale(item.kind)
   const renderedWidth = item.width * perspectiveScale * mobileFurnitureScale
   const renderedHeight = item.height * perspectiveScale * mobileFurnitureScale
-  const left = item.x - renderedWidth * item.anchor.x
-  const top = item.y - renderedHeight * item.anchor.y
+  const drawPoint = getRoomRendererItemDrawPoint(item)
+  const left = drawPoint.x - renderedWidth * item.anchor.x
+  const top = drawPoint.y - renderedHeight * item.anchor.y
   const occlusion = item.frontOcclusion
   if (item.foregroundOcclusionAsset) {
     return (
@@ -435,8 +495,9 @@ const RoomRendererFurnitureContactShadow = memo(function RoomRendererFurnitureCo
   const mobileFurnitureScale = getRoomV2FurnitureMobileRenderScale(item.kind)
   const renderedWidth = item.width * perspectiveScale * mobileFurnitureScale
   const renderedHeight = item.height * perspectiveScale * mobileFurnitureScale
-  const left = item.x - renderedWidth * item.anchor.x
-  const top = item.y - renderedHeight * item.anchor.y
+  const drawPoint = getRoomRendererItemDrawPoint(item)
+  const left = drawPoint.x - renderedWidth * item.anchor.x
+  const top = drawPoint.y - renderedHeight * item.anchor.y
 
   return (
     <View
@@ -548,6 +609,8 @@ function PlacementGuideLayer(props: { shell: RoomShell }) {
 
 const RoomRendererItem = memo(function RoomRendererItem(props: {
   item: RoomV2RenderItem
+  /** A seated 2.5D avatar's layered seat (room calibration): her hip goes on the seat point. */
+  layeredSeat?: RoomV2LayeredSeatArt
   isSelected?: boolean
   placementState?: RoomRendererPlacementState
   onItemTap?: (item: RoomV2RenderItem) => void
@@ -589,6 +652,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     stageWidthPx,
     stageHeightPx,
     seatedFurnitureName,
+    layeredSeat,
     testID,
     onDrawn
   } = props
@@ -602,10 +666,15 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   const mobileFurnitureScale = getRoomV2FurnitureMobileRenderScale(item.kind)
   const renderedWidth = item.width * perspectiveScale * mobileFurnitureScale
   const renderedHeight = item.height * perspectiveScale * mobileFurnitureScale
-  const left = item.x - renderedWidth * item.anchor.x
-  const top = item.y - renderedHeight * item.anchor.y
+  const drawPoint = getRoomRendererItemDrawPoint(item)
+  const left = drawPoint.x - renderedWidth * item.anchor.x
+  const top = drawPoint.y - renderedHeight * item.anchor.y
+  // 2.5D room: a calibrated piece shows its floor cells or its wall strip (the editor's floor
+  // overlay), not the old rectangle highlights around its drawing
+  const showsFloorCells = item.kind === "furniture" &&
+    (item.footprintCells !== undefined || item.wallPlacement !== undefined)
   const shouldShowFootprint =
-    item.kind === "furniture" && Boolean(placementState)
+    item.kind === "furniture" && Boolean(placementState) && !showsFloorCells
   const footprintStyle = shouldShowFootprint && item.kind === "furniture"
     ? getFurnitureFootprintStyle(item)
     : undefined
@@ -630,6 +699,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     stageHeightPx
   )
   const avatarDirection = item.kind === "avatar" ? item.direction : undefined
+  const avatar25dKeepsSize = item.kind === "avatar" && Boolean(item.avatar25d) && Boolean(roomAvatar25d.roomCalibration)
   const avatarMotionStyle = useAnimatedStyle(() => ({
     // ROOM-03: walking toward the back wall only shrinks slightly; no ghost opacity.
     transform: [
@@ -637,7 +707,8 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
       { translateY: getAvatarMotionTranslateY(avatarMotion, breathe.value, walk.value, gesture.value, usesIdleBreathe, sittingTranslateY) },
       { scaleX: avatarDirection === "left" ? -1 : 1 },
       { scaleY: getAvatarMotionScaleY(avatarMotion, breathe.value, gesture.value, usesIdleBreathe) },
-      { scale: avatarDirection === "back" ? 0.96 : 1 },
+      // the 2.5D avatar keeps one size everywhere (room calibration): no back-facing shrink
+      { scale: avatarDirection === "back" && !avatar25dKeepsSize ? 0.96 : 1 },
       { rotate: getAvatarMotionRotate(avatarMotion, gesture.value) }
     ]
   }))
@@ -678,7 +749,12 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   // Only the drawn figure takes the avatar's taps; the rest of its box is
   // floor, so a tap right beside it walks there.
   const avatarTapTarget = tapsInsideLiveFrame
-    ? getRoomAvatarTapTarget(item.width * mobileFurnitureScale * stageWidthPx, item.height * mobileFurnitureScale * stageHeightPx)
+    ? getRoomAvatarTapTarget(
+      item.width * mobileFurnitureScale * stageWidthPx,
+      item.height * mobileFurnitureScale * stageHeightPx,
+      // a calibrated 2.5D figure is its own size, taller than the box: its target is the figure
+      avatar25dKeepsSize ? roomAvatar25d.roomCalibration?.avatarFigureHeightPx(stageHeightPx, item.kind === "avatar" ? item.avatar25d?.rig : undefined) : undefined
+    )
     : undefined
   const liveAvatarLayout = liveAvatarPosition && {
     live: liveAvatarPosition,
@@ -750,10 +826,10 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
             placementState === "invalid" ? styles.itemPlacementInvalid : null
           ]}
         >
-          {isSelected && item.kind === "furniture" ? (
+          {isSelected && item.kind === "furniture" && !showsFloorCells ? (
             <View pointerEvents="none" style={styles.itemSelectionHalo} />
           ) : null}
-          {placementState === "valid" ? (
+          {placementState === "valid" && !showsFloorCells ? (
             <View
               pointerEvents="none"
               style={[
@@ -777,6 +853,32 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
           {item.kind === "avatar" ? (
             <RoomRendererAvatarBody
               layers={item.layers}
+              avatar25d={item.avatar25d}
+              calibratedFigureHeightPx={avatar25dKeepsSize
+                ? roomAvatar25d.roomCalibration?.avatarFigureHeightPx(stageHeightPx, item.avatar25d?.rig)
+                : undefined}
+              outerMirrored={avatarDirection === "left"}
+              seatPlacement={item.avatar25d ? {
+                // a layered seat takes back exactly the drop the motion style applies (none when its state is not
+                // drawn as sitting); the older seat path keeps its authored offsets
+                outerPx: layeredSeat && avatar25dKeepsSize && avatarMotion.state !== "sitting" ? 0 : sittingTranslateY,
+                seatPx: Math.max(0, sittingTranslateY - ROOM_V2_DEFAULT_SITTING_TRANSLATE_Y_PX),
+                ...(item.seatRig?.approach ? {
+                  approachPx: { dx: item.seatRig.approach.x * stageWidthPx, dy: item.seatRig.approach.y * stageHeightPx }
+                } : {}),
+                ...(layeredSeat && avatar25dKeepsSize ? {
+                  hip: {
+                    view: layeredSeat.view,
+                    mirror: layeredSeat.mirror,
+                    ...(layeredSeat.avatarClipBelowHip !== undefined
+                      ? { clipBelowHipPx: layeredSeat.avatarClipBelowHip * stageHeightPx }
+                      : {}),
+                    ...(layeredSeat.soleDropBelowHip !== undefined
+                      ? { soleDropPx: layeredSeat.soleDropBelowHip * stageHeightPx }
+                      : {})
+                  }
+                } : {})
+              } : undefined}
               state={avatarMotion.state}
               walksWithFrames={avatarMotion.usesAnimatedAssets}
               reduceMotion={reduceMotion}
@@ -884,6 +986,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   previous.stageWidthPx === next.stageWidthPx &&
   previous.stageHeightPx === next.stageHeightPx &&
   previous.seatedFurnitureName === next.seatedFurnitureName &&
+  previous.layeredSeat === next.layeredSeat &&
   previous.testID === next.testID &&
   previous.onDrawn === next.onDrawn
 )
@@ -910,6 +1013,15 @@ function getFurnitureFootprintStyle(
   }
 }
 
+/**
+ * Where an item's anchor is drawn: its saved spot, plus the room calibration's move when it set one
+ * (a piece flush against a back wall). Never stored; only the room calibration sets `renderOffset`.
+ */
+function getRoomRendererItemDrawPoint(item: RoomV2RenderItem): { x: number; y: number } {
+  const offset = item.kind === "furniture" ? item.renderOffset : undefined
+  return offset ? { x: item.x + offset.x, y: item.y + offset.y } : item
+}
+
 function getRoomRendererItemPerspectiveScale(item: RoomV2RenderItem): number {
   return getRoomV2DepthPerspectiveScale(item.y)
 }
@@ -928,7 +1040,9 @@ function getPlacementGuideStyle(
 
 const styles = StyleSheet.create({
   innerTapTarget: {
-    position: "absolute"
+    position: "absolute",
+    // above the item's image (itemImage zIndex 2): it took the seat's taps, so a tapped chair never sat
+    zIndex: 5
   },
   root: {
     width: "100%",

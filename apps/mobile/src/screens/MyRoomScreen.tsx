@@ -1,7 +1,8 @@
+import { roomAvatar25d } from "../features/avatar/roomAvatarSeam"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
-import { useFocusEffect } from "@react-navigation/native"
+import { useFocusEffect, useIsFocused } from "@react-navigation/native"
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react"
+import { useCallback, useEffect, useEffectEvent, useMemo, useReducer, useRef, useState } from "react"
 import {
   type LayoutChangeEvent,
   Pressable,
@@ -41,6 +42,8 @@ import {
   useMyRoomStageCover
 } from "../features/roomV2/components/MyRoomStageVeil"
 import { formatRoomOwnerLabel } from "../features/roomV2/roomOwnerLabel"
+import { peekRoomEditorNewSeat, takeRoomEditorNewSeat } from "../features/roomV2/editor/roomEditorNewSeat"
+import { useMotion } from "../ui/motion"
 import { getAppLocale } from "../features/session/authLocale"
 import {
   isRoomWorldPointWalkable,
@@ -126,6 +129,9 @@ type MyRoomPoseActionState = Extract<
   "idle" | "waving" | "dancing"
 >
 
+/** After the editor saved a new seat, My Room waits this long (the page slides away) before she walks to it. */
+const MY_ROOM_NEW_SEAT_DELAY_MS = 600
+
 export function MyRoomScreen({
   navigation,
   sessionActor,
@@ -192,6 +198,7 @@ export function MyRoomScreen({
       }),
     [userRoomDecor]
   )
+  // 2.5D avatar: the room calibration's walkable floor comes with the geometry (roomWorldRoomV2Projection)
   const roomWorldGeometry = useMemo(
     () => createRoomWorldGeometryFromRoomV2Scene(baseRoomScene),
     [baseRoomScene]
@@ -284,6 +291,7 @@ export function MyRoomScreen({
       avatarId: "my-room-owner",
       name: sessionActor.profile.displayName,
       appearance: projectedRoomAvatar,
+      avatarLoadout: displayedAvatar,
       x: avatarPose.x,
       y: avatarPose.y,
       width: avatarSize.width,
@@ -297,7 +305,12 @@ export function MyRoomScreen({
             furnitureRenderId: seatedFurnitureRenderId!,
             seatId: seatedHotspot.seatId ?? seatedHotspot.id,
             seatHeight: seatedHotspot.seatHeight,
-            facing: seatedHotspot.facing ?? avatarPose.direction
+            facing: seatedHotspot.facing ?? avatarPose.direction,
+            // where she actually stands (the walk may end on a fallback beside an approach that another piece
+            // covers), relative to the seat point: the 2.5D body draws itself from there onto the seat
+            ...(roomAvatar25d.enabled && seatedHotspot.approachPoint
+              ? { approach: { x: avatarPose.x - seatedHotspot.x, y: avatarPose.y - seatedHotspot.y } }
+              : {})
           }
         : undefined
     })
@@ -306,12 +319,28 @@ export function MyRoomScreen({
     avatarPose.state,
     avatarPose.x,
     avatarPose.y,
+    displayedAvatar,
     projectedRoomAvatar,
     seatedHotspot,
     sessionActor.profile.displayName,
     seatedFurnitureRenderId,
     usesWideStageCamera
   ])
+
+  // 2.5D avatar: the 2.5D avatar walks slower with gentler starts (lab39 avatar_motion.json);
+  // avatarV2 keeps the shipped timing. A ref, so callbacks read the current avatar without re-creating.
+  const avatar25dWalkRef = useRef(false)
+  avatar25dWalkRef.current = Boolean(roomAvatar.avatar25d)
+  const avatar25dMovementTiming = useMemo(
+    () => roomAvatar25d.movementTiming(ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING, displayedAvatar),
+    [displayedAvatar]
+  )
+  const avatar25dMovementTimingRef = useRef(avatar25dMovementTiming)
+  avatar25dMovementTimingRef.current = avatar25dMovementTiming
+  const getMovementTiming = useCallback(
+    () => avatar25dWalkRef.current ? avatar25dMovementTimingRef.current : ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING,
+    []
+  )
 
   // The avatar's place in the draw order: by its feet against each
   // footprint's front edge (the same rule the UI thread uses while walking).
@@ -471,7 +500,16 @@ export function MyRoomScreen({
       ? omitRoomWorldBlockers(roomWorldGeometry, [seatedFurnitureRenderId])
       : roomWorldGeometry
     const movementGeometry = arrival?.geometry ?? defaultGeometry
-    const seatDeparturePlan = arrival?.seat && currentSeatExit
+    const seat25dApproach = avatar25dWalkRef.current && currentSeatExit ? currentSeatHotspot?.approachPoint : undefined
+    const seatDeparturePlan = arrival?.seat && currentSeatExit && seat25dApproach
+      ? createRoomWorldMovementPlan({
+        geometry: roomWorldGeometry,
+        from: seat25dApproach,
+        to: arrival.seat.approach,
+        clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
+        timing: getMovementTiming()
+      })
+      : arrival?.seat && currentSeatExit
       ? createRoomWorldSeatExitMovementPlan({
         geometry: roomWorldGeometry,
         from: start,
@@ -479,7 +517,7 @@ export function MyRoomScreen({
         target: arrival.seat.approach,
         seatedFurnitureRenderId: currentSeatExit.furnitureRenderId,
         clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-        timing: ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+        timing: getMovementTiming()
       })
       : undefined
     if (arrival?.seat && currentSeatExit && !seatDeparturePlan) {
@@ -487,7 +525,18 @@ export function MyRoomScreen({
       showMovementFeedback(copy.makeRoom)
       return
     }
-    const seatPlan = arrival?.seat
+    // 2.5D avatar: she walks only to the approach spot in front of the seat; the sit blend then carries
+    // her onto the cushion (the shared plan walks the box on through the seat's front to the seat point).
+    const seats25d = avatar25dWalkRef.current
+    const seatPlan = arrival?.seat && seats25d
+      ? createRoomWorldMovementPlan({
+        geometry: movementGeometry,
+        from: seatDeparturePlan?.target ?? start,
+        to: arrival.seat.approach,
+        clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
+        timing: getMovementTiming()
+      })
+      : arrival?.seat
       ? createRoomWorldSeatMovementPlan({
         geometry: movementGeometry,
         from: seatDeparturePlan?.target ?? start,
@@ -495,7 +544,7 @@ export function MyRoomScreen({
         seat: arrival.seat.point,
         seatedFurnitureRenderId: arrival.seat.furnitureRenderId,
         clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-        timing: ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+        timing: getMovementTiming()
       })
       : null
     if (arrival?.seat && !seatPlan) {
@@ -534,7 +583,15 @@ export function MyRoomScreen({
       showMovementFeedback(restingPose.state === "sitting" ? copy.settledIn : copy.alreadyHere)
       return
     }
-    const exitPlan = !seatPlan && currentSeatExit
+    const exitPlan = !seatPlan && currentSeatExit && seat25dApproach
+      ? createRoomWorldMovementPlan({
+        geometry: roomWorldGeometry,
+        from: seat25dApproach,
+        to: resolvedTarget,
+        clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
+        timing: getMovementTiming()
+      })
+      : !seatPlan && currentSeatExit
       ? createRoomWorldSeatExitMovementPlan({
         geometry: roomWorldGeometry,
         from: start,
@@ -542,7 +599,7 @@ export function MyRoomScreen({
         target: resolvedTarget,
         seatedFurnitureRenderId: currentSeatExit.furnitureRenderId,
         clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-        timing: ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+        timing: getMovementTiming()
       })
       : null
     if (!seatPlan && currentSeatExit && !exitPlan) {
@@ -559,7 +616,7 @@ export function MyRoomScreen({
         from: start,
         to: resolvedTarget,
         clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-        timing: ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+        timing: getMovementTiming()
       })
     if (!plan) {
       hapticError()
@@ -627,7 +684,15 @@ export function MyRoomScreen({
       dispatchTapMarker({ type: "arrived", markerId })
       hapticLight()
     })
-  }, [avatarWalk, copy, motionLifecycle, readAvatarPose, roomWorldGeometry, roomWorldHotspots, seatedFurnitureRenderId, showMovementFeedback])
+  }, [avatarWalk, copy, getMovementTiming, motionLifecycle, readAvatarPose, roomWorldGeometry, roomWorldHotspots, seatedFurnitureRenderId, showMovementFeedback])
+
+  // Room calibration: a tap walks to the true floor point under it (a wall tap: straight below it,
+  // in front of the skirting); every other bundle walks to the tapped stage point as shipped.
+  const roomShell = baseRoomScene.shell
+  const handleStagePress = useCallback((point: RoomWorldPoint): void => {
+    const calibration = roomAvatar25d.roomCalibration
+    moveAvatarToPoint(calibration ? calibration.resolveTapTarget(point, roomShell) : point)
+  }, [moveAvatarToPoint, roomShell])
 
   const handlePoseAction = useCallback((state: MyRoomPoseActionState): void => {
     if (!motionLifecycle.isFocused()) return
@@ -703,7 +768,7 @@ export function MyRoomScreen({
     }
   }, [handlePoseAction, handleWalkAction])
 
-  const handleRoomItemTap = useCallback((item: RoomV2RenderItem): void => {
+  const handleRoomItemTap = useCallback((item: RoomV2RenderItem, options?: { quiet?: boolean }): void => {
     if (item.renderId === MY_ROOM_OWNER_AVATAR_RENDER_ID) {
       handleAvatarTap()
       return
@@ -715,11 +780,13 @@ export function MyRoomScreen({
       hotspots: roomWorldHotspots,
       seatedFurnitureRenderId: item.renderId,
       clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-      timing: ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING
+      timing: getMovementTiming()
     })
     const seatHotspot = seatCandidate?.hotspot
     const seatApproach = seatCandidate?.approach
     if (!seatHotspot || !seatApproach) {
+      // a walk nobody asked for fails silently
+      if (options?.quiet) return
       hapticError()
       showMovementFeedback(copy.makeRoom)
       return
@@ -731,11 +798,16 @@ export function MyRoomScreen({
       direction: seatDirection,
       state: "sitting"
     })
-    const seatDecision = resolveRoomAvatarSeatInteractionDecision({
-      coverage: sittingCoverage,
-      seatDirection
-    })
+    // The 2.5D avatar draws its own seated pose for every facing; the avatarV2 sitting-art
+    // coverage gate does not apply to it.
+    const seatDecision = avatar25dWalkRef.current
+      ? { canSit: true as const, state: "sitting" as const, feedback: "" }
+      : resolveRoomAvatarSeatInteractionDecision({
+        coverage: sittingCoverage,
+        seatDirection
+      })
     if (!seatDecision.canSit) {
+      if (options?.quiet) return
       hapticError()
       showMovementFeedback(seatDecision.feedback)
       return
@@ -755,6 +827,7 @@ export function MyRoomScreen({
     })
   }, [
     copy.makeRoom,
+    getMovementTiming,
     handleAvatarTap,
     moveAvatarToPoint,
     projectedRoomAvatar,
@@ -763,6 +836,34 @@ export function MyRoomScreen({
     roomWorldHotspots,
     showMovementFeedback
   ])
+
+  // "Odayı düzenle": a seat the editor just saved into the room is tried once. Once the
+  // room shows (and the editor's page has slid away) she walks to it and sits, through the same seat path as a
+  // tap; any tap first, a blur or Reduce Motion (no unrequested movement) skips it.
+  const { reduceMotion } = useMotion()
+  const newSeatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Reads the latest room and tap path when the walk starts, without restarting the wait on every render.
+  const tryNewSeat = useEffectEvent((instanceId: string, generation: number) => {
+    newSeatTimerRef.current = null
+    if (!motionLifecycle.isCurrent(generation)) return
+    const seat = baseRoomScene.renderItems.find((item) => item.renderId === instanceId)
+    if (seat) handleRoomItemTap(seat, { quiet: true })
+  })
+  const isFocused = useIsFocused()
+  useEffect(() => {
+    // the editor saves while it still covers this page: wait until My Room is the page on screen
+    if (!isFocused || stageCovered || newSeatTimerRef.current !== null) return
+    const pending = peekRoomEditorNewSeat()
+    if (!pending || !baseRoomScene.renderItems.some((item) => item.renderId === pending)) return
+    takeRoomEditorNewSeat()
+    if (reduceMotion) return
+    // a tap or a blur before the walk starts moves the generation on, and the walk is skipped
+    const generation = motionLifecycle.currentGeneration()
+    newSeatTimerRef.current = setTimeout(() => tryNewSeat(pending, generation), MY_ROOM_NEW_SEAT_DELAY_MS)
+  }, [baseRoomScene.renderItems, isFocused, motionLifecycle, reduceMotion, stageCovered])
+  useEffect(() => () => {
+    if (newSeatTimerRef.current !== null) clearTimeout(newSeatTimerRef.current)
+  }, [])
 
   const handleStageLayout = useCallback((event: LayoutChangeEvent): void => {
     const nextWidth = Math.round(event.nativeEvent.layout.width)
@@ -821,7 +922,7 @@ export function MyRoomScreen({
               testID="my-room-production-stage"
               roomVNextRuntimeMode="disabled"
               accessibilityValue={{ text: getMyRoomStageAccessibilityValue({ savedItemCount: userRoomDecor.placedItems.length, locale: getAppLocale() }) }}
-              onStagePress={moveAvatarToPoint}
+              onStagePress={handleStagePress}
               onItemTap={handleRoomItemTap}
               style={[styles.stageRenderer, { width: stageRendererWidth }]}
               onSceneReady={handleShellDisplay}

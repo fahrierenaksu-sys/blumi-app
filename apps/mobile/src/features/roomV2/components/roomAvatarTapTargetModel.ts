@@ -35,10 +35,34 @@ function span(start: number, end: number, boxPx: number): { offset: number; size
   return { offset, size }
 }
 
-/** The avatar's tap target in px inside its box of `boxWidthPx` × `boxHeightPx`. */
-export function getRoomAvatarTapTarget(boxWidthPx: number, boxHeightPx: number): RoomAvatarTapTarget {
+/**
+ * A calibrated 2.5D figure stands on the box's floor point and is drawn from the room's one world scale,
+ * not from the box: it is taller than the box (about 80 pt against a 60 pt box), so the box-based target covered only
+ * its legs and chest, and a tap on its head or shoulders fell through to the furniture behind it (a sofa sat her
+ * down instead of her waving). Its target is its own figure: this tall, ending at the box bottom, this wide
+ * (about its height; arms and a raised wave included), centred on the box.
+ */
+export const ROOM_AVATAR_FIGURE_TAP_WIDTH_PER_HEIGHT = 0.5
+/** Margin above the head and below the soles that a fingertip may miss by (pt). */
+export const ROOM_AVATAR_FIGURE_TAP_MARGIN_PT = 4
+
+/**
+ * The avatar's tap target in px inside its box of `boxWidthPx` × `boxHeightPx`. `figureHeightPx` is the drawn
+ * height of a calibrated 2.5D figure standing on the box's bottom edge; the target may then reach above the box.
+ */
+export function getRoomAvatarTapTarget(boxWidthPx: number, boxHeightPx: number, figureHeightPx?: number): RoomAvatarTapTarget {
   const width = Math.max(0, boxWidthPx)
   const height = Math.max(0, boxHeightPx)
+  if (figureHeightPx !== undefined && figureHeightPx > 0 && width > 0 && height > 0) {
+    const targetWidth = Math.max(ROOM_AVATAR_MIN_TAP_TARGET_PT, figureHeightPx * ROOM_AVATAR_FIGURE_TAP_WIDTH_PER_HEIGHT)
+    const targetHeight = Math.max(ROOM_AVATAR_MIN_TAP_TARGET_PT, figureHeightPx) + ROOM_AVATAR_FIGURE_TAP_MARGIN_PT
+    return {
+      left: (width - targetWidth) / 2,
+      top: height - targetHeight + ROOM_AVATAR_FIGURE_TAP_MARGIN_PT / 2,
+      width: targetWidth,
+      height: targetHeight
+    }
+  }
   const bounds = ROOM_AVATAR_TAP_FIGURE_BOUNDS
   const across = span(bounds.left, bounds.right, width)
   const down = span(bounds.top, bounds.bottom, height)

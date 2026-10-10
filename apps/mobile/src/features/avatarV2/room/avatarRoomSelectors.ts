@@ -1,3 +1,4 @@
+import { roomAvatar25d } from "../../avatar/roomAvatarSeam"
 import {
   DEFAULT_ROOM_AVATAR_FEMALE,
   DEFAULT_ROOM_AVATAR_MALE,
@@ -480,6 +481,8 @@ export function createRoomAvatarRenderItem(
   })
   const direction = input.direction ?? "front"
   const state = input.state ?? "idle"
+  // 2.5D avatar.
+  const avatar25d = roomAvatar25d.resolveRoomAvatar25d({ loadout: input.avatarLoadout, state, direction })
 
   return {
     renderId: input.renderId ?? `room_v2_avatar_${input.avatarId}`,
@@ -497,6 +500,7 @@ export function createRoomAvatarRenderItem(
     direction,
     state,
     ...(input.seatRig ? { seatRig: { ...input.seatRig } } : {}),
+    ...(avatar25d ? { avatar25d } : {}),
     motionTreatment: getRoomV2AvatarMotionTreatment({
       layers,
       requestedState: state,

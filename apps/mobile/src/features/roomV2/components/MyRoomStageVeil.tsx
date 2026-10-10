@@ -7,6 +7,7 @@ import Animated, {
   useSharedValue,
   withTiming
 } from "react-native-reanimated"
+import { scheduleOnRN } from "react-native-worklets"
 import { useReducedMotion } from "../../../ui/animations"
 import {
   getMyRoomStageVeilFrame,
@@ -76,16 +77,26 @@ interface MyRoomStageVeilProps {
 }
 
 /** The cover's opacity on the UI thread: 1 at once when covered, a crossfade to 0 when not. */
-function useStageCoverOpacity(covered: boolean) {
+function useStageCoverOpacity(covered: boolean, onRevealed?: () => void) {
   const reduceMotion = useReducedMotion()
   const opacity = useSharedValue(covered ? 1 : 0)
 
   useEffect(() => {
     const frame = getMyRoomStageVeilFrame({ covered, reduceMotion })
-    opacity.value = frame.durationMs > 0
-      ? withTiming(frame.opacity, { duration: frame.durationMs, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.Never })
-      : frame.opacity
-  }, [covered, opacity, reduceMotion])
+    if (!onRevealed) {
+      opacity.value = frame.durationMs > 0
+        ? withTiming(frame.opacity, { duration: frame.durationMs, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.Never })
+        : frame.opacity
+      return
+    }
+    if (frame.durationMs > 0) {
+      opacity.value = withTiming(frame.opacity, { duration: frame.durationMs, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.Never },
+        (finished) => { if (finished && frame.opacity === 0) scheduleOnRN(onRevealed) })
+    } else {
+      opacity.value = frame.opacity
+      if (frame.opacity === 0) onRevealed()
+    }
+  }, [covered, onRevealed, opacity, reduceMotion])
   return opacity
 }
 
@@ -94,8 +105,8 @@ function useStageCoverOpacity(covered: boolean) {
  * then the same crossfade the veil uses. For stages drawn over a backdrop of
  * their own (MiniRoom), where a shell-coloured veil would not match.
  */
-export function useStageRevealStyle(covered: boolean) {
-  const opacity = useStageCoverOpacity(covered)
+export function useStageRevealStyle(covered: boolean, onRevealed?: () => void) {
+  const opacity = useStageCoverOpacity(covered, onRevealed)
   return useAnimatedStyle(() => ({ opacity: 1 - opacity.value }))
 }
 

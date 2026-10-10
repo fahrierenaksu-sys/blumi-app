@@ -10,6 +10,8 @@ import Reanimated, {
   type AnimatedStyle
 } from "react-native-reanimated"
 import { RoomAvatarRenderer2D } from "../../avatarV2/room/components/RoomAvatarRenderer2D"
+import { AvatarLive } from "../../avatar/components/AvatarLive"
+import type { RoomAvatar25dBodyProps, RoomAvatar25dSpec } from "../../avatar/roomAvatarSeamContract"
 import type { RoomV2AvatarMotionState, RoomV2AvatarRenderLayer } from "../roomV2.types"
 import type { RoomRendererLiveAvatarPosition } from "./RoomRendererLiveAvatarFrame"
 import {
@@ -41,6 +43,14 @@ const POSE_STAND = 2
  */
 export function RoomRendererAvatarBody(props: {
   layers: RoomV2AvatarRenderLayer[]
+  /** When set, the 2.5D renderer draws the whole avatar instead of the layers. */
+  avatar25d?: RoomAvatar25dSpec
+  /** The motion style already flips the avatar horizontally. */
+  outerMirrored?: boolean
+  /** The motion style's seated drop and the seat's own height (px), for the 2.5D body's seated placement. */
+  seatPlacement?: RoomAvatar25dBodyProps["seatPlacement"]
+  /** Room calibration: the 2.5D figure's height (px), soles on the floor point. */
+  calibratedFigureHeightPx?: number
   state: RoomV2AvatarMotionState
   /** The walk shows animated frames (not the procedural fallback bob). */
   walksWithFrames: boolean
@@ -120,6 +130,13 @@ export function RoomRendererAvatarBody(props: {
     [boxHeightPx, liveX, liveY, stageHeightPx, stageWidthPx]
   )
 
+  const stageWidth = useSharedValue(stageWidthPx)
+  const stageHeight = useSharedValue(stageHeightPx)
+  useLayoutEffect(() => {
+    stageWidth.value = stageWidthPx
+    stageHeight.value = stageHeightPx
+  }, [stageHeight, stageHeightPx, stageWidth, stageWidthPx])
+
   const liftPx = boxHeightPx * ROOM_AVATAR_POSE_LIFT_BOX_HEIGHTS
   const bobPx = boxHeightPx * ROOM_AVATAR_WALK_BOB_BOX_HEIGHTS
   const bodyStyle = useAnimatedStyle(() => {
@@ -141,11 +158,26 @@ export function RoomRendererAvatarBody(props: {
     <View pointerEvents="none" style={styles.root}>
       <Reanimated.View style={[styles.body, bodyStyle]}>
         <Reanimated.View style={[styles.fill, props.motionStyle]}>
-          <RoomAvatarRenderer2D
-            layers={props.layers}
-            strideProgress={strideWalking ? strideProgress : undefined}
-            onAllLayersShown={props.onAllLayersShown}
-          />
+          {props.avatar25d ? (
+            <AvatarLive
+              spec={props.avatar25d}
+              live={live}
+              stageWidthPx={stageWidth}
+              stageHeightPx={stageHeight}
+              outerMirrored={props.outerMirrored}
+              seatPlacement={props.seatPlacement}
+              calibratedFigureHeightPx={props.calibratedFigureHeightPx}
+              reduceMotion={reduceMotion}
+              boxHeightPx={boxHeightPx}
+              onDrawn={props.onAllLayersShown}
+            />
+          ) : (
+            <RoomAvatarRenderer2D
+              layers={props.layers}
+              strideProgress={strideWalking ? strideProgress : undefined}
+              onAllLayersShown={props.onAllLayersShown}
+            />
+          )}
         </Reanimated.View>
       </Reanimated.View>
     </View>

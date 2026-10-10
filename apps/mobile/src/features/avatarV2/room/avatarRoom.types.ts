@@ -1,3 +1,4 @@
+import type { RoomAvatar25dLoadout } from "../../avatar/roomAvatarSeamContract"
 import type {
   RoomAnchor,
   RoomV2AvatarAssetResolutionKind,
@@ -207,4 +208,6 @@ export interface CreateRoomAvatarRenderItemInput {
   seatRig?: RoomV2AvatarSeatRig
   chatBubbleAnchor?: RoomAnchor
   reactionAnchor?: RoomAnchor
+  /** The worn avatarV2 loadout, for the 2.5D avatar. */
+  avatarLoadout?: RoomAvatar25dLoadout
 }

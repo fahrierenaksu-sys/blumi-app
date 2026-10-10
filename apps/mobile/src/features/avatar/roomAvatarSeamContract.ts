@@ -1,7 +1,7 @@
 import type { RoomWorldGeometry, RoomWorldPoint } from "../roomWorld/roomWorldGeometry"
 import type { RoomWorldMovementTiming } from "../roomWorld/roomWorldRuntime"
 import type { FurnitureItem, RoomFurnitureRotation, RoomShell, RoomV2FurnitureRenderItem } from "../roomV2/roomV2.types"
-import type { AvatarDrawInput, AvatarDrawSpec, AvatarRigId } from "./model/avatarRoomContract"
+import type { AvatarDrawInput, AvatarDrawSpec, AvatarLiveProps, AvatarRigId } from "./model/avatarRoomContract"
 
 /**
  * Types of the room seam (`roomAvatarSeam.ts`): how shared room code (My Room, the editor, the MiniRoom) reaches
@@ -11,6 +11,7 @@ import type { AvatarDrawInput, AvatarDrawSpec, AvatarRigId } from "./model/avata
 export type RoomAvatar25dRigId = AvatarRigId
 export type RoomAvatar25dSpec = AvatarDrawSpec
 export type RoomAvatar25dResolveInput = AvatarDrawInput
+export type RoomAvatar25dBodyProps = AvatarLiveProps
 /** The worn loadout as it was stored or received (anyone's, never trusted): the resolver coerces it. */
 export type RoomAvatar25dLoadout = unknown
 
