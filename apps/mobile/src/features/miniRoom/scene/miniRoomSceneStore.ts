@@ -7,10 +7,6 @@ import {
   createRoomWorldHotspotsFromRoomV2Scene
 } from "../../roomWorld/roomWorldRoomV2Projection"
 import {
-  createRoomWorldGeometryFromMiniRoomScene,
-  createRoomWorldHotspotsFromMiniRoomScene
-} from "../../roomWorld/roomWorldMiniRoomProjection"
-import {
   combineRoomWorldMovementPlans,
   createRoomWorldMovementPlan,
   createRoomWorldSeatExitMovementPlan,
@@ -31,7 +27,6 @@ import {
   MINI_ROOM_LAYERED_SEAT_PAD,
   type MiniRoomLayeredSeats
 } from "./miniRoomLayeredSeats"
-import { cozyPinkBedroomScene } from "./roomMaps"
 import { resolveMiniRoomRefusedSeatStand } from "./miniRoomSeatRefusalModel"
 import { createMiniRoomEntryPlan } from "./miniRoomEntryModel"
 import { withMiniRoomPresence } from "./miniRoomPresentation"
@@ -70,7 +65,6 @@ import type {
   MiniRoomParticipantAvatarSnapshots,
   RoomHotspot,
   RoomPoint,
-  RoomScene,
   SpeechBubble
 } from "./miniRoomSceneTypes"
 
@@ -87,8 +81,8 @@ interface UseMiniRoomSceneStoreInput {
     displayName: string
   }
   participantAvatarSnapshots: MiniRoomParticipantAvatarSnapshots
-  scene?: RoomScene
-  roomDecorScene?: ResolvedRoomV2Scene
+  /** The room being shown. A scene without a shell has no floor, so nothing can walk or sit: there is no old-room fallback. */
+  roomDecorScene: ResolvedRoomV2Scene
   onLocalMove?: (point: RoomPoint, hotspotId?: string) => boolean
   /** A seat this phone already knows the partner holds was tapped. */
   onSeatTaken?: (hotspotId: string) => void
@@ -123,7 +117,7 @@ interface MoveOptions {
 }
 
 export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRoomStore {
-  const scene = input.scene ?? cozyPinkBedroomScene
+  const roomDecorScene = input.roomDecorScene
   const localUserId = input.localUser.userId
   const localDisplayName = input.localUser.displayName
   const partnerUserId = input.partnerUser.userId
@@ -132,37 +126,28 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   const bubbleLifetimeMs = input.bubbleLifetimeMs
   const onLocalMove = input.onLocalMove
   const onSeatTaken = input.onSeatTaken
-  const usesRoomV2Scene = Boolean(input.roomDecorScene?.shell)
   const geometry = useMemo(
-    () => usesRoomV2Scene && input.roomDecorScene
-      ? createRoomWorldGeometryFromRoomV2Scene(input.roomDecorScene)
-      : createRoomWorldGeometryFromMiniRoomScene(scene),
-    [input.roomDecorScene, scene, usesRoomV2Scene]
+    () => createRoomWorldGeometryFromRoomV2Scene(roomDecorScene),
+    [roomDecorScene]
   )
   const roomWorldHotspots = useMemo(
-    () => usesRoomV2Scene && input.roomDecorScene
-      ? createRoomWorldHotspotsFromRoomV2Scene(input.roomDecorScene)
-      : createRoomWorldHotspotsFromMiniRoomScene(scene),
-    [input.roomDecorScene, scene, usesRoomV2Scene]
+    () => createRoomWorldHotspotsFromRoomV2Scene(roomDecorScene),
+    [roomDecorScene]
   )
   // layered pieces (room calibration): empty in every other bundle.
   const layeredSeats = useMemo(
-    () => usesRoomV2Scene ? createMiniRoomLayeredSeats(input.roomDecorScene) : createMiniRoomLayeredSeats(undefined),
-    [input.roomDecorScene, usesRoomV2Scene]
+    () => createMiniRoomLayeredSeats(roomDecorScene),
+    [roomDecorScene]
   )
   const hotspots = useMemo(
-    () => usesRoomV2Scene
-      ? createMiniRoomHotspotsFromRoomWorldHotspots(roomWorldHotspots, layeredSeats)
-      : scene.hotspots,
-    [layeredSeats, roomWorldHotspots, scene.hotspots, usesRoomV2Scene]
+    () => createMiniRoomHotspotsFromRoomWorldHotspots(roomWorldHotspots, layeredSeats),
+    [layeredSeats, roomWorldHotspots]
   )
-  const roomShell = usesRoomV2Scene ? input.roomDecorScene?.shell : undefined
+  const roomShell = roomDecorScene.shell ?? undefined
   const [avatars, setAvatars] = useState<Record<string, AvatarState>>(() =>
     createInitialAvatars(
       { localUserId, partnerUserId, participantAvatarSnapshots },
-      scene,
-      geometry,
-      usesRoomV2Scene
+      geometry
     )
   )
   // The lazy state above already represents these inputs. Remember them so
@@ -174,9 +159,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     localUserId,
     participantAvatarSnapshots,
     partnerDisplayName,
-    partnerUserId,
-    scene,
-    usesRoomV2Scene
+    partnerUserId
   })
   // Committed avatars for callbacks. The scene reset below writes it before
   // publishing new avatars, so reads during render see the current id set.
@@ -215,7 +198,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   // Walks in from the door that are still running, with what runs when each lands.
   const arrivalWalksRef = useRef(new Map<string, { onLanded?: () => void }>())
   const arrivalCounterRef = useRef(0)
-  const shellEntry = usesRoomV2Scene ? input.roomDecorScene?.shell?.entry : undefined
+  const shellEntry = roomDecorScene.shell?.entry
   /** Ends a running walk in; `landed` runs its callback (the avatar is in the room). */
   const endArrivalWalk = useCallback((userId: string, landed: boolean) => {
     const walk = arrivalWalksRef.current.get(userId)
@@ -232,9 +215,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       previous.localUserId === localUserId &&
       previous.participantAvatarSnapshots === participantAvatarSnapshots &&
       previous.partnerDisplayName === partnerDisplayName &&
-      previous.partnerUserId === partnerUserId &&
-      previous.scene === scene &&
-      previous.usesRoomV2Scene === usesRoomV2Scene
+      previous.partnerUserId === partnerUserId
     ) return
     sceneInputRef.current = {
       geometry,
@@ -242,9 +223,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
       localUserId,
       participantAvatarSnapshots,
       partnerDisplayName,
-      partnerUserId,
-      scene,
-      usesRoomV2Scene
+      partnerUserId
     }
     for (const ref of movementsRef.current.values()) cancelActiveMiniRoomMovement(ref, cancelMiniRoomMovementRun)
     cancelPendingMiniRoomMovementCompletion(
@@ -253,9 +232,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     )
     const nextAvatars = createInitialAvatars(
       { localUserId, partnerUserId, participantAvatarSnapshots },
-      scene,
-      geometry,
-      usesRoomV2Scene
+      geometry
     )
     avatarsRef.current = nextAvatars
     setAvatars(nextAvatars)
@@ -282,9 +259,7 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     localUserId,
     participantAvatarSnapshots,
     partnerDisplayName,
-    partnerUserId,
-    scene,
-    usesRoomV2Scene
+    partnerUserId
   ])
 
   useEffect(() => {
@@ -873,7 +848,6 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
   }, [avatarIdsKey, getMotionDriver])
 
   return {
-    scene,
     hotspots,
     avatars,
     avatarPositions,

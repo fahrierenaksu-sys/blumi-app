@@ -39,7 +39,6 @@ function mountTypingScene(messages: { messageId: string; senderUserId: string; b
   const hud = () => null
   const context = () => null
   const avatarLayer = () => null
-  const roomMapLayer = () => null
   const roomDecorLayer = () => null
   const store = {
     hotspots: [], interaction: {}, avatars: [], avatarPositions: [], bubbles: [], scene: {},
@@ -70,7 +69,6 @@ function mountTypingScene(messages: { messageId: string; senderUserId: string; b
     "./MiniRoomHud": { MiniRoomHud: hud },
     "./MiniRoomRoomDecorLayer": { MiniRoomRoomDecorLayer: roomDecorLayer },
     "./RoomChatComposer": { MAX_ROOM_MESSAGE_LENGTH: 140, RoomChatComposer: composer },
-    "./RoomMapLayer": { RoomMapLayer: roomMapLayer },
     "./miniRoomSceneStore": { useMiniRoomSceneStore: () => store },
     "./miniRoomDepthModel": { createMiniRoomDepthScene: () => ({ occluderIds: [] }) },
     "./miniRoomReducedMotion": { MINI_ROOM_PARTNER_ARRIVAL_MS: 100, resolveMiniRoomMotionPolicy: () => ({ animateJoin: false }) },
@@ -101,6 +99,7 @@ function mountTypingScene(messages: { messageId: string; senderUserId: string; b
     localUser: { userId: "", displayName: "Me" },
     partnerUser: { userId: "", displayName: "Bora" },
     participantAvatarSnapshots: {} as never,
+    roomDecorScene: { shell: { canvasSize: { width: 1254, height: 714 } } as never, renderItems: [] },
     connectionStatus: "connected",
     voiceAvailable: false,
     localMedia: { micEnabled: false } as never,

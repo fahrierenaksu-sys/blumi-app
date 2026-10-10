@@ -1,6 +1,6 @@
 import { deriveRoomWorldFacing, type RoomWorldGeometry } from "../../roomWorld/roomWorldGeometry"
 import { resolveRoomWorldInteractiveTarget, ROOM_WORLD_AVATAR_COLLISION_CLEARANCE } from "../../roomWorld/roomWorldRuntime"
-import type { AvatarFacing, AvatarState, MiniRoomParticipantAvatarSnapshots, RoomPoint, RoomScene } from "./miniRoomSceneTypes"
+import type { AvatarFacing, AvatarState, MiniRoomParticipantAvatarSnapshots, RoomPoint } from "./miniRoomSceneTypes"
 
 const ROOM_V2_MINI_ROOM_SPAWN_SEEDS = {
   local: {
@@ -25,15 +25,9 @@ export function createInitialAvatars(
     partnerUserId: string
     participantAvatarSnapshots: MiniRoomParticipantAvatarSnapshots
   },
-  scene: RoomScene,
-  geometry: RoomWorldGeometry,
-  usesRoomV2Scene: boolean
+  geometry: RoomWorldGeometry
 ): Record<string, AvatarState> {
-  const { localSpawn, partnerSpawn } = createInitialSpawnPair({
-    scene,
-    geometry,
-    usesRoomV2Scene
-  })
+  const { localSpawn, partnerSpawn } = createInitialSpawnPair(geometry)
   const { local, partner } = input.participantAvatarSnapshots
 
   return {
@@ -58,11 +52,7 @@ export function createInitialAvatars(
   }
 }
 
-function createInitialSpawnPair(input: {
-  scene: RoomScene
-  geometry: RoomWorldGeometry
-  usesRoomV2Scene: boolean
-}): {
+function createInitialSpawnPair(geometry: RoomWorldGeometry): {
   localSpawn: {
     x: number
     y: number
@@ -74,28 +64,13 @@ function createInitialSpawnPair(input: {
     facing: AvatarFacing
   }
 } {
-  const fallbackLocal =
-    input.scene.spawnPoints.find((point) => point.role === "local") ??
-    input.scene.spawnPoints[0]
-  const fallbackPartner =
-    input.scene.spawnPoints.find((point) => point.role === "partner") ??
-    input.scene.spawnPoints[1] ??
-    fallbackLocal
-
-  if (!input.usesRoomV2Scene) {
-    return {
-      localSpawn: fallbackLocal,
-      partnerSpawn: fallbackPartner
-    }
-  }
-
   const localTarget = resolveRoomWorldInteractiveTarget({
-    geometry: input.geometry,
+    geometry,
     target: ROOM_V2_MINI_ROOM_SPAWN_SEEDS.local,
     clearance: ROOM_WORLD_AVATAR_COLLISION_CLEARANCE
   }) ?? ROOM_V2_MINI_ROOM_SPAWN_SEEDS.local
   const partnerTarget = resolveRoomWorldInteractiveTarget({
-    geometry: input.geometry,
+    geometry,
     target: ROOM_V2_MINI_ROOM_SPAWN_SEEDS.partner,
     occupants: [
       {

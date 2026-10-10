@@ -22,7 +22,7 @@ import test from "node:test"
 import WebSocket from "ws"
 import * as RealtimeClientModule from "@blumi/realtime-client"
 import type { RealtimeSocket } from "@blumi/realtime-client"
-import { createFakeReactRuntime, createInertModule, loadSourceWithFakeReact } from "../../testing/hookHarness"
+import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../testing/hookHarness"
 import type * as ProviderModule from "../realtime/globalRealtimeProvider"
 import type * as MotionHook from "./useMiniRoomMotion"
 import type * as StoreModule from "./scene/miniRoomSceneStore"
@@ -225,13 +225,8 @@ function createPhone(input: {
     modules: { "react-native": { AppState }, "../realtime/globalRealtimeProvider": provider },
     real: ["./miniRoomMotionSession"]
   })
-  const { cozyPinkBedroomScene } = loadSourceWithFakeReact<{ cozyPinkBedroomScene: unknown }>(
-    "features/miniRoom/scene/roomMaps.ts", runtime,
-    { modules: { "./miniRoomAssets": { miniRoomAssets: createInertModule("miniRoomAssets") } } }
-  )
   const storeModule = loadSourceWithFakeReact<typeof StoreModule>("features/miniRoom/scene/miniRoomSceneStore.ts", runtime, {
     modules: {
-      "./roomMaps": { cozyPinkBedroomScene },
       "../miniRoomAvatarMotion": { canMiniRoomAvatarUseMotion: () => true },
       "./miniRoomAvatarPositions": fakeAvatarPositions
     },
@@ -241,7 +236,6 @@ function createPhone(input: {
       "./miniRoomInitialAvatars",
       "../../roomWorld/roomWorldGeometry",
       "../../roomWorld/roomWorldRoomV2Projection",
-      "../../roomWorld/roomWorldMiniRoomProjection",
       "../../roomWorld/roomWorldRuntime",
       "./miniRoomMovementLifecycle",
       "./miniRoomMovementRun",

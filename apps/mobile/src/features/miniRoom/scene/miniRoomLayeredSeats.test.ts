@@ -212,7 +212,6 @@ function mountStore(scene: ResolvedRoomV2Scene) {
           createRoomWorldGeometryFromRoomV2Scene: (input: ResolvedRoomV2Scene) =>
             calibrationScene.calibrateRoomWalkGeometry(realProjection.createRoomWorldGeometryFromRoomV2Scene(input), input.shell)
         },
-        "./roomMaps": { cozyPinkBedroomScene: { hotspots: [], spawnPoints: [], furniture: [], map: { walkableAreas: [] } } },
         "../miniRoomAvatarMotion": { canMiniRoomAvatarUseMotion: () => true },
         "./miniRoomAvatarPositions": {
           createMiniRoomAvatarPosition: (point: { x: number; y: number }) => ({ x: { value: point.x }, y: { value: point.y } }),
@@ -241,7 +240,6 @@ function mountStore(scene: ResolvedRoomV2Scene) {
       real: [
         "./miniRoomInitialAvatars",
         "../../roomWorld/roomWorldGeometry",
-        "../../roomWorld/roomWorldMiniRoomProjection",
         "../../roomWorld/roomWorldRuntime",
         "./miniRoomMovementLifecycle",
         "./miniRoomMovementRun",

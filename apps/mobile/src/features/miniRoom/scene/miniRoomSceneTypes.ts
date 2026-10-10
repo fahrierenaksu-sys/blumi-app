@@ -24,20 +24,6 @@ export interface SpawnPoint {
   facing: AvatarFacing
 }
 
-export interface RoomMap {
-  mapId: string
-  backgroundAsset: ImageSourcePropType
-  width: number
-  height: number
-  walkableAreas: WalkableArea[]
-  safeInsets: {
-    top: number
-    bottom: number
-    left: number
-    right: number
-  }
-}
-
 export interface RoomHotspot {
   id: string
   kind: "seat" | "stand" | "decor" | "activity"
@@ -52,25 +38,6 @@ export interface RoomHotspot {
   padCentre?: RoomPoint
   /** Seats of one piece share one pad; a tap picks the nearest (layered pieces). */
   groupId?: string
-}
-
-export interface FurniturePlacement {
-  id: string
-  asset: ImageSourcePropType
-  x: number
-  y: number
-  width: number
-  height: number
-  depthY: number
-  blocksMovement: boolean
-}
-
-export interface RoomScene {
-  sceneId: string
-  map: RoomMap
-  furniture: FurniturePlacement[]
-  spawnPoints: SpawnPoint[]
-  hotspots: RoomHotspot[]
 }
 
 export interface AvatarAppearance {
@@ -171,7 +138,6 @@ export interface InteractionState {
 }
 
 export interface MiniRoomStore {
-  scene: RoomScene
   hotspots: RoomHotspot[]
   /** Committed pose per avatar: changes on segment starts/ends and arrival, never per frame. */
   avatars: Record<string, AvatarState>

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createFakeReactRuntime, createInertModule, loadSourceWithFakeReact } from "../../../testing/hookHarness"
+import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../../testing/hookHarness"
+import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
 import type { MiniRoomStore } from "./miniRoomSceneTypes"
 import { MINI_ROOM_AWAY_OPACITY, resolveMiniRoomAvatarOpacity } from "./miniRoomPresentation"
 import type { useMiniRoomSceneStore as UseMiniRoomSceneStore } from "./miniRoomSceneStore"
@@ -10,6 +11,35 @@ import type { useMiniRoomSceneStore as UseMiniRoomSceneStore } from "./miniRoomS
 // current bubble lifetime.
 type StoreInput = Parameters<typeof UseMiniRoomSceneStore>[0]
 
+// The room catalog bundles image modules: in plain Node they load as their file names.
+for (const extension of [".png", ".webp", ".jpg"]) {
+  require.extensions[extension] = (module, filename) => { module.exports = filename }
+}
+/* eslint-disable @typescript-eslint/no-require-imports -- loaded after the image hooks above */
+const catalog = require("../../roomV2/roomV2Catalog") as typeof import("../../roomV2/roomV2Catalog")
+const selectors = require("../../roomV2/roomV2Selectors") as typeof import("../../roomV2/roomV2Selectors")
+/* eslint-enable @typescript-eslint/no-require-imports */
+
+/** The default 2.5D shell with one armchair-like seat piece: the room every MiniRoom is built from. */
+function createSeatedScene(): ResolvedRoomV2Scene {
+  const empty = selectors.resolveRoomV2Scene({
+    roomShellCatalog: catalog.ROOM_V2_SHELL_CATALOG,
+    furnitureCatalog: [],
+    decor: { schemaVersion: 3, geometryVersion: "room_v2", roomShellId: catalog.DEFAULT_ROOM_V2_SHELL_ID, placedItems: [] },
+    defaultRoomShellId: catalog.DEFAULT_ROOM_V2_SHELL_ID
+  })
+  const seatPiece = {
+    kind: "furniture", renderId: "test_armchair", itemId: "test_armchair", name: "Test armchair", category: "seating",
+    x: 0.5, y: 0.78, width: 0.1, height: 0.12, depth: 0.78, rotation: "front", blocksMovement: false,
+    interactionType: "seat"
+  }
+  return { ...empty, renderItems: [seatPiece as never] }
+}
+const SEATED_SCENE = createSeatedScene()
+/** The seat of that piece, as the shared room projection names it. */
+const SEAT_ID = "test_armchair:seat"
+const SEAT_POINT = { x: 0.5, y: 0.738 }
+
 function mount() {
   const runtime = createFakeReactRuntime()
   const cancelledDrivers: unknown[] = []
@@ -18,17 +48,11 @@ function mount() {
   const timers = new Map<number, { run: () => void; delay: number }>()
   let timerId = 0
   const clock = { now: 1_000 }
-  const { cozyPinkBedroomScene } = loadSourceWithFakeReact<{ cozyPinkBedroomScene: unknown }>(
-    "features/miniRoom/scene/roomMaps.ts",
-    runtime,
-    { modules: { "./miniRoomAssets": { miniRoomAssets: createInertModule("miniRoomAssets") } } }
-  )
   const { useMiniRoomSceneStore } = loadSourceWithFakeReact<{ useMiniRoomSceneStore: typeof UseMiniRoomSceneStore }>(
     "features/miniRoom/scene/miniRoomSceneStore.ts",
     runtime,
     {
       modules: {
-        "./roomMaps": { cozyPinkBedroomScene },
         "../miniRoomAvatarMotion": { canMiniRoomAvatarUseMotion: () => true },
         "./miniRoomAvatarPositions": {
           createMiniRoomAvatarPosition: (point: { x: number; y: number }) => ({ x: { value: point.x }, y: { value: point.y } }),
@@ -70,7 +94,6 @@ function mount() {
         "./miniRoomInitialAvatars",
         "../../roomWorld/roomWorldGeometry",
         "../../roomWorld/roomWorldRoomV2Projection",
-        "../../roomWorld/roomWorldMiniRoomProjection",
         "../../roomWorld/roomWorldRuntime",
         "./miniRoomMovementLifecycle",
         "./miniRoomMovementRun",
@@ -97,6 +120,7 @@ function mount() {
     localUser: { userId: "local", displayName: "Local" },
     partnerUser: { userId: "partner", displayName: "Partner" },
     participantAvatarSnapshots,
+    roomDecorScene: SEATED_SCENE,
     bubbleLifetimeMs: 4000
   } as unknown as StoreInput
   const render = (next: Partial<StoreInput> = {}) => {
@@ -153,9 +177,9 @@ test("a partner step this phone cannot plan around its own avatar still moves th
   f.render()
   // This phone's avatar takes the sofa first; the partner's phone sent its own
   // step to the same seat before it saw that. The partner must not stay behind.
-  assert.equal(f.store().moveLocalAvatarToHotspot("sofa_corner"), true)
+  assert.equal(f.store().moveLocalAvatarToHotspot(SEAT_ID), true)
   const before = { x: f.store().avatars.partner.x, y: f.store().avatars.partner.y }
-  f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 2, hotspotId: "sofa_corner" })
+  f.store().applyRemoteAvatar({ userId: "partner", ...SEAT_POINT, present: true, revision: 2, hotspotId: SEAT_ID })
   const partner = f.store().avatars.partner
   const moved = partner.motion === "walking" || partner.x !== before.x || partner.y !== before.y
   assert.ok(moved, "the partner walks or is placed at its authoritative target")
@@ -190,14 +214,15 @@ test("a refused seat claim walks the avatar beside the seat, standing and facing
   const f = mount()
   f.render()
   // The partner's claim on the sofa was refused by the server.
-  f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 2, deniedHotspotId: "sofa_corner" })
+  f.store().applyRemoteAvatar({ userId: "partner", ...SEAT_POINT, present: true, revision: 2, deniedHotspotId: SEAT_ID })
   const walking = f.store().avatars.partner
   assert.equal(walking.motion, "walking")
-  assert.notEqual(walking.seatedHotspotId, "sofa_corner")
-  // Beside the seat's approach point (.24/.62), out of the sitter's lane.
-  assert.ok(Math.abs(Math.hypot(walking.targetX! - .24, walking.targetY! - .62) - .128) < .001)
+  assert.notEqual(walking.seatedHotspotId, SEAT_ID)
+  // Beside the seat, out of the sitter's lane: near it, but not on it.
+  const beside = Math.hypot(walking.targetX! - SEAT_POINT.x, walking.targetY! - SEAT_POINT.y)
+  assert.ok(beside > .03 && beside < .2, `stands ${beside} from the seat`)
   // A rejoin snapshot places it at the same stand point, never on the seat.
-  f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 2, deniedHotspotId: "sofa_corner" }, true)
+  f.store().applyRemoteAvatar({ userId: "partner", ...SEAT_POINT, present: true, revision: 2, deniedHotspotId: SEAT_ID }, true)
   const placed = f.store().avatars.partner
   assert.equal(placed.motion, "idle")
   assert.equal(placed.seatedHotspotId, undefined)
@@ -209,21 +234,21 @@ test("tapping a seat the partner already holds is refused locally and reported a
   const taken: string[] = []
   const f = mount()
   f.render({ onSeatTaken: (hotspotId: string) => { taken.push(hotspotId) } } as Partial<StoreInput>)
-  f.store().applyRemoteAvatar({ userId: "partner", x: .24, y: .62, present: true, revision: 1, hotspotId: "sofa_corner" }, true)
-  assert.equal(f.store().moveLocalAvatarToHotspot("sofa_corner"), false)
-  assert.deepEqual(taken, ["sofa_corner"])
+  f.store().applyRemoteAvatar({ userId: "partner", ...SEAT_POINT, present: true, revision: 1, hotspotId: SEAT_ID }, true)
+  assert.equal(f.store().moveLocalAvatarToHotspot(SEAT_ID), false)
+  assert.deepEqual(taken, [SEAT_ID])
   f.runtime.unmount()
 })
 
 test("snapping onto a seat shows the avatar seated there, as on the sender's phone", () => {
   const f = mount()
   f.render()
-  f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 1, hotspotId: "sofa_corner" }, true)
+  f.store().applyRemoteAvatar({ userId: "partner", ...SEAT_POINT, present: true, revision: 1, hotspotId: SEAT_ID }, true)
   const partner = f.store().avatars.partner
   assert.equal(partner.motion, "sitting")
-  assert.equal(partner.seatedHotspotId, "sofa_corner")
-  assert.deepEqual({ x: partner.x, y: partner.y }, { x: .2, y: .58 })
-  assert.deepEqual(f.store().avatarPositions.partner, { x: { value: .2 }, y: { value: .58 } })
+  assert.equal(partner.seatedHotspotId, SEAT_ID)
+  assert.deepEqual({ x: partner.x, y: partner.y }, { ...SEAT_POINT })
+  assert.deepEqual(f.store().avatarPositions.partner, { x: { value: SEAT_POINT.x }, y: { value: SEAT_POINT.y } })
   f.runtime.unmount()
 })
 
@@ -231,15 +256,15 @@ test("sitting down keeps the seat's draw depth until seated; nothing about it is
   const sent: unknown[] = []
   const f = mount()
   f.render({ onLocalMove: (point: unknown, hotspotId?: string) => { sent.push([point, hotspotId]); return true } } as Partial<StoreInput>)
-  assert.equal(f.store().moveLocalAvatarToHotspot("sofa_corner"), true)
+  assert.equal(f.store().moveLocalAvatarToHotspot(SEAT_ID), true)
   const seen: (string | undefined)[] = []
   for (let guard = 0; guard < 20 && f.store().avatars.local.motion === "walking"; guard += 1) {
     seen.push(f.store().avatars.local.depthSeatHotspotId)
     f.finishSegment()
   }
-  assert.equal(seen.at(-1), "sofa_corner", "the last step onto the seat is drawn at the seat's depth")
+  assert.equal(seen.at(-1), SEAT_ID, "the last step onto the seat is drawn at the seat's depth")
   const local = f.store().avatars.local
-  assert.equal(local.seatedHotspotId, "sofa_corner")
+  assert.equal(local.seatedHotspotId, SEAT_ID)
   assert.equal(local.depthSeatHotspotId, undefined, "seated: the seat itself now holds the depth")
   assert.equal(sent.length, 1, "one authoritative step; the draw depth is local presentation")
   f.runtime.unmount()
@@ -249,9 +274,9 @@ test("a walk with corners is handed to the UI thread whole; the partner is sent 
   const sent: { x: number; y: number }[] = []
   const f = mount()
   f.render({ onLocalMove: (point: { x: number; y: number }) => { sent.push(point); return true } } as Partial<StoreInput>)
-  assert.equal(f.store().moveLocalAvatarToHotspot("sofa_corner"), true)
+  assert.equal(f.store().moveLocalAvatarToHotspot(SEAT_ID), true)
   for (let guard = 0; guard < 20 && f.store().avatars.local.motion === "walking"; guard += 1) f.finishSegment()
-  assert.equal(f.store().avatars.local.seatedHotspotId, "sofa_corner")
+  assert.equal(f.store().avatars.local.seatedHotspotId, SEAT_ID)
   sent.length = 0
   // Standing up and walking away: off the seat through its exit, then on.
   assert.equal(f.store().moveLocalAvatar({ x: 0.7, y: 0.8 }), true)
@@ -371,7 +396,7 @@ test("entering the room the partner is never an unexplained ghost: hidden until 
 
 test("a room without a door presents no walk; the record applies as usual", () => {
   const f = mount()
-  f.render()
+  f.render({ roomDecorScene: { ...SEATED_SCENE, shell: { ...SEATED_SCENE.shell!, entry: undefined } } as ResolvedRoomV2Scene })
   assert.equal(f.store().presentArrival({ userId: "partner", x: .62, y: .74, present: true, revision: 2 }, { walk: true }), false)
   f.runtime.unmount()
 })
@@ -533,7 +558,7 @@ test("a message decorates a moving or seated avatar without changing its movemen
   for (const seated of [false, true]) {
     const f = mount()
     f.render()
-    if (seated) f.store().applyRemoteAvatar({ userId: "partner", x: .2, y: .58, present: true, revision: 1, hotspotId: "sofa_corner" }, true)
+    if (seated) f.store().applyRemoteAvatar({ userId: "partner", ...SEAT_POINT, present: true, revision: 1, hotspotId: SEAT_ID }, true)
     else f.store().applyRemoteAvatar({ userId: "partner", x: .65, y: .72, present: true, revision: 1 })
     const avatars = f.store().avatars
     f.store().sayPhrases([{ speakerUserId: "partner", body: "While moving" }])
@@ -544,4 +569,14 @@ test("a message decorates a moving or seated avatar without changing its movemen
     assert.equal(f.store().avatars.partner.motion, seated ? "sitting" : "walking")
     f.runtime.unmount()
   }
+})
+
+// Phase 2 closing review M1: a MiniRoom whose scene has no shell must never fall back to the retired pink bedroom
+// and its old walk floor (the server's floor rule does not match it, so partner moves would be dropped silently).
+test("a scene without a shell offers no old-room floor to walk on or sit in", () => {
+  const f = mount()
+  f.render({ roomDecorScene: { shell: null, renderItems: [] } } as Partial<StoreInput>)
+  assert.equal(f.store().moveLocalAvatar({ x: .35, y: .70 }), false, "no walk floor, so no step")
+  assert.deepEqual(f.store().hotspots, [], "the old room's sofa and bed are not offered")
+  f.runtime.unmount()
 })

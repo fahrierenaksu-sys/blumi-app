@@ -23,7 +23,6 @@ import { MiniRoomContext } from "./MiniRoomContext"
 import { MiniRoomHud } from "./MiniRoomHud"
 import { MiniRoomRoomDecorLayer } from "./MiniRoomRoomDecorLayer"
 import { RoomChatComposer } from "./RoomChatComposer"
-import { RoomMapLayer } from "./RoomMapLayer"
 import { useMiniRoomSceneStore } from "./miniRoomSceneStore"
 import { createMiniRoomDepthScene } from "./miniRoomDepthModel"
 import {
@@ -60,7 +59,8 @@ interface MiniRoomSceneProps {
   connectionStatus: MiniRoomConnectionStatus
   voiceAvailable: boolean
   localMedia: MiniRoomLocalMediaState
-  roomDecorScene?: ResolvedRoomV2Scene
+  /** Without a shell nothing is drawn or walkable: the retired pink bedroom is no fallback. */
+  roomDecorScene: ResolvedRoomV2Scene
   leaveDisabled: boolean
   onLeave: () => void
   onOpenSafety: () => void
@@ -91,7 +91,7 @@ const ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000
 const MINI_ROOM_STAGE_READY_CAP_MS = 320
 const NO_HISTORY: readonly RoomChatHistoryItem[] = [], NO_NOTICES: readonly string[] = []
 const NO_FAILED_MESSAGES: readonly FailedRoomMessage[] = []
-const StableMiniRoomRoomDecorLayer = memo(MiniRoomRoomDecorLayer), StableRoomMapLayer = memo(RoomMapLayer)
+const StableMiniRoomRoomDecorLayer = memo(MiniRoomRoomDecorLayer)
 const StableHotspotLayer = memo(HotspotLayer), StableMiniRoomHud = memo(MiniRoomHud)
 const StableMiniRoomContext = memo(MiniRoomContext)
 
@@ -363,18 +363,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
             {hotspotLayer}
             {avatarLayer}
           </Reanimated.View>
-        ) : (
-          <Reanimated.View
-            pointerEvents="box-none"
-            style={[styles.legacyRoomStage, { top: restCamera.top }, cameraStyle]}
-            onLayout={handleStageLayout}
-          >
-            {floorTapLayer}
-            <StableRoomMapLayer scene={store.scene} interaction={store.interaction} />
-            {hotspotLayer}
-            {avatarLayer}
-          </Reanimated.View>
-        )}
+        ) : null}
       </View>
 
       <MiniRoomChatPanel
@@ -440,14 +429,5 @@ const styles = StyleSheet.create({
     position: "absolute",
     overflow: "visible",
     backgroundColor: "transparent"
-  },
-  legacyRoomStage: {
-    position: "absolute",
-    alignSelf: "center",
-    width: "100%",
-    maxWidth: 420,
-    aspectRatio: 1,
-    overflow: "hidden",
-    backgroundColor: "#F8ECF2"
   },
 })
