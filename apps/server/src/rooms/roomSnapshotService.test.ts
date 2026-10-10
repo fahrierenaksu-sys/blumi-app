@@ -245,35 +245,87 @@ test("the room renderer draws a placed 2.5D piece from the art pack", async () =
   assert.ok(changed > empty.length * 0.02, `changed ${changed}`)
 })
 
-test("a snapshot drawn by another renderer version is never served", async () => {
-  const repository = createInMemoryRoomSnapshotRepository()
-  const service = createRoomSnapshotService({
-    repository,
-    isPublicByDefault: true,
-    renderer: {
-      version: "room-snapshot-v2",
-      async render() {
-        return { body: Buffer.from("new"), mimeType: "image/webp", rendererVersion: "room-snapshot-v2" }
-      }
-    }
-  })
-  await repository.save({
+function v1Snapshot(overrides: Partial<{ roomRevision: number; isPublic: boolean; headline: string | null }> = {}) {
+  return {
     userId: "user_1",
-    roomRevision: 1,
+    roomRevision: overrides.roomRevision ?? 1,
     assetKey: "b".repeat(64),
-    mimeType: "image/webp",
+    mimeType: "image/webp" as const,
     rendererVersion: "room-snapshot-v1",
     body: Buffer.from("old"),
-    isPublic: true,
-    headline: null,
+    isPublic: overrides.isPublic ?? true,
+    headline: overrides.headline ?? null,
     updatedAt: "2026-10-10T00:00:00.000Z"
-  })
-  const current = room(1)
-  assert.equal(await service.getLatestForUser("user_1", current), null)
+  }
+}
+
+function v2Renderer(onRender: () => void = () => {}) {
+  return {
+    version: "room-snapshot-v2",
+    async render() {
+      onRender()
+      return { body: Buffer.from("new"), mimeType: "image/webp" as const, rendererVersion: "room-snapshot-v2" }
+    }
+  }
+}
+
+// M3 (Phase 2 review): existing users hold pictures drawn by the old renderer and may never save again. Reading
+// their room redraws it once, keeping their visibility and headline; the old drawing itself is never served.
+test("reading a room drawn by an older renderer redraws it once and keeps the user's showcase choices", async () => {
+  const repository = createInMemoryRoomSnapshotRepository()
+  let renders = 0
+  const service = createRoomSnapshotService({ repository, renderer: v2Renderer(() => { renders += 1 }) })
+  await repository.save(v1Snapshot({ isPublic: true, headline: "Hello" }))
+
+  const [first, concurrent] = await Promise.all([
+    service.getLatestForUser("user_1", room(1)),
+    service.getLatestForUser("user_1", room(1))
+  ])
+  const again = await service.getLatestForUser("user_1", room(1))
+
+  assert.equal(first?.rendererVersion, "room-snapshot-v2")
+  assert.equal(first?.isPublic, true)
+  assert.equal(first?.headline, "Hello")
+  assert.deepEqual(concurrent, first)
+  assert.deepEqual(again, first)
+  assert.equal(renders, 1)
   assert.equal(await service.findByAssetKey("b".repeat(64)), null)
-  const redrawn = await service.publishForRoomSave(current)
+  assert.equal((await service.findByAssetKey(first!.assetKey))?.body.toString(), "new")
+})
+
+test("a read redraw that fails serves nothing and reports the error", async () => {
+  const repository = createInMemoryRoomSnapshotRepository()
+  const errors: unknown[] = []
+  const service = createRoomSnapshotService({
+    repository,
+    onRenderError: (error) => { errors.push(error) },
+    renderer: { version: "room-snapshot-v2", async render() { throw new Error("art pack missing") } }
+  })
+  await repository.save(v1Snapshot())
+
+  assert.equal(await service.getLatestForUser("user_1", room(1)), null)
+  assert.equal(errors.length, 1)
+  assert.equal((await repository.getLatest("user_1"))?.rendererVersion, "room-snapshot-v1")
+})
+
+test("a read never draws a room that has no picture or whose picture is for another revision", async () => {
+  const repository = createInMemoryRoomSnapshotRepository()
+  let renders = 0
+  const service = createRoomSnapshotService({ repository, renderer: v2Renderer(() => { renders += 1 }) })
+
+  assert.equal(await service.getLatestForUser("user_1", room(1)), null)
+  await repository.save(v1Snapshot({ roomRevision: 1 }))
+  assert.equal(await service.getLatestForUser("user_1", room(2)), null)
+  assert.equal(renders, 0)
+})
+
+test("a save redraws a same-revision room drawn by an older renderer", async () => {
+  const repository = createInMemoryRoomSnapshotRepository()
+  const service = createRoomSnapshotService({ repository, renderer: v2Renderer() })
+  await repository.save(v1Snapshot())
+
+  const redrawn = await service.publishForRoomSave(room(1))
   assert.equal(redrawn.rendererVersion, "room-snapshot-v2")
-  assert.ok(await service.getLatestForUser("user_1", current))
 })
 
 test("the start-up self-check reports the art pack without throwing", async () => {
