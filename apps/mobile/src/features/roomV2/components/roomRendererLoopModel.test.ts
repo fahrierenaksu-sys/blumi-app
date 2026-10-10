@@ -18,9 +18,9 @@ test("a focused room keeps its loops and Reduce Motion stops breathe and gesture
   assert.deepEqual(getRoomRendererAvatarLoops({ ...idle, reduceMotion: true }), { breathe: false, walk: false, gesture: false })
   const walking = { ...idle, state: "walking", usesRuntimeLocomotion: true }
   assert.deepEqual(getRoomRendererAvatarLoops(walking), { breathe: false, walk: true, gesture: false })
-  const dancing = { ...idle, state: "dancing", usesRuntimeGesture: true }
-  assert.deepEqual(getRoomRendererAvatarLoops(dancing), { breathe: false, walk: false, gesture: true })
-  assert.deepEqual(getRoomRendererAvatarLoops({ ...dancing, reduceMotion: true }), { breathe: false, walk: false, gesture: false })
+  const waving = { ...idle, state: "waving", usesRuntimeGesture: true }
+  assert.deepEqual(getRoomRendererAvatarLoops(waving), { breathe: false, walk: false, gesture: true })
+  assert.deepEqual(getRoomRendererAvatarLoops({ ...waving, reduceMotion: true }), { breathe: false, walk: false, gesture: false })
   assert.deepEqual(getRoomRendererAvatarLoops({ ...idle, isAvatar: false }), { breathe: false, walk: false, gesture: false })
 })
 

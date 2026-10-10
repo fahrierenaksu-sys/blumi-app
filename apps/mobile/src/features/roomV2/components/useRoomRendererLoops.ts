@@ -48,7 +48,7 @@ function startLoop(
 }
 
 /**
- * The avatar's procedural idle loops (breathe, walk bob, wave/dance gesture)
+ * The avatar's procedural idle loops (breathe, walk bob, wave gesture)
  * as UI-thread shared values. They stop and reset while the screen is not
  * focused and resume when it is.
  */
@@ -77,7 +77,7 @@ export function useRoomRendererAvatarLoops(input: {
     reduceMotion,
     paused
   })
-  const gestureDurationMs = avatarMotion.state === "dancing" ? 260 : 420
+  const gestureDurationMs = 420
 
   useEffect(() => {
     if (!loops.breathe) {

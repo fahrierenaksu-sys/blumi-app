@@ -43,7 +43,6 @@ import {
 import {
   getAvatarMotionRotate,
   getAvatarMotionScaleY,
-  getAvatarMotionTranslateX,
   getAvatarMotionTranslateY
 } from "./roomRendererAvatarMotionStyle"
 import {
@@ -598,7 +597,6 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   const avatarMotionStyle = useAnimatedStyle(() => ({
     // ROOM-03: walking toward the back wall only shrinks slightly; no ghost opacity.
     transform: [
-      { translateX: getAvatarMotionTranslateX(avatarMotion, gesture.value) },
       { translateY: getAvatarMotionTranslateY(avatarMotion, breathe.value, walk.value, gesture.value, usesIdleBreathe, sittingTranslateY) },
       { scaleX: avatarDirection === "left" ? -1 : 1 },
       { scaleY: getAvatarMotionScaleY(avatarMotion, breathe.value, gesture.value, usesIdleBreathe) },

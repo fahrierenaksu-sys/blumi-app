@@ -126,7 +126,7 @@ interface MyRoomAvatarPose extends RoomWorldPoint {
 
 type MyRoomPoseActionState = Extract<
   RoomV2AvatarMotionState,
-  "idle" | "waving" | "dancing"
+  "idle" | "waving"
 >
 
 /** After the editor saved a new seat, My Room waits this long (the page slides away) before she walks to it. */
@@ -760,8 +760,7 @@ export function MyRoomScreen({
     if (currentState === "idle") {
       handlePoseAction("waving")
     } else if (currentState === "waving") {
-      handlePoseAction("dancing")
-    } else if (currentState === "dancing") {
+      // No dance (F17): the wave hands over to a short walk.
       handleWalkAction()
     } else {
       handlePoseAction("idle")

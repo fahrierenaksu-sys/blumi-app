@@ -32,7 +32,6 @@ export type RoomV2AvatarMotionState =
   | "walking"
   | "sitting"
   | "waving"
-  | "dancing"
 
 export type RoomV2AvatarAssetResolutionKind =
   | "exact"

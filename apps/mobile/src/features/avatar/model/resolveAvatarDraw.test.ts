@@ -79,12 +79,11 @@ test("the boy is drawn by his own rig; an item without his art, a girl's include
   }
 })
 
-test("left/right are one drawing mirrored, back is the back drawing; a dance stands (no 2.5D dance)", () => {
+test("left/right are one drawing mirrored, back is the back drawing", () => {
   const at = (direction: "front" | "left" | "right" | "back") => resolveAvatarDraw(RIGS, { loadout: GIRL_RIG_OUTFIT, direction })
   assert.equal(at("right").view, at("left").view)
   assert.notEqual(at("right").mirror, at("left").mirror)
   assert.equal(at("back").view, "back")
-  assert.equal(resolveAvatarDraw(RIGS, { loadout: GIRL_RIG_OUTFIT, state: "dancing" }).pose, "stand")
 })
 
 test("with painted walk frames, trousers without walk cards are not drawn in any state (never switching mid-walk)", () => {

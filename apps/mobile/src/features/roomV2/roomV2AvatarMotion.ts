@@ -110,14 +110,6 @@ export const ROOM_V2_AVATAR_MOTION_SLICE_SPECS: readonly RoomV2AvatarMotionSlice
         minimumFrameCount: 1,
         requiresAnimation: false,
         productionBlocking: false
-      },
-      {
-        state: "dancing",
-        direction: "front",
-        label: "Dance front",
-        minimumFrameCount: 6,
-        requiresAnimation: true,
-        productionBlocking: false
       }
     ]
   }
@@ -191,7 +183,7 @@ export function doRoomV2AvatarLayersSupportExactMotion(input: {
 export function doesRoomV2AvatarStateRequireAnimation(
   state: RoomV2AvatarMotionState
 ): boolean {
-  return state === "walking" || state === "dancing"
+  return state === "walking"
 }
 
 export function doRoomV2AvatarLayersSupportAnimatedMotion(input: {
@@ -326,7 +318,7 @@ export function getRoomV2AvatarMotionTreatment(input: {
   if (input.requestedState === "walking") return "runtimeLocomotion"
   if (
     input.layers.length > 0 &&
-    (input.requestedState === "waving" || input.requestedState === "dancing")
+    input.requestedState === "waving"
   ) {
     return "runtimeGesture"
   }
@@ -405,8 +397,6 @@ function formatMotionState(state: RoomV2AvatarMotionState): string {
       return "Sit"
     case "waving":
       return "Wave"
-    case "dancing":
-      return "Dance"
   }
 }
 

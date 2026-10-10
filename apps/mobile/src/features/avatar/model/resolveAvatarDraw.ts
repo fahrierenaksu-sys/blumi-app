@@ -15,7 +15,7 @@ function toPose(state: AvatarDrawInput["state"]): AvatarPose {
   if (state === "walking") return "walk"
   if (state === "sitting") return "sit"
   if (state === "waving") return "wave"
-  // no 2.5D dance (F17): dancing and every other state stand
+  // no 2.5D dance (F17): every other state stands
   return "stand"
 }
 

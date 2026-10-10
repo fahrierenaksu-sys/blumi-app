@@ -6,7 +6,7 @@ import type {
 
 const COPY = {
   en: {
-    states: { idle: "Standing", walking: "Walking", sitting: "Sitting", waving: "Waving", dancing: "Dancing" },
+    states: { idle: "Standing", walking: "Walking", sitting: "Sitting", waving: "Waving" },
     directions: { front: "front", back: "back", left: "left", right: "right" },
     view: (state: string, direction: string) => `${state}, ${direction} view`,
     sittingOn: (name: string) => `Sitting on ${name}`,
@@ -18,7 +18,7 @@ const COPY = {
     stage: "Walk in room"
   },
   tr: {
-    states: { idle: "Ayakta", walking: "Yürüyor", sitting: "Oturuyor", waving: "El sallıyor", dancing: "Dans ediyor" },
+    states: { idle: "Ayakta", walking: "Yürüyor", sitting: "Oturuyor", waving: "El sallıyor" },
     directions: { front: "ön", back: "arka", left: "sol", right: "sağ" },
     view: (state: string, direction: string) => `${state}, ${direction} görünüm`,
     sittingOn: (name: string) => `${name} üzerinde oturuyor`,
@@ -48,7 +48,7 @@ export function getRoomV2AvatarAccessibilityValue(input: {
 /**
  * Which room items are buttons. Furniture always is (seat, interact, or
  * select in the editor); the avatar is in an interactive room, where a tap
- * runs the wave → dance → walk chain (ROOM-01), and never in the editor.
+ * runs the wave → walk chain (ROOM-01, no dance: F17), and never in the editor.
  */
 /**
  * Which room items take a tap. In the editor every piece of furniture does
