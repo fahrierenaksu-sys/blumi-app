@@ -256,9 +256,9 @@ test("the sofa exists only in the flagged experiment's catalog, under a new id",
   assert.equal(SOFA!.interactionType, "seat")
   // no art in the bundle, no catalog entry
   assert.deepEqual(createRoomAvatar25dFurnitureCatalog({}), [])
-  // plain Node is a bundle without the flag: the shipped catalog has no sofa and keeps its own ids
+  // plain Node has no seam installed: the shipped catalog draws nothing (the old flat pieces were retired in X8)
   assert.ok(!ROOM_V2_FURNITURE_CATALOG.some((item) => item.id === ROOM_AVATAR_25D_SOFA_ID))
-  assert.ok(ROOM_V2_FURNITURE_CATALOG.some((item) => item.id === "room_v2_chair_blush"))
+  assert.deepEqual(ROOM_V2_FURNITURE_CATALOG, [])
 })
 
 test("a furnished room with the sofa and the armchair places validly, every seat reachable", () => {

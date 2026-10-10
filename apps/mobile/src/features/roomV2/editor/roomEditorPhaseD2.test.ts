@@ -74,9 +74,22 @@ const { MY_ROOM_AVATAR_SPAWN } = require("../../roomWorld/myRoomInteractionModel
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 const copy = getMyRoomEditorCopy("en")
-const CATALOG: FurnitureItem[] = [...ROOM_V2_FURNITURE_CATALOG, ...flagged.furnitureCatalog]
+// a plain (unlayered) catalog piece, as the old flat table was before X8 retired it: the editor still handles one
+const STANDIN_TABLE: FurnitureItem = {
+  id: "standin_round_table", name: "Stand-in Round Table", asset: { key: "standin_round_table", source: 0 as never },
+  category: "table", layer: "furniture", width: 0.126, height: 0.168, footprint: { width: 0.101, height: 0.067 },
+  blocksMovement: true, interactionType: "decor", locked: true
+}
+// a plain (unlayered) wall piece, as the old flat bookshelf was before X8 retired it: the wall magnet still handles one
+const STANDIN_SHELF: FurnitureItem = {
+  id: "standin_wall_shelf", name: "Stand-in Wall Shelf", asset: { key: "standin_wall_shelf", source: 0 as never },
+  // the size of the old shelf's drawn art (its box was 0.168 x 0.252, its art about half as wide)
+  category: "wallDecor", layer: "wall", width: 0.088, height: 0.228, anchor: { x: 0.5, y: 0.88 },
+  placementSurface: "wall", blocksMovement: false, interactionType: "decor", locked: true
+}
+const CATALOG: FurnitureItem[] = [...ROOM_V2_FURNITURE_CATALOG, STANDIN_TABLE, STANDIN_SHELF]
 const SHELL_ID = "room_v2_shell_blumi_world_v1"
-const SHELF_ID = "room_v2_cute_bookshelf"
+const SHELF_ID = STANDIN_SHELF.id
 const STAGE = { x: -39, y: 120, width: 468, height: 266.5 }
 const EPS = 1e-6
 
@@ -356,7 +369,7 @@ test("a turn that does not fit where the piece stands moves it to the nearest ce
   }
   assert.ok(nudged > 20, `nudged ${nudged} turns`)
   // a rotation the piece has no drawing for is never "fitted" by moving it
-  const table: PlacedRoomItem = { instanceId: "table", itemId: "room_v2_table_round", x: 0.36, y: 0.64, rotation: "front" }
+  const table: PlacedRoomItem = { instanceId: "table", itemId: STANDIN_TABLE.id, x: 0.36, y: 0.64, rotation: "front" }
   const tableDecor: UserRoomDecor = { roomShellId: SHELL_ID, placedItems: [table] }
   assert.equal(findRoomEditorRotateNudge({
     copy, scene: sceneWith([table]), decor: tableDecor, furnitureCatalog: CATALOG, instanceId: "table", rotation: "right"

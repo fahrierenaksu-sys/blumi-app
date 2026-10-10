@@ -11,11 +11,8 @@ import {
 } from "../release/releaseCatalog"
 import { isLegacyItemId, LEGACY_AVATAR_ITEM_IDS, LEGACY_ROOM_ITEM_IDS } from "./legacyItemIds"
 
-/**
- * Old room items that are still active economy entries until the commit that retires their art (X8) removes them;
- * each is already in the registry so that commit only deletes. This list may only shrink.
- */
-const ACTIVE_UNTIL_X8 = new Set([
+/** The six old flat room pieces retired in X8: in the registry, never an active economy entry again. */
+const RETIRED_FLAT_ROOM_IDS = new Set([
   "room_v2_cozy_bed",
   "room_v2_cute_bookshelf",
   "room_v2_heart_rug",
@@ -33,13 +30,12 @@ test("L14: no new, reserved or kept id is in the legacy registry, and old ids ar
     assert.equal(isLegacyItemId(id), false, `${id} is active or reserved but listed as legacy`)
   }
   for (const item of ECONOMY_CATALOG) {
-    if (!isLegacyItemId(item.itemId)) continue
-    assert.ok(ACTIVE_UNTIL_X8.has(item.itemId), `${item.itemId}: a legacy id is an active economy entry`)
+    assert.equal(isLegacyItemId(item.itemId), false, `${item.itemId}: a legacy id is an active economy entry`)
   }
 })
 
 test("the room part of the registry holds the six old flat pieces and all 45 universal core candidates", () => {
-  for (const id of ACTIVE_UNTIL_X8) assert.ok(isLegacyItemId(id), id)
+  for (const id of RETIRED_FLAT_ROOM_IDS) assert.ok(isLegacyItemId(id), id)
   const universal = UNIVERSAL_CORE_ROOM_ECONOMY_CANDIDATES.map((item) => item.itemId)
   assert.equal(universal.length, 45)
   for (const id of universal) assert.ok(isLegacyItemId(id), id)

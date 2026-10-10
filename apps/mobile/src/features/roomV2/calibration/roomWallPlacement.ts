@@ -57,10 +57,7 @@ export interface WallPieceShape {
  * Measured opaque bounds of the wall pieces' art, as fractions of their room box (alpha bbox of the runtime
  * sprite, contain-fitted in the catalog box). Unlisted pieces use the contained square.
  */
-export const WALL_PIECE_ART: Readonly<Record<string, WallPieceArt>> = {
-  // furniture_bookshelf_v1.webp: 1024 px canvas, alpha bbox x 206-833, y 58-982; box 0.168 x 0.252 of 1254 x 714
-  room_v2_cute_bookshelf: { minX: 0.245, maxX: 0.768, minY: 0.057, maxY: 0.959 }
-}
+export const WALL_PIECE_ART: Readonly<Record<string, WallPieceArt>> = {}
 
 export type WallPiecePolicy = "avoid_openings" | "opening"
 

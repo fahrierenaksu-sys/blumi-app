@@ -63,7 +63,6 @@ import {
   getRoomV2DepthPerspectiveScale,
   getRoomV2FurnitureImageResizeMode,
   getRoomV2FurnitureMobileRenderScale,
-  getRoomV2SeatedFurnitureRenderIds,
   isRoomV2LayeredFloorPiece
 } from "../roomV2RenderSurface"
 import type { RoomVNextRuntimeMode } from "../roomVNextRuntimeGate"
@@ -197,9 +196,6 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
   }
 
   const aspectRatio = shell.canvasSize.width / shell.canvasSize.height
-  const seatedFurnitureRenderIds = getRoomV2SeatedFurnitureRenderIds(renderItems)
-  const seats25dFurnitureRenderIds = new Set(renderItems.flatMap((item) =>
-    item.kind === "avatar" && item.avatar25d && item.seatRig ? [item.seatRig.furnitureRenderId] : []))
   // room calibration: a 2.5D avatar seated in a layered piece draws between its back and front layers;
   // a piece with several seats gives each sitter its own seat's rules (her drawing, the front layer's split)
   const getLayeredSeat = (item: RoomV2RenderItem): { piece: RoomV2FurnitureRenderItem; seat: RoomV2LayeredSeatArt } | undefined => {
@@ -323,18 +319,6 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
         ) : null
       )}
       {renderItems.filter((item) => !isRoomV2LayeredFloorPiece(item)).map(renderMainItem)}
-      {renderItems.map((item) => (
-        item.kind === "furniture" &&
-        (item.frontOcclusion || item.foregroundOcclusionAsset) &&
-        seatedFurnitureRenderIds.has(item.renderId) &&
-        // a 2.5D avatar's seated drawing hangs its legs in front of the seat: no front crop over it
-        !seats25dFurnitureRenderIds.has(item.renderId) ? (
-          <RoomRendererFurnitureFrontOcclusion
-            key={`${item.renderId}-front-occlusion`}
-            item={item}
-          />
-        ) : null
-      ))}
     </Root>
   )
 }
@@ -389,95 +373,6 @@ export const RoomRendererFurnitureSprite = memo(function RoomRendererFurnitureSp
 }, (previous, next) =>
   previous.item === next.item && previous.zIndex === next.zIndex && previous.onDisplay === next.onDisplay)
 
-/**
- * Furniture is sorted behind a seated avatar so the avatar can enter the
- * cushion. Re-drawing only the calibrated foreground crop after all items
- * restores the physical occlusion at the seat edge without covering the
- * avatar's torso or introducing a painted placeholder mask.
- */
-const RoomRendererFurnitureFrontOcclusion = memo(function RoomRendererFurnitureFrontOcclusion(
-  props: { item: RoomV2FurnitureRenderItem }
-) {
-  const { item } = props
-  const perspectiveScale = getRoomRendererItemPerspectiveScale(item)
-  const mobileFurnitureScale = getRoomV2FurnitureMobileRenderScale(item.kind)
-  const renderedWidth = item.width * perspectiveScale * mobileFurnitureScale
-  const renderedHeight = item.height * perspectiveScale * mobileFurnitureScale
-  const drawPoint = getRoomRendererItemDrawPoint(item)
-  const left = drawPoint.x - renderedWidth * item.anchor.x
-  const top = drawPoint.y - renderedHeight * item.anchor.y
-  const occlusion = item.frontOcclusion
-  if (item.foregroundOcclusionAsset) {
-    return (
-      <View
-        pointerEvents="none"
-        testID={`${item.renderId}-front-occlusion`}
-        style={[
-          styles.furnitureFrontOcclusion,
-          {
-            left: `${left * 100}%`,
-            top: `${top * 100}%`,
-            width: `${renderedWidth * 100}%`,
-            height: `${renderedHeight * 100}%`
-          }
-        ]}
-      >
-        <ExpoImage
-          source={item.foregroundOcclusionAsset.source}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-          allowDownscaling={false}
-          transition={0}
-          style={styles.furnitureFrontOcclusionImage}
-        />
-      </View>
-    )
-  }
-  if (!occlusion || occlusion.width <= 0 || occlusion.height <= 0) return null
-
-  return (
-    <View
-      pointerEvents="none"
-      testID={`${item.renderId}-front-occlusion`}
-      style={[
-        styles.furnitureFrontOcclusion,
-        {
-          left: `${left * 100}%`,
-          top: `${top * 100}%`,
-          width: `${renderedWidth * 100}%`,
-          height: `${renderedHeight * 100}%`
-        }
-      ]}
-    >
-      <View
-        style={[
-          styles.furnitureFrontOcclusionCrop,
-          {
-            left: `${occlusion.left * 100}%`,
-            top: `${occlusion.top * 100}%`,
-            width: `${occlusion.width * 100}%`,
-            height: `${occlusion.height * 100}%`
-          }
-        ]}
-      >
-        <ExpoImage
-          source={item.asset.source}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-          allowDownscaling={false}
-          transition={0}
-          style={{
-            position: "absolute",
-            left: `${(-occlusion.left / occlusion.width) * 100}%`,
-            top: `${(-occlusion.top / occlusion.height) * 100}%`,
-            width: `${(1 / occlusion.width) * 100}%`,
-            height: `${(1 / occlusion.height) * 100}%`
-          }}
-        />
-      </View>
-    </View>
-  )
-}, (previous, next) => previous.item === next.item)
 
 /**
  * Draws only an authored contact-shadow layer. There is intentionally no
@@ -1149,18 +1044,6 @@ const styles = StyleSheet.create({
     opacity: 0.92
   },
   furnitureContactShadowImage: {
-    width: "100%",
-    height: "100%"
-  },
-  furnitureFrontOcclusion: {
-    position: "absolute",
-    zIndex: 20
-  },
-  furnitureFrontOcclusionCrop: {
-    position: "absolute",
-    overflow: "hidden"
-  },
-  furnitureFrontOcclusionImage: {
     width: "100%",
     height: "100%"
   },

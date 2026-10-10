@@ -43,6 +43,21 @@ const visibleAvatarTypes = new Set([
   "accessory",
 ]);
 
+// Plain Node has no room seam (and, since X8, no flat pieces): stand-in drawings, one unheld with its own price
+const standInPiece = (id: string, name: string) => ({
+  id, name, asset: { key: id, source: 1 }, category: "seating" as const, layer: "furniture" as const,
+  width: 0.1, height: 0.1, interactionType: "seat" as const,
+});
+const STAND_IN_ROOM_ID = "stand_in_room_piece";
+const STAND_IN_ROOM_CATALOG = [
+  standInPiece(STAND_IN_ROOM_ID, "Stand-in Piece"),
+  standInPiece("room_v2_chair_blush", "Blush Lounge Chair"),
+];
+const STAND_IN_ECONOMY = [
+  ...ECONOMY_CATALOG,
+  { itemId: STAND_IN_ROOM_ID, type: "room" as const, title: "Stand-in Piece", priceCoins: 10 },
+];
+
 test("every mobile shop item is represented by the shared economy catalog", () => {
   const visibleAvatarItems = AVATAR_V2_CATALOG.filter(
     (item) => visibleAvatarTypes.has(item.type) && item.hiddenFromShop !== true,
@@ -83,7 +98,7 @@ test("every Shop product is priced exactly as the shared economy catalog", () =>
 
 test("room shop accepts an explicitly gated QA catalog and treats its QA-owned pieces as placeable", () => {
   const qaOnlyItem = {
-    ...ROOM_V2_FURNITURE_CATALOG[0]!,
+    ...STAND_IN_ROOM_CATALOG[0]!,
     id: "universal_shop_qa_probe",
     name: "Universal Shop QA Probe",
     ownedByDefault: false,
@@ -123,11 +138,14 @@ test("demo Shop lists Room products even when none are owned", () => {
       unlockedFeatureIds: [],
       updatedAt: "2026-09-27T00:00:00.000Z"
     },
-    roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] }
+    roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
+    economyCatalog: STAND_IN_ECONOMY,
+    roomFurnitureCatalog: STAND_IN_ROOM_CATALOG
   })
   const roomProducts = products.filter((product) => product.sectionId === "room")
   // every piece but the held ones (pricing pending), which no build lists
-  assert.equal(roomProducts.length, ROOM_V2_FURNITURE_CATALOG.filter((item) => !isReleaseCatalogItemHeld(item.id)).length)
+  assert.equal(roomProducts.length, STAND_IN_ROOM_CATALOG.filter((item) => !isReleaseCatalogItemHeld(item.id)).length)
+  assert.equal(roomProducts.length, 1)
   assert.ok(roomProducts.some((product) => !product.owned))
   assert.ok(roomProducts.every((product) => product.roomItem))
 })
@@ -168,7 +186,7 @@ test("R1 Shop lists starter and receipted paid items and hides held ones", () =>
 });
 
 test("an owned room item already placed in the room is shown as placed, not offered for a duplicate placement", () => {
-  const item = ROOM_V2_FURNITURE_CATALOG.find((entry) => !isReleaseCatalogItemHeld(entry.id))!;
+  const item = STAND_IN_ROOM_CATALOG.find((entry) => !isReleaseCatalogItemHeld(entry.id))!;
   const products = buildShopCatalogItems({
     avatar: resolveInitialAvatarV2("avatar_v2_body_default"),
     inventory: {
@@ -188,6 +206,8 @@ test("an owned room item already placed in the room is shown as placed, not offe
         rotation: "front",
       }],
     },
+    economyCatalog: STAND_IN_ECONOMY,
+    roomFurnitureCatalog: STAND_IN_ROOM_CATALOG,
   });
 
   const roomProduct = products.find((product) => product.sourceItemId === item.id);

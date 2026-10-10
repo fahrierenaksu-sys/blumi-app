@@ -336,7 +336,14 @@ test("wall pieces were projected onto the app's own measured walls and draw the 
 
 test("a furnished room with the rug and the coffee table in front of the sofa is all valid, every seat reachable", () => {
   const all = new Map(CATALOG)
-  const blush = ROOM_V2_FURNITURE_CATALOG.find((entry) => entry.id === "room_v2_chair_blush")!
+  // the blush chair is a layered piece too (its old flat art was retired in X8): stand-in layer images
+  const blushLayers = Object.fromEntries(([0, 1, 2, 3] as const).map((r) => [r, {
+    back: { key: `blush_r${r}_back`, source: 0 as never },
+    front: { key: `blush_r${r}_front`, source: 0 as never },
+    shadow: { key: `blush_r${r}_shadow`, source: 0 as never }
+  }])) as unknown as Parameters<typeof createRoomAvatar25dFurnitureCatalog>[0][string]
+  const blush = createRoomAvatar25dFurnitureCatalog({ room_v2_chair_blush: blushLayers })
+    .find((entry) => entry.id === "room_v2_chair_blush")!
   all.set(blush.id, blush)
   const decor = createLayeredFurnitureTestRoom()
   const pieces = decor.placedItems.map((placed) =>

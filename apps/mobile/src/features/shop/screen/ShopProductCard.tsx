@@ -16,7 +16,6 @@ import { useScrollSafePress } from "../../../ui/MainTabPagerGestureOwnership"
 import { uiTheme } from "../../../ui/theme"
 import {
   getAvatarItemPreviewSource,
-  getRoomProductThumbnailSource,
   getShopProductThumbnailBounds,
   getShopProductThumbnailSource,
   RIG_LAYER_THUMBNAIL_ITEM_IDS
@@ -97,7 +96,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
     ? RIG_LAYER_THUMBNAIL_ITEM_IDS.has(product.sourceItemId)
     : false
   const roomPreviewSource = product.roomItem
-    ? getRoomProductThumbnailSource(product.sourceItemId) ?? product.roomItem.asset.source
+    ? product.roomItem.asset.source
     : undefined
   const automationSlug = product.avatarItem
     ? getAvatarAutomationSlug(product.sourceItemId)

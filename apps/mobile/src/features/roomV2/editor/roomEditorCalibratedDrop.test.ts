@@ -68,7 +68,13 @@ const { ROOM_EDITOR_PLACE_JUICE } = require("./roomEditorPlaceMotion") as typeof
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 const copy = getMyRoomEditorCopy("en")
-const CATALOG: FurnitureItem[] = [...ROOM_V2_FURNITURE_CATALOG, ...flagged.furnitureCatalog]
+// a plain (unlayered) catalog piece, as the old flat table was before X8 retired it: the editor still handles one
+const STANDIN_TABLE: FurnitureItem = {
+  id: "standin_round_table", name: "Stand-in Round Table", asset: { key: "standin_round_table", source: 0 as never },
+  category: "table", layer: "furniture", width: 0.126, height: 0.168, footprint: { width: 0.101, height: 0.067 },
+  blocksMovement: true, interactionType: "decor", locked: true
+}
+const CATALOG: FurnitureItem[] = [...ROOM_V2_FURNITURE_CATALOG, STANDIN_TABLE]
 const SHELL_ID = "room_v2_shell_blumi_world_v1"
 const ROTATIONS: RoomFurnitureRotation[] = ["front", "right", "back", "left"]
 const STAGE = { x: -39, y: 120, width: 468, height: 266.5 }
@@ -119,7 +125,7 @@ test("every drag cell is a calibration cell: its point is that cell's centre and
 })
 
 const PIECES = [
-  { itemId: "room_v2_table_round", rotations: ["front"] as RoomFurnitureRotation[], label: "old catalog table" },
+  { itemId: STANDIN_TABLE.id, rotations: ["front"] as RoomFurnitureRotation[], label: "plain catalog table" },
   { itemId: "room_v2_chair_blush", rotations: ROTATIONS, label: "layered armchair" },
   { itemId: ROOM_AVATAR_25D_SOFA_ID, rotations: ROTATIONS, label: "layered sofa" }
 ]
@@ -186,7 +192,7 @@ test("a held piece's hit box is where the room draws it, not where its anchor is
 test("while placing, the floor shows the piece's own diamond cells in its validity tone; while selected, a quiet tone", () => {
   const scene = sceneWith([
     { instanceId: "sofa", itemId: ROOM_AVATAR_25D_SOFA_ID, x: 0.5, y: 0.7, rotation: "front" },
-    { instanceId: "table", itemId: "room_v2_table_round", x: 0.3, y: 0.62, rotation: "front" }
+    { instanceId: "table", itemId: STANDIN_TABLE.id, x: 0.3, y: 0.62, rotation: "front" }
   ])
   const sofa = furnitureOf(scene, "sofa")
   const floor = drag.getRoomEditorDragFloorGrid(sofa, scene.shell)!

@@ -84,10 +84,16 @@ function loadSharedRoomScene(): ResolvedRoomV2Scene {
   /* eslint-disable @typescript-eslint/no-require-imports */
   const catalog = require("../roomV2/roomV2Catalog")
   const selectors = require("../roomV2/roomV2Selectors")
+  const layered = require("../roomV2/furniture/layeredFurnitureCatalog")
   /* eslint-enable @typescript-eslint/no-require-imports */
+  // the chair is a layered piece (the old flat art was retired in X8); stand-in layer images, plain Node
+  const layer = (key: string) => ({ key, source: 0 })
+  const chairLayers = Object.fromEntries([0, 1, 2, 3].map((r) => [r, {
+    back: layer(`chair_r${r}_back`), front: layer(`chair_r${r}_front`), shadow: layer(`chair_r${r}_shadow`)
+  }]))
   return selectors.resolveRoomV2Scene({
     roomShellCatalog: catalog.ROOM_V2_SHELL_CATALOG,
-    furnitureCatalog: catalog.ROOM_V2_FURNITURE_CATALOG,
+    furnitureCatalog: layered.createRoomAvatar25dFurnitureCatalog({ room_v2_chair_blush: chairLayers }),
     decor: {
       schemaVersion: 3, geometryVersion: "room_v2", roomShellId: catalog.DEFAULT_ROOM_V2_SHELL_ID,
       placedItems: [{ instanceId: "chair_left", itemId: "room_v2_chair_blush", x: 0.3, y: 0.62, rotation: "front" }]

@@ -16,7 +16,6 @@ import { resolveRoomV2Scene, resolveRoomV2Shell } from "../roomV2/roomV2Selector
 import { useRoomV2 } from "../roomV2/state/RoomV2Provider"
 import { getAppLocale, getLocaleIdentifier } from "../session/appLocale"
 import {
-  getRoomProductThumbnailSource,
   getShopProductThumbnailSource,
   PRODUCT_REFERENCE_AVATAR_ITEM_IDS
 } from "../shop/shopAssets"
@@ -383,7 +382,7 @@ export function CurrentSceneAssetWarmup({
         )
         const roomItemsById = new Map(roomItems.map((item) => [item.id, item]))
         return firstRoomIds
-          .map((id) => getRoomProductThumbnailSource(id) ?? roomItemsById.get(id)?.asset.source)
+          .map((id) => roomItemsById.get(id)?.asset.source)
           .filter((source): source is ImageSourcePropType => source !== undefined)
       }
       const avatarSources = (): ImageSourcePropType[] => {

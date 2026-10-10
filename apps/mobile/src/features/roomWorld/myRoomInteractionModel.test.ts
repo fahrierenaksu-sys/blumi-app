@@ -1,40 +1,12 @@
 import assert from "node:assert/strict"
-import path from "node:path"
 import test from "node:test"
 import {
   getMyRoomWalkActionTarget,
   getWideStageRendererTranslateY,
-  MY_ROOM_AVATAR_SPAWN,
   MY_ROOM_MOVEMENT_NO_OP_DISTANCE,
   MY_ROOM_WALK_ACTION_TARGETS
 } from "./myRoomInteractionModel"
 import type { RoomWorldGeometry } from "./roomWorldGeometry"
-import {
-  createRoomWorldGeometryFromRoomV2Scene,
-  createRoomWorldHotspotsFromRoomV2Scene
-} from "./roomWorldRoomV2Projection"
-import { resolveRoomV2Scene } from "../roomV2/roomV2Selectors"
-
-require.extensions[".png"] = (module, filename) => {
-  module.exports = filename
-}
-require.extensions[".webp"] = require.extensions[".png"]
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const runtimeModule = require("node:module") as {
-  _resolveFilename: (request: string, parent: NodeModule | null, ...rest: unknown[]) => string
-}
-const resolveFilename = runtimeModule._resolveFilename
-runtimeModule._resolveFilename = (request, parent, ...rest) => {
-  if (request.startsWith("./assets/") && /\.(png|webp)$/.test(request)) {
-    return path.resolve(process.cwd(), "src/features/roomV2", request.slice(2))
-  }
-  return resolveFilename(request, parent, ...rest)
-}
-const { ROOM_V2_FURNITURE_CATALOG, ROOM_V2_SHELL_CATALOG, MOCK_USER_ROOM_V2_DECOR } =
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  require("../roomV2/roomV2Catalog") as typeof import("../roomV2/roomV2Catalog")
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-const { resolveRoomWorldSeatSelection } = require("./roomWorldRuntime") as typeof import("./roomWorldRuntime")
 
 const openRoom: RoomWorldGeometry = {
   walkableAreas: [
@@ -94,31 +66,4 @@ test("wide stage camera keeps avatar feet inside the authored lower-third", () =
   // The shell always covers the stage: no edge is revealed above or below.
   assert.ok(rendererTop <= 0.5)
   assert.ok(rendererTop + rendererHeight >= input.stageHeight - 0.5)
-})
-
-test("default My Room chair exposes a reachable seat from the avatar spawn", () => {
-  const scene = resolveRoomV2Scene({
-    roomShellCatalog: ROOM_V2_SHELL_CATALOG,
-    furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
-    decor: MOCK_USER_ROOM_V2_DECOR,
-    defaultRoomShellId: MOCK_USER_ROOM_V2_DECOR.roomShellId
-  })
-  const chair = scene.renderItems.find(
-    (item) => item.kind === "furniture" && item.renderId === "room_v2_placed_chair_01"
-  )
-  assert.ok(chair)
-  const selection = resolveRoomWorldSeatSelection({
-    geometry: createRoomWorldGeometryFromRoomV2Scene(scene),
-    from: MY_ROOM_AVATAR_SPAWN,
-    hotspots: createRoomWorldHotspotsFromRoomV2Scene(scene),
-    seatedFurnitureRenderId: chair.renderId,
-    clearance: 0.012,
-    timing: {
-      durationPerDistanceMs: 1_800,
-      maxWalkDurationMs: 1_800,
-      rampDistance: 0.04
-    }
-  })
-
-  assert.ok(selection, "the default chair must not be a dead seat affordance")
 })

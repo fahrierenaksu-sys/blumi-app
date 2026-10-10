@@ -187,16 +187,6 @@ export const SHOP_THUMBNAIL_SOURCES: Partial<Record<string, ImageSourcePropType>
   avatar_v2_accessory_sunny_star_clips: require("../avatarV2/assets/shop-thumbnails/avatar_v2_accessory_sunny_star_clips.png")
 }
 
-export const ROOM_SHOP_THUMBNAIL_SOURCES: Partial<Record<string, ImageSourcePropType>> = {
-  room_v2_chair_blush: require("../roomV2/assets/shop-thumbnails/room_v2_chair_blush.png"),
-  room_v2_table_round: require("../roomV2/assets/shop-thumbnails/room_v2_table_round.png"),
-  room_v2_lamp_heart: require("../roomV2/assets/shop-thumbnails/room_v2_lamp_heart.png"),
-  room_v2_cozy_bed: require("../roomV2/assets/shop-thumbnails/room_v2_cozy_bed.png"),
-  room_v2_cute_bookshelf: require("../roomV2/assets/shop-thumbnails/room_v2_cute_bookshelf.png"),
-  room_v2_heart_rug: require("../roomV2/assets/shop-thumbnails/room_v2_heart_rug.png"),
-  room_v2_side_table: require("../roomV2/assets/shop-thumbnails/room_v2_side_table.png")
-}
-
 export function getAvatarItemPreviewSource(
   item: { id: string } | string
 ): ImageSourcePropType | undefined {
@@ -213,10 +203,4 @@ export function getShopProductThumbnailSource(
 export function getShopProductThumbnailBounds(sourceItemId: string): readonly number[] | undefined {
   return getGarmentThumbnailOverride(sourceItemId)?.bounds
     ?? (shopThumbnailBounds as Record<string, number[]>)[sourceItemId]
-}
-
-export function getRoomProductThumbnailSource(
-  sourceItemId: string
-): ImageSourcePropType | undefined {
-  return ROOM_SHOP_THUMBNAIL_SOURCES[sourceItemId]
 }

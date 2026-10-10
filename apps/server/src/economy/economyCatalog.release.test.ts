@@ -16,8 +16,7 @@ test("the production economy projection sells receipted paid items and excludes 
     "avatar_v2_face_warm_peach_foundation",
     "avatar_v2_eyes_sage_glass",
     "avatar_v2_nose_petal_curve",
-    "avatar_v2_mouth_rose_gloss_smile",
-    "room_v2_cozy_bed"
+    "avatar_v2_mouth_rose_gloss_smile"
   ]) {
     assert.ok(ids.has(starterId), starterId)
   }
@@ -26,8 +25,7 @@ test("the production economy projection sells receipted paid items and excludes 
     "avatar_v2_top_sage_ribbon_knit_jacket",
     "avatar_v2_top_boho_patchwork_maxi_dress",
     "avatar_v2_top_male_tonal_geometric_camp_collar_shirt",
-    "avatar_v2_hair_male_soft_textured_crop",
-    "room_v2_cute_bookshelf"
+    "avatar_v2_hair_male_soft_textured_crop"
   ]) {
     const item = catalog.find((entry) => entry.itemId === paidId)
     assert.ok(item, paidId)
@@ -39,7 +37,10 @@ test("the production economy projection sells receipted paid items and excludes 
     "avatar_v2_top_blush_lace_cardigan",
     "avatar_v2_top_male_acid_washed_boxy_sweatshirt",
     "universal_cloud_loveseat_a",
-    // pricing-pending (plan F8/R1): the blush chair is held although its receipt stays until X8 removes it
+    // the old flat room pieces were retired in X8 (legacy registry), the free cozy bed included
+    "room_v2_cozy_bed",
+    "room_v2_cute_bookshelf",
+    // pricing-pending (plan F8/R1): the blush chair is held; its receipt was removed in X8
     "room_v2_chair_blush",
     "room_v3_sofa_japon_cream"
   ]) {

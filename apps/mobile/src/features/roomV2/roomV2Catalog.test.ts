@@ -21,8 +21,31 @@ runtimeModule._resolveFilename = (request, parent, ...rest) => {
   if (request.startsWith("./assets/") && /\.(png|webp)$/.test(request)) {
     return path.resolve(process.cwd(), "src/features/roomV2", request.slice(2))
   }
+  // the layered furniture art next to its emitted module: back to the checked-in file in src
+  if (request.startsWith(".") && /\.(png|webp)$/.test(request) && parent?.filename) {
+    const sourceDirectory = path.dirname(parent.filename).replace(/\/\.blumi-[^/]+-tests-[^/]+(?=\/)/, "/src")
+    return path.resolve(sourceDirectory, request)
+  }
   return resolveFilename(request, parent, ...rest)
 }
+
+// The room seam as App.tsx installs it, with the real layered furniture art (before the room modules load).
+/* eslint-disable @typescript-eslint/no-require-imports -- the seam must be in place before the room catalog loads */
+const { LAYERED_FURNITURE_ASSETS, LAYERED_WALL_ASSETS } = require("./furniture/layeredFurnitureAssets") as
+  typeof import("./furniture/layeredFurnitureAssets")
+const { createRoomAvatar25dFurnitureCatalog } = require("./furniture/layeredFurnitureCatalog") as
+  typeof import("./furniture/layeredFurnitureCatalog")
+const { createRoomAvatar25dRoomCalibration } = require("./calibration/roomAvatar25dRoomCalibration") as
+  typeof import("./calibration/roomAvatar25dRoomCalibration")
+const { roomAvatar25d: seamStub, installRoomAvatarSeam } = require("../avatar/roomAvatarSeam") as
+  typeof import("../avatar/roomAvatarSeam")
+/* eslint-enable @typescript-eslint/no-require-imports */
+installRoomAvatarSeam({
+  ...seamStub,
+  enabled: true,
+  roomCalibration: createRoomAvatar25dRoomCalibration(LAYERED_FURNITURE_ASSETS, LAYERED_WALL_ASSETS),
+  furnitureCatalog: createRoomAvatar25dFurnitureCatalog(LAYERED_FURNITURE_ASSETS, LAYERED_WALL_ASSETS)
+})
 
 const {
   DEFAULT_ROOM_V2_SHELL_ID,
@@ -34,12 +57,6 @@ const {
   roomV2ProductionAssets
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./roomV2ProductionAssets") as typeof import("./roomV2ProductionAssets")
-
-function getFurnitureItem(itemId: string) {
-  const item = ROOM_V2_FURNITURE_CATALOG.find((candidate) => candidate.id === itemId)
-  assert.ok(item, `missing active Room V2 furniture item: ${itemId}`)
-  return item
-}
 
 function collectAssetSources(input: unknown): string[] {
   if (!input || typeof input !== "object") {
@@ -78,10 +95,6 @@ test("the live shell catalog holds no candidate, pending-QA or draft room_v3 she
 
 test("runtime assets do not bundle the blocked historical shell draft", () => {
   assert.equal("mintGardenMasterDraft" in roomV2ProductionAssets.shells, false)
-  assert.equal(
-    Object.keys(roomV2ProductionAssets.furniture).some((key) => key.startsWith("roomVNext")),
-    false
-  )
   assert.equal(
     collectAssetSources(roomV2ProductionAssets).some((source) =>
       source.includes("/assets/runtime/room-vnext/")
@@ -146,41 +159,6 @@ test("every seat's art has a measured tap outline that covers all of its drawn p
   }
 })
 
-test("the starter bed's seat is reachable at its rendered size in every rotation, with unchanged art", () => {
-  // Loaded after the asset hooks above, like the catalog itself.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  const { resolveRoomV2Scene } = require("./roomV2Selectors") as typeof import("./roomV2Selectors")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  const projection = require("../roomWorld/roomWorldRoomV2Projection") as
-    typeof import("../roomWorld/roomWorldRoomV2Projection")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  const runtime = require("../roomWorld/roomWorldRuntime") as typeof import("../roomWorld/roomWorldRuntime")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  const geometryModule = require("../roomWorld/roomWorldGeometry") as typeof import("../roomWorld/roomWorldGeometry")
-  const bed = getFurnitureItem("room_v2_cozy_bed")
-  for (const rotation of ["front", "right", "back", "left"] as const) {
-    const scene = resolveRoomV2Scene({ roomShellCatalog: ROOM_V2_SHELL_CATALOG, furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
-      decor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [
-        { instanceId: "starter-room-bed", itemId: "room_v2_cozy_bed", x: 0.52, y: 0.7, rotation }] },
-      defaultRoomShellId: "room_v2_shell_blumi_world_v1" })
-    const item = scene.renderItems.find((entry) => entry.kind === "furniture")
-    // The art keeps rendering at the visual contract's size; only seat routes moved.
-    assert.equal(item?.width, bed.visualContract?.directions[rotation]?.normalizedRenderSize.width)
-    const geometry = projection.createRoomWorldGeometryFromRoomV2Scene(scene)
-    const [seat] = projection.createRoomWorldHotspotsFromRoomV2Scene(scene)
-    assert.ok(seat?.approachPoint && seat.exitPoint && seat.sourceRenderId, rotation)
-    const floor = geometry.walkableAreas[0]!.points
-    assert.ok(geometryModule.pointInRoomWorldPolygon(seat, floor), `${rotation}: seat on the floor`)
-    for (const point of [seat.approachPoint, seat.exitPoint]) {
-      assert.ok(geometryModule.isRoomWorldPointWalkable(geometry, point,
-        { clearance: runtime.ROOM_WORLD_AVATAR_COLLISION_CLEARANCE }), `${rotation}: approach and exit walkable`)
-    }
-    assert.ok(runtime.createRoomWorldSeatMovementPlan({ geometry, from: { x: 0.5, y: 0.85 }, approach: seat.approachPoint,
-      seat, seatedFurnitureRenderId: seat.sourceRenderId, clearance: runtime.ROOM_WORLD_AVATAR_COLLISION_CLEARANCE,
-      timing: runtime.ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING }), `${rotation}: MiniRoom can plan sitting on the bed`)
-  }
-})
-
 test("every published room_v2 item and the starter bed keep resolving to one canonical catalog entry", () => {
   // Canonical IDs survive art and runtime changes: an item sold through the
   // R1 release catalog must stay resolvable in the live room catalog.
@@ -205,14 +183,17 @@ test("every published room_v2 item and the starter bed keep resolving to one can
     }
   }
   collect(releaseCatalog)
-  assert.ok(publishedRoomIds.size > 0, "the release catalog lists published room items")
   const catalogIds = new Set(ROOM_V2_FURNITURE_CATALOG.map((item) => item.id))
   assert.equal(catalogIds.size, ROOM_V2_FURNITURE_CATALOG.length, "catalog IDs are unique")
   for (const itemId of publishedRoomIds) {
     assert.ok(catalogIds.has(itemId), `${itemId} must resolve in the live room catalog`)
   }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- CommonJS fixture loading as above
+  const { isLegacyItemId, LEGACY_ROOM_ITEM_IDS } = require("@blumi/domain") as typeof import("@blumi/domain")
+  // the chair keeps its canonical id through the art change (now its layered drawing); retired ids never resolve
+  assert.ok(catalogIds.has("room_v2_chair_blush"), "the blush chair keeps resolving under its own id")
+  for (const itemId of LEGACY_ROOM_ITEM_IDS) assert.equal(catalogIds.has(itemId), false, `${itemId} is retired`)
   // the starter bed is the domain's reserved free bed: never a retired id; it resolves once its art lands (4.7)
-  const { isLegacyItemId } = require("@blumi/domain") as typeof import("@blumi/domain")
   assert.equal(isLegacyItemId(STARTER_ROOM_BED_ITEM_ID), false)
 })
 

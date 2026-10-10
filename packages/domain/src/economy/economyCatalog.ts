@@ -389,13 +389,8 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   avatarItem("avatar_v2_top_buttercup_picnic_pinafore_dress", "Buttercup Picnic Pinafore Dress", 180, false, ["avatar_v2_bottom_buttercup_picnic_pinafore_dress"]),
   avatarItem("avatar_v2_top_lavender_garden_ribbon_dress", "Lavender Garden Ribbon Dress", 200, false, ["avatar_v2_bottom_lavender_garden_ribbon_dress"]),
 
+  // the old flat pieces are retired (legacy registry); the chair keeps its id with layered art, held until §12
   roomItem("room_v2_chair_blush", "Blush Lounge Chair", 0),
-  roomItem("room_v2_table_round", "Cozy Round Table", 0),
-  roomItem("room_v2_lamp_heart", "Heart Glow Lamp", 0),
-  roomItem("room_v2_heart_rug", "Heart Cloud Rug", 0),
-  roomItem("room_v2_cozy_bed", "Pink Cloud Bed", 0, true),
-  roomItem("room_v2_cute_bookshelf", "Cozy Bookshelf", 360),
-  roomItem("room_v2_side_table", "Petal Side Table", 240),
   // the 2.5D furniture: held in the release catalog's `pricing-pending` scope until the economy proposal (§12)
   ...ROOM_V3_FURNITURE.map(({ itemId, title }) => roomItem(itemId, title, PRICING_PENDING_PLACEHOLDER_COINS))
 ]

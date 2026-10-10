@@ -26,68 +26,33 @@ export interface RoomFurnitureDrawnOutline {
  * seat's art has an outline here that still covers all of its pixels.
  */
 export const ROOM_FURNITURE_DRAWN_OUTLINES: Readonly<Record<string, RoomFurnitureDrawnOutline>> = Object.freeze({
-  room_v2_furniture_world_chair_v1: {
-    aspect: 263 / 257,
-    points: [
-      { x: 0.18, y: 0 }, { x: 0.615, y: 0 }, { x: 0.974, y: 0.367 }, { x: 0.974, y: 0.769 },
-      { x: 0.77, y: 0.977 }, { x: 0.203, y: 0.977 }, { x: 0.022, y: 0.792 }, { x: 0.022, y: 0.161 }
-    ]
-  },
-  room_v2_modeled_pink_cloud_bed_front_body_v29: {
-    aspect: 1254 / 714,
-    points: [
-      { x: 0.465, y: 0.245 }, { x: 0.578, y: 0.245 }, { x: 0.644, y: 0.362 }, { x: 0.644, y: 0.476 },
-      { x: 0.565, y: 0.615 }, { x: 0.411, y: 0.615 }, { x: 0.353, y: 0.514 }, { x: 0.353, y: 0.442 }
-    ]
-  },
-  room_v2_modeled_pink_cloud_bed_right_body_v29: {
-    aspect: 1254 / 714,
-    points: [
-      { x: 0.422, y: 0.246 }, { x: 0.541, y: 0.246 }, { x: 0.649, y: 0.436 }, { x: 0.649, y: 0.505 },
-      { x: 0.587, y: 0.614 }, { x: 0.429, y: 0.614 }, { x: 0.355, y: 0.483 }, { x: 0.355, y: 0.365 }
-    ]
-  },
-  room_v2_modeled_pink_cloud_bed_back_body_v29: {
-    aspect: 1254 / 714,
-    points: [
-      { x: 0.413, y: 0.284 }, { x: 0.587, y: 0.284 }, { x: 0.647, y: 0.39 }, { x: 0.647, y: 0.472 },
-      { x: 0.565, y: 0.615 }, { x: 0.411, y: 0.615 }, { x: 0.356, y: 0.518 }, { x: 0.356, y: 0.386 }
-    ]
-  },
-  room_v2_modeled_pink_cloud_bed_left_body_v29: {
-    aspect: 1254 / 714,
-    points: [
-      { x: 0.413, y: 0.288 }, { x: 0.594, y: 0.288 }, { x: 0.645, y: 0.379 }, { x: 0.645, y: 0.512 },
-      { x: 0.587, y: 0.614 }, { x: 0.429, y: 0.614 }, { x: 0.351, y: 0.476 }, { x: 0.351, y: 0.397 }
-    ]
-  },
   // The blush chair's room-camera back layers (2.5D layered furniture).
   room_v2_chair_blush_layered_r0_back: {
-    aspect: 305 / 246,
+    aspect: 193 / 156,
     points: [
-      { x: 0.372, y: 0.02 }, { x: 0.556, y: 0.02 }, { x: 0.717, y: 0.181 }, { x: 0.717, y: 0.799 },
-      { x: 0.544, y: 0.971 }, { x: 0.241, y: 0.971 }, { x: 0.018, y: 0.748 }, { x: 0.018, y: 0.374 }
+      { x: 0.374, y: 0.016 }, { x: 0.552, y: 0.016 }, { x: 0.715, y: 0.178 }, { x: 0.715, y: 0.798 },
+      { x: 0.541, y: 0.972 }, { x: 0.245, y: 0.972 }, { x: 0.016, y: 0.743 }, { x: 0.016, y: 0.373 }
     ]
   },
   room_v2_chair_blush_layered_r1_back: {
-    aspect: 277 / 246,
+    aspect: 175 / 156,
     points: [
-      { x: 0.15, y: 0.049 }, { x: 0.443, y: 0.049 }, { x: 0.784, y: 0.391 }, { x: 0.784, y: 0.748 },
-      { x: 0.574, y: 0.959 }, { x: 0.196, y: 0.959 }, { x: 0.006, y: 0.769 }, { x: 0.006, y: 0.192 }
+      { x: 0.153, y: 0.041 }, { x: 0.437, y: 0.041 }, { x: 0.787, y: 0.392 }, { x: 0.787, y: 0.746 },
+      { x: 0.575, y: 0.959 }, { x: 0.199, y: 0.959 }, { x: 0.007, y: 0.767 }, { x: 0.007, y: 0.188 }
     ]
   },
   room_v2_chair_blush_layered_r2_back: {
-    aspect: 280 / 216,
+    aspect: 177 / 137,
     points: [
-      { x: 0.125, y: 0.029 }, { x: 0.418, y: 0.029 }, { x: 0.78, y: 0.391 }, { x: 0.78, y: 0.772 },
-      { x: 0.586, y: 0.966 }, { x: 0.273, y: 0.966 }, { x: 0.02, y: 0.714 }, { x: 0.02, y: 0.134 }
+      { x: 0.125, y: 0.026 }, { x: 0.419, y: 0.026 }, { x: 0.784, y: 0.392 }, { x: 0.784, y: 0.764 },
+      { x: 0.589, y: 0.959 }, { x: 0.268, y: 0.959 }, { x: 0.018, y: 0.709 }, { x: 0.018, y: 0.133 }
     ]
   },
   room_v2_chair_blush_layered_r3_back: {
-    aspect: 304 / 217,
+    aspect: 192 / 137,
     points: [
-      { x: 0.38, y: 0.029 }, { x: 0.61, y: 0.029 }, { x: 0.712, y: 0.131 }, { x: 0.712, y: 0.723 },
-      { x: 0.473, y: 0.962 }, { x: 0.194, y: 0.962 }, { x: 0.015, y: 0.782 }, { x: 0.015, y: 0.394 }
+      { x: 0.381, y: 0.026 }, { x: 0.61, y: 0.026 }, { x: 0.713, y: 0.129 }, { x: 0.713, y: 0.723 },
+      { x: 0.47, y: 0.966 }, { x: 0.196, y: 0.966 }, { x: 0.016, y: 0.786 }, { x: 0.016, y: 0.391 }
     ]
   },
   // The pilot sofa's room-camera back layers (2.5D layered furniture).

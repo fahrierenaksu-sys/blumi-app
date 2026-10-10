@@ -30,6 +30,8 @@ interface LayeredCatalogEntry {
 /** The floor pieces, in the order the inventory lists them. */
 export const ROOM_AVATAR_25D_LAYERED_FLOOR_ENTRIES: readonly LayeredCatalogEntry[] = Object.freeze([
   { id: ROOM_AVATAR_25D_SOFA_ID, name: "Japon Cream Sofa", category: "seating" },
+  // the old blush chair keeps its canonical id; since X8 it is drawn only from its layered art
+  { id: "room_v2_chair_blush", name: "Blush Lounge Chair", category: "seating" },
   { id: "room_v3_armchair_japon_cream", name: "Japon Cream Armchair", category: "seating" },
   { id: "room_v3_bed_japon_sakura", name: "Japon Sakura Bed", category: "seating" },
   { id: "room_v3_coffeetable_japon_round", name: "Japon Round Coffee Table", category: "table" },

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import { isAbsolute, relative, resolve } from "node:path"
 import test from "node:test"
+import type { FurnitureItem } from "../roomV2/roomV2.types"
 
 // Metro asset IDs are represented by absolute file paths in Node.
 for (const extension of [".png", ".webp", ".jpg", ".jpeg"]) {
@@ -35,7 +36,6 @@ const { ROOM_V2_FURNITURE_CATALOG } =
   require("../roomV2/roomV2Catalog") as typeof import("../roomV2/roomV2Catalog")
 const {
   getAvatarItemPreviewSource,
-  getRoomProductThumbnailSource,
   getShopProductThumbnailSource
 } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
@@ -48,13 +48,6 @@ const heldPatterns = releaseCatalog.heldScopes.flatMap((scope) =>
   scope.itemIdPatterns.map((pattern) => ({ scope: scope.scope, pattern: new RegExp(pattern) }))
 )
 const paidItems = ECONOMY_CATALOG.filter((item) => item.ownedByDefault !== true)
-/**
- * Published items that a held scope also names: the hold wins, so they are never sold or listed. The blush chair
- * joined `pricing-pending` (plan F8, R1 decided) and keeps its receipt until X8 removes it with its old art. This
- * list may only shrink.
- */
-const HELD_UNTIL_RECEIPT_REMOVAL = new Set(["room_v2_chair_blush"])
-
 function sha256(repositoryPath: string): string {
   return createHash("sha256").update(readFileSync(resolve(repositoryRoot, repositoryPath))).digest("hex")
 }
@@ -105,7 +98,6 @@ function resolveRuntimeAssetPaths(item: (typeof ECONOMY_CATALOG)[number]): strin
     }
   } else {
     collectAssetFiles(ROOM_V2_FURNITURE_CATALOG.find((furniture) => furniture.id === item.itemId), files)
-    collectAssetFiles(getRoomProductThumbnailSource(item.itemId), files)
   }
   return [...files].map((file) => relative(repositoryRoot, file)).sort()
 }
@@ -127,11 +119,7 @@ test("published release items are unique, sellable economy items outside every h
     assert.ok(economyItem, `${published.itemId} is not in ECONOMY_CATALOG`)
     assert.equal(published.itemType, economyItem.type, `${published.itemId} has the wrong itemType`)
     assert.notEqual(economyItem.ownedByDefault, true, `${published.itemId} is a starter item and needs no receipt`)
-    if (HELD_UNTIL_RECEIPT_REMOVAL.has(published.itemId)) {
-      assert.equal(heldScopeFor(published.itemId), "pricing-pending", `${published.itemId} must stay held`)
-    } else {
-      assert.equal(heldScopeFor(published.itemId), undefined, `${published.itemId} matches a held scope`)
-    }
+    assert.equal(heldScopeFor(published.itemId), undefined, `${published.itemId} matches a held scope`)
     assert.equal(isRetiredAvatarItemId(published.itemId), false, `${published.itemId} is retired and cannot be sold`)
 
     const { receipt } = published
@@ -173,7 +161,6 @@ test("published items are visible in the Shop and render in the Room", () => {
         ROOM_V2_FURNITURE_CATALOG.some((furniture) => furniture.id === published.itemId),
         `${published.itemId} has no Room V2 furniture entry`
       )
-      assert.ok(getRoomProductThumbnailSource(published.itemId), `${published.itemId} has no Shop thumbnail`)
     }
   }
 })
@@ -211,7 +198,7 @@ test("each receipt's evidence manifest exists with the recorded SHA-256", () => 
 test("the production projection sells every published item and no held or retired item", () => {
   const projectedIds = new Set(resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG).map((item) => item.itemId))
   for (const published of publishedItems) {
-    assert.equal(projectedIds.has(published.itemId), !HELD_UNTIL_RECEIPT_REMOVAL.has(published.itemId), published.itemId)
+    assert.equal(projectedIds.has(published.itemId), true, published.itemId)
   }
   for (const item of paidItems) {
     if (heldScopeFor(item.itemId) || isRetiredAvatarItemId(item.itemId)) {
@@ -268,14 +255,23 @@ test("each receipt's source commit holds the same asset bytes", (context) => {
 test("the room Shop never lists a held piece, in any build, even one the room catalog can draw", () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded after the image hooks above.
   const { buildRoomShopItems } = require("./shopCatalog") as typeof import("./shopCatalog")
-  const chair = ROOM_V2_FURNITURE_CATALOG.find((item) => item.id === "room_v2_chair_blush")!
-  const heldSofa = { ...chair, id: "room_v3_sofa_japon_cream", name: "Japon Cream Sofa" }
-  for (const publishedItemIds of [undefined, resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG).map((item) => item.itemId)]) {
+  // stand-in drawings (plain Node has no seam catalog); one unheld stand-in proves the Shop still lists pieces
+  const standIn = (id: string, name: string): FurnitureItem => ({
+    id, name, asset: { key: id, source: 1 }, category: "seating", layer: "furniture", width: 0.1, height: 0.1,
+    interactionType: "seat"
+  })
+  const unheldId = "stand_in_room_piece"
+  const economyCatalog = [...ECONOMY_CATALOG, { itemId: unheldId, type: "room" as const, title: "Stand-in", priceCoins: 10 }]
+  for (const publishedItemIds of [undefined, [...resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG).map((item) => item.itemId), unheldId]]) {
     const listed = buildRoomShopItems({
       roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
-      economyCatalog: ECONOMY_CATALOG,
+      economyCatalog,
       publishedItemIds,
-      roomFurnitureCatalog: [...ROOM_V2_FURNITURE_CATALOG, heldSofa],
+      roomFurnitureCatalog: [
+        standIn("room_v2_chair_blush", "Blush Lounge Chair"),
+        standIn("room_v3_sofa_japon_cream", "Japon Cream Sofa"),
+        standIn(unheldId, "Stand-in")
+      ],
       inventory: { ownedRoomItemIds: [] }
     }).map((item) => item.sourceItemId)
     assert.equal(listed.includes("room_v3_sofa_japon_cream"), false)
