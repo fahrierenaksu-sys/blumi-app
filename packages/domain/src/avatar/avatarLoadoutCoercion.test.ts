@@ -76,3 +76,28 @@ test("coercion never changes its input", () => {
   coerceAvatarLoadout(stored)
   assert.equal(JSON.stringify(stored), before)
 })
+
+// Review A F2: a look the strict save rules accept must read back unchanged,
+// so the tolerant reader never silently changes a valid saved look.
+test("a loadout the strict rules accept is returned unchanged", () => {
+  let checked = 0
+  for (const starter of [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT]) {
+    for (const baseline of [starter, toAvatarLoadoutV2(starter)]) {
+      const variants: unknown[] = [baseline]
+      for (const item of AVATAR_LOADOUT_CATALOG) {
+        for (const key of SLOT_KEYS) variants.push({ ...baseline, [key]: item.itemId })
+        variants.push({ ...baseline, accessoryIds: [item.itemId] })
+        if (baseline.schemaVersion === 2 && item.pairedItemId) {
+          variants.push({ ...baseline, topId: item.itemId, bottomId: item.pairedItemId, dressId: item.itemId })
+        }
+      }
+      for (const variant of variants) {
+        const strict = validateAvatarLoadout(variant, ALL_IDS)
+        if (!strict.ok) continue
+        checked += 1
+        assert.deepEqual(coerceAvatarLoadout(variant, { presetId: starter.bodyId }), strict.loadout)
+      }
+    }
+  }
+  assert.ok(checked > 50, `only ${checked} strictly valid looks were checked`)
+})
