@@ -27,6 +27,33 @@ is no added login blocking function. `verification_outcomes_enabled=false`
 until observation health is verified on real clients. API shared budgets and
 callable pre-database work ceilings apply independently of that switch.
 
+### HTTP client-address follow-up
+
+Post-deploy invalid-input probes found recovery requests split into separate
+source budgets when connections changed. One keepalive connection reached 429
+on the fourth request, but default pooled connections did not; the budget did
+not match the client address from Railway HTTP telemetry. Broadening the proxy
+range alone did not fix it and was reverted. This is not native/SMS evidence.
+
+The opt-in `BLUMI_TRUSTED_CLIENT_IP_HEADER=x-real-ip` bridge uses Railway's
+documented client header only when the immediate TCP peer matches
+`BLUMI_TRUST_PROXY`. It replaces arbitrary XFF prefixes with that single valid
+address before HTTP limiters run. Missing/malformed metadata from a trusted
+peer refuses `/v1/` requests instead of switching to a new counter identity;
+readiness stays available. Direct untrusted peers cannot override their source
+with either header. The mode is disabled by default outside this deployment.
+It applies to HTTP APIs, not the separate raw WebSocket resolver.
+
+The local rotating-proxy/shared-source regression, invalid metadata, direct
+caller spoofing, existing proxy/legacy routes and config group passed 48 tests;
+server build passed. Live source matching and attempted header spoofing must be
+verified on the resulting deployment before this follow-up is marked closed.
+Do not assume a stable/exclusive provider CIDR or header authenticity from a
+SPA example. Provider/region changes require re-verification; IP remains an
+additional abuse signal, not a physical-device or account identity.
+
+Provider header specification: https://docs.railway.com/networking/public-networking/specs-and-limits
+
 - `tools/firebase-sms-defense`: ayrı codebase; Node 22; yalnız iki koruma function'ı.
 - `blumiSmsDeviceGate`: App Check enforced + consume-token callable; platform/Firebase app ID eşleştirmesi, iOS üretim App Attest veya Android Play Integrity kanıtı, challenge/izin.
 - `blumiBeforeSmsSent`: sağlayıcının imzalı olayı; numara izni ve SMS bütçesini aynı transaction'da tüketir; yalnız {} veya BLOCK, asla ALLOW.

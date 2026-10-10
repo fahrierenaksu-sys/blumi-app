@@ -149,6 +149,7 @@ const app = createServer({
   nodeEnv: config.nodeEnv,
   corsOrigins: config.corsOrigins,
   trustedProxyAddresses: config.trustedProxyAddresses,
+  trustedClientIpHeader: config.trustedClientIpHeader,
   adminKey: config.adminKey,
   adminTokenService,
   adminUsersService: services.adminUsersService,

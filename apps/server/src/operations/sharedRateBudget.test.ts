@@ -43,6 +43,30 @@ test("recovery has its own shared source budget and budget outages fail before t
   } finally { await unavailable.close() }
 })
 
+test("rotating trusted proxy connections use one recovery source and ignore supplied XFF prefixes", async () => {
+  const authRateLimiter = createInMemoryRateBudget(() => 1_800_000_000_000)
+  const apps = [0, 1].map(() => createServer({ authRateLimiter,
+    trustedProxyAddresses: ["100.64.0.0/10"], trustedClientIpHeader: "x-real-ip" }))
+  try {
+    for (let i = 0; i < 4; i++) {
+      const response = await apps[i % 2]!.inject({ method: "POST", url: "/v1/account/recovery/requests",
+        remoteAddress: `100.64.0.${i + 6}`, headers: { "x-real-ip": "198.51.100.2", "x-forwarded-for": `203.0.113.${i + 1}` }, payload: {} })
+      assert.equal(response.statusCode, i < 3 ? 202 : 429)
+    }
+    for (const value of ["", "198.51.100.2, 203.0.113.1", "invalid"]) {
+      assert.equal((await apps[0]!.inject({ method: "POST", url: "/v1/account/recovery/requests",
+        remoteAddress: "100.64.0.8", headers: { "x-real-ip": value }, payload: {} })).statusCode, 400)
+    }
+    assert.equal((await apps[0]!.inject({ method: "GET", url: "/ready", remoteAddress: "100.64.0.8" })).statusCode, 200)
+    // Untrusted direct callers cannot rotate their counter using either header.
+    for (let i = 0; i < 4; i++) {
+      const response = await apps[i % 2]!.inject({ method: "POST", url: "/v1/account/recovery/requests",
+        remoteAddress: "198.51.100.3", headers: { "x-real-ip": `203.0.113.${i + 1}`, "x-forwarded-for": `203.0.113.${i + 1}` }, payload: {} })
+      assert.equal(response.statusCode, i < 3 ? 202 : 429)
+    }
+  } finally { await Promise.all(apps.map(app => app.close())) }
+})
+
 test("sensitive account actions share a verified-user budget even across changing IPs", async () => {
   const auth = createAuthService({ codeFactory: () => "123456" })
   await auth.sendCode("+12025550101")

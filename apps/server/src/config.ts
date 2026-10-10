@@ -172,6 +172,7 @@ export interface ServerConfig {
   androidAppLinkSha256CertFingerprints: string[]
   corsOrigins: string[]
   trustedProxyAddresses: string[]
+  trustedClientIpHeader?: "x-real-ip"
   /**
    * Bearer session cache TTL (BLUMI_SESSION_CACHE_TTL_MS, default 15 s, 0
    * turns it off, at most 30 s). See auth/sessionCache.ts.
@@ -351,6 +352,10 @@ export function resolveServerConfig(
   )
   const corsOrigins = parseCsv(env.BLUMI_CORS_ORIGINS)
   const trustedProxyAddresses = parseTrustedProxyAddresses(env.BLUMI_TRUST_PROXY)
+  const trustedClientIpHeader = env.BLUMI_TRUSTED_CLIENT_IP_HEADER?.trim()
+  if (trustedClientIpHeader && trustedClientIpHeader !== "x-real-ip") {
+    throw new Error("BLUMI_TRUSTED_CLIENT_IP_HEADER must be x-real-ip or unset.")
+  }
   const qaAuthEnabledValue = env.BLUMI_QA_AUTH_ENABLED?.trim()
   const qaPhoneNumber = env.BLUMI_QA_PHONE_NUMBER?.trim()
   const qaOtpCode = env.BLUMI_QA_OTP_CODE?.trim()
@@ -495,6 +500,7 @@ export function resolveServerConfig(
     androidAppLinkSha256CertFingerprints,
     corsOrigins,
     trustedProxyAddresses,
+    ...(trustedClientIpHeader === "x-real-ip" ? { trustedClientIpHeader } : {}),
     sessionCacheTtlMs,
     rateBudgetStore,
     qaAuth: qaAuthEnabled && qaPhoneNumber && qaOtpCode

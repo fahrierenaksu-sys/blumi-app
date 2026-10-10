@@ -1,6 +1,7 @@
 import cors from "@fastify/cors"
 import { createInMemoryRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
 import { registerSharedRateBudget } from "./operations/sharedRateBudgetHook"
+import { createTrustedRealIpBridge } from "./operations/trustedRealIpHeader"
 import { createAfterResponseTasks, type AfterResponseTasks } from "./operations/afterResponseTasks"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 import { classifyDatabaseError } from "./operations/databaseErrorStatus"
@@ -131,6 +132,7 @@ interface CreateServerOptions {
   nodeEnv?: string
   corsOrigins?: string[]
   trustedProxyAddresses?: string[]
+  trustedClientIpHeader?: "x-real-ip"
   adminKey?: string
   adminTokenService?: AdminTokenService
   adminUsersService?: AdminUsersService
@@ -235,6 +237,14 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       config: route.config
     })
   })
+  if (options.trustedClientIpHeader === "x-real-ip") {
+    const bridge = createTrustedRealIpBridge(trustedProxyAddresses)
+    app.addHook("onRequest", async (request, reply) => {
+      if (bridge(request.raw) === "invalid" && request.url.split("?")[0]?.startsWith("/v1/")) {
+        return reply.code(400).send({ error: "Request unavailable." })
+      }
+    })
+  }
   registerProductionMiddleware(app, {
     nodeEnv,
     corsOrigins: options.corsOrigins ?? []
