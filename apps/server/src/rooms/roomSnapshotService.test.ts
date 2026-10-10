@@ -333,3 +333,60 @@ test("the start-up self-check reports the art pack without throwing", async () =
   const broken = await checkRoomSnapshotRenderer(createRoomSnapshotRenderer({ artDir: "/nonexistent-art-pack" }))
   assert.equal(broken.ok, false)
 })
+
+// LOW-1 (fresh review): a redraw that keeps failing must not re-run the renderer on every read. After a failure
+// the room's revision waits a retry-after before a read tries again; a save always draws.
+test("a failed read redraw waits its retry-after before a read tries again", async () => {
+  const repository = createInMemoryRoomSnapshotRepository()
+  let clock = Date.parse("2026-10-10T12:00:00.000Z")
+  let renders = 0
+  const errors: unknown[] = []
+  const service = createRoomSnapshotService({
+    repository,
+    now: () => clock,
+    redrawRetryAfterMs: 60_000,
+    onRenderError: (error) => { errors.push(error) },
+    renderer: { version: "room-snapshot-v2", async render() { renders += 1; throw new Error("art pack missing") } }
+  })
+  await repository.save(v1Snapshot())
+
+  assert.equal(await service.getLatestForUser("user_1", room(1)), null)
+  assert.equal(await service.getLatestForUser("user_1", room(1)), null)
+  assert.equal(renders, 1)
+  assert.equal(errors.length, 1)
+
+  clock += 60_001
+  assert.equal(await service.getLatestForUser("user_1", room(1)), null)
+  assert.equal(renders, 2)
+  await assert.rejects(service.publishForRoomSave(room(1)), /art pack missing/)
+  assert.equal(renders, 3)
+})
+
+// LOW-2 (fresh review): reads share a pending redraw only for the same room revision, so a read of a newer
+// revision is never handed the previous revision's picture.
+test("a read of a newer room revision never joins the previous revision's pending redraw", async () => {
+  const repository = createInMemoryRoomSnapshotRepository()
+  let release!: () => void
+  const paused = new Promise<void>((resolve) => { release = resolve })
+  const drawnRevisions: number[] = []
+  const service = createRoomSnapshotService({
+    repository,
+    renderer: {
+      version: "room-snapshot-v2",
+      async render({ roomRevision }) {
+        drawnRevisions.push(roomRevision)
+        if (roomRevision === 1) await paused
+        return { body: Buffer.from(`r${roomRevision}`), mimeType: "image/webp" as const, rendererVersion: "room-snapshot-v2" }
+      }
+    }
+  })
+  await repository.save(v1Snapshot({ roomRevision: 1 }))
+  const first = service.getLatestForUser("user_1", room(1))
+  await repository.save(v1Snapshot({ roomRevision: 2 }))
+  const pendingSecond = service.getLatestForUser("user_1", room(2))
+  release()
+  const [, second] = await Promise.all([first, pendingSecond])
+
+  assert.deepEqual(drawnRevisions, [1, 2])
+  assert.equal(second?.roomRevision, 2)
+})

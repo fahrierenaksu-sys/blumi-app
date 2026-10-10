@@ -31,11 +31,19 @@ export interface RoomSnapshotService {
   }): Promise<RoomShowcaseSnapshotMetadata | null>
 }
 
+/** After a failed read redraw, reads of that room revision wait this long before drawing again. */
+export const ROOM_SNAPSHOT_REDRAW_RETRY_AFTER_MS = 10 * 60 * 1000
+/** At most this many failed rooms are remembered per server; the oldest marker is dropped first. */
+const MAX_REDRAW_FAILURE_MARKERS = 1000
+
 export function createRoomSnapshotService(options: {
   repository?: RoomSnapshotRepository
   renderer?: RoomSnapshotRenderer
   isPublicByDefault?: boolean
   onRenderError?: (error: unknown, room: PersonalRoomDecorSnapshot) => void
+  /** Clock and retry-after of the read-redraw backoff; tests set them. */
+  now?: () => number
+  redrawRetryAfterMs?: number
 } = {}): RoomSnapshotService {
   const repository = options.repository ?? createInMemoryRoomSnapshotRepository()
   const renderer = options.renderer ?? createRoomSnapshotRenderer()
@@ -50,8 +58,22 @@ export function createRoomSnapshotService(options: {
     renderer.version !== undefined &&
     roomSnapshotMatchesRoomRevision(snapshot, room) &&
     roomSnapshotRendererGeneration(snapshot.rendererVersion) < roomSnapshotRendererGeneration(renderer.version)
-  // one redraw per user at a time: concurrent Discover reads share it
+  // one redraw per room revision at a time: concurrent Discover reads of that revision share it
   const readRedraws = new Map<string, Promise<RoomShowcaseSnapshotMetadata | null>>()
+  // a room revision whose read redraw failed is not drawn again by a read before its retry-after (in memory, per
+  // server; a save always draws)
+  const now = options.now ?? Date.now
+  const retryAfterMs = options.redrawRetryAfterMs ?? ROOM_SNAPSHOT_REDRAW_RETRY_AFTER_MS
+  let redrawFailures = new Map<string, number>()
+  const redrawKey = (room: PersonalRoomDecorSnapshot) => `${room.userId}:${room.revision}`
+  const isWaitingToRetry = (key: string) => (redrawFailures.get(key) ?? 0) > now()
+  function markRedrawFailed(key: string) {
+    const next = new Map(redrawFailures)
+    next.delete(key)
+    next.set(key, now() + retryAfterMs)
+    while (next.size > MAX_REDRAW_FAILURE_MARKERS) next.delete(next.keys().next().value!)
+    redrawFailures = next
+  }
 
   async function draw(
     room: PersonalRoomDecorSnapshot,
@@ -90,14 +112,19 @@ export function createRoomSnapshotService(options: {
     room: PersonalRoomDecorSnapshot,
     stale: RoomShowcaseSnapshotMetadata
   ): Promise<RoomShowcaseSnapshotMetadata | null> {
-    const pending = readRedraws.get(room.userId)
+    const key = redrawKey(room)
+    const pending = readRedraws.get(key)
     if (pending) return pending
+    if (isWaitingToRetry(key)) return Promise.resolve(null)
     const redraw = draw(room, stale)
       .then((saved) => (isCurrent(saved) && roomSnapshotMatchesRoomRevision(saved, room) ? saved : null))
       // reported through onRenderError in draw; a read never fails because a picture could not be drawn
-      .catch(() => null)
-      .finally(() => { readRedraws.delete(room.userId) })
-    readRedraws.set(room.userId, redraw)
+      .catch(() => {
+        markRedrawFailed(key)
+        return null
+      })
+      .finally(() => { readRedraws.delete(key) })
+    readRedraws.set(key, redraw)
     return redraw
   }
 
