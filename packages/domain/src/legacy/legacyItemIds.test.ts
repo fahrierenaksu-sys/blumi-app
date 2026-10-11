@@ -8,7 +8,24 @@ import {
   resolveR1PublishedEconomyCatalog,
   resolveUnheldEconomyCatalog
 } from "../release/releaseCatalog"
-import { isLegacyItemId, LEGACY_AVATAR_ITEM_IDS, LEGACY_ROOM_ITEM_IDS } from "./legacyItemIds"
+import {
+  AVATAR_LOADOUT_CATALOG,
+  DEFAULT_FEMALE_AVATAR_LOADOUT,
+  DEFAULT_MALE_AVATAR_LOADOUT,
+  type AvatarLoadoutSlot
+} from "../avatar/avatarLoadoutCatalog"
+import { coerceAvatarLoadout } from "../avatar/avatarLoadoutCoercion"
+import { toAvatarLoadoutV2, validateAvatarLoadout } from "../avatar/avatarLoadoutRules"
+import { AVATAR_STILL_MANIFEST } from "../avatar/avatarStills"
+import { RETIRED_AVATAR_ITEM_IDS } from "../avatar/retiredAvatarItems"
+import { LEGACY_AVATAR_ITEM_REPLACEMENTS } from "../economy/economyCatalog"
+import {
+  isLegacyItemId,
+  isRetiringAvatarItemId,
+  LEGACY_AVATAR_ITEM_IDS,
+  LEGACY_ROOM_ITEM_IDS,
+  RETIRING_AVATAR_ITEM_IDS
+} from "./legacyItemIds"
 
 /** The six old flat room pieces retired in X8: in the registry, never an active economy entry again. */
 const RETIRED_FLAT_ROOM_IDS = new Set([
@@ -94,6 +111,16 @@ test("L14: no new, reserved or kept id is in the legacy registry, and old ids ar
   for (const item of ECONOMY_CATALOG) {
     assert.equal(isLegacyItemId(item.itemId), false, `${item.itemId}: a legacy id is an active economy entry`)
   }
+  for (const item of AVATAR_LOADOUT_CATALOG) {
+    assert.equal(isLegacyItemId(item.itemId), false, `${item.itemId}: a legacy id is wearable`)
+  }
+  const everyRegistered = [...registry, ...RETIRING_AVATAR_ITEM_IDS]
+  assert.equal(new Set(everyRegistered).size, everyRegistered.length, "an id is either legacy or retiring, never both")
+  for (const [bodyId, body] of Object.entries(AVATAR_STILL_MANIFEST.bodies)) {
+    for (const id of [...Object.keys(body.items), ...Object.values(body.starter).filter((id): id is string => typeof id === "string")]) {
+      assert.equal(isLegacyItemId(id) || isRetiringAvatarItemId(id), false, `${bodyId}: rig art ${id} is an old id`)
+    }
+  }
 })
 
 test("the room part of the registry holds the six old flat pieces and all 45 universal core candidates", () => {
@@ -140,4 +167,83 @@ test("held items are neither sold nor listed in production or development projec
   // ownedByDefault starters stay in both
   assert.ok(resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG).some((item) => item.itemId === "avatar_v2_body_default"))
   assert.ok(resolveUnheldEconomyCatalog(ECONOMY_CATALOG).some((item) => item.itemId === "avatar_v2_body_default"))
+})
+
+const STARTERS = [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT] as const
+const SLOT_KEYS: readonly (readonly [AvatarLoadoutSlot, "hairId" | "topId" | "bottomId" | "shoesId"])[] = [
+  ["hair", "hairId"],
+  ["top", "topId"],
+  ["bottom", "bottomId"],
+  ["shoes", "shoesId"]
+]
+const CATALOG_IDS = AVATAR_LOADOUT_CATALOG.map((item) => item.itemId)
+
+function assertValidLook(loadout: unknown, label: string): void {
+  const result = validateAvatarLoadout(loadout, CATALOG_IDS)
+  assert.ok(result.ok, `${label}: ${result.ok ? "" : result.code}`)
+}
+
+test("every old avatar id has one defined behaviour: legacy and replaced, or retiring and still readable", () => {
+  // legacy now: in no catalog, so no one can buy or wear it; an old inventory that owns it is granted the replacement
+  assert.deepEqual([...LEGACY_AVATAR_ITEM_IDS].sort(), Object.keys(LEGACY_AVATAR_ITEM_REPLACEMENTS).sort())
+  for (const id of LEGACY_AVATAR_ITEM_IDS) {
+    assert.ok(isLegacyItemId(id), id)
+    assert.equal(CATALOG_IDS.includes(id), false, `${id} must not be wearable`)
+    assert.equal(ECONOMY_CATALOG.some((item) => item.itemId === id), false, `${id} must not be sold`)
+    assert.ok(CATALOG_IDS.includes(LEGACY_AVATAR_ITEM_REPLACEMENTS[id]), `${id}: its replacement is not readable`)
+  }
+  // retiring: still in the catalog, so every stored loadout and inventory that holds one keeps reading
+  assert.equal(RETIRING_AVATAR_ITEM_IDS.length, 165)
+  for (const id of RETIRING_AVATAR_ITEM_IDS) {
+    assert.equal(isLegacyItemId(id), false, `${id} is not legacy before the catalog switch`)
+    assert.ok(CATALOG_IDS.includes(id), `${id} is retiring but no longer readable`)
+  }
+  // the hidden (retired) ids are retiring ids too, so the catalog switch takes them along
+  for (const id of RETIRED_AVATAR_ITEM_IDS) assert.ok(isRetiringAvatarItemId(id), id)
+})
+
+test("only the kept ids stay out of the retiring list: bodies, face constants and the rig starters", () => {
+  const kept = new Set<string>(["avatar_v2_hair_male_soft_black_side_part"])
+  for (const starter of STARTERS) {
+    for (const id of [starter.bodyId, starter.faceId, starter.eyesId, starter.noseId, starter.mouthId]) kept.add(id)
+  }
+  for (const body of Object.values(AVATAR_STILL_MANIFEST.bodies)) {
+    for (const id of Object.keys(body.items)) kept.add(id)
+  }
+  const notRetiring = CATALOG_IDS.filter((id) => !isRetiringAvatarItemId(id))
+  assert.deepEqual(new Set(notRetiring), kept)
+})
+
+test("an account that wears only old ids reads as a valid look for its body and its stored value is unchanged", () => {
+  for (const starter of STARTERS) {
+    const bodyId = starter.bodyId
+    // every retiring id, in its own slot: kept while wearable, the body's starter piece when hidden or other-body
+    for (const [slot, key] of SLOT_KEYS) {
+      for (const item of AVATAR_LOADOUT_CATALOG.filter((entry) => entry.slot === slot)) {
+        if (!isRetiringAvatarItemId(item.itemId)) continue
+        for (const stored of [{ ...starter, [key]: item.itemId }, { ...toAvatarLoadoutV2(starter), [key]: item.itemId }]) {
+          const before = JSON.stringify(stored)
+          const read = coerceAvatarLoadout(stored, { presetId: bodyId })
+          assertValidLook(read, `${bodyId} ${key}=${item.itemId}`)
+          assert.equal(JSON.stringify(stored), before)
+          const wearable = item.supportedBodyIds.includes(bodyId) && !RETIRED_AVATAR_ITEM_IDS.has(item.itemId)
+          if (!wearable) assert.equal(read[key], starter[key], `${bodyId} ${key}=${item.itemId}`)
+        }
+      }
+    }
+    // a look made only of legacy and hidden ids: every slot is the body's starter piece
+    const legacy = [...LEGACY_AVATAR_ITEM_IDS]
+    const hidden = [...RETIRED_AVATAR_ITEM_IDS]
+    for (const ids of [legacy, hidden]) {
+      const stored = {
+        ...toAvatarLoadoutV2(starter),
+        hairId: ids[0], topId: ids[1], bottomId: ids[2], shoesId: ids[3],
+        dressId: ids[1], accessoryIds: ids.slice(4, 6)
+      }
+      const read = coerceAvatarLoadout(stored, { presetId: bodyId })
+      assertValidLook(read, `${bodyId} old look`)
+      for (const [, key] of SLOT_KEYS) assert.equal(read[key], starter[key], `${bodyId} ${key}`)
+      assert.equal(read.bodyId, bodyId)
+    }
+  }
 })
