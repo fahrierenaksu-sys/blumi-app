@@ -1,11 +1,13 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { AVATAR_STILL_MANIFEST, DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT } from "@blumi/domain"
+import { AVATAR_STILL_MANIFEST, DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT, type AvatarStillManifest } from "@blumi/domain"
+import * as realShowcaseModel from "../model/avatarShowcaseModel"
 import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 
-// The showcase surfaces (Discover card, profile and You hero, match moment) draw AvatarShowcase. Until the factory
-// delivers front art, every look must be today's 3/4 still exactly as those surfaces drew it before: same loadout,
-// crop, box and mirroring, and the same startup receipt.
+// The showcase surfaces (Discover card, profile and You hero, match moment) draw AvatarShowcase. A look without front
+// art for every worn piece must be the 3/4 still exactly as those surfaces drew it before: same loadout, crop, box and
+// mirroring, and the same startup receipt. These tests run on a fixture manifest, so landing real front art in the
+// baked manifest (data only) cannot change what they prove; the last test ties the component to the baked data.
 
 interface Element {
   type: unknown
@@ -30,7 +32,18 @@ function find(node: unknown, type: unknown): Element | undefined {
   return find(element.props?.children, type)
 }
 
-function mountShowcase() {
+/** The baked manifest as if no body had front art: the component must then draw the 3/4 still. */
+function withoutFrontArt(): AvatarStillManifest {
+  const bodies = Object.fromEntries(
+    Object.entries(AVATAR_STILL_MANIFEST.bodies).map(([rig, body]) => {
+      const { showcaseBase: _base, ...rest } = body
+      return [rig, { ...rest, items: Object.fromEntries(Object.entries(body.items).map(([id, { showcase: _showcase, ...bare }]) => [id, bare])) }]
+    })
+  )
+  return { ...AVATAR_STILL_MANIFEST, bodies } as unknown as AvatarStillManifest
+}
+
+function mountShowcase(manifest: AvatarStillManifest = withoutFrontArt()) {
   const runtime = createFakeReactRuntime()
   const { AvatarShowcase } = loadSourceWithFakeReact<{ AvatarShowcase: (props: Record<string, unknown>) => unknown }>(
     "features/avatar/components/AvatarShowcase.tsx",
@@ -40,10 +53,15 @@ function mountShowcase() {
         "react-native": createReactNativeStub().module,
         "expo-image": { Image: "Image" },
         "../stills/stillAssets": { AVATAR_STILL_ASSETS: EVERY_ASSET_BUNDLED },
+        "../model/avatarShowcaseModel": {
+          ...realShowcaseModel,
+          createAvatarShowcasePlanCache: () => (loadout: unknown, crop: never, box: never, options: never) =>
+            realShowcaseModel.planAvatarShowcase(loadout, crop, box, { ...(options as object), manifest } as never)
+        },
         "./AvatarStill": { AvatarStill },
         "./useStillDisplayReceipts": { useStillDisplayReceipts }
       },
-      real: ["@blumi/domain", "../model/avatarShowcaseModel"]
+      real: ["@blumi/domain"]
     }
   )
   let props: Record<string, unknown> = {}
@@ -65,8 +83,7 @@ const looks = [
   ["an unreadable loadout", "nonsense"]
 ] as const
 
-test("with today's art every look on every showcase surface is the 3/4 still the surface drew before", () => {
-  assert.ok(AVATAR_STILL_MANIFEST.bodies.female, "the baked manifest is loaded")
+test("a look without front art, on every showcase surface, is the 3/4 still the surface drew before", () => {
   const surfaces = [
     { name: "Discover front", crop: "card", fallbackCrop: "full", width: 184, height: 194, mirror: false, still: "full" },
     { name: "profile hero", crop: "card", fallbackCrop: undefined, width: 190, height: 300, mirror: false, still: "full" },
@@ -136,6 +153,7 @@ test("a figure without a label is decorative and hands the fallback window to th
   const window = [52, 28, 160, 160] as const
   const output = mountShowcase().render({
     loadout: DEFAULT_FEMALE_AVATAR_LOADOUT,
+    decorative: true,
     crop: "head",
     fallbackCrop: "bust",
     fallbackWindow: window,
@@ -147,4 +165,20 @@ test("a figure without a label is decorative and hands the fallback window to th
   const still = find(output, AvatarStill)
   assert.equal(still?.props.crop, "bust")
   assert.deepEqual(still?.props.window, window)
+})
+
+test("the component draws the front figure for exactly the looks the baked manifest has front art for", () => {
+  const surface = { crop: "card", width: 100, height: 200, accessibilityLabel: "Defne avatar" }
+  for (const [rig, loadout] of [["female", DEFAULT_FEMALE_AVATAR_LOADOUT], ["male", DEFAULT_MALE_AVATAR_LOADOUT]] as const) {
+    const body = AVATAR_STILL_MANIFEST.bodies[rig]
+    const hasFront = Boolean(body.showcaseBase) && Object.values(body.starter).every((id) => id && body.items[id]?.showcase)
+    const output = mountShowcase(AVATAR_STILL_MANIFEST).render({ ...surface, loadout })
+    if (hasFront) {
+      assert.equal(find(output, AvatarStill), undefined, `${rig}: the front art replaces the 3/4 still`)
+      const plan = output.props.plan as { kind: string; frames: readonly unknown[] } | undefined
+      assert.ok(plan?.kind === "showcase" && plan.frames.length > 1, `${rig}: the front layers are drawn`)
+    } else {
+      assert.ok(find(output, AvatarStill), `${rig}: no front art, the 3/4 still`)
+    }
+  }
 })

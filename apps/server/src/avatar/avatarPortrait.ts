@@ -168,8 +168,23 @@ function portraitPlans(
     window: [0, 0, bust.space.width, bust.space.height]
   }
   const front = resolveShowcaseLayers(loadout, "push", manifest)
-  if (front.kind === "fallback") return { rig: bust.rig, plans: [bustPlan] }
+  if (front.kind === "fallback" || !isWindowInside(front.windows?.push, front.space)) return { rig: bust.rig, plans: [bustPlan] }
   return { rig: bust.rig, plans: [{ view: "showcase", layers: front.layers, space: front.space, window: front.windows.push }, bustPlan] }
+}
+
+/** Whether the manifest has front art for the whole of this look (so its push picture must be the front figure). */
+function hasFrontArt(loadout: unknown, manifest: AvatarStillManifest | undefined): boolean {
+  return resolveShowcaseLayers(loadout, "push", manifest).kind === "showcase"
+}
+
+/** A crop window must be four finite numbers inside the canvas; a malformed front base falls back to the next source. */
+function isWindowInside(
+  window: readonly number[] | undefined,
+  space: { readonly width: number; readonly height: number }
+): window is readonly [number, number, number, number] {
+  if (!Array.isArray(window) || window.length !== 4 || !window.every((value) => Number.isFinite(value))) return false
+  const [x, y, width, height] = window as readonly number[]
+  return width! > 0 && height! > 0 && x! >= 0 && y! >= 0 && x! + width! <= space.width && y! + height! <= space.height
 }
 
 async function drawPortrait(
@@ -229,7 +244,8 @@ export function getAvatarPortraitSelfCheckState(): "unchecked" | "ok" | "failed"
  * it can be logged and shown in the health detail without any user or loadout value.
  */
 export async function checkAvatarPortraitRenderer(
-  rendererOrDefault?: AvatarPortraitRenderer | null
+  rendererOrDefault?: AvatarPortraitRenderer | null,
+  options: { readonly manifest?: AvatarStillManifest } = {}
 ): Promise<{ ok: true } | { ok: false; errorType: string }> {
   try {
     // Built inside the try: whatever goes wrong while building it is a failed check, not a start-up crash.
@@ -240,6 +256,11 @@ export async function checkAvatarPortraitRenderer(
       if (result.body.length === 0) throw Object.assign(new Error("Empty portrait."), { name: "EmptyImage" })
       // Pictures still go out from the fixed bust, but a default look that needs it means the art pack is not usable.
       if (result.level !== "look") throw Object.assign(new Error("Default portrait used a fallback."), { name: "FallbackPortrait" })
+      // A default look the manifest has front art for must draw the front figure: a stale pack would otherwise send the
+      // 3/4 bust while the app shows the front one, with /ready still green.
+      if (hasFrontArt(loadout, options.manifest) && result.view !== "showcase") {
+        throw Object.assign(new Error("Default portrait is not the front figure."), { name: "MissingFrontArt" })
+      }
     }
     selfCheckState = "ok"
     return { ok: true }

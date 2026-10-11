@@ -8,7 +8,7 @@ import { AVATAR_STILL_ASSETS } from "../stills/stillAssets"
 import { AvatarStill } from "./AvatarStill"
 import { useStillDisplayReceipts } from "./useStillDisplayReceipts"
 
-export interface AvatarShowcaseProps {
+interface AvatarShowcaseBaseProps {
   /** Anyone's loadout as stored or received: resolved by the domain showcase resolver (total). */
   loadout: unknown
   hints?: AvatarLoadoutCoercionHints
@@ -25,11 +25,6 @@ export interface AvatarShowcaseProps {
   fallbackWindow?: AvatarStillRect
   /** Turns the 3/4 fallback the other way (the partner facing the person); the front view always faces the viewer. */
   mirror?: boolean
-  /**
-   * The figure is one accessible image (who it is, for screen readers). Left out, it is decorative: a parent that
-   * already carries the label (a round chip, a list row) owns the accessibility, and nothing here is focusable.
-   */
-  accessibilityLabel?: string
   /** Shown behind the figure until every layer has drawn (loading state); transparent by default. */
   placeholderColor?: string
   style?: StyleProp<ViewStyle>
@@ -38,6 +33,16 @@ export interface AvatarShowcaseProps {
   /** A layer failed to draw (front layers then fall back to the 3/4 still). */
   onError?: () => void
 }
+
+/**
+ * Every showcase figure either names the person for screen readers or says it is decorative (a parent that already
+ * carries the label owns the accessibility). One of the two is required, so a new surface cannot silently skip it.
+ */
+export type AvatarShowcaseProps = AvatarShowcaseBaseProps &
+  (
+    | { /** The figure is one accessible image: who it is. */ accessibilityLabel: string; decorative?: undefined }
+    | { /** A round chip or list row already carries the label; nothing here is focusable. */ decorative: true; accessibilityLabel?: undefined }
+  )
 
 /** Shared by every showcase on screen: equal looks in the same crop and box reuse one plan. */
 const planShowcase = createAvatarShowcasePlanCache()
@@ -106,7 +111,7 @@ function useStableListener(listener: (() => void) | undefined): (() => void) | u
   return useMemo(() => (hasListener ? () => latest.current?.() : undefined), [hasListener])
 }
 
-interface ShowcaseFrontProps extends AvatarShowcaseProps {
+type ShowcaseFrontProps = AvatarShowcaseProps & {
   plan: AvatarShowcaseFrontPlan
   onLayerError: (cacheKey: string) => void
 }

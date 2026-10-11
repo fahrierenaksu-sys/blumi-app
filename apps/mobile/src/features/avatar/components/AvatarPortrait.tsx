@@ -40,6 +40,7 @@ export const AvatarPortrait = memo(function AvatarPortrait(props: AvatarPortrait
       <AvatarShowcase
         loadout={props.loadout}
         hints={props.hints}
+        decorative
         crop="head"
         fallbackCrop="bust"
         fallbackWindow={size <= AVATAR_PORTRAIT_TINY_PT ? FACE_WINDOW : BUST_WINDOW}

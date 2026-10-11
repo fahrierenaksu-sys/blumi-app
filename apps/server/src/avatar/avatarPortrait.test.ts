@@ -32,6 +32,24 @@ const unknownItems = (loadout: AvatarLoadout): AvatarLoadout => ({
   shoesId: "avatar_v2_shoes_never_existed"
 })
 
+/**
+ * The baked manifest as if no body had front art yet: every test of the 3/4 bust or of a synthetic front base starts
+ * from this, so landing real front art in the manifest (data only) cannot change what those tests prove.
+ */
+function withoutFrontArt(manifest: AvatarStillManifest = AVATAR_STILL_MANIFEST): AvatarStillManifest {
+  const bodies = Object.fromEntries(
+    Object.entries(manifest.bodies).map(([rig, body]) => {
+      const { showcaseBase: _base, ...rest } = body
+      const items = Object.fromEntries(Object.entries(body.items).map(([id, item]) => {
+        const { showcase: _showcase, ...bare } = item
+        return [id, bare]
+      }))
+      return [rig, { ...rest, items }]
+    })
+  )
+  return { ...manifest, bodies } as unknown as AvatarStillManifest
+}
+
 async function pixels(body: Buffer) {
   const { data, info } = await sharp(body).removeAlpha().raw().toBuffer({ resolveWithObject: true })
   const at = (x: number, y: number) => {
@@ -167,12 +185,13 @@ test("a truncated art manifest never stops the server: no art, so the fixed bust
  */
 const OTHER_TOP = "avatar_v2_top_sage_ribbon_knit_jacket"
 const girlManifest = (options: { otherTop: boolean; starterTop: boolean }): AvatarStillManifest => {
-  const female = AVATAR_STILL_MANIFEST.bodies.female
+  const bare = withoutFrontArt()
+  const female = bare.bodies.female
   const { top: _starterTop, ...starterWithoutTop } = female.starter
   return {
-    ...AVATAR_STILL_MANIFEST,
+    ...bare,
     bodies: {
-      ...AVATAR_STILL_MANIFEST.bodies,
+      ...bare.bodies,
       female: {
         ...female,
         starter: options.starterTop ? female.starter : starterWithoutTop,
@@ -199,8 +218,9 @@ test("the saved outfit decides the picture: a bare top draws no top or sleeve pi
   const none = await noTopAnywhere.render({ loadout: female, background })
   assert.ok(bare.body.equals(none.body), "no polo layer, and so no sleeve fragment, is drawn without its top")
   // The real manifest bakes no such top: the same loadout there is the starter picture.
-  const real = await createAvatarPortraitRenderer({ art }).render({ loadout: { ...female, topId: OTHER_TOP }, background })
-  assert.ok(real.body.equals(starter.body))
+  const real = await createAvatarPortraitRenderer({ art, manifest: withoutFrontArt() }).render({ loadout: { ...female, topId: OTHER_TOP }, background })
+  const realStarter = await createAvatarPortraitRenderer({ art, manifest: withoutFrontArt() }).render({ loadout: female, background })
+  assert.ok(real.body.equals(realStarter.body))
 })
 
 test("a sender wearing retired catalog items and an old dress pair still gets the body's starter picture", async () => {
@@ -226,7 +246,8 @@ const FRONT_CANVAS = { width: 300, height: 720 }
 const PUSH_WINDOW = [50, 0, 200, 200] as const
 
 function girlWithFrontArt(options: { omit?: readonly string[] } = {}): AvatarStillManifest {
-  const girl = AVATAR_STILL_MANIFEST.bodies.female
+  const base = withoutFrontArt()
+  const girl = base.bodies.female
   const items = Object.fromEntries(
     Object.entries(girl.items).map(([id, item], index) => [
       id,
@@ -239,7 +260,7 @@ function girlWithFrontArt(options: { omit?: readonly string[] } = {}): AvatarSti
     ground: [150, 700] as const,
     windows: { card: [0, 0, 300, 720] as const, head: [50, 0, 200, 200] as const, push: PUSH_WINDOW }
   }
-  return { ...AVATAR_STILL_MANIFEST, bodies: { ...AVATAR_STILL_MANIFEST.bodies, female: { ...girl, items, showcaseBase } } }
+  return { ...base, bodies: { ...base.bodies, female: { ...girl, items, showcaseBase } } }
 }
 
 /** An art pack dir: the real bust layers plus the synthetic front layers of `manifest` (minus `missing` keys). */
@@ -292,7 +313,7 @@ test("a look with front art is the push crop of the front figure, cut from the p
 
 test("a look the front art does not cover whole is drawn as the 3/4 bust, never a mix of the two", async () => {
   const background = "#D6EEFF"
-  const bustOnly = await createAvatarPortraitRenderer({ art }).render({ loadout: female, background })
+  const bustOnly = await createAvatarPortraitRenderer({ art, manifest: withoutFrontArt() }).render({ loadout: female, background })
   // One worn item has no front layer yet.
   const partial = girlWithFrontArt({ omit: ["top"] })
   const partialPack = await packWithFrontArt(partial)
@@ -313,9 +334,48 @@ test("a look the front art does not cover whole is drawn as the 3/4 bust, never 
   }
 })
 
-test("today's baked art has no front figure yet, so every push is the 3/4 bust", async () => {
+test("a look with no front art draws the 3/4 bust, and without an art pack the fixed bust", async () => {
   assert.ok(art)
-  const renderer = createAvatarPortraitRenderer({ art })
+  const renderer = createAvatarPortraitRenderer({ art, manifest: withoutFrontArt() })
   for (const loadout of [female, male]) assert.equal((await renderer.render({ loadout, background: "#FFD9E8" })).view, "bust")
   assert.equal((await createAvatarPortraitRenderer({ art: null }).render({ loadout: female, background: "#FFD9E8" })).view, "fixed")
+})
+
+test("every body whose starter look has front art in the baked manifest draws its push picture from it", async () => {
+  assert.ok(art)
+  const renderer = createAvatarPortraitRenderer({ art })
+  for (const [rig, loadout] of [["female", female], ["male", male]] as const) {
+    const body = AVATAR_STILL_MANIFEST.bodies[rig]
+    const hasFront = Boolean(body.showcaseBase) && Object.values(body.starter).every((id) => id && body.items[id]?.showcase)
+    const result = await renderer.render({ loadout, background: "#FFD9E8" })
+    assert.equal(result.view, hasFront ? "showcase" : "bust", `${rig}: the push picture follows the manifest's front art`)
+  }
+})
+
+test("a front base without usable crop windows falls back to the 3/4 bust instead of dropping the picture", async () => {
+  assert.ok(art)
+  const background = "#FFD9E8"
+  const bustOnly = await createAvatarPortraitRenderer({ art, manifest: withoutFrontArt() }).render({ loadout: female, background })
+  const good = girlWithFrontArt()
+  const girl = good.bodies.female
+  const broken = (showcaseBase: unknown): AvatarStillManifest =>
+    ({ ...good, bodies: { ...good.bodies, female: { ...girl, showcaseBase } } }) as unknown as AvatarStillManifest
+  const noWindows = { ...girl.showcaseBase!, windows: undefined }
+  const outside = { ...girl.showcaseBase!, windows: { ...girl.showcaseBase!.windows, push: [0, 0, 9999, 9999] } }
+  const notNumbers = { ...girl.showcaseBase!, windows: { ...girl.showcaseBase!.windows, push: ["a", 0, 10, 10] } }
+  for (const manifest of [broken(noWindows), broken(outside), broken(notNumbers)]) {
+    const result = await createAvatarPortraitRenderer({ art, manifest }).render({ loadout: female, background })
+    assert.deepEqual([result.level, result.view], ["look", "bust"])
+    assert.ok(result.body.equals(bustOnly.body))
+  }
+})
+
+test("the start-up check fails when the manifest has front art for a default look but the pack draws the bust", async () => {
+  assert.ok(art)
+  const withFront = girlWithFrontArt()
+  // Front art in the manifest, but none of it in the pack: every default push would silently be the bust.
+  const staleResult = await checkAvatarPortraitRenderer(createAvatarPortraitRenderer({ art, manifest: withFront }), { manifest: withFront })
+  assert.deepEqual(staleResult, { ok: false, errorType: "MissingFrontArt" })
+  const noFront = withoutFrontArt()
+  assert.deepEqual(await checkAvatarPortraitRenderer(createAvatarPortraitRenderer({ art, manifest: noFront }), { manifest: noFront }), { ok: true })
 })
