@@ -82,7 +82,7 @@ import { registerCapabilityRoutes } from "./routes/capabilityRoutes"
 import { createChatReceiptService } from "./chat/chatReceiptService"
 import { registerChatPreferencesRoutes } from "./routes/chatPreferencesRoutes"
 import { getRoomSnapshotSelfCheckState } from "./rooms/roomSnapshotRenderer"
-import { getAvatarPortraitSelfCheckState } from "./avatar/avatarPortrait"
+import { computeAvatarArtPackHash, getAvatarPortraitSelfCheckState } from "./avatar/avatarPortrait"
 import {
   createPersonalRoomDecorService,
   type PersonalRoomDecorService
@@ -108,6 +108,8 @@ interface CreateServerOptions {
   isAccepting?: () => boolean
   checkReadiness?: () => Promise<void>
   readinessTimeoutMs?: number
+  /** Overrides how /ready reads the avatar art-pack hash (tests); default hashes the built art pack manifest. */
+  avatarArtPackHash?: () => string | null
   authService?: AuthService
   firebaseAuthVerifier?: FirebaseAuthVerifier
   /**
@@ -313,9 +315,11 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       check: options.checkReadiness ?? (async () => {}),
       timeoutMs: options.readinessTimeoutMs
     })
+    let cachedArtPackHash: string | null | undefined
+    const artPackHash = () => (cachedArtPackHash === undefined ? (cachedArtPackHash = (options.avatarArtPackHash ?? computeAvatarArtPackHash)()) : cachedArtPackHash)
     app.get("/ready", async (_request, reply) => {
       const ready = await probe()
-      return reply.code(ready ? 200 : 503).send({ ok: ready, service: "blumi-server" })
+      return reply.code(ready ? 200 : 503).send({ ok: ready, service: "blumi-server", artPackHash: artPackHash() })
     })
   })
   app.addHook("onRequest", async (request, reply) => {
