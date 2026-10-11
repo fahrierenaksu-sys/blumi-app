@@ -31,21 +31,36 @@ export function layoutAvatarStill(
   box: { readonly width: number; readonly height: number },
   body?: { readonly ground: readonly [number, number]; readonly sheetHeight: number }
 ): AvatarStillLayout {
-  const [wx, wy, ww, wh] = window
+  const placed = placeStillLayers(still.layers, window, box)
+  const { scale, offsetX, offsetY } = placed
+  return {
+    scale,
+    frames: placed.frames,
+    ground: body && still.product === "full" ? { x: offsetX + body.ground[0] * scale, y: offsetY + body.ground[1] * scale } : null,
+    figureHeight: body && still.product === "full" ? body.sheetHeight * scale : null
+  }
+}
+
+/** Fits a window inside a box (contain), centred, and places each layer at its baked rect in the window's space. */
+export function placeStillLayers(
+  layers: readonly { readonly asset: string; readonly rect: AvatarStillRect }[],
+  [wx, wy, ww, wh]: AvatarStillRect,
+  box: { readonly width: number; readonly height: number }
+): { readonly scale: number; readonly offsetX: number; readonly offsetY: number; readonly frames: readonly AvatarStillFrame[] } {
   const scale = Math.min(box.width / ww, box.height / wh)
   const offsetX = (box.width - ww * scale) / 2 - wx * scale
   const offsetY = (box.height - wh * scale) / 2 - wy * scale
   return {
     scale,
-    frames: still.layers.map(({ asset, rect: [x, y, w, h] }) => ({
+    offsetX,
+    offsetY,
+    frames: layers.map(({ asset, rect: [x, y, w, h] }) => ({
       asset,
       left: offsetX + x * scale,
       top: offsetY + y * scale,
       width: w * scale,
       height: h * scale
-    })),
-    ground: body && still.product === "full" ? { x: offsetX + body.ground[0] * scale, y: offsetY + body.ground[1] * scale } : null,
-    figureHeight: body && still.product === "full" ? body.sheetHeight * scale : null
+    }))
   }
 }
 

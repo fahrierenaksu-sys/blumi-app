@@ -152,6 +152,8 @@ try {
       resolve(workspaceRoot, "src/features/avatar/stills/avatarStills.test.ts"),
       // still layout and the live-canvas budget (plan 2.2)
       resolve(workspaceRoot, "src/features/avatar/model/avatarStillLayout.test.ts"),
+      // the front (showcase) stack outside the room: whole-figure 3/4 fallback, missing assets, plan cache (Phase 3 D1)
+      resolve(workspaceRoot, "src/features/avatar/model/avatarShowcaseModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatar/model/avatarLiveBudget.test.ts"),
       // AvatarLive's canvas gate: useAvatarLiveSlot as AvatarLive calls it, against the real budget (review A F4)
       resolve(workspaceRoot, "src/features/avatar/components/useAvatarLiveSlot.test.ts"),
