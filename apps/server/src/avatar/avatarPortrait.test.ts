@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -216,4 +216,106 @@ test("a sender wearing retired catalog items and an old dress pair still gets th
   const starter = await renderer.render({ loadout: female, background })
   assert.ok(drawn.body.equals(starter.body))
   assert.equal(drawn.level, "look")
+})
+
+/**
+ * Front (showcase) art for the girl, synthetic: a 300x720 base that is green except a blue square exactly where the
+ * `push` window is, and transparent item layers. The picture is then blue only if the push window was cut out.
+ */
+const FRONT_CANVAS = { width: 300, height: 720 }
+const PUSH_WINDOW = [50, 0, 200, 200] as const
+
+function girlWithFrontArt(options: { omit?: readonly string[] } = {}): AvatarStillManifest {
+  const girl = AVATAR_STILL_MANIFEST.bodies.female
+  const items = Object.fromEntries(
+    Object.entries(girl.items).map(([id, item], index) => [
+      id,
+      options.omit?.includes(item.slot) ? item : { ...item, showcase: { key: `${id}__front`, rect: [0, 0, FRONT_CANVAS.width, FRONT_CANVAS.height] as const, order: index + 1 } }
+    ])
+  )
+  const showcaseBase = {
+    key: "base__front",
+    canvas: FRONT_CANVAS,
+    ground: [150, 700] as const,
+    windows: { card: [0, 0, 300, 720] as const, head: [50, 0, 200, 200] as const, push: PUSH_WINDOW }
+  }
+  return { ...AVATAR_STILL_MANIFEST, bodies: { ...AVATAR_STILL_MANIFEST.bodies, female: { ...girl, items, showcaseBase } } }
+}
+
+/** An art pack dir: the real bust layers plus the synthetic front layers of `manifest` (minus `missing` keys). */
+async function packWithFrontArt(manifest: AvatarStillManifest, missing: readonly string[] = []) {
+  assert.ok(art)
+  const dir = mkdtempSync(join(tmpdir(), "blumi-art-"))
+  cpSync(join(art.dir, "avatar"), join(dir, "avatar"), { recursive: true })
+  mkdirSync(join(dir, "avatar/female/showcase"), { recursive: true })
+  const girl = manifest.bodies.female
+  const keys = [girl.showcaseBase!.key, ...Object.values(girl.items).flatMap((item) => (item.showcase ? [item.showcase.key] : []))]
+  const green = { r: 0, g: 160, b: 0, alpha: 1 }
+  const blue = { r: 0, g: 0, b: 255, alpha: 1 }
+  const baseSquare = await sharp({ create: { width: PUSH_WINDOW[2], height: PUSH_WINDOW[3], channels: 4, background: blue } }).png().toBuffer()
+  const base = await sharp({ create: { ...FRONT_CANVAS, channels: 4, background: green } })
+    .composite([{ input: baseSquare, left: PUSH_WINDOW[0], top: PUSH_WINDOW[1] }])
+    .webp({ lossless: true })
+    .toBuffer()
+  const clear = await sharp({ create: { ...FRONT_CANVAS, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).webp({ lossless: true }).toBuffer()
+  for (const key of keys) {
+    if (missing.includes(key)) continue
+    writeFileSync(join(dir, `avatar/female/showcase/${key}.webp`), key === girl.showcaseBase!.key ? base : clear)
+  }
+  const files = Object.fromEntries([...art.files, ...keys.filter((key) => !missing.includes(key)).map((key) => `avatar/female/showcase/${key}.webp`)].map((path) => [path, "x"]))
+  writeFileSync(join(dir, "manifest.json"), JSON.stringify({ version: 1, files }))
+  return { dir, pack: loadAvatarPortraitArt(dir)! }
+}
+
+test("a look with front art is the push crop of the front figure, cut from the push window and nothing else", async () => {
+  const manifest = girlWithFrontArt()
+  const { dir, pack } = await packWithFrontArt(manifest)
+  try {
+    const background = "#FFD9E8"
+    const front = await createAvatarPortraitRenderer({ art: pack, manifest }).render({ loadout: female, background })
+    assert.deepEqual([front.level, front.view], ["look", "showcase"])
+    const { info, at } = await pixels(front.body)
+    assert.deepEqual([info.width, info.height], [AVATAR_PORTRAIT_SIZE, AVATAR_PORTRAIT_SIZE])
+    for (const [x, y] of [[2, 2], [AVATAR_PORTRAIT_SIZE - 3, 2], [2, AVATAR_PORTRAIT_SIZE - 3], [AVATAR_PORTRAIT_SIZE / 2, AVATAR_PORTRAIT_SIZE / 2]] as const) {
+      assert.equal(at(x, y), "#0000FF", `the window is the whole picture at ${x},${y}`)
+    }
+    const again = await createAvatarPortraitRenderer({ art: pack, manifest }).render({ loadout: cloneAvatarLoadout(female), background })
+    assert.ok(front.body.equals(again.body), "deterministic for a loadout")
+    // Items without art draw as the body's starter pieces, in the front view too.
+    const unknown = await createAvatarPortraitRenderer({ art: pack, manifest }).render({ loadout: unknownItems(female), background })
+    assert.ok(unknown.body.equals(front.body))
+    assert.equal(unknown.view, "showcase")
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test("a look the front art does not cover whole is drawn as the 3/4 bust, never a mix of the two", async () => {
+  const background = "#D6EEFF"
+  const bustOnly = await createAvatarPortraitRenderer({ art }).render({ loadout: female, background })
+  // One worn item has no front layer yet.
+  const partial = girlWithFrontArt({ omit: ["top"] })
+  const partialPack = await packWithFrontArt(partial)
+  // Every item has one, but a front file is missing from the art pack.
+  const complete = girlWithFrontArt()
+  const holedKey = Object.values(complete.bodies.female.items).find((item) => item.slot === "shoes")!.showcase!.key
+  const holedPack = await packWithFrontArt(complete, [holedKey])
+  try {
+    const noLayer = await createAvatarPortraitRenderer({ art: partialPack.pack, manifest: partial }).render({ loadout: female, background })
+    assert.deepEqual([noLayer.level, noLayer.view], ["look", "bust"])
+    assert.ok(noLayer.body.equals(bustOnly.body), "exactly today's bust picture")
+    const noFile = await createAvatarPortraitRenderer({ art: holedPack.pack, manifest: complete }).render({ loadout: female, background })
+    assert.deepEqual([noFile.level, noFile.view], ["look", "bust"])
+    assert.ok(noFile.body.equals(bustOnly.body))
+  } finally {
+    rmSync(partialPack.dir, { recursive: true, force: true })
+    rmSync(holedPack.dir, { recursive: true, force: true })
+  }
+})
+
+test("today's baked art has no front figure yet, so every push is the 3/4 bust", async () => {
+  assert.ok(art)
+  const renderer = createAvatarPortraitRenderer({ art })
+  for (const loadout of [female, male]) assert.equal((await renderer.render({ loadout, background: "#FFD9E8" })).view, "bust")
+  assert.equal((await createAvatarPortraitRenderer({ art: null }).render({ loadout: female, background: "#FFD9E8" })).view, "fixed")
 })

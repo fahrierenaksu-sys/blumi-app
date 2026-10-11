@@ -64,6 +64,12 @@ for (const [rig, body] of Object.entries(stillManifest.bodies ?? {})) {
   const bust = body?.layers?.bust ?? []
   if (bust.length === 0) fail(`no bust layers for ${rig}`)
   for (const layer of bust) sources.set(`avatar/${rig}/bust/${layer.key}.webp`, join(stillLayersRoot, rig, "bust", `${layer.key}.webp`))
+  // the front (showcase) layers the push picture draws, once a body has front art: the base plus each item's layer.
+  // A body without `showcaseBase` has none yet, and its pushes draw the 3/4 bust.
+  if (!body?.showcaseBase) continue
+  const showcaseKeys = new Set([body.showcaseBase.key])
+  for (const item of Object.values(body.items ?? {})) if (item?.showcase?.key) showcaseKeys.add(item.showcase.key)
+  for (const key of showcaseKeys) sources.set(`avatar/${rig}/showcase/${key}.webp`, join(stillLayersRoot, rig, "showcase", `${key}.webp`))
 }
 
 const files = {}

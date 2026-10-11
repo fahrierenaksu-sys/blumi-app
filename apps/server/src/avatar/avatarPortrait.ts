@@ -8,20 +8,22 @@ import {
   DEFAULT_MALE_AVATAR_LOADOUT,
   pickAvatarSwatch,
   resolveAvatarStillLayers,
+  resolveShowcaseLayers,
   type AvatarStillManifest,
-  type AvatarStillResolved,
+  type AvatarStillRect,
   type AvatarStillRigId
 } from "@blumi/domain"
 import { resolveRoomArtPackDir } from "../rooms/roomSnapshotRenderer"
 import { drawFallbackPortrait } from "./avatarPortraitFallback"
 
 /**
- * Small pictures of a user's current 2.5D chibi (the baked head-and-shoulders still on their avatar circle colour),
- * drawn from the server's art pack (`dist/art/avatar/<rig>/bust`, written by scripts/build-art-pack.mjs) with the
- * same layer resolver the app uses. Used as the sender picture of chat and room invite pushes. Nothing is stored:
+ * Small pictures of a user's current 2.5D chibi on their avatar circle colour, drawn from the server's art pack
+ * (`dist/art/avatar/<rig>/{showcase,bust}`, written by scripts/build-art-pack.mjs) with the same layer resolvers the
+ * app uses: the front (showcase) figure in the `push` crop when the whole look has front art, otherwise the baked
+ * 3/4 head-and-shoulders bust. Used as the sender picture of chat and room invite pushes. Nothing is stored:
  * a portrait is rendered on demand and kept in a small in-memory cache keyed by what it shows.
  */
-export const AVATAR_PORTRAIT_RENDERER_VERSION = "avatar-portrait-v2"
+export const AVATAR_PORTRAIT_RENDERER_VERSION = "avatar-portrait-v3"
 /** Output edge in pixels (square PNG; iOS draws it as a circle). */
 export const AVATAR_PORTRAIT_SIZE = 192
 
@@ -35,10 +37,22 @@ const STARTER_LOADOUTS: Readonly<Record<AvatarStillRigId, unknown>> = {
 /** Which level of the chain drew the picture: the person's look, their body's starter, or the fixed bust. */
 export type AvatarPortraitLevel = "look" | "starter" | "fixed"
 
+/** Which art drew it: the front showcase figure, the 3/4 bust still, or the fixed code-drawn bust. */
+export type AvatarPortraitView = "showcase" | "bust" | "fixed"
+
 export interface AvatarPortrait {
   body: Buffer
   mimeType: "image/png"
   level: AvatarPortraitLevel
+  view: AvatarPortraitView
+}
+
+/** One drawable candidate: layers on a canvas, and the window of that canvas that becomes the picture. */
+interface PortraitPlan {
+  readonly view: "showcase" | "bust"
+  readonly layers: readonly { readonly asset: string; readonly rect: AvatarStillRect }[]
+  readonly space: { readonly width: number; readonly height: number }
+  readonly window: AvatarStillRect
 }
 
 export interface AvatarPortraitRenderer {
@@ -115,41 +129,67 @@ export function createAvatarPortraitRenderer(options: {
     async render({ loadout, background }) {
       if (!HEX_COLOUR.test(background)) throw new Error("Avatar portrait background is invalid.")
       // Total: the loadout is coerced and unknown items draw as the body's starter pieces. A valid link never fails
-      // for an art reason: look, then that body's starter, then the fixed bust of the body.
-      const still = resolveAvatarStillLayers(loadout, "bust", { manifest: options.manifest })
-      const starter = resolveAvatarStillLayers(STARTER_LOADOUTS[still.rig], "bust", { manifest: options.manifest })
-      const attempts: readonly (readonly [AvatarPortraitLevel, AvatarStillResolved])[] = [["look", still], ["starter", starter]]
+      // for an art reason: the look (front figure, then 3/4 bust), then that body's starter the same way, then the
+      // fixed bust of the body.
+      const { rig, plans: lookPlans } = portraitPlans(loadout, options.manifest)
+      const attempts: readonly (readonly [AvatarPortraitLevel, PortraitPlan])[] = [
+        ...lookPlans.map((plan) => ["look", plan] as const),
+        ...portraitPlans(STARTER_LOADOUTS[rig], options.manifest).plans.map((plan) => ["starter", plan] as const)
+      ]
       if (art) {
-        for (const [level, attempt] of attempts) {
+        for (const [level, plan] of attempts) {
           try {
-            return { body: await drawCached(attempt.layers, background, () => drawPortrait(art, attempt, background)), mimeType: "image/png", level }
+            const body = await drawCached([plan.view, plan.layers, plan.window], background, () => drawPortrait(art, plan, background))
+            return { body, mimeType: "image/png", level, view: plan.view }
           } catch {
-            // Try the next level; nothing about the look is logged.
+            // Try the next candidate; nothing about the look is logged.
           }
         }
       }
-      const body = await drawCached(["fixed", still.rig], background, () => drawFallbackPortrait(still.rig, background, AVATAR_PORTRAIT_SIZE))
-      return { body, mimeType: "image/png", level: "fixed" }
+      const body = await drawCached(["fixed", rig], background, () => drawFallbackPortrait(rig, background, AVATAR_PORTRAIT_SIZE))
+      return { body, mimeType: "image/png", level: "fixed", view: "fixed" }
     }
   }
 }
 
+/**
+ * The candidates for one loadout, best first: the front figure in the `push` crop when the whole look has front art,
+ * then the 3/4 bust of the same look (the resolver's fallback is the whole 3/4 figure, never a mix).
+ */
+function portraitPlans(
+  loadout: unknown,
+  manifest: AvatarStillManifest | undefined
+): { readonly rig: AvatarStillRigId; readonly plans: readonly PortraitPlan[] } {
+  const bust = resolveAvatarStillLayers(loadout, "bust", { manifest })
+  const bustPlan: PortraitPlan = {
+    view: "bust",
+    layers: bust.layers,
+    space: bust.space,
+    window: [0, 0, bust.space.width, bust.space.height]
+  }
+  const front = resolveShowcaseLayers(loadout, "push", manifest)
+  if (front.kind === "fallback") return { rig: bust.rig, plans: [bustPlan] }
+  return { rig: bust.rig, plans: [{ view: "showcase", layers: front.layers, space: front.space, window: front.windows.push }, bustPlan] }
+}
+
 async function drawPortrait(
   art: { dir: string; files: ReadonlySet<string> },
-  still: AvatarStillResolved,
+  plan: PortraitPlan,
   background: string
 ): Promise<Buffer> {
-  if (still.layers.length === 0) throw new Error("Avatar portrait has no layers.")
-  const composites: OverlayOptions[] = still.layers.map(({ asset, rect }) => {
+  if (plan.layers.length === 0) throw new Error("Avatar portrait has no layers.")
+  const composites: OverlayOptions[] = plan.layers.map(({ asset, rect }) => {
     const path = `avatar/${asset}.webp`
     if (!art.files.has(path)) throw new Error("Avatar portrait layer is missing from the art pack.")
     return { input: join(art.dir, path), left: rect[0], top: rect[1] }
   })
   const figure = await sharp({
-    create: { width: still.space.width, height: still.space.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
+    create: { width: plan.space.width, height: plan.space.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
   }).composite(composites).png().toBuffer()
+  const [left, top, width, height] = plan.window
   const head = await sharp(figure)
-    .resize(AVATAR_PORTRAIT_SIZE, AVATAR_PORTRAIT_SIZE, { kernel: "lanczos3" })
+    .extract({ left, top, width, height })
+    .resize(AVATAR_PORTRAIT_SIZE, AVATAR_PORTRAIT_SIZE, { kernel: "lanczos3", fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer()
   return sharp({
