@@ -160,6 +160,23 @@ async function drawPortrait(
     .toBuffer()
 }
 
+/**
+ * A short content hash of the avatar art in the pack (the manifest's avatar entries, sorted), so /ready can show
+ * which art a running server draws pushes from. Null when the pack has no avatar art. Contains no IDs or user data.
+ */
+export function computeAvatarArtPackHash(dir = resolveRoomArtPackDir()): string | null {
+  try {
+    const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as { files?: Record<string, unknown> }
+    const entries = Object.entries(manifest.files ?? {})
+      .filter(([path]) => path.startsWith("avatar/"))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    if (entries.length === 0) return null
+    return createHash("sha256").update(JSON.stringify(entries)).digest("hex").slice(0, 16)
+  } catch {
+    return null
+  }
+}
+
 let selfCheckState: "unchecked" | "ok" | "failed" = "unchecked"
 
 /** The last start-up self-check result, for the health detail. */
