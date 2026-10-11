@@ -20,7 +20,7 @@ const ZOOM_DURATION_MS = 220
 
 /**
  * The canonical character, large and centred over a thin circle, with a zoom
- * control at the lower right. The renderer and layer order are unchanged;
+ * control at the lower right. The figure is a static image stack (AvatarTryOnFigure, no canvas);
  * a try-on crossfades the old look out and the body hops (AvatarTryOnTransition).
  */
 export function WardrobePreviewStage(props: {
@@ -92,7 +92,7 @@ export function WardrobePreviewStage(props: {
                     <AvatarPreview2D
                       avatar={look}
                       catalog={catalog}
-                      animationState="idle_front"
+                      accessibilityLabel={copy.appearance}
                       showGlow={false}
                       size={layout.avatarSize}
                       stageHeight={layout.avatarHeight}

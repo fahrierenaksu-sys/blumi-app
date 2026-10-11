@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { memo, useMemo, useState, useLayoutEffect } from "react"
+import { memo, useCallback, useMemo, useState, useLayoutEffect } from "react"
 import {
   useWindowDimensions,
   StyleSheet,
@@ -7,14 +7,10 @@ import {
   Text,
   View
 } from "react-native"
-import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import type { UserAvatar } from "../avatarV2/avatarV2.types"
-import { ROOM_AVATAR_CATALOG } from "../avatarV2/room/avatarRoomCatalog"
-import { RoomAvatarRenderer2D } from "../avatarV2/room/components/RoomAvatarRenderer2D"
 import { AvatarTryOnTransition } from "../avatarV2/components/AvatarTryOnTransition"
+import { AvatarTryOnFigure } from "../avatarV2/components/AvatarTryOnFigure"
 import { FlightTargetView } from "../../ui/flight/FlightLayer"
-import { projectAvatarV2ToRoomAvatarAppearance } from "../avatarV2/room/avatarRoomProjection"
-import { getRoomAvatarRenderLayers } from "../avatarV2/room/avatarRoomSelectors"
 import { RoomRenderer2D } from "../roomV2/components/RoomRenderer2D"
 import { resolveRoomV2Scene } from "../roomV2/roomV2Selectors"
 import type { FurnitureItem } from "../roomV2/roomV2.types"
@@ -174,6 +170,7 @@ export function ShopPreviewPanel(props: {
               <ShopAvatarLivePreview
                 {...avatarDrawing}
                 active={avatarPreview}
+                accessibilityLabel={copy.previewOnAvatar}
                 landingFlightIds={avatarPreview ? purchaseLandingFlightIds : undefined}
               />
             </View>
@@ -345,42 +342,31 @@ const ShopAvatarLivePreview = memo(function ShopAvatarLivePreview(props: {
   active: boolean
   avatar: UserAvatar
   avatarWidth: number
+  accessibilityLabel: string
   landingFlightIds?: readonly string[]
 }) {
-  const roomAvatarLayers = useMemo(() => {
-    const { appearance } = projectAvatarV2ToRoomAvatarAppearance({
-      avatar: props.avatar,
-      avatarCatalog: AVATAR_V2_CATALOG,
-      roomAvatarCatalog: ROOM_AVATAR_CATALOG
-    })
-    return getRoomAvatarRenderLayers({
-      appearance,
-      catalog: ROOM_AVATAR_CATALOG,
-      direction: "front",
-      state: "idle"
-    })
-  }, [props.avatar])
-  // Current Shop idle/front sources are still images. If animated idle art is
-  // introduced, release its hidden renderer rather than running a hidden clock.
-  if (!props.active && roomAvatarLayers.some((layer) => (layer.animation?.frames.length ?? 0) > 1)) return null
-
-  return <ShopAvatarDrawing layers={roomAvatarLayers} avatarWidth={props.avatarWidth} landingFlightIds={props.landingFlightIds} />
+  // Both drawings are static image stacks (no canvas, no clock), so a hidden slot keeps its figure for a quick return.
+  return <ShopAvatarDrawing avatar={props.avatar} avatarWidth={props.avatarWidth} accessibilityLabel={props.accessibilityLabel} landingFlightIds={props.landingFlightIds} />
 })
 
 const ShopAvatarDrawing = memo(function ShopAvatarDrawing(props: {
-  layers: ReturnType<typeof getRoomAvatarRenderLayers>
+  avatar: UserAvatar
   avatarWidth: number
+  accessibilityLabel: string
   landingFlightIds?: readonly string[]
 }) {
   const avatarHeight = props.avatarWidth / SHOP_AVATAR_WIDTH_TO_HEIGHT_RATIO
+  const renderLook = useCallback((look: UserAvatar) => (
+    <AvatarTryOnFigure avatar={look} width={props.avatarWidth} height={avatarHeight} accessibilityLabel={props.accessibilityLabel} />
+  ), [avatarHeight, props.accessibilityLabel, props.avatarWidth])
   return (
     <View style={styles.shopAvatarPreview}>
       <View style={[styles.shopAvatarFrame, { width: props.avatarWidth, height: avatarHeight }]}>
-        {/* A try-on crossfades the old look out and the body hops. */}
+        {/* A try-on crossfades the old look out and the body hops; a new piece is just a new layer list. */}
         <AvatarTryOnTransition
-          value={props.layers}
+          value={props.avatar}
           style={tryOnFill}
-          render={renderShopAvatarLayers}
+          render={renderLook}
         />
         {props.landingFlightIds?.map((flightId) => (
           <FlightTargetView key={flightId} flightId={flightId} style={purchaseLandingSpot} />
@@ -406,10 +392,6 @@ const purchaseLandingSpot = {
   top: "34%",
   height: "26%"
 } as const
-
-function renderShopAvatarLayers(layers: ReturnType<typeof getRoomAvatarRenderLayers>) {
-  return <RoomAvatarRenderer2D layers={layers} />
-}
 
 const ShopRoomItemPreview = memo(function ShopRoomItemPreview(props: {
   active: boolean

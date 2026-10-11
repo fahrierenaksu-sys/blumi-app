@@ -154,6 +154,9 @@ try {
       resolve(workspaceRoot, "src/features/avatar/model/avatarStillLayout.test.ts"),
       // the front (showcase) stack outside the room: whole-figure 3/4 fallback, missing assets, plan cache (Phase 3 D1)
       resolve(workspaceRoot, "src/features/avatar/model/avatarShowcaseModel.test.ts"),
+      // try-on surfaces (Wardrobe, Shop, avatar setup; Phase 4 4.1): showcase figure, or the old drawing whole for old pieces
+      resolve(workspaceRoot, "src/features/avatar/model/avatarTryOnModel.test.ts"),
+      resolve(workspaceRoot, "src/features/avatarV2/components/AvatarTryOnFigure.test.ts"),
       // the showcase surfaces (Discover, profile and You hero, match): 3/4 still in the old crop until front art lands
       resolve(workspaceRoot, "src/features/avatar/components/AvatarShowcase.test.ts"),
       resolve(workspaceRoot, "src/features/avatar/showcaseSurfaces.test.ts"),

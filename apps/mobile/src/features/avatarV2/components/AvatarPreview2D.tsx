@@ -1,30 +1,17 @@
-import { useMemo } from "react"
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native"
 import { blumiEntryTheme, uiTheme } from "../../../ui/theme"
-import { AVATAR_V2_CATALOG } from "../avatarV2Catalog"
-import { ROOM_AVATAR_CATALOG } from "../room/avatarRoomCatalog"
-import { projectAvatarV2ToRoomAvatarAppearance } from "../room/avatarRoomProjection"
-import { getRoomAvatarRenderLayers } from "../room/avatarRoomSelectors"
-import { RoomAvatarRenderer2D } from "../room/components/RoomAvatarRenderer2D"
-import type {
-  AvatarAnimationState,
-  AvatarCatalogItem,
-  AvatarItemType,
-  UserAvatar
-} from "../avatarV2.types"
-import type {
-  RoomFurnitureRotation,
-  RoomV2AvatarMotionState
-} from "../../roomV2/roomV2.types"
+import type { AvatarCatalogItem, AvatarItemType, UserAvatar } from "../avatarV2.types"
+import { AvatarTryOnFigure } from "./AvatarTryOnFigure"
 
 export interface AvatarPreview2DProps {
   avatar?: Partial<UserAvatar>
   catalog?: AvatarCatalogItem[]
-  animationState?: AvatarAnimationState
   size?: number
   stageHeight?: number
   selectedType?: AvatarItemType
   label?: string
+  /** What screen readers hear for the figure. */
+  accessibilityLabel?: string
   metaTone?: "dark" | "light"
   themeTone?: "app" | "entry"
   showGlow?: boolean
@@ -34,8 +21,7 @@ export interface AvatarPreview2DProps {
 export function AvatarPreview2D(props: AvatarPreview2DProps) {
   const {
     avatar,
-    catalog = AVATAR_V2_CATALOG,
-    animationState = "idle_front",
+    catalog,
     size = 220,
     stageHeight = 286,
     selectedType,
@@ -46,22 +32,6 @@ export function AvatarPreview2D(props: AvatarPreview2DProps) {
     style
   } = props
   const previewTheme = themeTone === "entry" ? blumiEntryTheme : uiTheme
-  const roomAvatarLayers = useMemo(() => {
-    const { appearance } = projectAvatarV2ToRoomAvatarAppearance({
-      avatar,
-      avatarCatalog: catalog,
-      roomAvatarCatalog: ROOM_AVATAR_CATALOG
-    })
-    const roomMotion = getRoomAvatarMotionFromPreviewState(animationState)
-
-    return getRoomAvatarRenderLayers({
-      appearance,
-      catalog: ROOM_AVATAR_CATALOG,
-      direction: roomMotion.direction,
-      state: roomMotion.state
-    })
-  }, [animationState, avatar, catalog])
-
   const avatarHeight = size / (256 / 384)
 
   return (
@@ -76,7 +46,13 @@ export function AvatarPreview2D(props: AvatarPreview2DProps) {
           />
         ) : null}
         <View style={[styles.avatar, { width: size, height: avatarHeight }]}>
-          <RoomAvatarRenderer2D layers={roomAvatarLayers} />
+          <AvatarTryOnFigure
+            avatar={avatar}
+            catalog={catalog}
+            width={size}
+            height={avatarHeight}
+            accessibilityLabel={props.accessibilityLabel ?? label ?? ""}
+          />
         </View>
       </View>
       {label || selectedType ? (
@@ -108,24 +84,6 @@ export function AvatarPreview2D(props: AvatarPreview2DProps) {
       ) : null}
     </View>
   )
-}
-
-function getRoomAvatarMotionFromPreviewState(
-  animationState: AvatarAnimationState
-): {
-  state: RoomV2AvatarMotionState
-  direction: RoomFurnitureRotation
-} {
-  switch (animationState) {
-    case "walk_front":
-      return { state: "walking", direction: "front" }
-    case "sit_front":
-      return { state: "sitting", direction: "front" }
-    case "wave_front":
-      return { state: "waving", direction: "front" }
-    case "idle_front":
-      return { state: "idle", direction: "front" }
-  }
 }
 
 const styles = StyleSheet.create({
