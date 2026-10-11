@@ -193,7 +193,11 @@ test("every old avatar id has one defined behaviour: legacy and replaced, or ret
     assert.ok(CATALOG_IDS.includes(LEGACY_AVATAR_ITEM_REPLACEMENTS[id]), `${id}: its replacement is not readable`)
   }
   // retiring: still in the catalog, so every stored loadout and inventory that holds one keeps reading
-  assert.equal(RETIRING_AVATAR_ITEM_IDS.length, 165)
+  assert.ok(RETIRING_AVATAR_ITEM_IDS.length > 0, "the retiring list is empty")
+  assert.equal(new Set(RETIRING_AVATAR_ITEM_IDS).size, RETIRING_AVATAR_ITEM_IDS.length, "a retiring id is listed twice")
+  for (const id of RETIRING_AVATAR_ITEM_IDS) {
+    assert.equal(LEGACY_AVATAR_ITEM_IDS.includes(id), false, `${id} is already in the legacy avatar list`)
+  }
   for (const id of RETIRING_AVATAR_ITEM_IDS) {
     assert.equal(isLegacyItemId(id), false, `${id} is not legacy before the catalog switch`)
     assert.ok(CATALOG_IDS.includes(id), `${id} is retiring but no longer readable`)

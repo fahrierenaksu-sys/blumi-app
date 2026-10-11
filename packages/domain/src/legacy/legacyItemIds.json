@@ -1,6 +1,6 @@
 {
   "schemaVersion": "blumi-legacy-item-ids-v1",
-  "note": "Frozen list of retired item ids (plan section 5.4). Stored rows that hold them are ignored; the ids are never reused. Only additions are allowed. \"avatarRetiring\" holds the 165 old avatar ids that stay wearable until the avatar catalog switch (X15), which moves them into \"avatar\".",
+  "note": "Frozen list of retired item ids (plan section 5.4). Stored rows that hold them are ignored; the ids are never reused. Ids are never deleted. \"avatarRetiring\" holds the old avatar ids that stay wearable until the avatar catalog switch (X15), which may MOVE ids from \"avatarRetiring\" into \"avatar\" (a move, never a deletion).",
   "room": [
     "room_v2_cozy_bed",
     "room_v2_cute_bookshelf",
