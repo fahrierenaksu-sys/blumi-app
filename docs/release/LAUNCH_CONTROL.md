@@ -4,6 +4,11 @@
 
 Snapshot: 2026-10-10. The OTP security update below is current for 2026-10-10; the other At a glance rows retain their own dated evidence. Recheck volatile statuses before acting.
 
+## Update — 2026-10-11: avatar 2.5D integration, Phase 2 (room) closed
+
+- **Tested:** the Phase 2 final gate is green on the `feat/avatar-2.5d-world` branch (9158ce53, full mode, no reruns); `verify:postgres` was not run. Simulator Maestro rows 20, 22 and 24b passed.
+- **Open:** Native verified on a device, User approved, and the Phase 3 surfaces. Not released; see `AVATAR_25D_INTEGRATION_PLAN.md`.
+
 ## Update — 2026-10-10: OTP/SMS abuse protection
 
 - **EXTERNAL VERIFIED (follow-up):** fresh dump SHA-256 `97ba771baf10fed876e2cb4c3874e34eb95c3e52f1cd6966873e7ab83aa76490` restored on PostgreSQL 17, rerun zero, no integrity findings. Only OTP migration 073 applied live and checksum locked; 24 accounts/22 inventories preserved, 070/071 pending. Restricted observer role verified. Existing HMAC key mirrored to backend without rotation; Firebase Phone/ENFORCE/0.5 preserved and SMS bot scoring enabled. Outcome enforcement remains off pending real-client proof. Function/source deployment follow-up is recorded after completion in the [follow-up report](../quality/OTP_SECURITY_FOLLOWUP_2026-10-10.md).
