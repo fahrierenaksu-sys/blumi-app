@@ -1,7 +1,7 @@
 import { memo } from "react"
 import { View, type StyleProp, type ViewStyle } from "react-native"
 import type { AvatarLoadoutCoercionHints, AvatarStillRect } from "@blumi/domain"
-import { AvatarStill } from "./AvatarStill"
+import { AvatarShowcase } from "./AvatarShowcase"
 
 /** Portraits at or below this size (pt) show a face-tight crop of the bust (plan 2.2: tiny). */
 export const AVATAR_PORTRAIT_TINY_PT = 40
@@ -24,7 +24,11 @@ export interface AvatarPortraitProps {
   accessibilityLabel?: string
 }
 
-/** A round head-and-shoulders still (lists, headers, chips): baked bust layers, never a GPU canvas. */
+/**
+ * A round head still (lists, headers, chips): the front showcase `head` crop, never a GPU canvas. A look without
+ * front art for every worn piece is drawn whole as the baked 3/4 bust (face-tight when tiny), so swapping in the
+ * front art later is data only.
+ */
 export const AvatarPortrait = memo(function AvatarPortrait(props: AvatarPortraitProps) {
   const { size } = props
   return (
@@ -33,11 +37,12 @@ export const AvatarPortrait = memo(function AvatarPortrait(props: AvatarPortrait
       accessibilityLabel={props.accessibilityLabel}
       style={[{ width: size, height: size, borderRadius: size / 2, overflow: "hidden", backgroundColor: props.backgroundColor }, props.style]}
     >
-      <AvatarStill
+      <AvatarShowcase
         loadout={props.loadout}
         hints={props.hints}
-        crop="bust"
-        window={size <= AVATAR_PORTRAIT_TINY_PT ? FACE_WINDOW : BUST_WINDOW}
+        crop="head"
+        fallbackCrop="bust"
+        fallbackWindow={size <= AVATAR_PORTRAIT_TINY_PT ? FACE_WINDOW : BUST_WINDOW}
         width={size}
         height={size}
         mirror={props.mirror}

@@ -131,3 +131,20 @@ test("a listener that arrives later (a card promoted to the top) is handed down;
   ;(onTop?.props.onError as () => void)()
   assert.deepEqual(calls, [1, 2])
 })
+
+test("a figure without a label is decorative and hands the fallback window to the 3/4 still", () => {
+  const window = [52, 28, 160, 160] as const
+  const output = mountShowcase().render({
+    loadout: DEFAULT_FEMALE_AVATAR_LOADOUT,
+    crop: "head",
+    fallbackCrop: "bust",
+    fallbackWindow: window,
+    width: 32,
+    height: 32
+  })
+  assert.equal(output.props.accessible, false)
+  assert.equal(output.props.accessibilityRole, undefined)
+  const still = find(output, AvatarStill)
+  assert.equal(still?.props.crop, "bust")
+  assert.deepEqual(still?.props.window, window)
+})

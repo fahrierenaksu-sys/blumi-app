@@ -1,4 +1,4 @@
-import type { AvatarLoadoutCoercionHints, AvatarShowcaseCrop } from "@blumi/domain"
+import type { AvatarLoadoutCoercionHints, AvatarShowcaseCrop, AvatarStillRect } from "@blumi/domain"
 import { Image } from "expo-image"
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
@@ -21,10 +21,15 @@ export interface AvatarShowcaseProps {
    * `bust` otherwise. A surface that showed a half-body still passes `half`, so it looks exactly as before.
    */
   fallbackCrop?: AvatarStillCrop
+  /** An explicit window of the 3/4 fallback still (overrides `fallbackCrop`'s own window; the tiny face-tight chip crop). */
+  fallbackWindow?: AvatarStillRect
   /** Turns the 3/4 fallback the other way (the partner facing the person); the front view always faces the viewer. */
   mirror?: boolean
-  /** Required: the figure is one accessible image (who it is, for screen readers). */
-  accessibilityLabel: string
+  /**
+   * The figure is one accessible image (who it is, for screen readers). Left out, it is decorative: a parent that
+   * already carries the label (a round chip, a list row) owns the accessibility, and nothing here is focusable.
+   */
+  accessibilityLabel?: string
   /** Shown behind the figure until every layer has drawn (loading state); transparent by default. */
   placeholderColor?: string
   style?: StyleProp<ViewStyle>
@@ -62,9 +67,7 @@ export const AvatarShowcase = memo(function AvatarShowcase(props: AvatarShowcase
   }
   return (
     <View
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={props.accessibilityLabel}
+      {...figureAccessibility(props.accessibilityLabel)}
       pointerEvents="none"
       style={[{ width, height }, props.style]}
     >
@@ -72,6 +75,7 @@ export const AvatarShowcase = memo(function AvatarShowcase(props: AvatarShowcase
         loadout={loadout}
         hints={hints}
         crop={props.fallbackCrop ?? avatarShowcaseFallbackCrop(crop)}
+        window={props.fallbackWindow}
         width={width}
         height={height}
         mirror={props.mirror}
@@ -81,6 +85,13 @@ export const AvatarShowcase = memo(function AvatarShowcase(props: AvatarShowcase
     </View>
   )
 })
+
+/** One labelled image for screen readers, or nothing at all when the parent owns the label. */
+function figureAccessibility(label: string | undefined) {
+  return label === undefined
+    ? ({ accessible: false } as const)
+    : ({ accessible: true, accessibilityRole: "image", accessibilityLabel: label } as const)
+}
 
 /**
  * The listener's latest closure behind one identity that changes only when a listener is added or removed, so a
@@ -113,9 +124,7 @@ const ShowcaseFront = memo(function ShowcaseFront(props: ShowcaseFrontProps) {
   const isLoading = displayedKey !== plan.cacheKey
   return (
     <View
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={props.accessibilityLabel}
+      {...figureAccessibility(props.accessibilityLabel)}
       accessibilityState={{ busy: isLoading }}
       pointerEvents="none"
       style={[
