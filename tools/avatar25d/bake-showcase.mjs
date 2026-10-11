@@ -42,6 +42,8 @@ export function validateAllowlist(list) {
   for (const [rig, body] of Object.entries(list.bodies)) {
     if (!RIGS.includes(rig)) throw new Error(`unknown body ${rig}`)
     for (const key of ["base", "baseSha256", "crops", "items"]) if (!body[key]) throw new Error(`${rig}: missing ${key}`)
+    if (typeof body.qaPass !== "string" || body.qaPass.trim() === "") throw new Error(`${rig}: missing qaPass (path to the fresh-QA PASS record)`)
+    if (body.ownerApproved !== true) throw new Error(`${rig}: ownerApproved must be true (the owner has approved the look)`)
     for (const crop of ["head", "push"]) if (!Array.isArray(body.crops[crop]) || body.crops[crop].length !== 4) throw new Error(`${rig}: crop ${crop} needs [x, y, w, h]`)
     for (const [id, item] of Object.entries(body.items)) {
       for (const key of ["slot", "file", "sha256", "order"]) if (item[key] === undefined) throw new Error(`${rig}.${id}: missing ${key}`)

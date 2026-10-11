@@ -84,7 +84,8 @@ export function resolveShowcaseLayers(
     still: resolveAvatarStillLayers(loadout, "full", { manifest }),
   });
   const base = body.showcaseBase;
-  if (!base) return fallback("no-showcase-base");
+  const hasCanvas = Number.isFinite(base?.canvas?.width) && Number.isFinite(base?.canvas?.height);
+  if (!base || !hasCanvas) return fallback("no-showcase-base");
   const drawn = avatarStillDrawnItems(body, loadout);
   const front: DrawnFrontLayer[] = [];
   for (const [slot, itemId] of drawn) {

@@ -7,9 +7,19 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * 3/4 fallback (ITEM_SYNC_RULES). Items listed here are known debt: they were ported before the showcase view existed.
  * The list may only shrink. When an item gets its front layer, this test fails until its entry is removed. A new item
  * must ship with its front layer; adding an entry needs a reason in the same commit.
+ *
+ * Reason for the girl starter entries (2026-10-12): fresh QA failed her front still (skin blotches on shoes and
+ * ankles, white slivers in hair, ragged cuffs, shoulder notches) and the owner has not approved the look, so it was
+ * taken out of the bake (tools/avatar25d/showcase-allowlist.json). Remove these four when a QA-passed, owner-approved
+ * still is baked.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: [],
+  female: [
+    "avatar_v2_shoes_mint_ribbon_court_sneakers",
+    "avatar_v2_bottom_coral_wave_pants",
+    "avatar_v2_top_coral_wave_polo",
+    "avatar_v2_hair_ink_pageboy_star",
+  ],
   male: [],
 };
 

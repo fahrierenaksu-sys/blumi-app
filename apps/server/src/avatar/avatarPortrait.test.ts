@@ -363,7 +363,8 @@ test("a front base without usable crop windows falls back to the 3/4 bust instea
   const noWindows = { ...girl.showcaseBase!, windows: undefined }
   const outside = { ...girl.showcaseBase!, windows: { ...girl.showcaseBase!.windows, push: [0, 0, 9999, 9999] } }
   const notNumbers = { ...girl.showcaseBase!, windows: { ...girl.showcaseBase!.windows, push: ["a", 0, 10, 10] } }
-  for (const manifest of [broken(noWindows), broken(outside), broken(notNumbers)]) {
+  const noCanvas = { ...girl.showcaseBase!, canvas: undefined }
+  for (const manifest of [broken(noWindows), broken(outside), broken(notNumbers), broken(noCanvas)]) {
     const result = await createAvatarPortraitRenderer({ art, manifest }).render({ loadout: female, background })
     assert.deepEqual([result.level, result.view], ["look", "bust"])
     assert.ok(result.body.equals(bustOnly.body))

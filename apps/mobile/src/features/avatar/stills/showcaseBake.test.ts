@@ -89,12 +89,26 @@ test("the allowlist rejects candidate paths, a missing hash and a crop that is n
   const { validateAllowlist } = await loadBaker()
   const { dir, body } = await fixture()
   rmSync(dir, { recursive: true, force: true })
-  const list = (patch: Record<string, unknown>) => ({ scale: 0.5, bodies: { female: { ...body, ...patch } } })
+  const approved = { qaPass: "qa/PASS.md", ownerApproved: true }
+  const list = (patch: Record<string, unknown>) => ({ scale: 0.5, bodies: { female: { ...body, ...approved, ...patch } } })
   assert.doesNotThrow(() => validateAllowlist(list({})))
   assert.throws(() => validateAllowlist(list({ base: "x/candidate/base.png" })), /candidate/)
   assert.throws(() => validateAllowlist(list({ items: { a: { slot: "top", order: 1, file: "a.png" } } })), /sha256/)
   assert.throws(() => validateAllowlist(list({ crops: { head: [1, 2], push: [1, 2, 3, 4] } })), /head/)
-  assert.throws(() => validateAllowlist({ scale: 0.5, bodies: { robot: body } }), /unknown body/)
+  assert.throws(() => validateAllowlist({ scale: 0.5, bodies: { robot: { ...body, ...approved } } }), /unknown body/)
+})
+
+test("an entry without a QA PASS record or without the owner's approval is refused", async () => {
+  const { validateAllowlist } = await loadBaker()
+  const { dir, body } = await fixture()
+  rmSync(dir, { recursive: true, force: true })
+  const entry = (patch: Record<string, unknown>) => ({ scale: 0.5, bodies: { female: { ...body, qaPass: "qa/PASS.md", ownerApproved: true, ...patch } } })
+  assert.doesNotThrow(() => validateAllowlist(entry({})))
+  assert.throws(() => validateAllowlist(entry({ qaPass: undefined })), /qaPass/)
+  assert.throws(() => validateAllowlist(entry({ qaPass: " " })), /qaPass/)
+  assert.throws(() => validateAllowlist(entry({ ownerApproved: undefined })), /ownerApproved/)
+  assert.throws(() => validateAllowlist(entry({ ownerApproved: "yes" })), /ownerApproved/)
+  assert.throws(() => validateAllowlist(entry({ ownerApproved: false })), /ownerApproved/)
 })
 
 test("a crop window that leaves the canvas stops the bake", async () => {

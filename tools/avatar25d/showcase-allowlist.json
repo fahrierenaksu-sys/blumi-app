@@ -2,6 +2,6 @@
   "version": 1,
   "scale": 0.5,
   "pad": 24,
-  "note": "RULE: only a still with a fresh-QA PASS may be listed here, and it ships only after the owner approves its look (QA PASS + owner look approval). Listed stills, at exactly these sha256 values, are baked into the app; anything else keeps the 3/4 fallback. Paths are relative to the Workbench showcase root (--src). Remove an entry and re-bake to take a still out.",
+  "note": "RULE: only a still with a fresh-QA PASS may be listed here, and it ships only after the owner approves its look (QA PASS + owner look approval). Listed stills, at exactly these sha256 values, are baked into the app; anything else keeps the 3/4 fallback. Paths are relative to the Workbench showcase root (--src). Remove an entry and re-bake to take a still out. Each body entry needs qaPass (path to its fresh-QA PASS record) and ownerApproved: true, set only after the owner's yes; the baker refuses an entry without both.",
   "bodies": {}
 }
