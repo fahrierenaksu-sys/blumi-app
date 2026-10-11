@@ -8,7 +8,7 @@ Path short forms: `M/` = `apps/mobile/`, `S/` = `apps/mobile/src/`, `SV/` = `app
 
 ## 1. Summary, fixed decisions, open questions
 
-The new 2.5D avatar (WebGPU rig, girl and boy), the calibrated 2.5D room, layered furniture and the editor become the only system. The old layered-PNG avatar (`avatarV2`), the old room paths, the old clothing and furniture items, their art, their catalog entries and their tests are removed. Lists and small avatars use baked still pictures; a live canvas is reserved for the hero of the focused screen. The server keeps drawing the push picture and the Discover room picture, from a build-time art pack instead of old mobile art. Stored old item IDs are ignored by code, never by a schema change. One exception by the owner's choice (F15): the onboarding, boot and loading character sprites stay as they are and are replaced last, in Phase 6.
+The new 2.5D avatar (WebGPU rig, girl and boy), the calibrated 2.5D room, layered furniture and the editor become the only system. The old layered-PNG avatar (`avatarV2`), the old room paths, the old clothing and furniture items, their art, their catalog entries and their tests are removed. Lists and small avatars use baked still pictures; a live canvas is drawn only inside rooms (My Room, room editor, RoomSetup, MiniRoom; section 2.2b). The server keeps drawing the push picture and the Discover room picture, from a build-time art pack instead of old mobile art. Stored old item IDs are ignored by code, never by a schema change. One exception by the owner's choice (F15): the onboarding, boot and loading character sprites stay as they are and are replaced last, in Phase 6.
 
 ### 1.1 Fixed decisions (do not reopen)
 
@@ -122,13 +122,13 @@ Rejected: keeping `src/experimental/` and the flag (two systems forever); renami
 
 Cache keys and invalidation: client key `bakerVersion|body|hair|top|bottom|shoes|product|mirror` → memoised layer list (equal looks share it); the layers are bundled assets, so there is no file cache to purge. A loadout change is a new key. Server key: sha256(renderer version, background, layer keys, size), LRU 8 MiB as today. Guard: one test fails when `manifest.rigSha256` differs from the committed rig files (a rig changed without a re-bake).
 
-**Live canvas rule** (`avatarLiveBudget`): at most 1 live canvas for the focused screen, 2 in MiniRoom, 0 anywhere else. Main-tab pager pages that are mounted but not shown release theirs and show the identical still. Allowed live (shrunk by 2.2b): My Room, room editor, RoomSetup, MiniRoom (2). Always still, showcase view (2.2b): Discover cards front and back, profile and You hero, AvatarSetup, Wardrobe, Shop preview, every list, header, chip, modal, flight, onboarding.
+**Live canvas rule** (`avatarLiveBudget`): at most 1 live canvas on a focused room screen (My Room, room editor, RoomSetup), 2 in MiniRoom, 0 anywhere else (2.2b). Main-tab pager pages that are mounted but not shown release theirs and show the identical still. Allowed live (shrunk by 2.2b): My Room, room editor, RoomSetup, MiniRoom (2). Always still, showcase view (2.2b): Discover cards front and back, profile and You hero, AvatarSetup, Wardrobe, Shop preview, every list, header, chip, modal, flight, onboarding.
 
 | Budget (measure in Phase 5 on a real phone) | Discover | MiniRoom (2 avatars) |
 |---|---|---|
-| Live canvases | 1 | 2 |
-| Rig textures (ASTC; PNG fallback ×4) | ≤ 4 MB (one rig, front view) | ≤ 7 MB (both rigs, both views) |
-| Canvas surfaces incl. MSAA (cap the canvas at 2× pixel ratio above 250 pt) | ≤ 16 MB | ≤ 24 MB |
+| Live canvases | 0 (showcase stills, 2.2b) | 2 |
+| Rig textures (ASTC; PNG fallback ×4) | 0 (no live canvas, 2.2b) | ≤ 7 MB (both rigs, both views) |
+| Canvas surfaces incl. MSAA (cap the canvas at 2× pixel ratio above 250 pt) | 0 (no live canvas, 2.2b) | ≤ 24 MB |
 | Decoded still layers | ≤ 24 MB (3 stacked cards) | ≤ 2 MB (chips) |
 | Frame rate | 60 fps while swiping; no React render per frame | 60 fps with both walking and the keyboard up |
 | Rig JSON (2.2 MB + 1.4 MB) | parsed lazily, off the boot path | same |
