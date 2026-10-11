@@ -240,7 +240,7 @@ export function AvatarSetupStudioStage({
         ]}
       >
         <AvatarPreview2D
-          animationState="idle_front"
+          accessibilityLabel={copy.accessibilityLabel}
           avatar={avatar}
           catalog={catalog}
           showGlow={false}
