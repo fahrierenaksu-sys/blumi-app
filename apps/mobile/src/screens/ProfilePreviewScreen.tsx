@@ -1,4 +1,3 @@
-import { useIsFocused } from "@react-navigation/native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -11,7 +10,7 @@ import {
   createCandidateAvatarSnapshot,
   type CandidateAvatarSnapshot
 } from "../features/avatarV2/candidateAvatarSnapshot"
-import { AvatarHero } from "../features/avatar/components/AvatarHero"
+import { AvatarShowcase } from "../features/avatar/components/AvatarShowcase"
 import { avatarInputFromSelection } from "../features/avatar/model/avatarInput"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { getLobbyReturnStrategy, goBackOrFallback } from "../navigation/rootNavigationModel"
@@ -116,8 +115,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
     return { transform: [{ translateY: stretch.translateY }, { scale: stretch.scale }] }
   })
 
-  // The one live canvas of this page, only while it is the focused screen; the loadout is what the server sent.
-  const focused = useIsFocused()
+  // The hero is the showcase still (no live canvas outside rooms); the loadout is what the server sent.
   const avatarInput = useMemo(
     () => avatarInputFromSelection(profile
       ? createCandidateAvatarSnapshot({
@@ -317,14 +315,12 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
 
             {/* Giant Avatar */}
             <View style={styles.avatarContainer} pointerEvents="none">
-              <AvatarHero
+              <AvatarShowcase
                 loadout={avatarInput.loadout}
                 hints={avatarInput.hints}
+                crop="card"
                 width={PROFILE_HERO_AVATAR_WIDTH}
                 height={PROFILE_HERO_AVATAR_HEIGHT}
-                liveScope="screen"
-                liveActive={focused}
-                reduceMotion={reduceMotion}
                 accessibilityLabel={`${profile.displayName} ${avatarSnapshot.label}`}
               />
             </View>
