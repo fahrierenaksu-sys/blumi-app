@@ -1,6 +1,7 @@
 import manifestJson from "./avatarStillManifest.json";
 import { DEFAULT_MALE_AVATAR_LOADOUT } from "./avatarLoadoutCatalog";
 import { coerceAvatarLoadout, type AvatarLoadoutCoercionHints } from "./avatarLoadoutCoercion";
+import type { AvatarLoadout } from "@blumi/contracts";
 
 /**
  * Baked 2.5D avatar stills (plan 2.2): which pre-rendered layers draw a loadout, in painter's order. Pure and total,
@@ -26,6 +27,37 @@ export interface AvatarStillLayerEntry {
   readonly legVariant?: string;
 }
 
+/** The crops of the one front (showcase) still: Discover card front, chat head, push picture. */
+export type AvatarShowcaseCrop = "card" | "head" | "push";
+
+/** The fixed front body every showcase item is registered to (ITEM_SYNC_RULES "Fit in the showcase view"). */
+export interface AvatarShowcaseBase {
+  readonly key: string;
+  readonly canvas: { readonly width: number; readonly height: number };
+  readonly ground: readonly [number, number];
+  readonly windows: Readonly<Record<AvatarShowcaseCrop, AvatarStillRect>>;
+}
+
+/**
+ * An item's front (showcase) layer. Same canonical item ID as its 3/4 art, no separate ID. `order` is the draw order
+ * on the showcase base (shoes < bottoms < tops < hair front); `tucked: true` draws a top under the bottom.
+ */
+export interface AvatarShowcaseItemLayer {
+  readonly key: string;
+  /** Pixels on the showcase base canvas. */
+  readonly rect: AvatarStillRect;
+  readonly order: number;
+  readonly tucked?: boolean;
+}
+
+export interface AvatarStillItem {
+  readonly slot: string;
+  readonly rigItemId: string;
+  readonly thumb: string;
+  /** Optional until the item's front art has passed its gates; missing = the 3/4 fallback. */
+  readonly showcase?: AvatarShowcaseItemLayer;
+}
+
 export interface AvatarStillBody {
   readonly rigSha256: string;
   readonly sheetHeight: number;
@@ -34,7 +66,9 @@ export interface AvatarStillBody {
   readonly windows: { readonly bust: AvatarStillRect; readonly half: AvatarStillRect; readonly full: AvatarStillRect };
   readonly bustPx: number;
   readonly starter: Readonly<Partial<Record<AvatarStillSlot, string>>>;
-  readonly items: Readonly<Record<string, { readonly slot: string; readonly rigItemId: string; readonly thumb: string }>>;
+  readonly items: Readonly<Record<string, AvatarStillItem>>;
+  /** Optional: the body's front (showcase) base. A body without it draws every showcase as the 3/4 fallback. */
+  readonly showcaseBase?: AvatarShowcaseBase;
   readonly layers: { readonly full: readonly AvatarStillLayerEntry[]; readonly bust: readonly AvatarStillLayerEntry[] };
 }
 
@@ -60,7 +94,7 @@ export interface AvatarStillResolved {
   readonly cacheKey: string;
 }
 
-const SLOT_KEYS: readonly (readonly [AvatarStillSlot, "shoesId" | "bottomId" | "topId" | "hairId"])[] = [
+export const AVATAR_STILL_SLOT_KEYS: readonly (readonly [AvatarStillSlot, "shoesId" | "bottomId" | "topId" | "hairId"])[] = [
   ["shoes", "shoesId"],
   ["bottom", "bottomId"],
   ["top", "topId"],
@@ -70,6 +104,22 @@ const SLOT_KEYS: readonly (readonly [AvatarStillSlot, "shoesId" | "bottomId" | "
 /** Which rig draws this body: the male body is the boy, every other body the girl. */
 export function avatarStillRigForBody(bodyId: string): AvatarStillRigId {
   return bodyId === DEFAULT_MALE_AVATAR_LOADOUT.bodyId ? "male" : "female";
+}
+
+/**
+ * Which item each slot draws for a coerced loadout: the worn item when this body has baked art for it in that slot,
+ * else the body's starter piece, else nothing. Shared by the 3/4 stills and the front showcase.
+ */
+export function avatarStillDrawnItems(body: AvatarStillBody, loadout: AvatarLoadout): ReadonlyMap<AvatarStillSlot, string> {
+  const drawn = new Map<AvatarStillSlot, string>();
+  for (const [slot, key] of AVATAR_STILL_SLOT_KEYS) {
+    const worn = loadout[key];
+    const own = body.items[worn]?.slot === slot ? worn : undefined;
+    const starter = body.starter[slot];
+    const item = own ?? (starter && body.items[starter]?.slot === slot ? starter : undefined);
+    if (item) drawn.set(slot, item);
+  }
+  return drawn;
 }
 
 /**
@@ -85,14 +135,7 @@ export function resolveAvatarStillLayers(
   const loadout = coerceAvatarLoadout(rawLoadout, options.hints ?? {});
   const rig = avatarStillRigForBody(loadout.bodyId);
   const body = manifest.bodies[rig];
-  const drawn = new Map<AvatarStillSlot, string>();
-  for (const [slot, key] of SLOT_KEYS) {
-    const worn = loadout[key];
-    const own = body.items[worn]?.slot === slot ? worn : undefined;
-    const starter = body.starter[slot];
-    const item = own ?? (starter && body.items[starter]?.slot === slot ? starter : undefined);
-    if (item) drawn.set(slot, item);
-  }
+  const drawn = avatarStillDrawnItems(body, loadout);
   const owners = new Set(drawn.values());
   const legKey = (["bottom", "shoes"] as const).filter((slot) => drawn.has(slot)).join("+");
   const all = body.layers[product];
@@ -119,7 +162,7 @@ export function resolveAvatarStillLayers(
     space,
     windows,
     mirror,
-    cacheKey: [manifest.bakerVersion, rig, ...SLOT_KEYS.map(([slot]) => drawn.get(slot) ?? "-"), product, mirror ? 1 : 0].join("|"),
+    cacheKey: [manifest.bakerVersion, rig, ...AVATAR_STILL_SLOT_KEYS.map(([slot]) => drawn.get(slot) ?? "-"), product, mirror ? 1 : 0].join("|"),
   };
 }
 
