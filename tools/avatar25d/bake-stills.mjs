@@ -15,7 +15,10 @@
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/bust/<key>.webp   the same layers in the 256 px bust window
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/thumb/<item>.webp the item alone, cropped, at most 256 px
  *   apps/mobile/src/features/avatar/stills/stillAssets.ts                 literal require table (Metro, asset scan)
- *   packages/domain/src/avatar/avatarStillManifest.json                   layers, rects, windows, rigSha256
+ *   apps/mobile/src/features/avatar/stills/layers/<rig>/showcase/<key>.webp front (showcase) layers, carried over from
+ *                                                                          bake-showcase.mjs (verified by sha256)
+ *   packages/domain/src/avatar/avatarStillManifest.json                   layers, rects, windows, rigSha256, and the
+ *                                                                          showcaseBase / item showcase layers
  * --check: bake into memory and fail if anything on disk differs (nothing is written).
  */
 import { createHash } from "node:crypto"
@@ -34,6 +37,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const AVATAR = join(ROOT, "apps/mobile/src/features/avatar")
 const STILLS = join(AVATAR, "stills")
 const MANIFEST = join(ROOT, "packages/domain/src/avatar/avatarStillManifest.json")
+const SHOWCASE_BAKED = join(ROOT, "tools/avatar25d/showcase-baked.json")
 const RIG_DIRS = { female: "girl", male: "boy" }
 const SLOT_RANK = { shoes: 0, bottom: 1, top: 2, hair: 3 }
 const CHECK = process.argv.includes("--check")
@@ -392,12 +396,30 @@ function stillAssetsSource(keys) {
   return lines.join("\n")
 }
 
+/** The front (showcase) bake of bake-showcase.mjs, merged in as data: its files are read from disk and verified. */
+function mergeShowcase(rigId, body, files) {
+  const baked = existsSync(SHOWCASE_BAKED) ? JSON.parse(readFileSync(SHOWCASE_BAKED, "utf8")).bodies?.[rigId] : undefined
+  if (!baked) return body
+  const items = { ...body.items }
+  for (const [id, layer] of Object.entries(baked.items)) {
+    if (!items[id] || items[id].slot !== layer.slot) throw new Error(`${rigId}: showcase layer for ${id}, which has no rig art in that slot`)
+    const { slot: _slot, ...front } = layer
+    items[id] = { ...items[id], showcase: front }
+  }
+  for (const [key, hash] of Object.entries(baked.files)) {
+    const path = join(STILLS, "layers", rigId, "showcase", `${key}.webp`)
+    if (!existsSync(path) || sha256(readFileSync(path)) !== hash) throw new Error(`${rigId}: showcase file ${key} is missing or differs from showcase-baked.json (run bake-showcase.mjs)`)
+    files.set(`layers/${rigId}/showcase/${key}.webp`, readFileSync(path))
+  }
+  return { ...body, items, showcaseBase: baked.showcaseBase }
+}
+
 const files = new Map()
 const manifest = { bakerVersion: BAKER_VERSION, supersample: SS, bodies: {} }
 const evidence = []
 for (const rigId of Object.keys(RIG_DIRS)) {
   const baked = await bakeBody(rigId, files)
-  manifest.bodies[rigId] = baked.manifest
+  manifest.bodies[rigId] = mergeShowcase(rigId, baked.manifest, files)
   evidence.push(baked.evidence)
 }
 const keys = [...files.keys()].map((path) => path.replace(/^layers\//, "").replace(/\.webp$/, "")).sort()

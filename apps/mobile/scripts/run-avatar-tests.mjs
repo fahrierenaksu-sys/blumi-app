@@ -150,6 +150,8 @@ try {
       resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Astc.test.ts"),
       // baked stills (plan 2.2): match the rigs (L13), bundled, cover the art map (R4), live draw order
       resolve(workspaceRoot, "src/features/avatar/stills/avatarStills.test.ts"),
+      // front (showcase) bake: only allowlisted, hash-approved stills are baked
+      resolve(workspaceRoot, "src/features/avatar/stills/showcaseBake.test.ts"),
       // still layout and the live-canvas budget (plan 2.2)
       resolve(workspaceRoot, "src/features/avatar/model/avatarStillLayout.test.ts"),
       // the front (showcase) stack outside the room: whole-figure 3/4 fallback, missing assets, plan cache (Phase 3 D1)

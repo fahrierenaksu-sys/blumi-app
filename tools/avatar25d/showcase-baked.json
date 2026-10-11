@@ -1,0 +1,102 @@
+{
+  "bakerVersion": 1,
+  "scale": 0.5,
+  "bodies": {
+    "female": {
+      "showcaseBase": {
+        "key": "base__front",
+        "canvas": {
+          "width": 604,
+          "height": 1561
+        },
+        "ground": [
+          302,
+          1548
+        ],
+        "windows": {
+          "card": [
+            0,
+            0,
+            604,
+            1561
+          ],
+          "head": [
+            110,
+            37,
+            390,
+            390
+          ],
+          "push": [
+            68,
+            12,
+            480,
+            480
+          ]
+        }
+      },
+      "items": {
+        "avatar_v2_shoes_mint_ribbon_court_sneakers": {
+          "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__front",
+          "rect": [
+            132,
+            1372,
+            343,
+            179
+          ],
+          "order": 1,
+          "slot": "shoes"
+        },
+        "avatar_v2_bottom_coral_wave_pants": {
+          "key": "avatar_v2_bottom_coral_wave_pants__front",
+          "rect": [
+            18,
+            696,
+            576,
+            682
+          ],
+          "order": 2,
+          "slot": "bottom"
+        },
+        "avatar_v2_top_coral_wave_polo": {
+          "key": "avatar_v2_top_coral_wave_polo__front",
+          "rect": [
+            113,
+            402,
+            378,
+            322
+          ],
+          "order": 3,
+          "slot": "top"
+        },
+        "avatar_v2_hair_ink_pageboy_star": {
+          "key": "avatar_v2_hair_ink_pageboy_star__front",
+          "rect": [
+            140,
+            54,
+            326,
+            373
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "avatar_v2_hair_ink_pageboy_star__back",
+            "rect": [
+              116,
+              40,
+              384,
+              387
+            ]
+          }
+        }
+      },
+      "files": {
+        "base__front": "b3719f24c7a4127856ab9786842bfd6588c56732a8b16a5f4a16e2875604fdd6",
+        "avatar_v2_shoes_mint_ribbon_court_sneakers__front": "4925dea0be0ae46c608215bfa822585dfebbc63ba1c6620ac19bafa6b5935d6c",
+        "avatar_v2_bottom_coral_wave_pants__front": "e18cd130cce8437f3e05a3711e309f124ac70d6d6bb8fc413430ca537659d785",
+        "avatar_v2_top_coral_wave_polo__front": "5ee7322f9fb4b82132731c905e5de2aedab2942fa6db6c0c805ab87f3e5faafa",
+        "avatar_v2_hair_ink_pageboy_star__front": "bb788fb07e79917480c96092ee9e398cab6ec46d5f877cb20abc5de8a4bfff23",
+        "avatar_v2_hair_ink_pageboy_star__back": "c6d27e03ee6e84aebd342bd55ceec4908d145f738ba57ce376f2175384ffd728"
+      }
+    }
+  }
+}

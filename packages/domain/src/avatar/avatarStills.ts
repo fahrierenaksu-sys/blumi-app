@@ -48,6 +48,8 @@ export interface AvatarShowcaseItemLayer {
   readonly rect: AvatarStillRect;
   readonly order: number;
   readonly tucked?: boolean;
+  /** A part drawn under the base body (hair behind the head and shoulders); the layer above stays in front. */
+  readonly back?: { readonly key: string; readonly rect: AvatarStillRect };
 }
 
 export interface AvatarStillItem {

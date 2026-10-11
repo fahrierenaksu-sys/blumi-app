@@ -11,9 +11,23 @@ const BOTTOM = "avatar_v2_bottom_coral_wave_pants";
 const SHOES = "avatar_v2_shoes_mint_ribbon_court_sneakers";
 const GIRL_OUTFIT = { ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: HAIR, topId: TOP, bottomId: BOTTOM, shoesId: SHOES, accessoryIds: [] };
 
+/** The baked manifest as if no body had front art yet: fixtures start here, so real front art is data these tests ignore. */
+function withoutFrontArt(manifest: AvatarStillManifest = AVATAR_STILL_MANIFEST): AvatarStillManifest {
+  const bodies = Object.fromEntries(
+    Object.entries(manifest.bodies).map(([rig, { showcaseBase: _base, ...body }]) => [
+      rig,
+      { ...body, items: Object.fromEntries(Object.entries(body.items).map(([id, { showcase: _showcase, ...item }]) => [id, item])) },
+    ]),
+  );
+  return { ...manifest, bodies } as unknown as AvatarStillManifest;
+}
+
 /** The baked manifest with front (showcase) art for the girl: a base and one layer per given item. */
-function girlWithShowcase(layers: Readonly<Record<string, { order: number; tucked?: boolean }>>): AvatarStillManifest {
-  const female = AVATAR_STILL_MANIFEST.bodies.female;
+function girlWithShowcase(
+  layers: Readonly<Record<string, { order: number; tucked?: boolean; back?: { key: string; rect: readonly [number, number, number, number] } }>>,
+): AvatarStillManifest {
+  const bare = withoutFrontArt();
+  const female = bare.bodies.female;
   const items = Object.fromEntries(
     Object.entries(female.items).map(([id, item]) => {
       const front = layers[id];
@@ -26,7 +40,7 @@ function girlWithShowcase(layers: Readonly<Record<string, { order: number; tucke
     ground: [300, 1420] as const,
     windows: { card: [0, 0, 600, 1440] as const, head: [150, 0, 300, 300] as const, push: [100, 0, 400, 400] as const },
   };
-  return { ...AVATAR_STILL_MANIFEST, bodies: { ...AVATAR_STILL_MANIFEST.bodies, female: { ...female, items, showcaseBase } } };
+  return { ...bare, bodies: { ...bare.bodies, female: { ...female, items, showcaseBase } } };
 }
 
 const FULL_FRONT = girlWithShowcase({ [SHOES]: { order: 1 }, [BOTTOM]: { order: 2 }, [TOP]: { order: 3 }, [HAIR]: { order: 4 } });
@@ -123,8 +137,35 @@ test("one worn item without a front layer draws the whole figure as the 3/4 stil
 });
 
 test("a body without front art falls back to its 3/4 still", () => {
-  const resolved = resolveShowcaseLayers(GIRL_OUTFIT, "card", AVATAR_STILL_MANIFEST);
+  const bare = withoutFrontArt();
+  const resolved = resolveShowcaseLayers(GIRL_OUTFIT, "card", bare);
   assert.equal(resolved.kind, "fallback");
   if (resolved.kind !== "fallback") return;
-  assert.deepEqual(resolved.still, resolveAvatarStillLayers(GIRL_OUTFIT, "full"));
+  assert.deepEqual(resolved.still, resolveAvatarStillLayers(GIRL_OUTFIT, "full", { manifest: bare }));
+});
+
+test("a part drawn behind the body (hair back) comes before the base, and only while its item is worn", () => {
+  const back = { key: `${HAIR}__back`, rect: [10, 0, 200, 300] as const };
+  const manifest = girlWithShowcase({ [SHOES]: { order: 1 }, [BOTTOM]: { order: 2 }, [TOP]: { order: 3 }, [HAIR]: { order: 4, back } });
+  const worn = resolveShowcaseLayers(GIRL_OUTFIT, "card", manifest);
+  assert.equal(worn.kind, "showcase");
+  if (worn.kind !== "showcase") return;
+  assert.deepEqual(worn.layers.map((layer) => layer.asset.split("/")[2]), [`${HAIR}__back`, "base__front", `${SHOES}__front`, `${BOTTOM}__front`, `${TOP}__front`, `${HAIR}__front`]);
+  assert.deepEqual(worn.layers[0]!.rect, back.rect);
+});
+
+test("the baked manifest's front art is complete: a base with windows inside its canvas, layers inside it, hair back first", () => {
+  for (const body of Object.values(AVATAR_STILL_MANIFEST.bodies)) {
+    const base = body.showcaseBase;
+    if (!base) continue;
+    for (const [x, y, w, h] of Object.values(base.windows)) {
+      assert.ok(x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= base.canvas.width && y + h <= base.canvas.height);
+    }
+    for (const item of Object.values(body.items)) {
+      for (const rect of [item.showcase?.rect, item.showcase?.back?.rect]) {
+        if (!rect) continue;
+        assert.ok(rect[0] >= 0 && rect[1] >= 0 && rect[0] + rect[2] <= base.canvas.width && rect[1] + rect[3] <= base.canvas.height);
+      }
+    }
+  }
 });

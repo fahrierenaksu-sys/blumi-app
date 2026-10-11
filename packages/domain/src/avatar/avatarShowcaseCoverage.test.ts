@@ -9,12 +9,7 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * must ship with its front layer; adding an entry needs a reason in the same commit.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: [
-    "avatar_v2_bottom_coral_wave_pants",
-    "avatar_v2_hair_ink_pageboy_star",
-    "avatar_v2_shoes_mint_ribbon_court_sneakers",
-    "avatar_v2_top_coral_wave_polo",
-  ],
+  female: [],
   male: [],
 };
 

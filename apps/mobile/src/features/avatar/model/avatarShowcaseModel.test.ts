@@ -19,7 +19,8 @@ const CARD_BOX = { width: 300, height: 480 }
 function girlWithFront(itemIds: readonly string[]): AvatarStillManifest {
   const female = AVATAR_STILL_MANIFEST.bodies.female
   const items = Object.fromEntries(
-    Object.entries(female.items).map(([id, item]) => {
+    // starting from items without front art: the baked manifest's own front layers are data these tests ignore
+    Object.entries(female.items).map(([id, { showcase: _baked, ...item }]) => {
       const order = itemIds.indexOf(id)
       return [id, order < 0 ? item : { ...item, showcase: { key: `${id}__front`, rect: [0, 0, 600, 1400] as const, order: order + 1 } }]
     })

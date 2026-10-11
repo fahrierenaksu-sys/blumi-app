@@ -13,6 +13,7 @@ const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const roomV2Root = resolve(serverRoot, "../mobile/src/features/roomV2")
 const stillLayersRoot = resolve(serverRoot, "../mobile/src/features/avatar/stills/layers")
 const stillManifestPath = resolve(serverRoot, "../../packages/domain/src/avatar/avatarStillManifest.json")
+const showcaseAllowlistPath = resolve(serverRoot, "../../tools/avatar25d/showcase-allowlist.json")
 const outDir = resolve(serverRoot, "dist/art")
 const require = createRequire(import.meta.url)
 const check = process.argv.includes("--check")
@@ -60,6 +61,14 @@ for (const itemId of drawList.listDrawableRoomItemIds()) {
 
 // every bust layer the still manifest can name: avatar/<rig>/bust/<key>.webp (the portrait renderer's paths)
 const stillManifest = JSON.parse(readFileSync(stillManifestPath, "utf8"))
+// A body the showcase allowlist approved must have its front art in the manifest: say so here, not as a silent 3/4 push.
+const showcaseAllowlist = existsSync(showcaseAllowlistPath) ? JSON.parse(readFileSync(showcaseAllowlistPath, "utf8")) : { bodies: {} }
+for (const [rig, approved] of Object.entries(showcaseAllowlist.bodies ?? {})) {
+  const body = stillManifest.bodies?.[rig]
+  if (!body?.showcaseBase) fail(`front art missing: the showcase allowlist approves ${rig}, but the still manifest has no showcaseBase for it (run tools/avatar25d/bake-showcase.mjs, then bake-stills.mjs)`)
+  const missing = Object.keys(approved.items ?? {}).filter((id) => !body.items?.[id]?.showcase)
+  if (missing.length > 0) fail(`front art missing: ${missing.length} allowlisted ${rig} item(s) have no showcase layer in the still manifest (run bake-showcase.mjs, then bake-stills.mjs)`)
+}
 for (const [rig, body] of Object.entries(stillManifest.bodies ?? {})) {
   const bust = body?.layers?.bust ?? []
   if (bust.length === 0) fail(`no bust layers for ${rig}`)
@@ -68,7 +77,10 @@ for (const [rig, body] of Object.entries(stillManifest.bodies ?? {})) {
   // A body without `showcaseBase` has none yet, and its pushes draw the 3/4 bust.
   if (!body?.showcaseBase) continue
   const showcaseKeys = new Set([body.showcaseBase.key])
-  for (const item of Object.values(body.items ?? {})) if (item?.showcase?.key) showcaseKeys.add(item.showcase.key)
+  for (const item of Object.values(body.items ?? {})) {
+    if (item?.showcase?.key) showcaseKeys.add(item.showcase.key)
+    if (item?.showcase?.back?.key) showcaseKeys.add(item.showcase.back.key)
+  }
   for (const key of showcaseKeys) sources.set(`avatar/${rig}/showcase/${key}.webp`, join(stillLayersRoot, rig, "showcase", `${key}.webp`))
 }
 

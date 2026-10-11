@@ -22,7 +22,7 @@ import {
 export interface AvatarShowcaseFront {
   readonly kind: "showcase";
   readonly rig: AvatarStillRigId;
-  /** Layer asset keys `<rig>/showcase/<key>`, base first, in draw order. */
+  /** Layer asset keys `<rig>/showcase/<key>` in draw order: parts behind the body, the base, then the front layers. */
   readonly layers: readonly { readonly asset: string; readonly rect: AvatarStillRect }[];
   /** The showcase base canvas the rects are in. */
   readonly space: AvatarShowcaseBase["canvas"];
@@ -92,12 +92,17 @@ export function resolveShowcaseLayers(
     if (!layer) return fallback("item-without-showcase");
     front.push({ slot, layer });
   }
+  const ordered = frontDrawOrder(front);
+  const behind = [...front]
+    .sort((a, b) => a.layer.order - b.layer.order)
+    .flatMap((entry) => (entry.layer.back ? [{ asset: `${rig}/showcase/${entry.layer.back.key}`, rect: entry.layer.back.rect }] : []));
   return {
     kind: "showcase",
     rig,
     layers: [
+      ...behind,
       { asset: `${rig}/showcase/${base.key}`, rect: [0, 0, base.canvas.width, base.canvas.height] },
-      ...frontDrawOrder(front).map((entry) => ({ asset: `${rig}/showcase/${entry.layer.key}`, rect: entry.layer.rect })),
+      ...ordered.map((entry) => ({ asset: `${rig}/showcase/${entry.layer.key}`, rect: entry.layer.rect })),
     ],
     space: base.canvas,
     windows: base.windows,

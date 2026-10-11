@@ -37,7 +37,10 @@ test("every layer and thumbnail in the manifest is a bundled file in the still r
   const expected = BODIES.flatMap((rig) => {
     const body = AVATAR_STILL_MANIFEST.bodies[rig]
     return [...body.layers.full.map((l) => `${rig}/full/${l.key}`), ...body.layers.bust.map((l) => `${rig}/bust/${l.key}`),
-      ...Object.values(body.items).map((item) => `${rig}/thumb/${item.thumb}`)]
+      ...Object.values(body.items).map((item) => `${rig}/thumb/${item.thumb}`),
+      // front (showcase) art: the base, each item's front layer and the part drawn behind the body (hair back)
+      ...(body.showcaseBase ? [`${rig}/showcase/${body.showcaseBase.key}`] : []),
+      ...Object.values(body.items).flatMap((item) => (item.showcase ? [`${rig}/showcase/${item.showcase.key}`, ...(item.showcase.back ? [`${rig}/showcase/${item.showcase.back.key}`] : [])] : []))]
   })
   assert.deepEqual([...bundled].sort(), [...expected].sort())
   for (const key of expected) assert.ok(existsSync(join(HERE, "layers", `${key}.webp`)), key)
