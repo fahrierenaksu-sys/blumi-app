@@ -6,6 +6,7 @@ import Animated, {
   useSharedValue
 } from "react-native-reanimated"
 import { animateTo, useMotion } from "../../../ui/motion"
+import { useCommittedReveal } from "../../../ui/committedReveal"
 import { uiTheme } from "../../../ui/theme"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
 
@@ -24,9 +25,11 @@ export function ShopCardRemoveButton(props: {
   const motion = useMotion()
   const { reduceMotion } = motion
   const progress = useSharedValue(reduceMotion ? 1 : 0)
+  // It mounts hidden: the end state is also committed once it has popped in (useCommittedReveal).
+  const { style: committedStyle, onRevealEnd } = useCommittedReveal()
   useEffect(() => {
-    progress.value = animateTo(1, motion.snappy)
-  }, [motion, progress])
+    progress.value = animateTo(1, motion.snappy, onRevealEnd)
+  }, [motion, onRevealEnd, progress])
   const dotStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, progress.value),
     transform: [{ scale: HIDDEN_SCALE + (1 - HIDDEN_SCALE) * progress.value }]
@@ -40,7 +43,7 @@ export function ShopCardRemoveButton(props: {
       style={styles.productRemoveHitArea}
     >
       {({ pressed }) => (
-        <Animated.View style={[styles.productRemoveDot, pressed ? styles.productRemoveDotPressed : null, dotStyle]}>
+        <Animated.View style={[styles.productRemoveDot, pressed ? styles.productRemoveDotPressed : null, dotStyle, committedStyle]}>
           <Ionicons name="close" size={12} color={uiTheme.colors.primary} />
         </Animated.View>
       )}

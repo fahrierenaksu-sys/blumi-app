@@ -6,6 +6,7 @@ import {
   useAnimatedStyle,
   useSharedValue
 } from "react-native-reanimated"
+import { useCommittedReveal } from "./committedReveal"
 import { animateSegment } from "./motion"
 
 /**
@@ -90,24 +91,28 @@ export function useBottomPanelEntrance(
 ) {
   const progress = useSharedValue(reduceMotion ? 1 : 0)
   const startedRef = useRef(reduceMotion)
+  // The panel mounts hidden: its end state is also committed once the entrance is over (useCommittedReveal).
+  const { style: committedStyle, onRevealEnd, markRevealed } = useCommittedReveal()
 
   useLayoutEffect(() => {
     if (reduceMotion) {
       startedRef.current = true
       progress.value = 1
+      markRevealed()
       return undefined
     }
     if (startedRef.current) return undefined
     return subscribeBottomPanelEntranceStart(navigation, () => {
       startedRef.current = true
-      progress.value = animateSegment(1, ENTRANCE_SEGMENT)
+      progress.value = animateSegment(1, ENTRANCE_SEGMENT, onRevealEnd)
     })
-  }, [navigation, progress, reduceMotion])
+  }, [markRevealed, navigation, onRevealEnd, progress, reduceMotion])
 
-  return useAnimatedStyle(() => ({
+  const animatedStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [{ translateY: (1 - progress.value) * BOTTOM_PANEL_ENTRANCE_DISTANCE }]
   }))
+  return [animatedStyle, committedStyle]
 }
 
 /**

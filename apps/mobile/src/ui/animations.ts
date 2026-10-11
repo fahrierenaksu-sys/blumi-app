@@ -18,6 +18,7 @@ import {
   withTiming
 } from "react-native-reanimated"
 import { getPulseRestProgress } from "./ambientMotionModel"
+import { useCommittedReveal } from "./committedReveal"
 import { animateTo, animateToAfter, useMotion, type ResolvedMotion } from "./motion"
 
 // The Reduce Motion store lives in ./motion; these re-exports keep the
@@ -49,6 +50,8 @@ export function useEntranceAnimation(options: EntranceOptions = {}) {
   const motion = useMotion()
   const { reduceMotion } = motion
   const progress = useSharedValue(0)
+  // The element mounts hidden: its end state is also committed once the entrance is over (useCommittedReveal).
+  const { style: committedStyle, onRevealEnd } = useCommittedReveal()
 
   useLayoutEffect(() => {
     const token: ResolvedMotion = reduceMotion
@@ -56,13 +59,14 @@ export function useEntranceAnimation(options: EntranceOptions = {}) {
       : duration === undefined
         ? motion.smooth
         : { kind: "timing", duration }
-    progress.value = animateToAfter(reduceMotion ? 0 : delay, 1, token)
-  }, [delay, duration, motion, progress, reduceMotion])
+    progress.value = animateToAfter(reduceMotion ? 0 : delay, 1, token, onRevealEnd)
+  }, [delay, duration, motion, onRevealEnd, progress, reduceMotion])
 
-  return useAnimatedStyle(() => ({
+  const animatedStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, progress.value),
     transform: [{ translateY: reduceMotion ? 0 : (1 - progress.value) * translateY }]
   }))
+  return [animatedStyle, committedStyle]
 }
 
 /* ── Pulse ─────────────────────────────────────────────────── */

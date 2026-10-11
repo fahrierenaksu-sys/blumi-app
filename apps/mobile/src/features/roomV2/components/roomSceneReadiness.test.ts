@@ -4,7 +4,8 @@ import {
   createFakeReactRuntime,
   createReactNativeStub,
   createReanimatedStub,
-  loadSourceWithFakeReact
+  loadSourceWithFakeReact,
+  loadCommittedRevealModule
 } from "../../../testing/hookHarness"
 import { findElements, type RenderedElement } from "../../../testing/reanimatedClock"
 import type { RoomShell, RoomV2RenderItem } from "../roomV2.types"
@@ -66,6 +67,7 @@ function mountRenderer(props: Record<string, unknown>) {
           useRoomRendererScreenFocused: () => true
         },
         "../../../ui/animations": { useReducedMotion: () => false },
+        "../../../ui/committedReveal": loadCommittedRevealModule(runtime),
         "./roomSceneReadiness": loadSourceWithFakeReact("features/roomV2/components/roomSceneReadiness.ts", runtime)
       },
       inertUnknown: true

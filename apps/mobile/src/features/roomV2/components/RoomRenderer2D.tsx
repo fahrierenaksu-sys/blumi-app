@@ -24,6 +24,7 @@ import { RoomFloorTapLayer } from "./RoomFloorTapLayer"
 import { getRoomAvatarTapTarget } from "./roomAvatarTapTargetModel"
 import { getRoomFurnitureTapTarget, isRoomFurnitureTapOnSeat } from "./roomFurnitureTapTargetModel"
 import { useReducedMotion } from "../../../ui/animations"
+import { useCommittedReveal } from "../../../ui/committedReveal"
 import type { RoomWorldPoint } from "../../roomWorld/roomWorldGeometry"
 import type {
   RoomShell,
@@ -433,9 +434,17 @@ const StageMarker = memo(function StageMarker(props: {
   const opacity = useSharedValue(reduceMotion ? 1 : 0)
   const leaving = Boolean(marker.leaving)
   const markerId = marker.id
+  // It mounts hidden: the shown state is also committed once the fade-in is over (useCommittedReveal).
+  // A leaving marker keeps it; it unmounts after its fade-out.
+  const { style: committedStyle, onRevealEnd, markRevealed } = useCommittedReveal()
   useEffect(() => {
     if (!leaving) {
-      opacity.value = reduceMotion ? 1 : animateTo(1, motion.fadeIn)
+      if (reduceMotion) {
+        opacity.value = 1
+        markRevealed()
+        return
+      }
+      opacity.value = animateTo(1, motion.fadeIn, onRevealEnd)
       return
     }
     if (reduceMotion) {
@@ -447,7 +456,7 @@ const StageMarker = memo(function StageMarker(props: {
       "worklet"
       if (finished && onFaded) scheduleOnRN(onFaded, markerId)
     })
-  }, [leaving, markerId, motion.fadeIn, motion.fadeOut, onFaded, opacity, reduceMotion])
+  }, [leaving, markRevealed, markerId, motion.fadeIn, motion.fadeOut, onFaded, onRevealEnd, opacity, reduceMotion])
   const fadeStyle = useAnimatedStyle(() => ({ opacity: opacity.value }))
 
   return (
@@ -457,7 +466,8 @@ const StageMarker = memo(function StageMarker(props: {
         styles.stageMarker,
         marker.tone === "blocked" ? styles.stageMarkerBlocked : null,
         { left: `${marker.x * 100}%`, top: `${marker.y * 100}%` },
-        fadeStyle
+        fadeStyle,
+        leaving ? null : committedStyle
       ]}
     >
       <View

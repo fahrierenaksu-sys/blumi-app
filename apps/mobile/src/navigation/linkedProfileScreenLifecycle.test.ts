@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../testing/hookHarness"
+import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact, loadCommittedRevealModule } from "../testing/hookHarness"
 
 // Characterizes LinkedProfileScreen's profile request lifecycle: one request per
 // target, aborted on target change, and never restarted by a locale change.
@@ -86,6 +86,7 @@ function mount(options: { demoMode?: boolean; directProfile?: Record<string, unk
         "react-native": createReactNativeStub().module,
         "react-native-reanimated": reanimated.module,
         "../ui/animations": { useReducedMotion: () => options.reduceMotion === true },
+        "../ui/committedReveal": loadCommittedRevealModule(runtime),
         "../ui/PressableScale": { PressableScale: "PressableScale" },
         "../features/avatarV2/candidateAvatarSnapshot": {
           createCandidateAvatarSnapshot: (input: { userId: string }) => ({ snapshotFor: input.userId })

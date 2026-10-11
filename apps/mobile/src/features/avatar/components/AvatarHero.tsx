@@ -10,6 +10,7 @@ import { AVATAR_RIG_DATA } from "../renderer/avatar25Assets"
 import { stepBreathWeight } from "../renderer/avatar25Life"
 import { AvatarStill } from "./AvatarStill"
 import { useAvatarLiveSlot } from "./useAvatarLiveSlot"
+import { useCommittedReveal } from "../../../ui/committedReveal"
 
 /** Above this height (pt) the live surface is capped at 2x pixel ratio (plan 2.2 memory budget). */
 const PIXEL_RATIO_CAP_ABOVE_PT = 250
@@ -72,10 +73,13 @@ export const AvatarHero = memo(function AvatarHero(props: AvatarHeroProps) {
   const liveOpacity = useSharedValue(0)
   const stillOpacity = useSharedValue(1)
   const [failed, setFailed] = useState(false)
+  // The live canvas mounts hidden: once its fade-in is over, its shown state is committed too (useCommittedReveal),
+  // so a lost UI-thread write cannot leave the hero with the still hidden and the live canvas invisible.
+  const { style: liveCommittedStyle, onRevealEnd, reset: resetLiveReveal } = useCommittedReveal()
   const onReady = useCallback(() => {
-    liveOpacity.value = withTiming(1, { duration: CROSS_FADE_MS })
+    liveOpacity.value = withTiming(1, { duration: CROSS_FADE_MS }, onRevealEnd)
     stillOpacity.value = withDelay(CROSS_FADE_MS, withTiming(0, { duration: 0 }))
-  }, [liveOpacity, stillOpacity])
+  }, [liveOpacity, onRevealEnd, stillOpacity])
   const onError = useCallback(() => setFailed(true), [])
   const showLive = granted && !failed && instances.length > 0
   const liveStyle = useAnimatedStyle(() => ({ opacity: liveOpacity.value }))
@@ -85,7 +89,8 @@ export const AvatarHero = memo(function AvatarHero(props: AvatarHeroProps) {
     if (showLive) return
     liveOpacity.value = 0
     stillOpacity.value = 1
-  }, [liveOpacity, showLive, stillOpacity])
+    resetLiveReveal()
+  }, [liveOpacity, resetLiveReveal, showLive, stillOpacity])
 
   return (
     <View
@@ -107,7 +112,7 @@ export const AvatarHero = memo(function AvatarHero(props: AvatarHeroProps) {
         />
       </Reanimated.View>
       {showLive ? (
-        <Reanimated.View style={[StyleSheet.absoluteFill, liveStyle]}>
+        <Reanimated.View style={[StyleSheet.absoluteFill, liveStyle, liveCommittedStyle]}>
           <HeroCanvas
             instances={instances}
             rig={spec.rig}

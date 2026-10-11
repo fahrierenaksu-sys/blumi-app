@@ -5,7 +5,8 @@ import {
   createReactNativeStub,
   createReanimatedStub,
   loadSourceWithFakeReact,
-  type FakeReactRuntime
+  type FakeReactRuntime,
+  loadCommittedRevealModule
 } from "../../../testing/hookHarness"
 import { getMiniRoomCopy } from "../miniRoomCopy"
 import type { RoomChatHistoryItem } from "../roomChatHistoryModel"
@@ -140,6 +141,7 @@ function loadControls(osReduceMotion: boolean, options: { hold?: boolean } = {})
   const modules = {
     ...base,
     "../../../ui/motion": motion,
+    "../../../ui/committedReveal": loadCommittedRevealModule(runtime),
     "../../../ui/PressableScale": pressableScale,
     "../../../ui/GesturePressableScale": gesturePressableScale,
     "../../../ui/haptics": {

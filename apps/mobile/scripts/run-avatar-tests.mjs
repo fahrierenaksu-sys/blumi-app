@@ -156,7 +156,9 @@ try {
       // AvatarLive's canvas gate: useAvatarLiveSlot as AvatarLive calls it, against the real budget (review A F4)
       resolve(workspaceRoot, "src/features/avatar/components/useAvatarLiveSlot.test.ts"),
       // review A F1: a valid old dress loadout draws as the body's rig starter on the live and still resolvers
-      resolve(workspaceRoot, "src/features/avatar/model/dressLoadoutDraw.test.ts")
+      resolve(workspaceRoot, "src/features/avatar/model/dressLoadoutDraw.test.ts"),
+      // row 24b class: a view that mounts hidden commits its revealed end state, so a lost UI-thread write cannot hide it
+      resolve(workspaceRoot, "src/ui/committedReveal.test.ts")
     ],
     {
       cwd: workspaceRoot,

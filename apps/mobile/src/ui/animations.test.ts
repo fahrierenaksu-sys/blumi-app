@@ -4,7 +4,8 @@ import {
   createFakeReactRuntime,
   createReanimatedStub,
   loadSourceWithFakeReact,
-  type FakeReactRuntime
+  type FakeReactRuntime,
+  loadCommittedRevealModule
 } from "../testing/hookHarness"
 import type * as AnimationsModule from "./animations"
 
@@ -32,7 +33,7 @@ function load(reduceMotion: boolean) {
     real: ["./motionTokens"]
   })
   const hooks = loadSourceWithFakeReact<typeof AnimationsModule>("ui/animations.ts", runtime, {
-    modules: { "react-native-reanimated": reanimated.module, "./motion": motionStub },
+    modules: { "react-native-reanimated": reanimated.module, "./motion": motionStub, "./committedReveal": loadCommittedRevealModule(runtime) },
     real: ["./ambientMotionModel"]
   })
   return { runtime, reanimated, hooks }
@@ -55,7 +56,7 @@ function renderFirstFrame<T>(runtime: FakeReactRuntime, hook: () => T): T {
 
 test("an entrance starts hidden and low on its first frame, then rises in", () => {
   const { runtime, reanimated, hooks } = load(false)
-  const first = renderFirstFrame(runtime, () => hooks.useEntranceAnimation({ translateY: 20 }) as Style)
+  const first = renderFirstFrame(runtime, () => (hooks.useEntranceAnimation({ translateY: 20 }) as unknown as Style[])[0])
   assert.equal(first.opacity, 0)
   assert.equal(translateY(first), 20)
   assert.ok(reanimated.calls.some((call) => call.kind === "withSpring" && call.target === 1))
@@ -66,7 +67,7 @@ test("an entrance starts hidden and low on its first frame, then rises in", () =
 
 test("Reduce Motion: an entrance only crossfades, with no travel and no delay", () => {
   const { runtime, reanimated, hooks } = load(true)
-  const first = renderFirstFrame(runtime, () => hooks.useEntranceAnimation({ translateY: 20, delay: 300 }) as Style)
+  const first = renderFirstFrame(runtime, () => (hooks.useEntranceAnimation({ translateY: 20, delay: 300 }) as unknown as Style[])[0])
   assert.equal(translateY(first), 0, "nothing moves")
   assert.equal(first.opacity, 0, "it still fades in")
   assert.ok(!reanimated.calls.some((call) => call.kind === "withDelay"))

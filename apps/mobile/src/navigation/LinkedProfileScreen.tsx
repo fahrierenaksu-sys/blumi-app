@@ -33,6 +33,7 @@ import { getAppLocale } from "../features/session/appLocale"
 import type { RootStackParamList } from "./RootNavigator"
 import { uiTheme } from "../ui/theme"
 import { useReducedMotion } from "../ui/animations"
+import { useCommittedReveal } from "../ui/committedReveal"
 import {
   createLinkedProfileLoadState,
   failLinkedProfileRequest,
@@ -160,24 +161,27 @@ export function LoadingProfile() {
 function LinkedProfileReveal(props: { children: ReactNode }) {
   const reduceMotion = useReducedMotion()
   const opacity = useSharedValue(reduceMotion ? 1 : 0)
+  // It mounts hidden: the end state is also committed once the fade is over (useCommittedReveal).
+  const { style: committedStyle, onRevealEnd, markRevealed } = useCommittedReveal()
 
   useEffect(() => {
     if (reduceMotion) {
       cancelAnimation(opacity)
       opacity.value = 1
+      markRevealed()
       return undefined
     }
     opacity.value = withTiming(1, {
       duration: PROFILE_REVEAL_DURATION_MS,
       easing: Easing.out(Easing.cubic)
-    })
+    }, onRevealEnd)
     return () => cancelAnimation(opacity)
-  }, [opacity, reduceMotion])
+  }, [markRevealed, onRevealEnd, opacity, reduceMotion])
 
   const revealStyle = useAnimatedStyle(() => ({ opacity: opacity.value }))
 
   return (
-    <Reanimated.View style={[styles.reveal, revealStyle]}>
+    <Reanimated.View style={[styles.reveal, revealStyle, committedStyle]}>
       {props.children}
     </Reanimated.View>
   )

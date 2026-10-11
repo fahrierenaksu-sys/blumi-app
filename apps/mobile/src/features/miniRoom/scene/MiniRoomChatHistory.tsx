@@ -11,6 +11,7 @@ import {
 } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { animateToAfter, MOTION_STAGGER, useMotion } from "../../../ui/motion"
+import { useCommittedReveal } from "../../../ui/committedReveal"
 import { createFirstAppearanceStagger, type FirstAppearanceStagger } from "./miniRoomFirstAppearance"
 import type { MiniRoomCopy } from "../miniRoomCopy"
 import { formatRoomChatTime, roomChatHistoryKeyOf, type RoomChatHistoryItem, type RoomChatHistoryStatus } from "../roomChatHistoryModel"
@@ -135,16 +136,19 @@ function useHistoryRowEntrance(id: string, enterSlot: number | null, onEntered: 
   const { reduceMotion } = motion
   const [slot] = useState(enterSlot)
   const progress = useSharedValue(slot === null ? 1 : 0)
+  // A row that mounts hidden also commits its end state once it has entered (useCommittedReveal).
+  const { style: committedStyle, onRevealEnd } = useCommittedReveal()
   useLayoutEffect(() => {
     if (slot === null) return
     onEntered(id)
-    progress.value = animateToAfter(motion.staggerDelay(slot), 1, reduceMotion ? motion.crossfade : motion.smooth)
-  }, [id, motion, onEntered, progress, reduceMotion, slot])
+    progress.value = animateToAfter(motion.staggerDelay(slot), 1, reduceMotion ? motion.crossfade : motion.smooth, onRevealEnd)
+  }, [id, motion, onEntered, onRevealEnd, progress, reduceMotion, slot])
   // The list is inverted (each cell is flipped), so a negative offset sits below.
-  return useAnimatedStyle(() => ({
+  const animatedStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [{ translateY: reduceMotion ? 0 : (progress.value - 1) * ROW_ENTER_RISE }]
   }))
+  return [animatedStyle, committedStyle]
 }
 
 const HistoryRow = memo(function HistoryRow(props: {

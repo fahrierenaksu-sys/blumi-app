@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test, { mock } from "node:test"
-import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../testing/hookHarness"
+import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact, loadCommittedRevealModule } from "../testing/hookHarness"
 import { createClockedReanimatedStub, loadClockedMotion } from "../testing/reanimatedClock"
 import type * as Entrance from "./bottomPanelEntrance"
 
@@ -31,13 +31,15 @@ function mountPanel(reduceMotion: boolean) {
   const entrance = loadSourceWithFakeReact<typeof Entrance>("ui/bottomPanelEntrance.ts", runtime, {
     modules: {
       "react-native-reanimated": clock.module,
-      "./motion": loadClockedMotion(runtime, clock.module, reactNative)
+      "./motion": loadClockedMotion(runtime, clock.module, reactNative),
+      "./committedReveal": loadCommittedRevealModule(runtime)
     }
   })
   const navigation = fakeNavigation()
   let style: { opacity: number; transform: { translateY: number }[] } | undefined
   runtime.render(() => {
-    style = entrance.useBottomPanelEntrance(navigation, reduceMotion) as unknown as typeof style
+    // the UI-thread animated part; the committed end state is covered by committedReveal.test.ts
+    style = (entrance.useBottomPanelEntrance(navigation, reduceMotion) as unknown as (typeof style)[])[0]
     return null
   })
   return {
@@ -122,11 +124,12 @@ function mountPanelProps(reduceMotion: boolean) {
   const entrance = loadSourceWithFakeReact<typeof Entrance>("ui/bottomPanelEntrance.ts", runtime, {
     modules: {
       "react-native-reanimated": clock.module,
-      "./motion": loadClockedMotion(runtime, clock.module, reactNative)
+      "./motion": loadClockedMotion(runtime, clock.module, reactNative),
+      "./committedReveal": loadCommittedRevealModule(runtime)
     }
   })
   const navigation = fakeNavigation()
-  let props: { style: { opacity: number }; layout: unknown } | undefined
+  let props: { style: { opacity: number }[]; layout: unknown } | undefined
   runtime.render(() => {
     props = entrance.useBottomPanelEntranceProps(navigation, reduceMotion) as unknown as typeof props
     return null
@@ -137,14 +140,14 @@ function mountPanelProps(reduceMotion: boolean) {
 test("the panel props carry the rise and a layout glide; Reduce Motion drops the glide", () => {
   const moving = mountPanelProps(false)
   assert.ok(moving.props().layout, "the panel glides while its height settles")
-  assert.equal(moving.props().style.opacity, 0)
+  assert.equal(moving.props().style[0]!.opacity, 0)
   moving.navigation.emit(false)
   mock.timers.tick(moving.entrance.BOTTOM_PANEL_ENTRANCE_MS)
-  assert.equal(moving.props().style.opacity, 1)
+  assert.equal(moving.props().style[0]!.opacity, 1)
 
   const still = mountPanelProps(true)
   assert.equal(still.props().layout, undefined)
-  assert.equal(still.props().style.opacity, 1)
+  assert.equal(still.props().style[0]!.opacity, 1)
 })
 
 type ScreenElement = { type: unknown; props: Record<string, unknown> }

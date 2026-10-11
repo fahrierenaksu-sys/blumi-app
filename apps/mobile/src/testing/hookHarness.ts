@@ -511,3 +511,13 @@ export function loadSourceWithFakeReact<T = Record<string, unknown>>(
   wrapper(module.exports, requireModule, module, file, dirname(file), ...Object.values(globals))
   return module.exports
 }
+
+/**
+ * The real `ui/committedReveal` on the fake runtime (a UI-thread completion hands the call straight back to JS),
+ * for sources that import it.
+ */
+export function loadCommittedRevealModule(runtime: FakeReactRuntime): unknown {
+  return loadSourceWithFakeReact("ui/committedReveal.ts", runtime, {
+    modules: { "react-native-worklets": { scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => fn(...args) } }
+  })
+}

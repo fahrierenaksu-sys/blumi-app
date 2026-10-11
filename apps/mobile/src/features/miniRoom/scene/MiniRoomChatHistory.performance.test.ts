@@ -4,7 +4,8 @@ import {
   createFakeReactRuntime,
   createReactNativeStub,
   createReanimatedStub,
-  loadSourceWithFakeReact
+  loadSourceWithFakeReact,
+  loadCommittedRevealModule
 } from "../../../testing/hookHarness"
 import { getMiniRoomCopy } from "../miniRoomCopy"
 import type { RoomChatHistoryItem } from "../roomChatHistoryModel"
@@ -37,6 +38,7 @@ function mount(items: RoomChatHistoryItem[]) {
         "react-native": createReactNativeStub({ FlatList: "FlatList" }).module,
         "react-native-reanimated": createReanimatedStub(runtime).module,
         "../../../ui/motion": { MOTION_STAGGER },
+        "../../../ui/committedReveal": loadCommittedRevealModule(runtime),
         "@expo/vector-icons/Ionicons": { __esModule: true, default: "Ionicons" }
       },
       real: ["./miniRoomFirstAppearance", "../roomChatHistoryModel"]
