@@ -7,9 +7,8 @@ import {
 } from "../testing/hookHarness"
 import { candidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
 
-// The chibi on Discover and in the match moment is the baked 2.5D still. Discover's front cards are the
-// live-capable hero (a still until the live budget grants a canvas), so promoting a card to the top card never
-// remounts its figure; everything else is a plain still.
+// The chibi on Discover and in the match moment is always the baked 2.5D still (owner decision: the Discover deck
+// is still, no live canvas), so the deck's cards, behind or on top, never mount a GPU canvas.
 
 interface Element {
   type: unknown
@@ -57,29 +56,29 @@ function mountPreview() {
 
 const snapshot = { kind: "candidate_avatar_snapshot", displayName: "Defne", label: "chibi", bodyPreset: "female" }
 
-test("a Discover front card is the hero; it only asks for a live canvas while it is the active top card", () => {
+test("a Discover front card is the baked still, whether it is behind or on top of the deck", () => {
   const preview = mountPreview()
-  const behind = find(preview.render({ snapshot, stage: "discover", live: true, liveActive: false }), AvatarHero)
-  assert.ok(behind, "a card behind the top one is drawn by the hero, as a still")
-  assert.equal(behind.props.liveScope, "screen")
-  assert.equal(behind.props.liveActive, false)
-
-  const onTop = find(preview.render({ snapshot, stage: "discover", live: true, liveActive: true }), AvatarHero)
-  assert.ok(onTop)
-  assert.equal(onTop.type, behind.type, "promotion keeps the same figure mounted")
-  assert.equal(onTop.props.liveActive, true)
+  const behind = preview.render({ snapshot, stage: "discover", size: 300 })
+  const onTop = preview.render({ snapshot, stage: "discover", size: 300, live: true, liveActive: true })
+  for (const output of [behind, onTop]) {
+    assert.equal(find(output, AvatarHero), undefined, "no live hero on the Discover deck")
+    const still = find(output, AvatarStill)
+    assert.ok(still, "the card draws the still")
+    assert.equal(still.props.crop, "full")
+  }
+  assert.equal(find(onTop, AvatarStill)?.type, find(behind, AvatarStill)?.type, "promotion keeps the same figure component")
 })
 
-test("the startup receipt and error of the figure come from the still under the hero", () => {
+test("the startup receipt and error of the figure come from the still", () => {
   const preview = mountPreview()
   const onDisplay = () => undefined
   const onImageError = () => undefined
-  const hero = find(preview.render({ snapshot, live: true, onDisplay, onImageError }), AvatarHero)
-  assert.equal(hero?.props.onStillDisplay, onDisplay)
-  assert.equal(hero?.props.onStillError, onImageError)
+  const still = find(preview.render({ snapshot, onDisplay, onImageError }), AvatarStill)
+  assert.equal(still?.props.onDisplay, onDisplay)
+  assert.equal(still?.props.onError, onImageError)
 })
 
-test("everything else is a baked still, never the live hero", () => {
+test("a stage without live props is the same baked still", () => {
   const preview = mountPreview()
   const flight = preview.render({ snapshot, stage: "discover", size: 120 })
   assert.equal(find(flight, AvatarHero), undefined)
@@ -93,8 +92,9 @@ test("the match moment shows the partner's half-body still turned towards the pe
   assert.equal(still?.props.mirror, true)
 })
 
-test("a half-body crop never mounts the live hero, even when asked", () => {
+test("a half-body crop is a still, even when live props are passed", () => {
   const preview = mountPreview()
   const output = preview.render({ snapshot, crop: "half", live: true, liveActive: true })
   assert.equal(find(output, AvatarHero), undefined)
+  assert.equal(find(output, AvatarStill)?.props.crop, "half")
 })

@@ -3,7 +3,6 @@ import type { AvatarSelection } from "@blumi/contracts"
 import { ImageBackground, StyleSheet, Text, View } from "react-native"
 import Animated from "react-native-reanimated"
 import type { RealtimeConnectionStatus } from "@blumi/realtime-client"
-import { AvatarHero } from "../features/avatar/components/AvatarHero"
 import { AvatarStill } from "../features/avatar/components/AvatarStill"
 import { candidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
 import {
@@ -167,20 +166,13 @@ export interface CandidateAvatarPreviewProps {
   crop?: "full" | "half"
   /** Mirrored to face the other way (the partner in the match moment). */
   mirror?: boolean
-  /**
-   * Draws the live-capable hero (Discover's front cards): it is a baked still until `liveActive` and the live
-   * budget grant a canvas, so a card promoted to the top is never remounted. Every other use is a plain still.
-   */
-  live?: boolean
-  liveActive?: boolean
-  reduceMotion?: boolean
   onDisplay?: () => void
   onImageError?: () => void
 }
 
-/** Another person's chibi on a soft stage: the baked 2.5D still, or the live hero on Discover's top card. */
+/** Another person's chibi on a soft stage: always the baked 2.5D still, never a live canvas. */
 export function CandidateAvatarPreview(props: CandidateAvatarPreviewProps) {
-  const { snapshot, size = 160, stage = "profile", crop = "full", mirror = false, live = false } = props
+  const { snapshot, size = 160, stage = "profile", crop = "full", mirror = false } = props
   const input = useMemo(() => candidateAvatarInput(snapshot), [snapshot])
   const isFull = crop === "full"
   const platformWidth = size * (stage === "discover" ? 0.96 : 0.82)
@@ -225,31 +217,16 @@ export function CandidateAvatarPreview(props: CandidateAvatarPreviewProps) {
         />
       ) : null}
       <View style={isFull ? cardStyles.candidateAvatarBody : cardStyles.candidateAvatarBodyHalf}>
-        {live && isFull ? (
-          <AvatarHero
-            loadout={input.loadout}
-            hints={input.hints}
-            width={figureWidth}
-            height={figureHeight}
-            mirror={mirror}
-            liveScope="screen"
-            liveActive={props.liveActive === true}
-            reduceMotion={props.reduceMotion}
-            onStillDisplay={props.onDisplay}
-            onStillError={props.onImageError}
-          />
-        ) : (
-          <AvatarStill
-            loadout={input.loadout}
-            hints={input.hints}
-            crop={crop}
-            width={figureWidth}
-            height={figureHeight}
-            mirror={mirror}
-            onDisplay={props.onDisplay}
-            onError={props.onImageError}
-          />
-        )}
+        <AvatarStill
+          loadout={input.loadout}
+          hints={input.hints}
+          crop={crop}
+          width={figureWidth}
+          height={figureHeight}
+          mirror={mirror}
+          onDisplay={props.onDisplay}
+          onError={props.onImageError}
+        />
       </View>
     </View>
   )
