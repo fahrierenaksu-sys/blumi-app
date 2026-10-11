@@ -24,6 +24,34 @@ require.extensions[".webp"] = require.extensions[".png"]
 
 // Exercise the shipped catalog/builders. Only React scheduling and native
 // image loading are substituted; ownership, prices and scene geometry are real.
+/* eslint-disable @typescript-eslint/no-require-imports -- the room seam must be installed before the room catalog loads */
+const { LAYERED_FURNITURE_ASSETS, LAYERED_WALL_ASSETS } = require("../../roomV2/furniture/layeredFurnitureAssets") as
+  typeof import("../../roomV2/furniture/layeredFurnitureAssets")
+const { createRoomAvatar25dFurnitureCatalog } = require("../../roomV2/furniture/layeredFurnitureCatalog") as
+  typeof import("../../roomV2/furniture/layeredFurnitureCatalog")
+const { createRoomAvatar25dRoomCalibration } = require("../../roomV2/calibration/roomAvatar25dRoomCalibration") as
+  typeof import("../../roomV2/calibration/roomAvatar25dRoomCalibration")
+const { roomAvatar25d: seamStub, installRoomAvatarSeam } = require("../../avatar/roomAvatarSeam") as
+  typeof import("../../avatar/roomAvatarSeam")
+const realDomain = require("@blumi/domain") as typeof import("@blumi/domain")
+/* eslint-enable @typescript-eslint/no-require-imports */
+
+// Plain Node has no room seam, and every 2.5D piece is held (pricing pending), so the real catalog sells no room
+// product. These tests are about how Shop derives room products from a published, priced room piece, so two
+// stand-ins carry the real layered geometry under their own ids. Each has a published economy row of its own.
+const STAND_IN_ROOM_IDS = ["stand_in_room_piece_a", "stand_in_room_piece_b"] as const
+const layeredPieces = createRoomAvatar25dFurnitureCatalog(LAYERED_FURNITURE_ASSETS, LAYERED_WALL_ASSETS)
+assert.ok(layeredPieces.length >= STAND_IN_ROOM_IDS.length, "the layered furniture art must be bundled")
+const standInPieces = STAND_IN_ROOM_IDS.map((id, index) => ({ ...layeredPieces[index]!, id, name: `Stand-in ${id}` }))
+const STAND_IN_ECONOMY_ITEMS = STAND_IN_ROOM_IDS.map((itemId) => (
+  { itemId, type: "room" as const, title: itemId, priceCoins: 10 }
+))
+installRoomAvatarSeam({
+  ...seamStub,
+  roomCalibration: createRoomAvatar25dRoomCalibration(LAYERED_FURNITURE_ASSETS, LAYERED_WALL_ASSETS),
+  furnitureCatalog: standInPieces
+})
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
 const { DEFAULT_AVATAR_V2 } = require("../../avatarV2/avatarV2Catalog") as typeof import("../../avatarV2/avatarV2Catalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
@@ -220,13 +248,22 @@ function mountCatalog() {
   const hook = loadSourceWithFakeReact<{ useShopCatalogProducts: typeof useShopCatalogProducts }>(
     "features/shop/screen/useShopCatalogProducts.ts", runtime,
     {
-      // Supply the native locale, retaining the real sort and presentation rules.
-      modules: { "./shopAvatarProductOrder": {
-        ...avatarProductOrder,
-        sortAvatarShopProducts: (products: Parameters<typeof avatarProductOrder.sortAvatarShopProducts>[0]) =>
-          avatarProductOrder.sortAvatarShopProducts(products, "tr")
-      } },
-      real: ["@blumi/domain", "../shopCatalog", "./shopScreenModel"]
+      modules: {
+        // Publish the stand-in room pieces next to the real catalog (see STAND_IN_ECONOMY_ITEMS).
+        "@blumi/domain": {
+          ...realDomain,
+          resolveR1PublishedEconomyCatalog: (...args: Parameters<typeof realDomain.resolveR1PublishedEconomyCatalog>) => [
+            ...realDomain.resolveR1PublishedEconomyCatalog(...args), ...STAND_IN_ECONOMY_ITEMS
+          ]
+        },
+        // Supply the native locale, retaining the real sort and presentation rules.
+        "./shopAvatarProductOrder": {
+          ...avatarProductOrder,
+          sortAvatarShopProducts: (products: Parameters<typeof avatarProductOrder.sortAvatarShopProducts>[0]) =>
+            avatarProductOrder.sortAvatarShopProducts(products, "tr")
+        }
+      },
+      real: ["../shopCatalog", "./shopScreenModel"]
     }
   ).useShopCatalogProducts
   const inventory: BlumiInventorySnapshot = {
