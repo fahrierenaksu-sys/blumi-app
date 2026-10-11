@@ -16,7 +16,7 @@ The new 2.5D avatar (WebGPU rig, girl and boy), the calibrated 2.5D room, layere
 |---|---|---|---|
 | F1 | The new system is THE system. Old avatar, room, clothes, furniture are deleted from code, art and catalog | 2026-10-10 | prompt §3, §4 |
 | F2 | Old user avatar, room and item data need not be preserved (beta). Waives "migrate without loss" and "hide, don't delete" for this migration only | 2026-10-10 | prompt §4; CONFIRMED by the owner in the lead chat 2026-10-10 (Q1). Recorded with its date in `AGENTS.md` in the first commit (1.1) |
-| F3 | Everyone starts fresh: female → girl starter, male → boy starter outfit + hair, everyone → default 2.5D room | 2026-10-10 | prompt §4 |
+| F3 | Everyone starts fresh: female → girl starter, male → boy starter outfit + hair, everyone → default 2.5D room | 2026-10-10 | prompt §4; the restore keeps stored rows whole (no 60-item re-check, §10.1 risk 15) |
 | F4 | Full beta reset runs LAST as a reviewed ops script with a dry run (coins to starter amount; chats, messages, matches deleted; accounts, profiles, body kept). Pre-approved | 2026-10-10 | prompt §4 |
 | F5 | Old entitlement, loadout and room ROWS stay in the database and are ignored; old IDs are never reused | 2026-10-10 | prompt §4 |
 | F6 | OTA is removed; every release is a TestFlight build | 2026-10-10 (first decided 2026-10-08 on the experiment) | RESUME |
@@ -198,7 +198,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 |---|---|---|---|---|---|
 | S1 | Discover card front | `S/features/demo/SwipeableDiscoverCard.tsx:471` (`CandidateAvatarPreview`) | `AvatarHero`: live on the top card, `AvatarStill full` on the cards behind | P3 | Open |
 | S2 | Discover card back | same file `:570` | `AvatarStill half` | P3 | Open |
-| S3 | Discover room picture on the card back | `DiscoveryRoomShowcaseSlot` + `SV/rooms/roomSnapshotRenderer.ts` | same slot; server renderer v2 from the art pack | P2 | Tested (server, 4180673c, c0909df2); Discover native check Open |
+| S3 | Discover room picture on the card back | `DiscoveryRoomShowcaseSlot` + `SV/rooms/roomSnapshotRenderer.ts` | same slot; server renderer v2 from the art pack | P2 | Tested (server, 4180673c, 46749784); Discover native check Open |
 | S4 | Empty Discover deck (self) | `S/features/discovery/EmptyDiscoveryDeck.tsx:70`, `S/components/DiscoverCard.tsx:296` | `AvatarStill full` | P3 | Open |
 | S5 | Demo Discover view | `S/screens/DemoLobbyView.tsx:110` | as S4; its `miniRoom/assets/runtime` background replaced by the shell art | P3 | Open |
 | S6 | Legacy lobby pending-invite strip (initials) | `S/features/lobby/PendingInviteStrip.tsx` | removed with the lobby split | P4 | Open |
@@ -240,7 +240,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | S42 | Shop combination row | `ShopCombinationRow.tsx:271` | `thumb` stills | P4 | Open |
 | S43 | Shop checkout sheet | `ShopCheckoutSheet.tsx:294` | `thumb` stills | P4 | Open |
 | S44 | Shop purchase flight | `useShopPurchaseFlight.tsx:88` | `thumb` stills | P4 | Open |
-| S45 | My Room | `S/screens/MyRoomScreen.tsx:815` | calibrated room, layered furniture, `AvatarLive` | P2 | Open |
+| S45 | My Room | `S/screens/MyRoomScreen.tsx:815` | calibrated room, layered furniture, `AvatarLive` | P2 | Tested (bc2a0dcd, e0fde538, 9f3ba287, 24746192); native check Open |
 | S46 | Room editor stage | `S/features/roomV2/editor/RoomEditorStage.tsx:151` | experiment editor (diamond cells, undo, wall magnet) | P2 | Open |
 | S47 | Editor inventory cards | `InventoryCatalogCard.tsx:91` | furniture thumbnails made from the `r0` layers | P2 | Open |
 | S48 | Editor drag ghost | `RoomEditorDragGhost.tsx:96` | experiment version (drawn where the piece lands) | P2 | Open |
@@ -261,7 +261,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | G4 | Shared avatar widgets (15 files) | `S/ui/participantAvatar.tsx`, `myAvatar.tsx`, `avatar.tsx`, `AvatarFrame.tsx`, `avatarSwatch.ts`, `S/components/DiscoverCard.tsx`, `S/features/chat/*Invite*`, `chatParticipantAvatar.ts`, `matches/match*Flight*`, `profile/ProfileChibi.tsx`, `session/initialProfileAvatar.ts` | edited to use `AvatarPortrait`/`AvatarStill`/`AvatarHero`; initials fallback and swatch kept | P3 | Open |
 | G5 | Onboarding sprite code (41 files) | `S/features/session/Onboarding*.tsx`, `*AssetCatalog.ts`, `*AssetGate.ts`, `ProfileCharacterReactionStage.tsx`, `RegisterWorldHero.tsx`, `S/screens/RegisterCharacterHero.tsx` | untouched until P6 except the old-renderer imports (S28, S34, S35 preview); in P6 components and timings kept, sprite catalogs point at re-baked sets, unused gates and QA flags removed | P6 (F15) | Open |
 | G6 | Shop (55 files) | `S/features/shop/**` | purchase, inventory and combination logic kept; `shopCatalog.ts`, `shopAssets.ts`, `shopAvatar*`, preview panel repointed to the new catalog, thumbnails and previews | P4 | Open |
-| G7 | roomV2 core (72 files) | `S/features/roomV2/**` | kept + experiment diffs; `roomV3*`, `roomVNext*`, `roomV3UniversalCore*` candidates (≈20 files) deleted; seam inlined | P2 | Open |
+| G7 | roomV2 core (72 files) | `S/features/roomV2/**` | kept + experiment diffs; `roomV3*`, `roomVNext*`, `roomV3UniversalCore*` candidates (≈20 files) deleted; seam inlined | P2 | Tested (1aa73cf9, bb73fede, c38e6ba0) |
 | G8 | Room editor (33 files) | `S/features/roomV2/editor/**`, `S/screens/MyRoomEditorScreen.tsx` | experiment editor + 6 new files | P2 | Open |
 | G9 | roomWorld (9 files) | `S/features/roomWorld/**` | kept + `roomWorldWallInset.ts`, calibrated walk geometry | P2 | Open |
 | G10 | roomStudio (13 files, 16 QA bitmaps, 19.6 MB) | `S/features/roomStudio/**`, `homeStudioQaModuleRouting.*`, Metro alias | deleted | P2 | Tested (7f9ed28b) |
@@ -270,7 +270,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | G13 | Host screens (23 files) | `S/screens/*` listed in the audit, plus `S/navigation/LinkedProfileScreen.tsx` (`candidateAvatarSnapshot`), `ProfileSetupScreen.tsx` (`avatarV2Catalog`, `avatarStarterModel`), `PreAuthSetupFlowScreen.tsx` and `RegisterScreen.tsx` (`UserAvatar` type) | edited with their surfaces; the type-only imports move in X17, the catalog imports before X15 (review R8) | P2–P4 | Open |
 | G14 | Dance state | `roomV2AvatarMotion.ts`, `roomRendererAvatarMotionStyle.ts`, `useRoomRendererLoops.ts`, `MyRoomScreen.tsx` | removed (F17) | P2 | Open |
 | G15 | Old avatar art | `S/features/avatarV2/assets/{layers,room,room/motion,room/motion-atlas,shop-thumbnails}` (1,335 files) + 3 data JSON | deleted after the receipts are removed | P4 | Open |
-| G16 | Old room art | `S/features/roomV2/assets/runtime` (all but `room_shell_blumi_world_v1.webp`), `roomV2/assets/shop-thumbnails`, `miniRoom/assets/runtime` | deleted; layered furniture folders + new thumbnails | P2 | Open |
+| G16 | Old room art | `S/features/roomV2/assets/runtime` (all but `room_shell_blumi_world_v1.webp`), `roomV2/assets/shop-thumbnails`, `miniRoom/assets/runtime` | deleted; layered furniture folders + new thumbnails | P2 | Open (Phase 3: be1ee198 removed the MiniRoom fallback art; the Discover demo card still reads `miniRoom/assets/runtime/rooms/cozy_pink_bedroom/room_snapshot_card.png`) |
 | G17 | Onboarding art | `S/features/session/assets/**` (101 files; 55 unused candidates and sources) | NOT in any deletion commit before P6 (F15), including the 55 unused ones; in P6 the unused ones go first (X2), then the 46 used are replaced by re-baked sets | P6 (F15) | Open |
 | G18 | Client storage keys | `@blumi/avatar_v2/user_avatar`, `@blumi/room_v2/user_room_decor`, `@blumi/room_v2/migrated*`, `@blumi/inventory/v2`, `local_inventory_v1`, `@blumi/room_studio/qa*` | one storage-epoch bump clears avatar, room and inventory caches on first launch of the new build; QA keys dropped | P4 | Open |
 | G19 | Art production scripts | 245 `M/scripts/*.py` (120 tests), ≈30 `M/scripts/*.mjs` (promote, package, render, repair, normalize, universal-core registry), `build-room-motion-atlases.mjs` | deleted (history stays in git) | P4 | Open |
@@ -293,17 +293,17 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | V11 | Seed data | `SV/matches/matchRepository.ts:489`, `apps/server/scripts/seedTestPersonas.ts` | follow the new defaults | P4 | Open |
 | V12 | Economy catalog and service | `D/economy/economyCatalog.ts`, `SV/economy/economyCatalog.ts`, `economyService.ts` | new entries; `LEGACY_AVATAR_ITEM_REPLACEMENTS` self-heal removed; inventory reads drop legacy IDs | P2 room, P4 avatar | Open |
 | V13 | Coin packs, commerce, rewards | `D/economy/coinPacks.ts`, `SV/commerce/*` | unchanged; inputs to §12 | — | Open |
-| V14 | Personal room decor | `SV/rooms/personalRoomDecorService.ts` | read drops legacy/unknown items; save leaves out retired ids an old client still sends (§10.1 risk 15), carries the stored retired placements over untouched, and refuses held, unknown or unowned items | P2 | Tested (7611de9a, 439d5b0e, bf9c5cdd) |
-| V15 | Room showcase | `SV/rooms/roomSnapshotService.ts`, `roomSnapshotRenderer.ts` | renderer v2; an older renderer's row is never served, it is redrawn once when read (same revision); only a newer renderer replaces a same-revision row | P2 | Tested (4180673c, a802cfc0, c0909df2) |
+| V14 | Personal room decor | `SV/rooms/personalRoomDecorService.ts` | read drops legacy/unknown items; save leaves out retired ids an old client still sends (§10.1 risk 15), carries the stored retired placements over untouched, and refuses held, unknown or unowned items | P2 | Tested (7611de9a, 584ebc62, c517c1c2, 477b83e9: stored placements of held owned items are also carried over, and a client placement whose id collides with a carried one gets a free id) |
+| V15 | Room showcase | `SV/rooms/roomSnapshotService.ts`, `roomSnapshotRenderer.ts` | renderer v2; an older renderer's row is never served, it is redrawn once when read (same revision); only a newer renderer replaces a same-revision row | P2 | Tested (4180673c, d99e7654, 46749784) |
 | V16 | Shared room decor | `SV/miniRooms/miniRoomService.ts`, `miniRoomRepository.ts:191`, `SV/db/postgresMiniRoomRepository.ts:192` | shell literal kept; host decor copied through the V14 projection | P2 | Tested (7611de9a) |
-| V17 | Shared room motion checks | `SV/miniRooms/miniRoomMotionService.ts`, `D/roomWorld/miniRoomFloor.ts` | test: every calibrated walk and seat point is accepted by the server floor rule | P2 | Tested (025adc7f, 0829a846) |
+| V17 | Shared room motion checks | `SV/miniRooms/miniRoomMotionService.ts`, `D/roomWorld/miniRoomFloor.ts` | test: every calibrated walk and seat point is accepted by the server floor rule | P2 | Tested (3815e944, 3f07381d) |
 | V18 | Legacy lobby server code | `SV/rooms/roomService.ts`, presence, `blumi_room_layouts` | left as is (out of scope; retired for clients) | — | Open |
 | V19 | Account data export | `SV/account/accountDataExportStream.ts` | still exports the raw rows (the user's data) | P4 verify | Open |
 | V20 | Release audit | `SV/operations/databaseReleaseAudit.ts`, `apps/server/scripts/auditDatabaseRelease.ts` | legacy IDs counted as ignored | P4 | Open |
 | V21 | Live test account runner | `tools/security/live-test-account-runner.mjs` | shape unchanged; verified | P4 | Open |
 | V22 | Loadout catalog, rules, retired set | `D/avatar/avatarLoadoutCatalog.ts`, `avatarLoadoutRules.ts`, `retiredAvatarItems.ts` | new catalog; rules kept; retired set folded into the legacy registry | P4 | Open |
-| V23 | Universal core room candidates (45 IDs) | `D/economy/universalCoreRoomEconomy.ts` | deleted; IDs go to the legacy registry | P2 | Open |
-| V24 | Room geometry fix | `D/roomWorld/roomWorldGeometry.ts` + test | experiment version (edge touch is not overlap) | P2 | Open |
+| V23 | Universal core room candidates (45 IDs) | `D/economy/universalCoreRoomEconomy.ts` | deleted; IDs go to the legacy registry | P2 | Tested (1aa73cf9) |
+| V24 | Room geometry fix | `D/roomWorld/roomWorldGeometry.ts` + test | experiment version (edge touch is not overlap) | P2 | Tested (96726720) |
 | V25 | Contracts shapes | `C/avatar/AvatarSelection.ts`, `C/chat/ChatThreadSchemas.ts`, `C/realtime/ServerEventSchemas.ts`, `C/miniRooms/MiniRoom.ts` | unchanged; test fixtures use new IDs | P4 | Open |
 | V26 | iOS notification extension | `M/plugins/notificationServiceExtension/NotificationService.swift` | unchanged | P3 verify | Open |
 
@@ -322,9 +322,9 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | L9 | Approved art checksums | `APPROVED_GIRL_*.sha256`, `APPROVED_BOY_BASE_*.sha256` (Workbench) | ported files match byte for byte | P1 | Open |
 | L10 | Engineering ratchet | `M/scripts/mobile-engineering-rules.test.mjs` | allowlists only shrink | P2 | Open |
 | L11 | Worklet closure allowlist | `M/scripts/mobile-worklet-closure.test.mjs` | adds `Float32Array`, `Uint8Array`, `Uint16Array` with the reason in the same commit | P1 | Open |
-| L12 | Import boundaries | `M/scripts/mobile-import-boundaries.test.mjs` | roomStudio guard removed with roomStudio; "shared room never reads the personal room" kept | P2 | Open |
+| L12 | Import boundaries | `M/scripts/mobile-import-boundaries.test.mjs` | roomStudio guard removed with roomStudio; "shared room never reads the personal room" kept | P2 | Tested (7f9ed28b, 6b157383) |
 | L13 | New guard: stills match rigs | — | manifest `rigSha256` equals the committed rig files | P1 | Open |
-| L14 | New guard: legacy IDs never return | — | no active or reserved ID is in `legacyItemIds.json` | P2 | Open |
+| L14 | New guard: legacy IDs never return | — | no active or reserved ID is in `legacyItemIds.json` | P2 | Tested (1aa73cf9, 29b43912, 7ee6df85) |
 | L15 | New guard: nothing old remains | — | tree-wide: no import of `experimental/`, `avatarV2/`, `roomStudio/`, no `EXPO_PUBLIC_BLUMI_ROOM_AVATAR_25D*`, no `blumi://dev/avatar-*` link. Until Phase 6 it allows exactly one exception: the `S/features/session/assets` files that the onboarding, boot and register surfaces require (F15); Phase 6 removes the exception | P5, P6 | Open |
 
 ### 3.5 Test groups
@@ -333,7 +333,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 |---|---|---|---|---|---|
 | T1 | Avatar runner (39 tests) | `M/scripts/run-avatar-v2-tests.mjs` | renamed `run-avatar-tests.mjs`; renderer, catalog, motion-atlas tests replaced by pose, resolver, stills, coercion tests | P1, P4 | Open |
 | T2 | Avatar starter runner (2) | `run-avatar-starter-tests.mjs` | starters per body on the new catalog | P4 | Open |
-| T3 | Match and room runner (79) | `run-match-room-tests.mjs` | + the experiment's 13 files with final paths | P2 | Open |
+| T3 | Match and room runner (79) | `run-match-room-tests.mjs` | + the experiment's 13 files with final paths | P2 | Tested (1aa73cf9, bb73fede, 233e7af2, 3815e944) |
 | T4 | Room persistence and hydration (8) | `run-room-persistence-tests.mjs`, `test:room-hydration` | kept; provider test rewritten by behaviour | P2 | Open |
 | T5 | Inventory runner (11) | `run-inventory-tests.mjs` | kept; demo-owner fixture dropped; legacy projection test added | P4 | Open |
 | T6 | Session runner (29) | `run-session-tests.mjs` | onboarding sprite tests follow the re-baked sets | P6 (F15) | Open |
@@ -351,7 +351,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 
 | # | What | Old file(s) | New replacement | Phase | Status |
 |---|---|---|---|---|---|
-| D1 | Demo furniture ownership and demo starter room | `roomAvatar25dDemoRoom.ts`, its hunks in `inventoryStore.ts`, `RoomV2Provider.tsx`, `MyRoomScreen.tsx`, two tests | not ported; real ownership through the catalog | P2 | Open |
+| D1 | Demo furniture ownership and demo starter room | `roomAvatar25dDemoRoom.ts`, its hunks in `inventoryStore.ts`, `RoomV2Provider.tsx`, `MyRoomScreen.tsx`, two tests | not ported; real ownership through the catalog | P2 | Tested (not ported: no demo room or demo ownership path on the branch) |
 | D2 | Dev deep links | `S/navigation/useRoomAvatar25dDevQaLink.ts` with all six links `blumi://dev/mini-room-qa`, `avatar-body`, `avatar-astc`, `avatar-blink`, `avatar-breath`, `avatar-outfit` (the last three added by Step A), the dev body override in `roomAvatar25dContract.ts` (~line 143), `RootNavigator.tsx` hunks, `env.ts` flag | not ported; L15 also fails on any `blumi://dev/avatar-` or `mini-room-qa` string in `apps/` | P1 | Open |
 | D3 | Rig preview QA route | `MiniRoomRigPreviewScreen.tsx`, `CAN_REGISTER_MINI_ROOM_RIG_PREVIEW`, dev entry | removed | P2 | Open |
 | D4 | Flag routing | `roomAvatar25dModule.ts`, `roomAvatar25dStub.ts`, `M/scripts/roomAvatar25dModuleRouting.*`, `roomAvatarLabModuleRouting.*`, `metro.config.js` aliases, `index.js` `@blumi/app-root` | not ported | P1 | Open |
@@ -361,9 +361,9 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | D8 | Uncalibrated fallbacks | fields in `layeredFurnitureCatalog.ts`, `layeredFurniture.ts` | removed | P2 | Open |
 | D9 | Old lab and unrelated files | `tools/room-avatar-lab/{native,guides,*.js,build*.py}`, `tools/website-screen-concepts-2026-10-07/` | not ported | P1 | Open |
 | D10 | Avatar QA unlock | `S/features/avatarV2/qa/avatarQaInventory.ts`, `EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS`, `start:go` script | removed | P4 | Open |
-| D11 | Room QA flags and dev entries | `EXPO_PUBLIC_BLUMI_HOME_STUDIO_*`, `ROOM_V3_DRAFT_PREVIEW`, `ROOM_VNEXT_*`, `UNIVERSAL_CORE_QA`, `FOCUS_12_QA`, `DEV_ENTRY_ROUTE` values `myroom`, `mini-room-rig-preview`, `home-studio-pilot`, `S/features/dev/blumiDevEntryPolicy.ts` | removed; `productionPolicy.forbiddenRuntimeFlags` in the release JSON trimmed in the same commit | P2 | Open |
+| D11 | Room QA flags and dev entries | `EXPO_PUBLIC_BLUMI_HOME_STUDIO_*`, `ROOM_V3_DRAFT_PREVIEW`, `ROOM_VNEXT_*`, `UNIVERSAL_CORE_QA`, `FOCUS_12_QA`, `DEV_ENTRY_ROUTE` values `myroom`, `mini-room-rig-preview`, `home-studio-pilot`, `S/features/dev/blumiDevEntryPolicy.ts` | removed; `productionPolicy.forbiddenRuntimeFlags` in the release JSON trimmed in the same commit | P2 | Tested (608549e7, 7f9ed28b, bb73fede) |
 | D12 | Onboarding QA flags | `PROFILE_CHARACTER_REACTION_QA`, `ONBOARDING_RUN_V3_QA` | removed with the sprite work | P6 (F15) | Open |
-| D13 | Stale notes in ported data | `status` and note fields in `item.json` (the sofa still says "NOT owner-approved") | stripped by the port | P2 | Open |
+| D13 | Stale notes in ported data | `status` and note fields in `item.json` (the sofa still says "NOT owner-approved") | stripped by the port | P2 | Tested (daf2b408) |
 
 ### 3.7 OTA, documents, non-source files
 
@@ -589,7 +589,7 @@ Reviewer checks: nothing from D4–D9 arrived; no pure module imports `react-nat
 | 2.10 | `refactor: retire the old furniture items` (X8) |
 | 2.11–2.15 | X3, X4, X5, X6, X9, then X10 |
 
-Status (2026-10-10, after the Phase 2 review fixes): 2.1–2.10 and X3, X4, X5 are Tested; X6, X9 and X10 are Open; the Simulator gate below is Open (Native verified: none yet).
+Status (2026-10-11, after the second Phase 2 review): 2.1–2.10 and X3, X4, X5, X6 (1aa73cf9), X9 (79d90cfd) and X10 (9dc5d1ec) are Tested. Review fixes, all Tested: M1 MiniRoom draws only the 2.5D shell, no pink-bedroom fallback (be1ee198); M2 room setup no longer promises a gift bed while the starter bed is missing (6a97ebc0); M3 held owned placements are carried over on save (477b83e9); L1 dead universal-core plans removed (c38e6ba0); L3 dev notes stripped (daf2b408); SMS permit expiry by the database clock (fd4ea04e); My Room keeps its avatar per pager page focus (9f3ba287, 24746192); Discover cards mount visible (346f7450). Row 2 (default room) waits on the starter bed (R7, 4.7). G16 stays Open (Phase 3). The Simulator gate below is Open (Native verified: none yet).
 
 Gate: typecheck; `test:match-room`, `test:room-persistence`, `test:room-hydration`, `test:theme`, `test:navigation`, domain and server suites; Simulator: My Room, editor (drag from tray, rotate, undo, wall pieces), sit on sofa and armchair front and back for girl and boy (both are held in `pricing-pending`, so the gate places them through a test-only inventory grant on the memory server that never ships; the hold itself is not weakened), MiniRoom two phones on the memory server, default room for a new and an existing account, Discover room picture.
 Reviewer checks: no flat-sprite or demo-ownership path left; every placed item is checked against ownership AND the active catalog on save; held IDs cannot be bought, placed or seen; the calibration JSON equals the Workbench file; server walk checks accept calibrated points (V17).
@@ -720,7 +720,7 @@ Before the reset can be called done: a test on the memory server proves that a p
 | 12 | All 27 approved furniture pieces wait for §12 prices, so a launch before §12 has a room with only the starter bed (the chair is held too) | `pricing-pending` scope keeps them refused and hidden; §12 is reviewed after Phase 3, well before Phase 5.6; the TestFlight gate checks that §12 is decided or that the owner accepts a bed-only launch |
 | 13 | Lost first tap after mount and the pager desync are only worked around | Carried as an open issue; cheaper first mount is future work |
 | 14 | Editing `M/package.json` scripts before OTA removal lands would change the native fingerprint | OTA removal is commit 1.2; script edits come after |
-| 15 | Cutover order (Phase 2 review M5): if Railway deploys this server before testers install the new build, the old TestFlight client keeps sending retired room ids (its starter bed `room_v2_cozy_bed`) and reads old rooms as empty | The server leaves retired ids (legacy registry) out of a room save instead of refusing it (`personalRoomDecorService.ts`, a count-only log line); held, unknown and unowned items are still refused, and nothing outside the active catalog is placed. The user's stored retired placements are carried over untouched by every save (old or new client), so no old room data is lost until the owner decides F3. Still land the server deploy and the TestFlight build together in 5.6; remove the tolerance only after X22 |
+| 15 | Cutover order (Phase 2 review M5): if Railway deploys this server before testers install the new build, the old TestFlight client keeps sending retired room ids (its starter bed `room_v2_cozy_bed`) and reads old rooms as empty | The server leaves retired ids (legacy registry) out of a room save instead of refusing it (`personalRoomDecorService.ts`, a count-only log line); held, unknown and unowned items are still refused, and nothing outside the active catalog is placed. The user's stored retired placements are carried over untouched by every save (old or new client), so no old room data is lost until the owner decides F3. Still land the server deploy and the TestFlight build together in 5.6; remove the tolerance only after X22. F3/X22 restore or migration must not re-validate stored rows with the 60-item cap of `normalizePersonalRoomDecor`: a stored row can now hold the sent ≤60 plus carried placements (review N2) |
 
 ### 10.2 Behaviour tests to add, and guards to retire or replace
 
