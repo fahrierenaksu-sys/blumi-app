@@ -7,8 +7,10 @@ import {
 } from "../testing/hookHarness"
 import { candidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
 
-// The chibi on Discover and in the match moment is always the baked 2.5D still (owner decision: the Discover deck
-// is still, no live canvas), so the deck's cards, behind or on top, never mount a GPU canvas.
+// The chibi on Discover and in the match moment is always baked (owner decision: the Discover deck is still, no live
+// canvas), so the deck's cards, behind or on top, never mount a GPU canvas. Outside the room it is the showcase
+// (front) view, which draws as today's 3/4 still in the same crop until the look has front art; the card back keeps
+// the 3/4 room view.
 
 interface Element {
   type: unknown
@@ -20,6 +22,9 @@ function AvatarHero() {
   return null
 }
 function AvatarStill() {
+  return null
+}
+function AvatarShowcase() {
   return null
 }
 
@@ -46,6 +51,7 @@ function mountPreview() {
       "react-native": createReactNativeStub().module,
       "../features/avatar/components/AvatarHero": { AvatarHero },
       "../features/avatar/components/AvatarStill": { AvatarStill },
+      "../features/avatar/components/AvatarShowcase": { AvatarShowcase },
       "../features/avatar/model/candidateAvatarInput": { candidateAvatarInput }
     },
     inertUnknown: true
@@ -56,45 +62,55 @@ function mountPreview() {
 
 const snapshot = { kind: "candidate_avatar_snapshot", displayName: "Defne", label: "chibi", bodyPreset: "female" }
 
-test("a Discover front card is the baked still, whether it is behind or on top of the deck", () => {
+test("a Discover front card is the showcase still of the whole figure, whether it is behind or on top of the deck", () => {
   const preview = mountPreview()
   const behind = preview.render({ snapshot, stage: "discover", size: 300 })
   const onTop = preview.render({ snapshot, stage: "discover", size: 300, live: true, liveActive: true })
   for (const output of [behind, onTop]) {
     assert.equal(find(output, AvatarHero), undefined, "no live hero on the Discover deck")
-    const still = find(output, AvatarStill)
-    assert.ok(still, "the card draws the still")
-    assert.equal(still.props.crop, "full")
+    const figure = find(output, AvatarShowcase)
+    assert.ok(figure, "the card draws the showcase still")
+    assert.equal(figure.props.crop, "card")
+    assert.equal(figure.props.fallbackCrop, "full", "until front art lands it is the whole 3/4 figure, as before")
+    assert.equal(figure.props.accessibilityLabel, "Defne chibi")
   }
-  assert.equal(find(onTop, AvatarStill)?.type, find(behind, AvatarStill)?.type, "promotion keeps the same figure component")
+  assert.equal(find(onTop, AvatarShowcase)?.type, find(behind, AvatarShowcase)?.type, "promotion keeps the same figure component")
 })
 
-test("the startup receipt and error of the figure come from the still", () => {
+test("the figure keeps the size the card gave the still", () => {
+  const figure = find(mountPreview().render({ snapshot, stage: "discover", size: 300 }), AvatarShowcase)
+  assert.ok(Math.abs((figure?.props.width as number) - 300 * 0.78) < 1e-9)
+  assert.ok(Math.abs((figure?.props.height as number) - 300 * 0.82) < 1e-9)
+})
+
+test("the startup receipt and error of the figure come from the showcase", () => {
   const preview = mountPreview()
   const onDisplay = () => undefined
   const onImageError = () => undefined
-  const still = find(preview.render({ snapshot, onDisplay, onImageError }), AvatarStill)
-  assert.equal(still?.props.onDisplay, onDisplay)
-  assert.equal(still?.props.onError, onImageError)
+  const figure = find(preview.render({ snapshot, onDisplay, onImageError }), AvatarShowcase)
+  assert.equal(figure?.props.onDisplay, onDisplay)
+  assert.equal(figure?.props.onError, onImageError)
 })
 
-test("a stage without live props is the same baked still", () => {
+test("a stage without live props (the match flight) is the same showcase figure", () => {
   const preview = mountPreview()
   const flight = preview.render({ snapshot, stage: "discover", size: 120 })
   assert.equal(find(flight, AvatarHero), undefined)
-  assert.equal(find(flight, AvatarStill)?.props.crop, "full")
+  assert.equal(find(flight, AvatarShowcase)?.props.fallbackCrop, "full")
 })
 
-test("the match moment shows the partner's half-body still turned towards the person", () => {
+test("the match moment shows the partner's half-body still turned towards the person until front art lands", () => {
   const preview = mountPreview()
-  const still = find(preview.render({ snapshot, stage: "match", size: 96, crop: "half", mirror: true }), AvatarStill)
-  assert.equal(still?.props.crop, "half")
-  assert.equal(still?.props.mirror, true)
+  const figure = find(preview.render({ snapshot, stage: "match", size: 96, crop: "half", mirror: true }), AvatarShowcase)
+  assert.equal(figure?.props.crop, "card")
+  assert.equal(figure?.props.fallbackCrop, "half")
+  assert.equal(figure?.props.mirror, true)
 })
 
-test("a half-body crop is a still, even when live props are passed", () => {
+test("the card back keeps the 3/4 room view in its half crop, never a live canvas", () => {
   const preview = mountPreview()
-  const output = preview.render({ snapshot, crop: "half", live: true, liveActive: true })
+  const output = preview.render({ snapshot, crop: "half", view: "room", live: true, liveActive: true })
   assert.equal(find(output, AvatarHero), undefined)
+  assert.equal(find(output, AvatarShowcase), undefined)
   assert.equal(find(output, AvatarStill)?.props.crop, "half")
 })

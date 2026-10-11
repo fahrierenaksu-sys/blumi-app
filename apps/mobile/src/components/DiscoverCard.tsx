@@ -3,6 +3,7 @@ import type { AvatarSelection } from "@blumi/contracts"
 import { ImageBackground, StyleSheet, Text, View } from "react-native"
 import Animated from "react-native-reanimated"
 import type { RealtimeConnectionStatus } from "@blumi/realtime-client"
+import { AvatarShowcase } from "../features/avatar/components/AvatarShowcase"
 import { AvatarStill } from "../features/avatar/components/AvatarStill"
 import { candidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
 import {
@@ -164,24 +165,30 @@ export interface CandidateAvatarPreviewProps {
   stage?: "discover" | "profile" | "match"
   /** `full` stands the whole figure on a platform; `half` shows it down to the hips (match moment, card back). */
   crop?: "full" | "half"
-  /** Mirrored to face the other way (the partner in the match moment). */
+  /** Mirrored to face the other way (the partner in the match moment); only the 3/4 still turns. */
   mirror?: boolean
+  /**
+   * `showcase` (default) is the front view used everywhere outside the room, drawn as today's 3/4 still until the
+   * look has front art; `room` keeps the 3/4 room view (the card back, which shows the person's room).
+   */
+  view?: "showcase" | "room"
   onDisplay?: () => void
   onImageError?: () => void
 }
 
-/** Another person's chibi on a soft stage: always the baked 2.5D still, never a live canvas. */
+/** Another person's chibi on a soft stage: always baked stills, never a live canvas. */
 export function CandidateAvatarPreview(props: CandidateAvatarPreviewProps) {
-  const { snapshot, size = 160, stage = "profile", crop = "full", mirror = false } = props
+  const { snapshot, size = 160, stage = "profile", crop = "full", mirror = false, view = "showcase" } = props
   const input = useMemo(() => candidateAvatarInput(snapshot), [snapshot])
   const isFull = crop === "full"
   const platformWidth = size * (stage === "discover" ? 0.96 : 0.82)
   const figureWidth = isFull ? size * FIGURE_WIDTH_SHARE : size
   const figureHeight = isFull ? size * FIGURE_HEIGHT_SHARE : size
+  const label = `${snapshot.displayName} ${snapshot.label}`
 
   return (
     <View
-      accessibilityLabel={`${snapshot.displayName} ${snapshot.label}`}
+      accessibilityLabel={label}
       style={[
         cardStyles.candidateAvatarStage,
         {
@@ -217,16 +224,31 @@ export function CandidateAvatarPreview(props: CandidateAvatarPreviewProps) {
         />
       ) : null}
       <View style={isFull ? cardStyles.candidateAvatarBody : cardStyles.candidateAvatarBodyHalf}>
-        <AvatarStill
-          loadout={input.loadout}
-          hints={input.hints}
-          crop={crop}
-          width={figureWidth}
-          height={figureHeight}
-          mirror={mirror}
-          onDisplay={props.onDisplay}
-          onError={props.onImageError}
-        />
+        {view === "showcase" ? (
+          <AvatarShowcase
+            loadout={input.loadout}
+            hints={input.hints}
+            crop="card"
+            fallbackCrop={crop}
+            width={figureWidth}
+            height={figureHeight}
+            mirror={mirror}
+            accessibilityLabel={label}
+            onDisplay={props.onDisplay}
+            onError={props.onImageError}
+          />
+        ) : (
+          <AvatarStill
+            loadout={input.loadout}
+            hints={input.hints}
+            crop={crop}
+            width={figureWidth}
+            height={figureHeight}
+            mirror={mirror}
+            onDisplay={props.onDisplay}
+            onError={props.onImageError}
+          />
+        )}
       </View>
     </View>
   )

@@ -61,3 +61,18 @@ test("every canvas comes out of the live budget: each component that mounts it t
     assert.doesNotMatch(readFileSync(path, "utf8"), /avatar\/renderer\/Avatar25Canvas["']/, `${relative(appSource, path)} imports the canvas`)
   }
 })
+
+test("a live avatar (AvatarLive, AvatarHero) is mounted only by room surfaces; everything else shows baked stills", () => {
+  // lead decision 2026-10-11 (plan 2.2b): live canvases only in My Room, the room editor, RoomSetup and MiniRoom
+  const ROOM_SURFACES = /^features\/(?:roomV2|roomWorld|miniRoom)\//
+  const appSource = join(ROOT, "../..")
+  const mounters: string[] = []
+  for (const path of sourceFiles(appSource)) {
+    if (path.startsWith(ROOT)) continue
+    if (!/components\/Avatar(?:Live|Hero)["']/.test(readFileSync(path, "utf8"))) continue
+    const where = relative(appSource, path)
+    mounters.push(where)
+    assert.match(where, ROOM_SURFACES, `${where} mounts a live avatar outside the rooms`)
+  }
+  assert.ok(mounters.length > 0, "the rooms still draw the live avatar")
+})

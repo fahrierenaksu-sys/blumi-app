@@ -1,8 +1,9 @@
 import type { AvatarLoadoutCoercionHints, AvatarShowcaseCrop } from "@blumi/domain"
 import { Image } from "expo-image"
-import { memo, useCallback, useMemo, useState } from "react"
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { avatarShowcaseFallbackCrop, createAvatarShowcasePlanCache, type AvatarShowcaseFrontPlan } from "../model/avatarShowcaseModel"
+import type { AvatarStillCrop } from "../model/avatarStillLayout"
 import { AVATAR_STILL_ASSETS } from "../stills/stillAssets"
 import { AvatarStill } from "./AvatarStill"
 import { useStillDisplayReceipts } from "./useStillDisplayReceipts"
@@ -15,6 +16,13 @@ export interface AvatarShowcaseProps {
   crop: AvatarShowcaseCrop
   width: number
   height: number
+  /**
+   * The 3/4 crop drawn while the look has no front art (the whole-figure fallback): defaults to `full` for `card` and
+   * `bust` otherwise. A surface that showed a half-body still passes `half`, so it looks exactly as before.
+   */
+  fallbackCrop?: AvatarStillCrop
+  /** Turns the 3/4 fallback the other way (the partner facing the person); the front view always faces the viewer. */
+  mirror?: boolean
   /** Required: the figure is one accessible image (who it is, for screen readers). */
   accessibilityLabel: string
   /** Shown behind the figure until every layer has drawn (loading state); transparent by default. */
@@ -40,15 +48,17 @@ export const AvatarShowcase = memo(function AvatarShowcase(props: AvatarShowcase
     () => planShowcase(loadout, crop, { width, height }, { hints, assets: AVATAR_STILL_ASSETS }),
     [crop, height, hints, loadout, width]
   )
+  // Parents often pass inline callbacks: a new identity each render must not report the drawn figure again.
+  const onDisplay = useStableListener(props.onDisplay)
+  const onError = useStableListener(props.onError)
   const [failedKey, setFailedKey] = useState<string | null>(null)
-  const onFrontError = props.onError
   const onLayerError = useCallback((cacheKey: string) => {
     setFailedKey(cacheKey)
-    onFrontError?.()
-  }, [onFrontError])
+    onError?.()
+  }, [onError])
 
   if (plan.kind === "showcase" && failedKey !== plan.cacheKey) {
-    return <ShowcaseFront {...props} plan={plan} onLayerError={onLayerError} />
+    return <ShowcaseFront {...props} plan={plan} onDisplay={onDisplay} onError={onError} onLayerError={onLayerError} />
   }
   return (
     <View
@@ -61,15 +71,29 @@ export const AvatarShowcase = memo(function AvatarShowcase(props: AvatarShowcase
       <AvatarStill
         loadout={loadout}
         hints={hints}
-        crop={avatarShowcaseFallbackCrop(crop)}
+        crop={props.fallbackCrop ?? avatarShowcaseFallbackCrop(crop)}
         width={width}
         height={height}
-        onDisplay={props.onDisplay}
-        onError={props.onError}
+        mirror={props.mirror}
+        onDisplay={onDisplay}
+        onError={onError}
       />
     </View>
   )
 })
+
+/**
+ * The listener's latest closure behind one identity that changes only when a listener is added or removed, so a
+ * listener that arrives later (a card promoted to the top) still gets its report and an inline one never re-fires.
+ */
+function useStableListener(listener: (() => void) | undefined): (() => void) | undefined {
+  const latest = useRef(listener)
+  useLayoutEffect(() => {
+    latest.current = listener
+  })
+  const hasListener = listener !== undefined
+  return useMemo(() => (hasListener ? () => latest.current?.() : undefined), [hasListener])
+}
 
 interface ShowcaseFrontProps extends AvatarShowcaseProps {
   plan: AvatarShowcaseFrontPlan

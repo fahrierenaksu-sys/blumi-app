@@ -571,6 +571,7 @@ function DiscoveryCardBack(props: {
               size={54}
               stage="discover"
               crop="half"
+              view="room"
             /> : null}
           </View>
           <View>

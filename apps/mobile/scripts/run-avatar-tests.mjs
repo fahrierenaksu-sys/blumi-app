@@ -154,6 +154,9 @@ try {
       resolve(workspaceRoot, "src/features/avatar/model/avatarStillLayout.test.ts"),
       // the front (showcase) stack outside the room: whole-figure 3/4 fallback, missing assets, plan cache (Phase 3 D1)
       resolve(workspaceRoot, "src/features/avatar/model/avatarShowcaseModel.test.ts"),
+      // the showcase surfaces (Discover, profile and You hero, match): 3/4 still in the old crop until front art lands
+      resolve(workspaceRoot, "src/features/avatar/components/AvatarShowcase.test.ts"),
+      resolve(workspaceRoot, "src/features/avatar/showcaseSurfaces.test.ts"),
       resolve(workspaceRoot, "src/features/avatar/model/avatarLiveBudget.test.ts"),
       // AvatarLive's canvas gate: useAvatarLiveSlot as AvatarLive calls it, against the real budget (review A F4)
       resolve(workspaceRoot, "src/features/avatar/components/useAvatarLiveSlot.test.ts"),

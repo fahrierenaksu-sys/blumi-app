@@ -16,7 +16,7 @@ import Reanimated, {
   withTiming
 } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
-import { AvatarStill } from "../features/avatar/components/AvatarStill"
+import { AvatarShowcase } from "../features/avatar/components/AvatarShowcase"
 import type { AvatarInput } from "../features/avatar/model/avatarInput"
 import { candidateAvatarInput } from "../features/avatar/model/candidateAvatarInput"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
@@ -314,13 +314,15 @@ function AvatarSpotlight(props: {
 }) {
   const preview: ReactNode = (
     <View style={styles.spotlightPreview}>
-      <AvatarStill
+      <AvatarShowcase
         loadout={props.avatar.loadout}
         hints={props.avatar.hints}
-        crop="half"
+        crop="card"
+        fallbackCrop="half"
         width={SPOTLIGHT_STILL_WIDTH}
         height={SPOTLIGHT_STILL_HEIGHT}
         mirror={props.mirror}
+        accessibilityLabel={props.label}
       />
       <View style={styles.spotlightNamePill}>
         <View style={styles.spotlightNameDot} />

@@ -1,5 +1,5 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
-import { AvatarStill } from "../features/avatar/components/AvatarStill"
+import { AvatarShowcase } from "../features/avatar/components/AvatarShowcase"
 import type { AvatarStillCrop } from "../features/avatar/model/avatarStillLayout"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
 import { uiTheme } from "./theme"
@@ -14,7 +14,10 @@ interface MyAvatarStillProps {
   style?: StyleProp<ViewStyle>
 }
 
-/** The signed-in user's own avatar as a baked still in a soft round stage (Discover, match moment): never a GPU canvas. */
+/**
+ * The signed-in user's own avatar as the showcase still in a soft round stage (Discover, match moment): never a GPU
+ * canvas. Until the look has front art it is today's 3/4 still in the same crop.
+ */
 export function MyAvatarStill(props: MyAvatarStillProps) {
   const { name, size = 64, ring = "none", crop = "full", mirror = false, style } = props
   const { avatar } = useAvatarV2()
@@ -22,10 +25,11 @@ export function MyAvatarStill(props: MyAvatarStillProps) {
   const inner = size - ringWidth * 2
   // the whole figure keeps a little air inside the bubble; the half crop fills it
   const figure = crop === "full" ? inner * 0.86 : inner
+  const label = `${name} avatar`
 
   return (
     <View
-      accessibilityLabel={`${name} avatar`}
+      accessibilityLabel={label}
       style={[
         styles.root,
         ring !== "none" ? uiTheme.shadow.soft : null,
@@ -37,12 +41,14 @@ export function MyAvatarStill(props: MyAvatarStillProps) {
         pointerEvents="none"
         style={[styles.glow, { width: inner * 0.9, height: inner * 0.74, borderRadius: inner * 0.45 }]}
       />
-      <AvatarStill
+      <AvatarShowcase
         loadout={avatar}
-        crop={crop}
+        crop="card"
+        fallbackCrop={crop}
         width={figure}
         height={figure}
         mirror={mirror}
+        accessibilityLabel={label}
       />
     </View>
   )

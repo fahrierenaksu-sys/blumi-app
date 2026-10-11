@@ -1,5 +1,4 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useIsFocused } from "@react-navigation/native"
 import { useEffect, useRef } from "react"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
@@ -37,7 +36,7 @@ const SPARKLES: readonly [number, number, number, number][] = [
 
 /**
  * The own profile's stage: a soft Blumi backdrop with drifting colour blobs,
- * the user's live 2.5D avatar standing on it, back on the left and Settings (gear)
+ * the user's showcase avatar still standing on it, back on the left and Settings (gear)
  * on the right. The avatar trails the scroll (parallax) and the backdrop
  * stretches on pull. Every motion runs on the UI thread and stops under
  * Reduce Motion.
@@ -52,7 +51,6 @@ export function OwnProfileHero(props: {
   const { copy, displayName, scrollY } = props
   const reduceMotion = useReducedMotion()
   const avatarRef = useRef<ProfileAvatarHeroHandle>(null)
-  const focused = useIsFocused()
   const drift = useSharedValue(0)
 
   useEffect(() => {
@@ -132,7 +130,7 @@ export function OwnProfileHero(props: {
           onPress={cheer}
           hitSlop={8}
         >
-          <ProfileAvatarHero ref={avatarRef} width={AVATAR_WIDTH} active={focused} />
+          <ProfileAvatarHero ref={avatarRef} width={AVATAR_WIDTH} accessibilityLabel={copy.heroAvatar(displayName)} />
         </Pressable>
       </Animated.View>
     </View>

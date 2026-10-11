@@ -1,36 +1,31 @@
-import { forwardRef, useImperativeHandle, useState } from "react"
+import { forwardRef, useImperativeHandle } from "react"
 import { StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated"
-import { AvatarHero } from "../avatar/components/AvatarHero"
-import { useReducedMotion } from "../../ui/animations"
+import { AvatarShowcase } from "../avatar/components/AvatarShowcase"
 import { PROFILE_AVATAR_ASPECT } from "./profileMotionModel"
 import { useOwnAvatarLoadout } from "./useOwnAvatarLoadout"
 
 export interface ProfileAvatarHeroHandle {
-  /** A tap: the avatar waves once (a soft glow instead under Reduce Motion, or while the baked still shows). */
+  /** A tap: a soft glow blooms behind the avatar. */
   cheer: () => void
 }
 
 /**
- * The viewer's own full-body 2.5D avatar on the You page. It is the page's one live canvas (`active` = the page is
- * focused): the baked still first, then the live idle (breathing, blinking). A tap plays one wave and a glow
- * behind her; Reduce Motion keeps the glow only.
+ * The viewer's own full-body avatar on the You page: the showcase still (lead decision 2026-10-11: a live avatar
+ * exists only inside rooms), drawn as today's 3/4 still until the look has front art. A tap blooms a glow behind it.
  */
-export const ProfileAvatarHero = forwardRef<ProfileAvatarHeroHandle, { width: number; active: boolean }>(
+export const ProfileAvatarHero = forwardRef<ProfileAvatarHeroHandle, { width: number; accessibilityLabel: string }>(
   function ProfileAvatarHero(props, ref) {
-    const { width, active } = props
+    const { width } = props
     const height = width * PROFILE_AVATAR_ASPECT
-    const reduceMotion = useReducedMotion()
     const loadout = useOwnAvatarLoadout()
-    const [waveSignal, setWaveSignal] = useState(0)
     const glow = useSharedValue(0)
 
     useImperativeHandle(ref, () => ({
       cheer: () => {
         glow.value = withSequence(withTiming(1, { duration: 140 }), withTiming(0, { duration: 620 }))
-        if (!reduceMotion) setWaveSignal((count) => count + 1)
       }
-    }), [glow, reduceMotion])
+    }), [glow])
 
     const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }))
 
@@ -43,14 +38,12 @@ export const ProfileAvatarHero = forwardRef<ProfileAvatarHeroHandle, { width: nu
             glowStyle
           ]}
         />
-        <AvatarHero
+        <AvatarShowcase
           loadout={loadout}
+          crop="card"
           width={width}
           height={height}
-          liveScope="screen"
-          liveActive={active}
-          reduceMotion={reduceMotion}
-          waveSignal={waveSignal}
+          accessibilityLabel={props.accessibilityLabel}
         />
       </View>
     )
