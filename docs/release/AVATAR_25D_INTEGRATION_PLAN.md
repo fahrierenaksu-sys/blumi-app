@@ -118,11 +118,11 @@ Rejected: keeping `src/experimental/` and the flag (two systems forever); renami
 | tiny | ≤ 40 | `AvatarPortrait` (circle, person's swatch colour behind) | `bust`, face-tight crop |
 | small | 41–60 | `AvatarPortrait` | `bust` |
 | medium | 61–130 | `AvatarPortrait` up to 85 pt; `AvatarStill half` above | `bust` / `full` |
-| hero | > 130 | `AvatarHero`: `AvatarStill full` first, cross-fades to a live canvas when the live budget grants one | `full` + live |
+| hero | > 130 | `AvatarHero`: showcase still (2.2b); a live canvas only inside rooms | `showcase` (`full` as the 3/4 fallback) |
 
 Cache keys and invalidation: client key `bakerVersion|body|hair|top|bottom|shoes|product|mirror` → memoised layer list (equal looks share it); the layers are bundled assets, so there is no file cache to purge. A loadout change is a new key. Server key: sha256(renderer version, background, layer keys, size), LRU 8 MiB as today. Guard: one test fails when `manifest.rigSha256` differs from the committed rig files (a rig changed without a re-bake).
 
-**Live canvas rule** (`avatarLiveBudget`): at most 1 live canvas for the focused screen, 2 in MiniRoom, 0 anywhere else. Main-tab pager pages that are mounted but not shown release theirs and show the identical still. Allowed live: Discover top card front, ProfilePreview/LinkedProfile hero, You hero, AvatarSetup, Wardrobe stage, Shop preview, My Room, room editor, RoomSetup, MiniRoom (2). Always still: every list, header, chip, modal, flight, card behind the top card, card back, onboarding.
+**Live canvas rule** (`avatarLiveBudget`): at most 1 live canvas for the focused screen, 2 in MiniRoom, 0 anywhere else. Main-tab pager pages that are mounted but not shown release theirs and show the identical still. Allowed live (shrunk by 2.2b): My Room, room editor, RoomSetup, MiniRoom (2). Always still, showcase view (2.2b): Discover cards front and back, profile and You hero, AvatarSetup, Wardrobe, Shop preview, every list, header, chip, modal, flight, onboarding.
 
 | Budget (measure in Phase 5 on a real phone) | Discover | MiniRoom (2 avatars) |
 |---|---|---|
@@ -132,6 +132,20 @@ Cache keys and invalidation: client key `bakerVersion|body|hair|top|bottom|shoes
 | Decoded still layers | ≤ 24 MB (3 stacked cards) | ≤ 2 MB (chips) |
 | Frame rate | 60 fps while swiping; no React render per frame | 60 fps with both walking and the keyboard up |
 | Rig JSON (2.2 MB + 1.4 MB) | parsed lazily, off the boot path | same |
+
+### 2.2b Showcase pipeline (Phase 3, plan of 2026-10-11)
+
+Owner decisions this builds on: showcase (front) view everywhere outside the room, pose a for both bodies, Discover front = showcase full body at about 85% of the card height, crops only for chat head and push, no animation on the deck, card back = room view snapshot. `CARD_SYNC_RULES.md` rule 1 ("server renders both card images", "waist-up") is **superseded** by these decisions: the card front is composited on the client from bundled showcase layers.
+
+Lead decisions (taken 2026-10-11 for the owner): a missing front layer on any worn item makes the whole figure fall back to the 3/4 still of the same loadout (never a blank, never mixed views); the You and profile hero is the showcase still, a live avatar exists only inside rooms.
+
+1. **Data model.** The same canonical item ID serves both views; no new ID, no contract change, no migration, the loadout shape is unchanged. `avatarStillManifest.json` gets a baked `showcase` product: per body `showcaseBase` (canvas, ground line, crop windows `card`, `head`, `push`), per item `showcase: { key, rect, order, tucked }`. Layer order is data: shoes < bottoms < tops < hair front; `tucked` swaps top and bottom at the waist. A pure `resolveShowcaseLayers(loadout, crop)` in `avatarStills.ts` coerces first (total, never throws), then per slot: own item, body showcase starter, then the whole-figure 3/4 fallback above.
+2. **Compositing.** Build time: the factory delivers one registered showcase layer per item, already warped to the showcase base, and the baker copies and encodes them (no per-combination pictures). Client: at most 5 stacked images (base, shoes, bottom, top, hair), so Shop and Wardrobe "live layer swap" is only a new layer list, no GPU. Server: the push picture uses the same resolver with crop `push`; the art pack builder adds showcase layers and `AVATAR_PORTRAIT_RENDERER_VERSION` is bumped. Rejected: server-rendered card images (storage per user, stale across devices, a deploy per art change).
+3. **Surfaces.** Showcase still: Discover card front (crop `card`), profile hero, You hero, match moment, Shop try-on, Wardrobe, AvatarSetup, onboarding creation. Showcase crop `head`: chat header, inbox, bubbles. Crop `push`: push picture. Unchanged: Discover card back (room view), My Room, room editor, MiniRoom. The live canvas list in 2.2 is now: My Room, room editor, RoomSetup, MiniRoom (2).
+4. **Cache and size.** Bundled assets, no file cache. Memo key `bakerVersion|body|hair|top|bottom|shoes|showcase|crop`. One layer per item at 1,440 px tall, lossy WebP q about 90, estimated 150-300 KB per item (an estimate until the first item is delivered). Decoded stills are resized to the card's pixel size; the 24 MB decoded-layer budget is measured on a phone in Phase 5.
+5. **Discover top card is a still.** The `live` prop and the `live && isFull` branch are removed, the deck's "one live avatar" wiring is deleted with its tests' intent changed to "deck mounts no canvas".
+6. **Boy default.** Canonical outfit-2 IDs are fixed before any port and never renamed; `DEFAULT_MALE_AVATAR_LOADOUT` is pointed at side part plus outfit 2 in one commit; reads already coerce, so old boy loadouts draw the new starter without a write. No bald boy is shown to the owner; until all four pieces pass the gates the boy is "base only, Open". The fresh start is the Phase 9 beta reset and needs its own yes and a PG17 dump and restore proof.
+7. **Lanes (from one fetched SHA, at most 3 commits each).** A domain (manifest, resolver, pending-set ratchet); B baker (showcase product, ASTC-only rig pages with a low-res PNG fallback); C Discover still (uses today's 3/4 still, ships before showcase art exists); D client surfaces (`AvatarShowcase`, Discover front, profile, match, chat head); E server push (art pack, renderer bump, art-pack hash on `/ready`; deploy needs the owner's yes); F boy default; G Shop, Wardrobe and AvatarSetup layer swap. A, B, C run in parallel; D and E follow A and B; F waits on art; G is Phase 4.
 
 ### 2.3 Server pictures (B)
 
@@ -598,23 +612,23 @@ Reviewer checks: no flat-sprite or demo-ownership path left; every placed item i
 
 | # | Commit |
 |---|---|
-| 3.1 | `feat(server): push and link portrait from the 2.5D avatar` (V7, V8, S24, fallback chain, capability key) |
-| 3.2 | `refactor: chat, inbox and invite avatars use AvatarPortrait` (S13–S19, S27, S51) |
-| 3.3 | `refactor: Discover cards use the 2.5D avatar` (S1, S2, S4, S5, S54) |
-| 3.4 | `refactor: match moment uses the 2.5D avatar` (S7–S10) |
-| 3.5 | `refactor: profile screens use the 2.5D avatar` (S11, S25, S26, S28, S34, S35) |
-| 3.6 | moved to Phase 6 (F15). Phase 3 only moves the old-renderer parts of S28, S34 and S35 |
-| 3.7 | verification-only notes for S20, S22, S23, V26 |
+| 3.1 | Lane A `feat(domain): showcase layers and resolver` (manifest `showcase`, `resolveShowcaseLayers`, pending-set ratchet) |
+| 3.2 | Lane B `feat: bake showcase stills` (WebP, crops `card/head/push`; ASTC-only rig pages with low-res PNG fallback) |
+| 3.3 | Lane C `refactor: Discover top card is a still` (S1, S2, S4, S5, S54; `live` removed, deck mounts no canvas) |
+| 3.4 | Lane D `refactor: surfaces use the showcase still` (`AvatarShowcase`; Discover front, profile, You hero, match S7-S11, S25, S26; chat, inbox, invite head crop S13-S19, S27, S51) |
+| 3.5 | Lane E `feat(server): push and link portrait from the showcase layers` (V7, V8, S24, renderer version bump, art-pack hash on `/ready`, capability key) |
+| 3.6 | Lane F `feat: boy default look` (after the outfit-2 art passes both gates) |
+| 3.7 | moved to Phase 6 (F15) for S28, S34, S35; verification-only notes for S20, S22, S23, V26 |
 
 Test (review A F1): a V2 loadout with a valid old dress (`dressId` set, top and bottom = the dress pair) and an old face ID resolves in `resolveAvatarDraw`, `resolveAvatarStillLayers` and the server portrait to the body's rig starter top and bottom and the body's one face, and the stored loadout is unchanged.
 Gate: every S-row of P3 passes the Simulator walkthrough for a girl and a boy account; inbox scroll and Discover swipe hold 60 fps in a release-mode Simulator run (phone numbers come in P5); a push sent on the memory server carries a picture for a sender with legacy IDs.
-Reviewer checks: no surface outside the allowed list mounts a canvas; no import of `RoomAvatarStill`, `RoomAvatarRenderer2D`, `AvatarPreview2D`, `CandidateAvatarPreview`'s old renderer remains outside files queued for P4; no user, room or item value in any new log line.
+Reviewer checks: no `AvatarHero` or canvas mounts outside the room surfaces; no import of `RoomAvatarStill`, `RoomAvatarRenderer2D`, `AvatarPreview2D`, `CandidateAvatarPreview`'s old renderer remains outside files queued for P4; no user, room or item value in any new log line.
 
 ### Phase 4: items and catalog
 
 | # | Commit |
 |---|---|
-| 4.1 | `refactor: Wardrobe, Shop and avatar setup preview with the 2.5D avatar` (S36, S38–S44; items without stills, i.e. every old item, keep their old thumbnail resolver until X15, so the receipt drift test stays green, R5) |
+| 4.1 | Lane G `refactor: Wardrobe, Shop and avatar setup use the showcase still with live layer swap` (S36, S38–S44; no live canvas; items without stills, i.e. every old item, keep their old thumbnail resolver until X15, so the receipt drift test stays green, R5) |
 | 4.2 | X14 `feat: legacy item registry (avatar part)` |
 | 4.3 | X15 `refactor: new avatar catalog and starters` (lock artifacts L1–L5 in the same commit) |
 | 4.4 | X16, X17, X18 |
