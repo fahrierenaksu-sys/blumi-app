@@ -44,71 +44,22 @@
         "avatar_v2_shoes_mint_ribbon_court_sneakers": {
           "slot": "shoes",
           "rigItemId": "shoes_mint_ribbon_court_sneakers",
-          "thumb": "avatar_v2_shoes_mint_ribbon_court_sneakers",
-          "showcase": {
-            "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__front",
-            "rect": [
-              132,
-              1372,
-              343,
-              179
-            ],
-            "order": 1
-          }
+          "thumb": "avatar_v2_shoes_mint_ribbon_court_sneakers"
         },
         "avatar_v2_bottom_coral_wave_pants": {
           "slot": "bottom",
           "rigItemId": "bottom_coral_wave_pants",
-          "thumb": "avatar_v2_bottom_coral_wave_pants",
-          "showcase": {
-            "key": "avatar_v2_bottom_coral_wave_pants__front",
-            "rect": [
-              18,
-              696,
-              576,
-              682
-            ],
-            "order": 2
-          }
+          "thumb": "avatar_v2_bottom_coral_wave_pants"
         },
         "avatar_v2_top_coral_wave_polo": {
           "slot": "top",
           "rigItemId": "top_coral_wave_polo",
-          "thumb": "avatar_v2_top_coral_wave_polo",
-          "showcase": {
-            "key": "avatar_v2_top_coral_wave_polo__front",
-            "rect": [
-              113,
-              402,
-              378,
-              322
-            ],
-            "order": 3
-          }
+          "thumb": "avatar_v2_top_coral_wave_polo"
         },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
-          "thumb": "avatar_v2_hair_ink_pageboy_star",
-          "showcase": {
-            "key": "avatar_v2_hair_ink_pageboy_star__front",
-            "rect": [
-              140,
-              54,
-              326,
-              373
-            ],
-            "order": 4,
-            "back": {
-              "key": "avatar_v2_hair_ink_pageboy_star__back",
-              "rect": [
-                116,
-                40,
-                384,
-                387
-              ]
-            }
-          }
+          "thumb": "avatar_v2_hair_ink_pageboy_star"
         }
       },
       "layers": {
@@ -511,37 +462,6 @@
             ]
           }
         ]
-      },
-      "showcaseBase": {
-        "key": "base__front",
-        "canvas": {
-          "width": 604,
-          "height": 1561
-        },
-        "ground": [
-          302,
-          1548
-        ],
-        "windows": {
-          "card": [
-            0,
-            0,
-            604,
-            1561
-          ],
-          "head": [
-            110,
-            37,
-            390,
-            390
-          ],
-          "push": [
-            68,
-            12,
-            480,
-            480
-          ]
-        }
       }
     },
     "male": {

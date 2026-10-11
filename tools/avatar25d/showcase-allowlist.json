@@ -2,40 +2,6 @@
   "version": 1,
   "scale": 0.5,
   "pad": 24,
-  "note": "Only stills listed here, at exactly these sha256 values, are baked into the app. Anything else keeps the 3/4 fallback. Paths are relative to the Workbench showcase root (--src). Add an entry only after the item's gates pass; remove it and re-bake to take a still out.",
-  "bodies": {
-    "female": {
-      "gates": "line_1117 girl r3b: G1-G8 PASS (2026-10-11 17:56). Fresh QA 1920 FAILED this still (skin blotches on shoes and ankles, white slivers in hair, ragged cuffs vs room, shoulder notches): in the repo for the pipeline only, owner has not approved the look.",
-      "base": "line_1117/girl/o_g1/base/girl_a.png",
-      "baseSha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0",
-      "crops": {
-        "head": [890, 190, 780, 780],
-        "push": [805, 140, 960, 960]
-      },
-      "items": {
-        "avatar_v2_shoes_mint_ribbon_court_sneakers": {
-          "slot": "shoes", "order": 1,
-          "file": "line_1117/girl/o_g1/layers/girl_shoes.png",
-          "sha256": "8347eed7b4e5de46b667cb71b9f43a323fedbf3ba387ce4f2f97e6d3d520c15a"
-        },
-        "avatar_v2_bottom_coral_wave_pants": {
-          "slot": "bottom", "order": 2,
-          "file": "line_1117/girl/o_g1/layers/girl_bottom.png",
-          "sha256": "c31d654d5ab58bef2a752b16a302577e2ab6dc02be17d9474eadd2b51c1cbc51"
-        },
-        "avatar_v2_top_coral_wave_polo": {
-          "slot": "top", "order": 3, "tucked": false,
-          "file": "line_1117/girl/o_g1/layers/girl_top.png",
-          "sha256": "0636f1f8a192d8605eb135a937f13639f7a5b493c9e0bc948b3eb62147428278"
-        },
-        "avatar_v2_hair_ink_pageboy_star": {
-          "slot": "hair", "order": 4,
-          "file": "line_1117/girl/o_g1/layers/girl_hair_front.png",
-          "sha256": "cc4aef6d02970d0eadd0c64ba7e057b551f1028823f7b5718ca00c50fda02a7e",
-          "backFile": "line_1117/girl/o_g1/layers/girl_hair_back.png",
-          "backSha256": "5e24647b4a2b858920d06cd7cfab645bed1ac641c190276cfa82f2dabec96e26"
-        }
-      }
-    }
-  }
+  "note": "RULE: only a still with a fresh-QA PASS may be listed here, and it ships only after the owner approves its look (QA PASS + owner look approval). Listed stills, at exactly these sha256 values, are baked into the app; anything else keeps the 3/4 fallback. Paths are relative to the Workbench showcase root (--src). Remove an entry and re-bake to take a still out.",
+  "bodies": {}
 }
