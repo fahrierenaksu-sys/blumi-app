@@ -6,6 +6,7 @@ import {
   avatarStillRigForBody,
   resolveAvatarStillLayers,
   type AvatarShowcaseBase,
+  type AvatarShowcaseCrop,
   type AvatarShowcaseItemLayer,
   type AvatarStillManifest,
   type AvatarStillRect,
@@ -27,7 +28,9 @@ export interface AvatarShowcaseFront {
   readonly space: AvatarShowcaseBase["canvas"];
   /** Crop windows in that space: card, head, push. */
   readonly windows: AvatarShowcaseBase["windows"];
-  /** Equal front looks share one key: bakerVersion|rig|hair|top|bottom|shoes|showcase. */
+  /** The crop this figure is shown in; its window is `windows[crop]`. */
+  readonly crop: AvatarShowcaseCrop;
+  /** Equal front looks in the same crop share one key: bakerVersion|rig|hair|top|bottom|shoes|showcase|crop. */
   readonly cacheKey: string;
 }
 
@@ -67,6 +70,7 @@ function frontDrawOrder(layers: readonly DrawnFrontLayer[]): readonly DrawnFront
  */
 export function resolveShowcaseLayers(
   rawLoadout: unknown,
+  crop: AvatarShowcaseCrop,
   manifest: AvatarStillManifest = AVATAR_STILL_MANIFEST,
   hints: AvatarLoadoutCoercionHints = {},
 ): AvatarShowcaseResolved {
@@ -97,6 +101,7 @@ export function resolveShowcaseLayers(
     ],
     space: base.canvas,
     windows: base.windows,
-    cacheKey: [manifest.bakerVersion, rig, ...AVATAR_STILL_SLOT_KEYS.map(([slot]) => drawn.get(slot) ?? "-"), "showcase"].join("|"),
+    crop,
+    cacheKey: [manifest.bakerVersion, rig, ...AVATAR_STILL_SLOT_KEYS.map(([slot]) => drawn.get(slot) ?? "-"), "showcase", crop].join("|"),
   };
 }

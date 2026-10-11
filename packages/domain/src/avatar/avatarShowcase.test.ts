@@ -61,36 +61,36 @@ test("anyone's loadout resolves to a front figure and the stored loadout is neve
   ];
   for (const raw of loadouts) {
     const before = JSON.stringify(raw);
-    const resolved = resolveShowcaseLayers(deepFreeze(structuredClone(raw)), FULL_FRONT);
+    const resolved = resolveShowcaseLayers(deepFreeze(structuredClone(raw)), "card", FULL_FRONT);
     assert.equal(JSON.stringify(raw), before);
     const drawn = resolved.kind === "showcase" ? resolved.layers : resolved.still.layers;
     assert.ok(drawn.length > 0, `nothing drawn for ${JSON.stringify(raw)}`);
   }
   // a girl wearing unknown or legacy items is drawn in her starter outfit, front view
-  assert.deepEqual(new Set(frontOwners(resolveShowcaseLayers(DEFAULT_FEMALE_AVATAR_LOADOUT, FULL_FRONT))), new Set(["base", SHOES, BOTTOM, TOP, HAIR]));
+  assert.deepEqual(new Set(frontOwners(resolveShowcaseLayers(DEFAULT_FEMALE_AVATAR_LOADOUT, "card", FULL_FRONT))), new Set(["base", SHOES, BOTTOM, TOP, HAIR]));
 });
 
 test("the boy never wears a girl's front layer", () => {
-  const resolved = resolveShowcaseLayers({ ...GIRL_OUTFIT, bodyId: DEFAULT_MALE_AVATAR_LOADOUT.bodyId }, FULL_FRONT);
+  const resolved = resolveShowcaseLayers({ ...GIRL_OUTFIT, bodyId: DEFAULT_MALE_AVATAR_LOADOUT.bodyId }, "card", FULL_FRONT);
   assert.equal(resolved.rig, "male");
   const assets = resolved.kind === "showcase" ? resolved.layers : resolved.still.layers;
   assert.ok(assets.every((layer) => layer.asset.startsWith("male/")));
 });
 
 test("the front figure is drawn base first, then shoes, bottom, top and hair last", () => {
-  assert.deepEqual(frontOwners(resolveShowcaseLayers(GIRL_OUTFIT, FULL_FRONT)), ["base", SHOES, BOTTOM, TOP, HAIR]);
+  assert.deepEqual(frontOwners(resolveShowcaseLayers(GIRL_OUTFIT, "card", FULL_FRONT)), ["base", SHOES, BOTTOM, TOP, HAIR]);
 });
 
 test("a tucked top draws under the bottom, an untucked one over it, and hair stays on top either way", () => {
   const tucked = girlWithShowcase({ [SHOES]: { order: 1 }, [BOTTOM]: { order: 2 }, [TOP]: { order: 3, tucked: true }, [HAIR]: { order: 4 } });
-  assert.deepEqual(frontOwners(resolveShowcaseLayers(GIRL_OUTFIT, tucked)), ["base", SHOES, TOP, BOTTOM, HAIR]);
+  assert.deepEqual(frontOwners(resolveShowcaseLayers(GIRL_OUTFIT, "card", tucked)), ["base", SHOES, TOP, BOTTOM, HAIR]);
   const untucked = girlWithShowcase({ [SHOES]: { order: 1 }, [BOTTOM]: { order: 2 }, [TOP]: { order: 3, tucked: false }, [HAIR]: { order: 4 } });
-  assert.deepEqual(frontOwners(resolveShowcaseLayers(GIRL_OUTFIT, untucked)), ["base", SHOES, BOTTOM, TOP, HAIR]);
+  assert.deepEqual(frontOwners(resolveShowcaseLayers(GIRL_OUTFIT, "card", untucked)), ["base", SHOES, BOTTOM, TOP, HAIR]);
 });
 
 test("equal front looks share a cache key that differs from the 3/4 still's", () => {
-  const a = resolveShowcaseLayers(GIRL_OUTFIT, FULL_FRONT);
-  const b = resolveShowcaseLayers(DEFAULT_FEMALE_AVATAR_LOADOUT, FULL_FRONT);
+  const a = resolveShowcaseLayers(GIRL_OUTFIT, "card", FULL_FRONT);
+  const b = resolveShowcaseLayers(DEFAULT_FEMALE_AVATAR_LOADOUT, "card", FULL_FRONT);
   assert.equal(a.kind, "showcase");
   assert.equal(b.kind, "showcase");
   if (a.kind !== "showcase" || b.kind !== "showcase") return;
@@ -99,9 +99,22 @@ test("equal front looks share a cache key that differs from the 3/4 still's", ()
   assert.deepEqual(Object.keys(a.windows).sort(), ["card", "head", "push"]);
 });
 
+test("two crops of the same front look get different cache keys", () => {
+  const card = resolveShowcaseLayers(GIRL_OUTFIT, "card", FULL_FRONT);
+  const head = resolveShowcaseLayers(GIRL_OUTFIT, "head", FULL_FRONT);
+  const push = resolveShowcaseLayers(GIRL_OUTFIT, "push", FULL_FRONT);
+  assert.equal(card.kind, "showcase");
+  assert.equal(head.kind, "showcase");
+  assert.equal(push.kind, "showcase");
+  if (card.kind !== "showcase" || head.kind !== "showcase" || push.kind !== "showcase") return;
+  assert.equal(new Set([card.cacheKey, head.cacheKey, push.cacheKey]).size, 3);
+  assert.deepEqual(head.layers, card.layers);
+  assert.deepEqual(resolveShowcaseLayers(GIRL_OUTFIT, "head", FULL_FRONT), head);
+});
+
 test("one worn item without a front layer draws the whole figure as the 3/4 still of the same loadout, never mixed", () => {
   const noTop = girlWithShowcase({ [SHOES]: { order: 1 }, [BOTTOM]: { order: 2 }, [HAIR]: { order: 4 } });
-  const resolved = resolveShowcaseLayers(GIRL_OUTFIT, noTop);
+  const resolved = resolveShowcaseLayers(GIRL_OUTFIT, "card", noTop);
   assert.equal(resolved.kind, "fallback");
   if (resolved.kind !== "fallback") return;
   assert.deepEqual(resolved.still, resolveAvatarStillLayers(GIRL_OUTFIT, "full", { manifest: noTop }));
@@ -110,7 +123,7 @@ test("one worn item without a front layer draws the whole figure as the 3/4 stil
 });
 
 test("a body without front art falls back to its 3/4 still", () => {
-  const resolved = resolveShowcaseLayers(GIRL_OUTFIT, AVATAR_STILL_MANIFEST);
+  const resolved = resolveShowcaseLayers(GIRL_OUTFIT, "card", AVATAR_STILL_MANIFEST);
   assert.equal(resolved.kind, "fallback");
   if (resolved.kind !== "fallback") return;
   assert.deepEqual(resolved.still, resolveAvatarStillLayers(GIRL_OUTFIT, "full"));
