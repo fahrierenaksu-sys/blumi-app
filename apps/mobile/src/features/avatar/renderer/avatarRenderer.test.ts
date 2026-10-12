@@ -5,6 +5,7 @@ import test from "node:test"
 import { DEFAULT_FEMALE_AVATAR_LOADOUT } from "@blumi/domain"
 import {
   avatar25HasMirrorCards,
+  avatar25MirroredOnScreen,
   compileAvatar,
   compileView,
   PALETTE_STRIDE,
@@ -309,6 +310,50 @@ test("mirror cards on their own page: only the marked vertices use it, and that 
     const vertex = vertexAt(mirrored.vertexData, bodyVertices + k)
     assert.equal(vertex.layer, layerOf(mirrored, isMarked ? cardPage : hair.page), `vertex ${k}`)
   }
+})
+
+test("mirror cards on their own page: the plain view of that avatar holds the same page set, so one texture array serves both", () => {
+  const cardPage = rig.views.front.items.shoes_mint_ribbon_court_sneakers.page
+  const cards = withMirrorCards(cardPage)
+  const worn = [CARD_HAIR]
+  const mirrored = compileAvatar(cards, "front", worn, true)
+  const plain = compileAvatar(cards, "front", worn, false, true)
+  // equal page sets key one cached texture array (the body and item pages are not uploaded a second time)
+  assert.deepEqual(plain.pages, mirrored.pages)
+  // and every vertex samples the same layer in both drawings except the marked ones, which move to the card's layer
+  const cardLayer = mirrored.pages.indexOf(cards.views.front.pages[cardPage])
+  assert.ok(cardLayer >= 0)
+  for (let i = 0; i < plain.vertexData.byteLength / VERTEX_STRIDE; i++) {
+    const [a, b] = [vertexAt(plain.vertexData, i), vertexAt(mirrored.vertexData, i)]
+    if (a.layer !== b.layer) assert.equal(b.layer, cardLayer, `vertex ${i}`)
+    assert.notEqual(a.layer, cardLayer, `vertex ${i}`)
+  }
+  // an avatar wearing no carded item keeps the page set it always had
+  const others = ["bottom_coral_wave_pants", "top_coral_wave_polo"]
+  assert.deepEqual(compileAvatar(cards, "front", others, false, true).pages, compileAvatar(rig, "front", others).pages)
+})
+
+test("the card is drawn exactly when the drawing the viewer sees is mirrored (the renderer's flip and an outer flip cancel)", () => {
+  // [flip applied by the canvas, flip applied around it, the viewer sees a mirrored drawing]
+  const table: [boolean, boolean, boolean][] = [
+    [false, false, false],
+    [true, false, true],
+    [false, true, true],
+    [true, true, false]
+  ]
+  for (const [mirror, outer, seen] of table) {
+    assert.equal(avatar25MirroredOnScreen(mirror, outer), seen, `mirror ${mirror}, outer ${outer}`)
+    const view = pickAvatar25View(["f", "b"], ["fM", "bM"], 1, avatar25MirroredOnScreen(mirror, outer))
+    assert.equal(view, seen ? "bM" : "b", `mirror ${mirror}, outer ${outer}`)
+  }
+})
+
+test("an avatar with a baked still under it never builds mirror cards, so the still and the live view flip alike", () => {
+  const cards = withMirrorCards()
+  assert.equal(avatar25HasMirrorCards(cards, "front", [CARD_HAIR]), true)
+  assert.equal(avatar25HasMirrorCards(cards, "front", [CARD_HAIR], false), false)
+  // without a mirrored view the pick is the plain view whatever the facing: the same flip the still shows
+  assert.equal(pickAvatar25View(["f", "b"], [undefined, undefined], 0, avatar25MirroredOnScreen(true, false)), "f")
 })
 
 test("mirror cards that do not match the mesh are ignored, never half applied", () => {

@@ -123,10 +123,9 @@ export function AvatarLive(props: AvatarLiveProps) {
   const mirrored = spec.mirror !== Boolean(props.outerMirrored)
   const viewIndex = useSharedValue(spec.view === "back" ? 1 : 0)
   const mirror = useSharedValue(mirrored ? 1 : 0)
+  // read by the mirror cards' pick (avatar25MirroredOnScreen): born with the right value, and rewritten in the same
+  // effect run as `mirror` below, so the two never differ for a frame (a one-frame wrong card)
   const outerMirror = useSharedValue(props.outerMirrored ? 1 : 0)
-  useEffect(() => {
-    outerMirror.value = props.outerMirrored ? 1 : 0
-  }, [outerMirror, props.outerMirrored])
   const walking = spec.pose === "walk"
   useEffect(() => {
     const sittingDown = spec.pose === "sit" && previousPose.current !== "sit" && bendsToSit
@@ -145,6 +144,7 @@ export function AvatarLive(props: AvatarLiveProps) {
   const travelMirror = useSharedValue(0)
   const hipFacing = seatHip ? `${seatHip.view}:${seatHip.mirror ? 1 : 0}` : ""
   useEffect(() => {
+    outerMirror.value = outerMirrored ? 1 : 0
     if (spec.pose === "sit") travelView.value = -1
     if (spec.pose === "sit" && hipFacing) {
       // a layered seat names the drawing she sits in: she turns to it, then sits
@@ -160,7 +160,7 @@ export function AvatarLive(props: AvatarLiveProps) {
     }
     viewIndex.value = spec.view === "back" ? 1 : 0
     mirror.value = mirrored ? 1 : 0
-  }, [hipFacing, mirror, mirrored, outerMirrored, spec.pose, spec.view, travelMirror, travelView, viewIndex])
+  }, [hipFacing, mirror, mirrored, outerMirror, outerMirrored, spec.pose, spec.view, travelMirror, travelView, viewIndex])
 
   // screen px of travel per walk cycle: the painted feet's own travel at this size
   const pxPerSheet = placement.figureHeightPx / view.height

@@ -16,7 +16,7 @@ import {
   type Avatar25GpuShared,
   type Avatar25GpuView
 } from "./avatar25Gpu"
-import { avatar25HasMirrorCards, avatarVariant, pickAvatar25View, writeAvatarClipTransform, writeAvatarPalette } from "./avatar25Pose"
+import { avatar25HasMirrorCards, avatar25MirroredOnScreen, avatarVariant, pickAvatar25View, writeAvatarClipTransform, writeAvatarPalette } from "./avatar25Pose"
 import type { AvatarRigId } from "../model/avatarRoomContract"
 import { getAvatar25Rig } from "./avatar25Assets"
 import { AVATAR25_ASTC_FEATURE, hasGpuFeature, shouldRequestAvatar25AstcFeature } from "./avatar25Astc"
@@ -70,6 +70,12 @@ export interface Avatar25Instance {
    * Absent: taken from its position in `instances`.
    */
   lifeSeed?: number
+  /**
+   * false = never draw the mirror cards, the mirrored directions are the plain flip. A baked still under the canvas
+   * (AvatarHero) is only ever that plain flip, so the live view must be too, or a one-sided marker swaps sides at the
+   * cross-fade. Absent = true (rooms have no still underneath).
+   */
+  mirrorCards?: boolean
 }
 
 export interface Avatar25FrameStats {
@@ -209,14 +215,15 @@ export function Avatar25Canvas(props: {
       })
       const avatars = await Promise.all(instances.map(async (instance) => {
         const rig = getAvatar25Rig(instance.rig)
+        const hasCards = (view: Avatar25ViewName) => avatar25HasMirrorCards(rig.rig, view, instance.itemIds, instance.mirrorCards !== false)
         const create = (view: Avatar25ViewName, mirrored: boolean) =>
-          createAvatar25GpuView(shared, rig.rig, view, instance.itemIds, rig.readTextureBytes, rig.id, rig.astc, mirrored)
+          createAvatar25GpuView(shared, rig.rig, view, instance.itemIds, rig.readTextureBytes, rig.id, rig.astc, mirrored, hasCards(view))
         return {
           instance,
+          // the plain view of a carded avatar holds the cards' overflow page too: one page set, one texture array
           views: await Promise.all(VIEWS.map((view) => create(view, false))),
           // a second drawing only for the directions whose worn items carry mirror cards
-          mirrorViews: await Promise.all(VIEWS.map((view) =>
-            avatar25HasMirrorCards(rig.rig, view, instance.itemIds) ? create(view, true) : undefined))
+          mirrorViews: await Promise.all(VIEWS.map((view) => hasCards(view) ? create(view, true) : undefined))
         }
       }))
       built = { shared, views: avatars.flatMap((a) => [...a.views, ...a.mirrorViews.filter((v): v is Avatar25GpuView => v !== undefined)]), msaa }
@@ -289,7 +296,7 @@ export function Avatar25Canvas(props: {
       const viewIndex = driver.view ? driver.view.value : instance.view === "back" ? 1 : 0
       const mirror = driver.mirror ? driver.mirror.value === 1 : instance.mirror
       // the mirror cards are drawn for the mirror the viewer sees: the flip here, undone by a flip outside, shows none
-      const mirroredOnScreen = mirror !== (driver.outerMirror ? driver.outerMirror.value === 1 : false)
+      const mirroredOnScreen = avatar25MirroredOnScreen(mirror, driver.outerMirror ? driver.outerMirror.value === 1 : false)
       const view = pickAvatar25View(views, mirrorViews, viewIndex, mirroredOnScreen)
       const compiled = view.view
       const lifeSeed = instance.lifeSeed ?? a * 0.37

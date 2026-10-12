@@ -277,10 +277,25 @@ export function itemMeshFor(item: Rig25Item, mirrored: boolean): Rig25Mesh {
   }
 }
 
-/** True when some worn item has mirror cards for this view, so a mirrored drawing differs from the flipped one. */
-export function avatar25HasMirrorCards(rig: Rig25, viewName: Avatar25ViewName, itemIds: string[]): boolean {
+/**
+ * True when some worn item has mirror cards for this view, so a mirrored drawing differs from the flipped one.
+ * `allowCards` false (a baked still sits under the canvas, see AvatarHero) never builds a mirrored drawing: the still
+ * is only ever the plain flip, and the live view must flip the same way or the marker swaps sides at the cross-fade.
+ */
+export function avatar25HasMirrorCards(rig: Rig25, viewName: Avatar25ViewName, itemIds: string[], allowCards = true): boolean {
+  if (!allowCards) return false
   const items = rig.views[viewName].items
   return itemIds.some((id) => items[id] !== undefined && hasMirrorCards(items[id]))
+}
+
+/**
+ * Whether the drawing the viewer sees is mirrored: `mirror` is the flip this renderer applies (AvatarLive already
+ * compensates for a flip outside it), `outerMirror` the one the surrounding renderer adds, so the two cancel out when
+ * both are set. The mirror cards are drawn exactly when this is true.
+ */
+export function avatar25MirroredOnScreen(mirror: boolean, outerMirror: boolean): boolean {
+  "worklet"
+  return mirror !== outerMirror
 }
 
 /**
@@ -297,8 +312,17 @@ export function pickAvatar25View<T>(views: readonly T[], mirrorViews: readonly (
  * frame, the visible ranges in painter's order (doll25 renderOrder). Drawing it is one drawIndexed call.
  * `mirrored` builds the drawing for a mirrored direction (the transform still flips it): worn items with mirror cards
  * sample them (see `itemMeshFor`). Geometry, weights and draw order are the same either way.
+ * `withCardPages` adds the pages the cards overflowed to even when drawing the plain view: an avatar that has both
+ * drawings then holds ONE page set, hence one texture array (and one ASTC set) instead of a second array that
+ * re-uploads the body and item pages just to add the card page.
  */
-export function compileAvatar(rig: Rig25, viewName: Avatar25ViewName, itemIds: string[], mirrored = false): CompiledAvatar {
+export function compileAvatar(
+  rig: Rig25,
+  viewName: Avatar25ViewName,
+  itemIds: string[],
+  mirrored = false,
+  withCardPages = mirrored
+): CompiledAvatar {
   const v = rig.views[viewName]
   const view = compileView(viewName, v)
   const motion = view.motion !== null
@@ -310,7 +334,7 @@ export function compileAvatar(rig: Rig25, viewName: Avatar25ViewName, itemIds: s
   const band = seatedShinBandRows(v)
   const strips = meshes.map((mesh) => seatedCardStrips(mesh, band, v.bones.length, v.bones.length + 2))
   // only the pages this avatar draws are loaded: rig page → texture-array layer
-  const cardPages = mirrored
+  const cardPages = withCardPages
     ? worn.map((id) => v.items[id]).flatMap((item) => (hasMirrorCards(item) && item.mirrorPage !== undefined ? [item.mirrorPage] : []))
     : []
   const usedPages = [...new Set([0, ...worn.map((id) => v.items[id].page), ...cardPages])].sort((a, b) => a - b)

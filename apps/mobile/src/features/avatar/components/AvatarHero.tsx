@@ -62,6 +62,8 @@ export const AvatarHero = memo(function AvatarHero(props: AvatarHeroProps) {
       rig: spec.rig,
       view: "front",
       mirror: spec.mirror,
+      // the baked still under the canvas is only the plain flip: no mirror cards, or the marker swaps at the cross-fade
+      mirrorCards: false,
       itemIds: spec.itemIds,
       anchorX: groundX / width,
       anchorY: layout.ground.y / height,

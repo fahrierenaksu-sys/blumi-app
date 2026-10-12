@@ -118,8 +118,12 @@ for (const dir of RIG_DIRS) {
     for (const view of ["front", "back"] as const) {
       const itemIds = Object.keys(rig.views[view].items)
       for (const worn of [[], ...itemIds.map((id) => [id]), itemIds]) {
-        const pages = compileAvatar(rig, view, worn).pages
-        assert.ok(findAvatar25AstcSet(manifest, pages), `${dir} ${view} ${worn.length} items`)
+        // the plain drawing, and a mirrored one (an item's mirror cards may live on a page of their own: that page must
+        // be in a blob too, or the mirrored view would fall back to PNG pages, four times the GPU memory)
+        for (const [mirrored, withCardPages] of [[false, false], [true, true], [false, true]] as const) {
+          const pages = compileAvatar(rig, view, worn, mirrored, withCardPages).pages
+          assert.ok(findAvatar25AstcSet(manifest, pages), `${dir} ${view} ${worn.length} items, mirrored ${mirrored}, card pages ${withCardPages}`)
+        }
       }
     }
   })

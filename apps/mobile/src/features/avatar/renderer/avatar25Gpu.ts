@@ -378,10 +378,12 @@ export async function createAvatar25GpuView(
   /** The rig's compressed blobs (see avatar25Astc.ts); absent = PNG pages. */
   astc?: Avatar25AstcSource,
   /** Build the mirrored direction's drawing (worn items' mirror cards); the transform still flips it. */
-  mirrored = false
+  mirrored = false,
+  /** Load the mirror cards' overflow page too (the plain view of an avatar that also has the mirrored one): one page set. */
+  withCardPages = mirrored
 ): Promise<Avatar25GpuView> {
   const { device } = shared
-  const compiled = compileAvatar(rig, viewName, itemIds, mirrored)
+  const compiled = compileAvatar(rig, viewName, itemIds, mirrored, withCardPages)
   const vertex = device.createBuffer({ size: compiled.vertexData.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST })
   device.queue.writeBuffer(vertex, 0, compiled.vertexData)
   const index = device.createBuffer({ size: Math.max(4, compiled.indexData.byteLength), usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST })
