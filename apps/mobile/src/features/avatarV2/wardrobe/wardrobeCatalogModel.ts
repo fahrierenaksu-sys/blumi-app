@@ -59,11 +59,14 @@ export function getWardrobeActiveItems(input: {
   bodyId: string
   canEquipItem: (item: AvatarCatalogItem) => boolean
   isAvailableInShop?: (item: AvatarCatalogItem) => boolean
+  /** Test seam: which items have room art to preview. The default reads the live projection map. */
+  isPreviewSupported?: (item: AvatarCatalogItem) => boolean
 }): AvatarCatalogItem[] {
+  const isPreviewSupported = input.isPreviewSupported ?? isAvatarItemRoomPreviewSupported
   const fitting = getWardrobeCategoryItems(input.catalog, input.category).filter(
     (item) =>
       isAvatarV2ItemCompatibleWithBody(item, input.bodyId) &&
-      isAvatarItemRoomPreviewSupported(item)
+      isPreviewSupported(item)
   )
   const owned = fitting.filter((item) => input.canEquipItem(item))
   const isAvailableInShop = input.isAvailableInShop
@@ -108,11 +111,14 @@ export function buildWardrobeCards(input: {
   getPreviewSource: (item: AvatarCatalogItem) => ImageSourcePropType | undefined
   /** The locked item being previewed on the stage, if any. */
   previewingItemId?: string | null
+  /** Test seam: which items have room art to preview. The default reads the live projection map. */
+  isPreviewSupported?: (item: AvatarCatalogItem) => boolean
 }): WardrobeCatalogCardModel[] {
   const { displayedAvatar, canEquipItem, copy } = input
+  const isPreviewSupported = input.isPreviewSupported ?? isAvatarItemRoomPreviewSupported
   return input.items.map((item) => {
     const canEquip = canEquipItem(item)
-    const roomPreviewSupported = isAvatarItemRoomPreviewSupported(item)
+    const roomPreviewSupported = isPreviewSupported(item)
     const locked = !canEquip || !roomPreviewSupported
     const equipped = isAvatarV2ItemEquipped(displayedAvatar, item) && roomPreviewSupported
     const previewSource = input.getPreviewSource(item)

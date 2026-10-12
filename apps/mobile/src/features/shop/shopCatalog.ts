@@ -66,6 +66,8 @@ export interface BuildShopCatalogItemsInput {
   avatar: UserAvatar
   roomDecor: UserRoomDecor
   economyCatalog?: readonly EconomyCatalogItem[]
+  /** Test seam: the avatar items on the shelf. The default is the live avatar catalog. */
+  avatarCatalog?: AvatarCatalogItem[]
   /**
    * Production release projection. When present, Shop must not render an
    * asset outside its immutable receipt-backed catalog.
@@ -107,7 +109,7 @@ export function buildShopCatalogItems(
 
 export function buildAvatarShopItems(input: Pick<
   BuildShopCatalogItemsInput,
-  "avatar" | "economyCatalog" | "publishedItemIds"
+  "avatar" | "economyCatalog" | "publishedItemIds" | "avatarCatalog"
 > & { inventory: Pick<BlumiInventorySnapshot, "ownedAvatarItemIds"> }): ShopCatalogItem[] {
   const avatarInventory = {
     ownedItemIds: input.inventory.ownedAvatarItemIds
@@ -117,7 +119,7 @@ export function buildAvatarShopItems(input: Pick<
     : undefined
 
   return getAvatarV2ShopItemsCompatibleWithBody(
-    AVATAR_V2_CATALOG,
+    input.avatarCatalog ?? AVATAR_V2_CATALOG,
     input.avatar.bodyId
   )
     .filter((item) => SHOP_AVATAR_TYPES.has(item.type))
