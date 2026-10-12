@@ -431,10 +431,35 @@ def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pag
     return out
 
 
-def pack_mirror_cards(iid, it, ir, mesh, page, pages, page_taken, blink_layer=None, holds_blink_patch=False):
+def mirror_eye_context(src_blink, head_layer, head_box):
+    """What the mirror-card eye check needs: the head layer's blink layer name, the eye rect in sheet px, the open head
+    there and the half/closed frames (the same inputs pack_blink_items cuts the item patches with)."""
+    import numpy as np
+    rx, ry, rw, rh = src_blink['rect']
+    return {'layer': src_blink.get('layer'), 'window': (head_box[0] + rx, head_box[1] + ry, rw, rh),
+            'head_open': np.asarray(head_layer.crop((rx, ry, rx + rw, ry + rh))),
+            'frames': [np.asarray(decode(src_blink['frames'][n])) for n in BLINK_FRAMES]}
+
+
+def card_carries_eye_copy(card, part, eye):
+    """True when the card has a copy of the open eye where the head's eye lies on screen. The mesh is not flipped (the
+    renderer flips the whole avatar), so that is the eye rect in sheet px, i.e. the same window of the part's own px
+    that pack_blink_items cuts the original from; a card carrying a copy would stay open while the head blinks."""
+    import numpy as np
+    sx, sy, rw, rh = eye['window']
+    ox, oy = sx - part['box'][0], sy - part['box'][1]
+    if ox + rw <= 0 or oy + rh <= 0 or ox >= card.width or oy >= card.height:
+        return False
+    crop = np.asarray(card.crop((ox, oy, ox + rw, oy + rh)))   # transparent where the card is not
+    return bool(blink_item_cut(eye['head_open'], eye['frames'], crop).any())
+
+
+def pack_mirror_cards(iid, it, ir, mesh, page, pages, page_taken, eye=None):
     """Mirror cards (see the docstring): returns {'mirrorUv': [...], 'mirrorPage': n?} for an item whose parts carry
     `pngMirror`, else None. Each card is pasted at the same phase modulo BLINK_ALIGN as its part (so both resample
-    alike), in free space of the item's page, else together on one new page appended to `pages`."""
+    alike), in free space of the item's page, else together on one new page appended to `pages`. `eye`
+    (mirror_eye_context) makes a card on the blink layer prove it carries no eye copy: the head's own blink then
+    shows through it (the item's eye patch is keyed to the original uv rect and is inert under a card)."""
     cards = [(k, decode(p['pngMirror'])) for k, p in enumerate(it.get('parts', [])) if p.get('pngMirror')]
     if not cards:
         return None
@@ -442,8 +467,8 @@ def pack_mirror_cards(iid, it, ir, mesh, page, pages, page_taken, blink_layer=No
         part = it['parts'][k]
         if card.size != decode(part['png']).size:
             raise SystemExit(f"mirror: {iid} part{k} card is {card.size}, its drawing is {decode(part['png']).size}")
-        if holds_blink_patch and part['layer'] == blink_layer:
-            raise SystemExit(f'mirror: {iid} part{k} is the blink layer and the item holds an eye patch; cut the patch from the card first')
+        if eye is not None and part['layer'] == eye['layer'] and card_carries_eye_copy(card, part, eye):
+            raise SystemExit(f'mirror: {iid} part{k} card carries a copy of the open eye; cut it from the card like the item patch')
     page_size = pages[page].size
 
     def place(taken):
@@ -658,11 +683,11 @@ def export_view(name, v, motion=None):
             blink['items'] = patches
 
     # mirror cards: after the blink patches, so they take only space that is still free
-    blink_layer = v['blink'].get('layer') if blink is not None else None
-    patched = {pt['item'] for pt in blink.get('items', [])} if blink is not None else set()
+    head = v['blink'].get('layer') if blink is not None else None
+    head_box = next((L['box'] for L in v['layers'] if L['name'] == head), None)
+    eye = mirror_eye_context(v['blink'], layer_images[head], head_box) if head_box is not None else None
     for iid, it in sorted(v.get('items', {}).items()):
-        mirror = pack_mirror_cards(iid, it, item_rects[iid], items[iid]['mesh'], items[iid]['page'], pages, page_taken,
-                                   blink_layer, iid in patched)
+        mirror = pack_mirror_cards(iid, it, item_rects[iid], items[iid]['mesh'], items[iid]['page'], pages, page_taken, eye)
         if mirror:
             items[iid].update(mirror)
 

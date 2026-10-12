@@ -413,6 +413,44 @@ class ExportMirrorCardsTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             ex.pack_mirror_cards('z', bad, {'part0': (ex.PAD, ex.PAD, 200, 100)}, mesh, 0, pages, taken)
 
+    def test_a_card_on_the_blink_layer_is_allowed_only_when_it_carries_no_copy_of_the_open_eye(self):
+        import numpy as np
+        from PIL import Image
+        ex = load_exporter()
+        h, w = 40, 60
+        skin, iris, hair = (250, 210, 185, 255), (150, 90, 40, 255), (30, 18, 14, 255)
+        head = np.zeros((h, w, 4), np.uint8); head[:] = skin
+        head[12:28, 24:40] = iris                                # the open eye
+        closed = head.copy(); closed[12:28, 24:40] = skin
+        closed[24:26, 20:44] = hair                              # its closed lash line
+        # the eye rect sits at (10, 5) in sheet px; the part's box is the sheet origin, so the window is (10, 5, 60, 40) of it
+        eye = {'layer': 'head', 'window': (10, 5, w, h), 'head_open': head, 'frames': [closed, closed]}
+
+        def card_with(copy):
+            card = np.zeros((70, 100, 4), np.uint8)
+            card[:, 0:8] = hair                                  # a side lock away from the eye
+            if copy:
+                card[5 + 12:5 + 28, 10 + 24:10 + 40] = (120, 70, 35, 255)   # the card's own copy of the open eye
+            return Image.fromarray(card, 'RGBA')
+
+        def pack(card, layer='head', eye_context=eye):
+            part = {'layer': layer, 'box': (0, 0), 'png': data_uri(card), 'pngMirror': data_uri(card)}
+            mesh = {'uv': [0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.0, 0.5], 'index': [0, 1, 2, 0, 2, 3],
+                    'ranges': [{'name': 'part0', 'start': 0, 'count': 6}]}
+            pages = [Image.new('RGBA', (512, 256), (0, 0, 0, 0))]
+            taken = {0: [(ex.PAD, ex.PAD, 100, 70)]}
+            return ex.pack_mirror_cards('hair', {'parts': [part]}, {'part0': (ex.PAD, ex.PAD, 100, 70)}, mesh, 0, pages, taken, eye_context)
+
+        self.assertIn('mirrorUv', pack(card_with(False)))        # no eye copy: the head's own blink shows through it
+        with self.assertRaises(SystemExit):
+            pack(card_with(True))                                # an eye copy would stay open while the head blinks
+        # only cards on the blink layer are checked, and a rig without a blink has nothing to check
+        self.assertIn('mirrorUv', pack(card_with(True), layer='back'))
+        self.assertIn('mirrorUv', pack(card_with(True), eye_context=None))
+        # a card whose window falls outside the part carries nothing at the eye
+        far = {**eye, 'window': (500, 500, w, h)}
+        self.assertIn('mirrorUv', pack(card_with(True), eye_context=far))
+
 
 if __name__ == '__main__':
     unittest.main()
