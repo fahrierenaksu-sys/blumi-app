@@ -4,9 +4,11 @@ import { resolve } from "node:path"
 import test from "node:test"
 import { DEFAULT_FEMALE_AVATAR_LOADOUT } from "@blumi/domain"
 import {
+  avatar25HasMirrorCards,
   compileAvatar,
   compileView,
   PALETTE_STRIDE,
+  pickAvatar25View,
   poseVariant,
   VARIANT_SIT,
   VARIANT_STAND,
@@ -19,7 +21,7 @@ import {
 import { avatar25TravelFacing, resolveAvatarDraw, scaleAvatarMovementTiming } from "../model/resolveAvatarDraw"
 import { seatedCardStrips, seatedShinBandRows } from "./avatar25SeatedLegs"
 import { ROOM_WORLD_MY_ROOM_MOVEMENT_TIMING, timeRoomWorldMovementSegments } from "../../roomWorld/roomWorldRuntime"
-import type { Rig25 } from "./rigTypes"
+import type { Rig25, Rig25Item } from "./rigTypes"
 
 const rig = JSON.parse(readFileSync(resolve(import.meta.dirname, "../rigs/girl/rig25.json"), "utf8")) as Rig25
 const maleRig = JSON.parse(readFileSync(resolve(import.meta.dirname, "../rigs/boy/rig25.json"), "utf8")) as Rig25
@@ -224,3 +226,119 @@ test("both rigs' seated cards can be cut at their shin band, so the seated soles
   }
 })
 
+
+// mirror cards: a fixture rig (the girl's rig, its pageboy hair given cards for its drawing) against the same rig without
+const CARD_HAIR = "hair_ink_pageboy_star"
+const CARD_SHIFT = 0.125
+const VERTEX_STRIDE = 32
+
+/** A copy of the girl rig whose hair has mirror cards on its main drawing (`part0`) only. */
+function withMirrorCards(cardPage?: number): Rig25 {
+  const copy = structuredClone(rig)
+  const hair: Rig25Item = copy.views.front.items[CARD_HAIR]
+  const part = hair.mesh.ranges.find((r) => r.name === "part0")!
+  const marked = new Set(hair.mesh.index.slice(part.start, part.start + part.count))
+  hair.mirrorUv = hair.mesh.uv.map((u, k) => (marked.has(k >> 1) && k % 2 === 0 ? u + CARD_SHIFT : u))
+  if (cardPage !== undefined) hair.mirrorPage = cardPage
+  return copy
+}
+
+/** [u, v, page layer] of vertex `i` in a compiled avatar's vertex buffer. */
+function vertexAt(data: ArrayBuffer, i: number) {
+  const f = new Float32Array(data, i * VERTEX_STRIDE, 4)
+  return { u: f[2], v: f[3], layer: new Uint8Array(data)[i * VERTEX_STRIDE + 24] }
+}
+
+test("mirror cards: a mirrored direction samples them for the marked parts only, and only for items that carry them", () => {
+  const worn = [CARD_HAIR]
+  const cards = withMirrorCards()
+  const bodyVertices = rig.views.front.mesh.pos.length / 2
+  const hair = cards.views.front.items[CARD_HAIR]
+  const plain = compileAvatar(cards, "front", worn, false)
+  const mirrored = compileAvatar(cards, "front", worn, true)
+  // the unmirrored drawing is the rig without cards, byte for byte; geometry, order and pages never change
+  const without = compileAvatar(rig, "front", worn)
+  assert.deepEqual(new Uint8Array(plain.vertexData), new Uint8Array(without.vertexData))
+  assert.deepEqual(plain.indexData, without.indexData)
+  assert.deepEqual(mirrored.indexData, plain.indexData)
+  assert.deepEqual(mirrored.variants, plain.variants)
+  assert.equal(mirrored.vertexData.byteLength, plain.vertexData.byteLength)
+  // every vertex of the hair takes the card's uv in the mirrored drawing; the body does not change at all
+  const changed = new Set<number>()
+  for (let i = 0; i < mirrored.vertexData.byteLength / VERTEX_STRIDE; i++) {
+    const [a, b] = [vertexAt(plain.vertexData, i), vertexAt(mirrored.vertexData, i)]
+    if (a.u !== b.u || a.v !== b.v) changed.add(i)
+    assert.equal(b.layer, a.layer)
+  }
+  assert.ok(changed.size > 0)
+  // only hair vertices move (the walk's weighted copies of them move too): by exactly the card's shift, never the body
+  for (const i of changed) {
+    assert.ok(i >= bodyVertices, "the body is not touched")
+    const [from, to] = [vertexAt(plain.vertexData, i), vertexAt(mirrored.vertexData, i)]
+    assert.ok(Math.abs(to.u - from.u - CARD_SHIFT) < 1e-6 && to.v === from.v)
+  }
+  for (let k = 0; k < hair.mesh.uv.length / 2; k++) {
+    const vertex = vertexAt(mirrored.vertexData, bodyVertices + k)
+    assert.ok(Math.abs(vertex.u - hair.mirrorUv![k * 2]) < 1e-6 && Math.abs(vertex.v - hair.mirrorUv![k * 2 + 1]) < 1e-6, `vertex ${k}`)
+  }
+  // an avatar wearing nothing with cards draws the same for both directions (the transform flips it)
+  const others = ["bottom_coral_wave_pants", "top_coral_wave_polo", "shoes_mint_ribbon_court_sneakers"]
+  const a = compileAvatar(cards, "front", others, true)
+  const b = compileAvatar(cards, "front", others, false)
+  assert.deepEqual(new Uint8Array(a.vertexData), new Uint8Array(b.vertexData))
+  assert.deepEqual(a.pages, b.pages)
+  assert.equal(avatar25HasMirrorCards(cards, "front", worn), true)
+  assert.equal(avatar25HasMirrorCards(cards, "front", others), false)
+  assert.equal(avatar25HasMirrorCards(cards, "back", worn), false)
+  assert.equal(avatar25HasMirrorCards(rig, "front", worn), false)
+})
+
+test("mirror cards on their own page: only the marked vertices use it, and that page is loaded only when mirrored", () => {
+  const cardPage = rig.views.front.items.shoes_mint_ribbon_court_sneakers.page
+  assert.notEqual(cardPage, rig.views.front.items[CARD_HAIR].page)
+  const cards = withMirrorCards(cardPage)
+  const plain = compileAvatar(cards, "front", [CARD_HAIR], false)
+  const mirrored = compileAvatar(cards, "front", [CARD_HAIR], true)
+  assert.ok(!plain.pages.includes(cards.views.front.pages[cardPage]))
+  assert.ok(mirrored.pages.includes(cards.views.front.pages[cardPage]))
+  const layerOf = (compiled: typeof plain, page: number) => compiled.pages.indexOf(cards.views.front.pages[page])
+  const hair = cards.views.front.items[CARD_HAIR]
+  const bodyVertices = cards.views.front.mesh.pos.length / 2
+  for (let k = 0; k < hair.mesh.uv.length / 2; k++) {
+    const isMarked = hair.mirrorUv![k * 2] !== hair.mesh.uv[k * 2]
+    const vertex = vertexAt(mirrored.vertexData, bodyVertices + k)
+    assert.equal(vertex.layer, layerOf(mirrored, isMarked ? cardPage : hair.page), `vertex ${k}`)
+  }
+})
+
+test("mirror cards that do not match the mesh are ignored, never half applied", () => {
+  const cards = withMirrorCards()
+  cards.views.front.items[CARD_HAIR].mirrorUv = cards.views.front.items[CARD_HAIR].mirrorUv!.slice(2)
+  assert.equal(avatar25HasMirrorCards(cards, "front", [CARD_HAIR]), false)
+  const a = compileAvatar(cards, "front", [CARD_HAIR], true)
+  const b = compileAvatar(rig, "front", [CARD_HAIR], false)
+  assert.deepEqual(new Uint8Array(a.vertexData), new Uint8Array(b.vertexData))
+})
+
+test("the mirrored view is picked only where one was built", () => {
+  assert.equal(pickAvatar25View(["f", "b"], [undefined, undefined], 0, true), "f")
+  assert.equal(pickAvatar25View(["f", "b"], ["fM", "bM"], 0, true), "fM")
+  assert.equal(pickAvatar25View(["f", "b"], ["fM", "bM"], 1, true), "bM")
+  assert.equal(pickAvatar25View(["f", "b"], ["fM", "bM"], 1, false), "b")
+  assert.equal(pickAvatar25View(["f", "b"], ["fM", undefined], 1, true), "b")
+})
+
+test("every shipped rig's mirror cards line up with their mesh", () => {
+  for (const [name, r] of Object.entries(RIGS)) {
+    for (const [viewName, view] of Object.entries(r.views)) {
+      for (const [id, item] of Object.entries(view.items)) {
+        if (item.mirrorUv === undefined) {
+          assert.equal(item.mirrorPage, undefined, `${name} ${viewName} ${id}: mirrorPage needs mirrorUv`)
+          continue
+        }
+        assert.equal(item.mirrorUv.length, item.mesh.uv.length, `${name} ${viewName} ${id}`)
+        if (item.mirrorPage !== undefined) assert.ok(view.pages[item.mirrorPage], `${name} ${viewName} ${id}: mirrorPage exists`)
+      }
+    }
+  }
+})

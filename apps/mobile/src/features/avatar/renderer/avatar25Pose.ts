@@ -6,7 +6,7 @@
  * The palette holds one 2×3 affine per slot (bones, then ROOT, then WAVE, then SEATED LEGS), 8 floats each:
  *   [a, c, tx, 0, b, d, ty, 0]  so  x' = a·x + c·y + tx,  y' = b·x + d·y + ty   (x, y in bill px)
  */
-import type { Avatar25Pose, Avatar25ViewName, Rig25, Rig25Mesh, Rig25View } from "./rigTypes"
+import type { Avatar25Pose, Avatar25ViewName, Rig25, Rig25Item, Rig25Mesh, Rig25View } from "./rigTypes"
 import {
   addMotionBreath,
   addMotionIdle,
@@ -255,23 +255,65 @@ function packVertices(meshes: Rig25Mesh[], layerOfPage: Map<number, number>): Ar
   return buffer
 }
 
+/** Whether the item carries usable mirror cards (`mirrorUv` as long as `mesh.uv`). */
+function hasMirrorCards(item: Rig25Item): item is Rig25Item & { mirrorUv: number[] } {
+  return item.mirrorUv !== undefined && item.mirrorUv.length === item.mesh.uv.length
+}
+
+/**
+ * The mesh an item is drawn with. Mirrored directions use the item's mirror cards for the marked parts (their uv,
+ * and `mirrorPage` when the cards live on another page); every other vertex, and every item without cards, keeps
+ * today's mesh, so the unmarked path is the same object, not a copy.
+ */
+export function itemMeshFor(item: Rig25Item, mirrored: boolean): Rig25Mesh {
+  if (!mirrored || !hasMirrorCards(item)) return item.mesh
+  const { uv, page } = item.mesh
+  const cardPage = item.mirrorPage
+  const isMarked = (i: number) => item.mirrorUv[i * 2] !== uv[i * 2] || item.mirrorUv[i * 2 + 1] !== uv[i * 2 + 1]
+  return {
+    ...item.mesh,
+    uv: item.mirrorUv,
+    page: cardPage === undefined ? page : page.map((p, i) => (isMarked(i) ? cardPage : p))
+  }
+}
+
+/** True when some worn item has mirror cards for this view, so a mirrored drawing differs from the flipped one. */
+export function avatar25HasMirrorCards(rig: Rig25, viewName: Avatar25ViewName, itemIds: string[]): boolean {
+  const items = rig.views[viewName].items
+  return itemIds.some((id) => items[id] !== undefined && hasMirrorCards(items[id]))
+}
+
+/**
+ * The GPU view to draw for a facing: the mirrored one when this direction is mirrored and one was built (only avatars
+ * that wear mirror cards have them), else the plain view, which the transform flips.
+ */
+export function pickAvatar25View<T>(views: readonly T[], mirrorViews: readonly (T | undefined)[], viewIndex: number, mirror: boolean): T {
+  "worklet"
+  return (mirror ? mirrorViews[viewIndex] : undefined) ?? views[viewIndex] ?? views[0]
+}
+
 /**
  * One avatar (a view plus worn items) as a single vertex buffer and one index buffer holding, per pose and walk
  * frame, the visible ranges in painter's order (doll25 renderOrder). Drawing it is one drawIndexed call.
+ * `mirrored` builds the drawing for a mirrored direction (the transform still flips it): worn items with mirror cards
+ * sample them (see `itemMeshFor`). Geometry, weights and draw order are the same either way.
  */
-export function compileAvatar(rig: Rig25, viewName: Avatar25ViewName, itemIds: string[]): CompiledAvatar {
+export function compileAvatar(rig: Rig25, viewName: Avatar25ViewName, itemIds: string[], mirrored = false): CompiledAvatar {
   const v = rig.views[viewName]
   const view = compileView(viewName, v)
   const motion = view.motion !== null
   const has = new Set(v.mesh.ranges.map((r) => r.name))
   const worn = itemIds.filter((id) => v.items[id])
-  const meshes = [v.mesh, ...worn.map((id) => v.items[id].mesh)]
+  const meshes = [v.mesh, ...worn.map((id) => itemMeshFor(v.items[id], mirrored))]
   // the seated cards are drawn as strips whose shins stretch, so her soles reach the floor at any height
   // (avatar25SeatedLegs); packed after every other vertex
   const band = seatedShinBandRows(v)
   const strips = meshes.map((mesh) => seatedCardStrips(mesh, band, v.bones.length, v.bones.length + 2))
   // only the pages this avatar draws are loaded: rig page → texture-array layer
-  const usedPages = [...new Set([0, ...worn.map((id) => v.items[id].page)])].sort((a, b) => a - b)
+  const cardPages = mirrored
+    ? worn.map((id) => v.items[id]).flatMap((item) => (hasMirrorCards(item) && item.mirrorPage !== undefined ? [item.mirrorPage] : []))
+    : []
+  const usedPages = [...new Set([0, ...worn.map((id) => v.items[id].page), ...cardPages])].sort((a, b) => a - b)
   const layerOfPage = new Map(usedPages.map((page, layer) => [page, layer]))
   const base: number[] = []
   const vertexTotal = meshes.reduce((n, m) => { base.push(n); return n + m.pos.length / 2 }, 0)

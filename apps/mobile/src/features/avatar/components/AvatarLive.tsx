@@ -123,6 +123,10 @@ export function AvatarLive(props: AvatarLiveProps) {
   const mirrored = spec.mirror !== Boolean(props.outerMirrored)
   const viewIndex = useSharedValue(spec.view === "back" ? 1 : 0)
   const mirror = useSharedValue(mirrored ? 1 : 0)
+  const outerMirror = useSharedValue(props.outerMirrored ? 1 : 0)
+  useEffect(() => {
+    outerMirror.value = props.outerMirrored ? 1 : 0
+  }, [outerMirror, props.outerMirrored])
   const walking = spec.pose === "walk"
   useEffect(() => {
     const sittingDown = spec.pose === "sit" && previousPose.current !== "sit" && bendsToSit
@@ -277,7 +281,7 @@ export function AvatarLive(props: AvatarLiveProps) {
         <Reanimated.View style={[styles.unclip, unclipStyle]}>
           {canvasMounted ? <Avatar25Canvas
             instances={instances}
-            driver={{ pose, walkCycles, walkWeight, waveStartMs, sitWeight, sitLegDropPx, breathWeight, view: viewIndex, mirror }}
+            driver={{ pose, walkCycles, walkWeight, waveStartMs, sitWeight, sitLegDropPx, breathWeight, view: viewIndex, mirror, outerMirror }}
             reduceMotion={reduceMotion}
             onReady={props.onDrawn}
           /> : null}

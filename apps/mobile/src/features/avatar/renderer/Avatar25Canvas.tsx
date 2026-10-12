@@ -16,7 +16,7 @@ import {
   type Avatar25GpuShared,
   type Avatar25GpuView
 } from "./avatar25Gpu"
-import { avatarVariant, writeAvatarClipTransform, writeAvatarPalette } from "./avatar25Pose"
+import { avatar25HasMirrorCards, avatarVariant, pickAvatar25View, writeAvatarClipTransform, writeAvatarPalette } from "./avatar25Pose"
 import type { AvatarRigId } from "../model/avatarRoomContract"
 import { getAvatar25Rig } from "./avatar25Assets"
 import { AVATAR25_ASTC_FEATURE, hasGpuFeature, shouldRequestAvatar25AstcFeature } from "./avatar25Astc"
@@ -45,6 +45,11 @@ export interface Avatar25Driver {
   /** Optional live facing for every instance: 0 front, 1 back; and 1 = mirrored. Switches without a rebuild. */
   view?: SharedValue<number>
   mirror?: SharedValue<number>
+  /**
+   * 1 when the renderer around this avatar flips it once more (`mirror` already compensates for that, so the drawing
+   * on screen is mirrored only when `mirror` and this differ); absent = 0. Picks the mirror-card drawing.
+   */
+  outerMirror?: SharedValue<number>
 }
 
 export interface Avatar25Instance {
@@ -144,8 +149,12 @@ interface GpuState {
   width: number
   height: number
   textureMB: number
-  /** Per instance: [front, back] GPU views, both resident so a turn never waits for a load. */
-  avatars: { views: Avatar25GpuView[]; instance: Avatar25Instance }[]
+  /**
+   * Per instance: [front, back] GPU views, both resident so a turn never waits for a load; `mirrorViews` holds the
+   * same two drawn for the mirrored directions, only where a worn item has mirror cards (else undefined: the plain
+   * view is flipped).
+   */
+  avatars: { views: Avatar25GpuView[]; mirrorViews: (Avatar25GpuView | undefined)[]; instance: Avatar25Instance }[]
 }
 
 /**
@@ -198,14 +207,19 @@ export function Avatar25Canvas(props: {
         sampleCount: AVATAR25_SAMPLE_COUNT,
         usage: GPUTextureUsage.RENDER_ATTACHMENT
       })
-      const avatars = await Promise.all(instances.map(async (instance) => ({
-        instance,
-        views: await Promise.all(VIEWS.map((view) => {
-          const rig = getAvatar25Rig(instance.rig)
-          return createAvatar25GpuView(shared, rig.rig, view, instance.itemIds, rig.readTextureBytes, rig.id, rig.astc)
-        }))
-      })))
-      built = { shared, views: avatars.flatMap((a) => a.views), msaa }
+      const avatars = await Promise.all(instances.map(async (instance) => {
+        const rig = getAvatar25Rig(instance.rig)
+        const create = (view: Avatar25ViewName, mirrored: boolean) =>
+          createAvatar25GpuView(shared, rig.rig, view, instance.itemIds, rig.readTextureBytes, rig.id, rig.astc, mirrored)
+        return {
+          instance,
+          views: await Promise.all(VIEWS.map((view) => create(view, false))),
+          // a second drawing only for the directions whose worn items carry mirror cards
+          mirrorViews: await Promise.all(VIEWS.map((view) =>
+            avatar25HasMirrorCards(rig.rig, view, instance.itemIds) ? create(view, true) : undefined))
+        }
+      }))
+      built = { shared, views: avatars.flatMap((a) => [...a.views, ...a.mirrorViews.filter((v): v is Avatar25GpuView => v !== undefined)]), msaa }
       if (cancelled) return
       const textureMB = (await getAvatar25TextureBytes(shared)) / 1e6
       if (cancelled) return
@@ -271,10 +285,12 @@ export function Avatar25Canvas(props: {
     const data = buffers.uniform
     let calls = 0
     for (let a = 0; a < gpu.avatars.length; a++) {
-      const { views, instance } = gpu.avatars[a]
+      const { views, mirrorViews, instance } = gpu.avatars[a]
       const viewIndex = driver.view ? driver.view.value : instance.view === "back" ? 1 : 0
       const mirror = driver.mirror ? driver.mirror.value === 1 : instance.mirror
-      const view = views[viewIndex] ?? views[0]
+      // the mirror cards are drawn for the mirror the viewer sees: the flip here, undone by a flip outside, shows none
+      const mirroredOnScreen = mirror !== (driver.outerMirror ? driver.outerMirror.value === 1 : false)
+      const view = pickAvatar25View(views, mirrorViews, viewIndex, mirroredOnScreen)
       const compiled = view.view
       const lifeSeed = instance.lifeSeed ?? a * 0.37
       const frame = writeAvatarPalette(compiled, {

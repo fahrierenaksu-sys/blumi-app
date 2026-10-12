@@ -41,6 +41,16 @@ export interface Rig25Item {
   /** Painted walk cards for this item (only meaningful when the body has painted walk frames). */
   hasWalk: boolean
   mesh: Rig25Mesh
+  /**
+   * Mirror cards (optional; export_rig.py writes them for parts with a pre-flipped drawing). The renderer mirrors
+   * the whole avatar for the two mirrored directions, which moves a one-sided marker (a hair clip) to her other
+   * side. `mirrorUv` is `mesh.uv` with the vertices of the marked parts pointing at their pre-flipped card; it has
+   * the same length as `mesh.uv`, and a vertex counts as marked when its pair differs from `mesh.uv`. Mesh,
+   * weights and draw order are shared. An item without it is drawn flipped, exactly as before.
+   */
+  mirrorUv?: number[]
+  /** The page holding the cards when they did not fit this item's `page`; absent = `page`. */
+  mirrorPage?: number
 }
 
 export interface Rig25WalkFrame {
