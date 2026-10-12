@@ -6,7 +6,8 @@ import {
 } from "../economy/economyRepository"
 import { createEconomyService } from "../economy/economyService"
 import { createCommerceService } from "./commerceService"
-import { TEST_AVATAR_PAID_ITEM_ID, TEST_ECONOMY_CATALOG } from "../economy/testRoomCatalog"
+import { TEST_AVATAR_ITEM_RULES } from "@blumi/domain"
+import { TEST_AVATAR_GIRL_BODY_ID, TEST_AVATAR_PAID_ITEM_ID, TEST_ECONOMY_CATALOG } from "../economy/testRoomCatalog"
 
 const CREATED_AT = new Date("2026-07-29T12:00:00.000Z")
 
@@ -80,7 +81,7 @@ test("a previously recorded transaction cannot be reassigned to another wallet",
 
 test("refund reversals consume unused coins first, then create debt without revoking cosmetics", async () => {
   const repository = createInMemoryEconomyRepository()
-  const economyService = createEconomyService({ catalog: TEST_ECONOMY_CATALOG, repository })
+  const economyService = createEconomyService({ catalog: TEST_ECONOMY_CATALOG, avatarRules: TEST_AVATAR_ITEM_RULES, repository })
   const commerceService = createCommerceService({ economyService })
 
   // A refund reverses a recorded purchase: credit it, then spend most of it.
@@ -110,7 +111,7 @@ test("refund reversals consume unused coins first, then create debt without revo
     economyService.purchaseItem("user_a", {
       type: "avatar",
       itemId: TEST_AVATAR_PAID_ITEM_ID,
-      avatarBodyId: "avatar_v2_body_default"
+      avatarBodyId: TEST_AVATAR_GIRL_BODY_ID
     }),
     /coin balance needs to be settled/i
   )

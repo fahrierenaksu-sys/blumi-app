@@ -9,6 +9,7 @@ import {
   pickAvatarSwatch,
   resolveAvatarStillLayers,
   resolveShowcaseLayers,
+  type AvatarItemRules,
   type AvatarStillManifest,
   type AvatarStillRect,
   type AvatarStillRigId
@@ -82,6 +83,8 @@ export function createAvatarPortraitRenderer(options: {
   art: { dir: string; files: ReadonlySet<string> } | null
   /** The baked-still manifest that names the layers of a look; the built one unless a test supplies another. */
   manifest?: AvatarStillManifest
+  /** The item facts a loadout is coerced with; the live catalog unless a test injects its fixture. */
+  avatarRules?: AvatarItemRules
   maxCacheBytes?: number
 }): AvatarPortraitRenderer {
   const { art } = options
@@ -131,10 +134,10 @@ export function createAvatarPortraitRenderer(options: {
       // Total: the loadout is coerced and unknown items draw as the body's starter pieces. A valid link never fails
       // for an art reason: the look (front figure, then 3/4 bust), then that body's starter the same way, then the
       // fixed bust of the body.
-      const { rig, plans: lookPlans } = portraitPlans(loadout, options.manifest)
+      const { rig, plans: lookPlans } = portraitPlans(loadout, options.manifest, options.avatarRules)
       const attempts: readonly (readonly [AvatarPortraitLevel, PortraitPlan])[] = [
         ...lookPlans.map((plan) => ["look", plan] as const),
-        ...portraitPlans(STARTER_LOADOUTS[rig], options.manifest).plans.map((plan) => ["starter", plan] as const)
+        ...portraitPlans(STARTER_LOADOUTS[rig], options.manifest, options.avatarRules).plans.map((plan) => ["starter", plan] as const)
       ]
       if (art) {
         for (const [level, plan] of attempts) {
@@ -158,23 +161,28 @@ export function createAvatarPortraitRenderer(options: {
  */
 function portraitPlans(
   loadout: unknown,
-  manifest: AvatarStillManifest | undefined
+  manifest: AvatarStillManifest | undefined,
+  rules: AvatarItemRules | undefined
 ): { readonly rig: AvatarStillRigId; readonly plans: readonly PortraitPlan[] } {
-  const bust = resolveAvatarStillLayers(loadout, "bust", { manifest })
+  const bust = resolveAvatarStillLayers(loadout, "bust", { manifest, rules })
   const bustPlan: PortraitPlan = {
     view: "bust",
     layers: bust.layers,
     space: bust.space,
     window: [0, 0, bust.space.width, bust.space.height]
   }
-  const front = resolveShowcaseLayers(loadout, "push", manifest)
+  const front = resolveShowcaseLayers(loadout, "push", manifest, {}, rules)
   if (front.kind === "fallback" || !isWindowInside(front.windows?.push, front.space)) return { rig: bust.rig, plans: [bustPlan] }
   return { rig: bust.rig, plans: [{ view: "showcase", layers: front.layers, space: front.space, window: front.windows.push }, bustPlan] }
 }
 
 /** Whether the manifest has front art for the whole of this look (so its push picture must be the front figure). */
-function hasFrontArt(loadout: unknown, manifest: AvatarStillManifest | undefined): boolean {
-  return resolveShowcaseLayers(loadout, "push", manifest).kind === "showcase"
+function hasFrontArt(
+  loadout: unknown,
+  manifest: AvatarStillManifest | undefined,
+  rules: AvatarItemRules | undefined
+): boolean {
+  return resolveShowcaseLayers(loadout, "push", manifest, {}, rules).kind === "showcase"
 }
 
 /** A crop window must be four finite numbers inside the canvas; a malformed front base falls back to the next source. */
@@ -258,7 +266,7 @@ export async function checkAvatarPortraitRenderer(
       if (result.level !== "look") throw Object.assign(new Error("Default portrait used a fallback."), { name: "FallbackPortrait" })
       // A default look the manifest has front art for must draw the front figure: a stale pack would otherwise send the
       // 3/4 bust while the app shows the front one, with /ready still green.
-      if (hasFrontArt(loadout, options.manifest) && result.view !== "showcase") {
+      if (hasFrontArt(loadout, options.manifest, undefined) && result.view !== "showcase") {
         throw Object.assign(new Error("Default portrait is not the front figure."), { name: "MissingFrontArt" })
       }
     }

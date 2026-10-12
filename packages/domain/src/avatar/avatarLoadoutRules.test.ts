@@ -14,6 +14,11 @@ import {
   type AvatarLoadoutCatalogItem
 } from "./avatarLoadoutCatalog"
 import {
+  TEST_AVATAR_ITEM as T,
+  TEST_AVATAR_ITEM_RULES as fixtureRules,
+  TEST_AVATAR_OWNED_BY_DEFAULT_IDS as fixtureOwnedIds
+} from "./avatarItemRulesFixture"
+import {
   cloneAvatarLoadout,
   createAvatarSelection,
   projectAvatarLoadoutV1,
@@ -24,6 +29,10 @@ import {
 const ownedDefaultIds = ECONOMY_CATALOG
   .filter((item) => item.type === "avatar" && item.ownedByDefault === true)
   .map((item) => item.itemId)
+// Plan X15: the live catalog has no dress, accessory or second piece per slot, so the rule tests below that need
+// them run on the injected test-only catalog (`avatarItemRulesFixture.ts`) with the same assertions.
+const fixtureGirl = fixtureRules.starters.female
+const fixtureBoy = fixtureRules.starters.male
 
 test("schema-specific loadout guards reject missing, unknown, and extra keys", () => {
   const v1 = DEFAULT_FEMALE_AVATAR_LOADOUT
@@ -116,56 +125,62 @@ test("V2 validation accepts explicit empty new slots and rejects unavailable ite
 })
 
 test("retired tops and unsupported outerwear cannot be equipped even when owned", () => {
-  const v2 = toAvatarLoadoutV2(DEFAULT_FEMALE_AVATAR_LOADOUT)
+  const v2 = toAvatarLoadoutV2(fixtureGirl, fixtureRules)
   assert.equal(
     validateAvatarLoadout(
-      { ...v2, topId: "avatar_v2_top_blush_lace_cardigan" },
-      [...ownedDefaultIds, "avatar_v2_top_blush_lace_cardigan"]
+      { ...v2, topId: T.retiredTop },
+      [...fixtureOwnedIds, T.retiredTop],
+      fixtureRules
     ).code,
     "retired_item"
   )
   assert.equal(
     validateAvatarLoadout(
-      { ...v2, outerwearId: "avatar_v2_top_sage_ribbon_knit_jacket" },
-      [...ownedDefaultIds, "avatar_v2_top_sage_ribbon_knit_jacket"]
+      { ...v2, outerwearId: T.girlTopPaid },
+      [...fixtureOwnedIds, T.girlTopPaid],
+      fixtureRules
     ).code,
     "unknown_item"
   )
 })
 
 test("V2 dressId uses the existing dress entitlement and keeps separates underneath", () => {
-  const dressId = "avatar_v2_top_boho_patchwork_maxi_dress"
-  const pairedBottomId = "avatar_v2_bottom_boho_patchwork_maxi_dress"
-  const v2 = toAvatarLoadoutV2(DEFAULT_FEMALE_AVATAR_LOADOUT)
+  const dressId = T.dressTop
+  const pairedBottomId = T.dressBottom
+  const v2 = toAvatarLoadoutV2(fixtureGirl, fixtureRules)
 
   assert.equal(
     validateAvatarLoadout(
       { ...v2, dressId },
-      [...ownedDefaultIds, dressId, pairedBottomId]
+      [...fixtureOwnedIds, dressId, pairedBottomId],
+      fixtureRules
     ).ok,
     true
   )
   assert.equal(
     validateAvatarLoadout(
       { ...v2, dressId },
-      [...ownedDefaultIds, dressId]
+      [...fixtureOwnedIds, dressId],
+      fixtureRules
     ).code,
     "unowned_item"
   )
   assert.equal(
     validateAvatarLoadout(
       { ...v2, topId: dressId },
-      [...ownedDefaultIds, dressId, pairedBottomId]
+      [...fixtureOwnedIds, dressId, pairedBottomId],
+      fixtureRules
     ).code,
     "outfit_pair_mismatch"
   )
   assert.equal(
     validateAvatarLoadout(
       {
-        ...toAvatarLoadoutV2(DEFAULT_MALE_AVATAR_LOADOUT),
+        ...toAvatarLoadoutV2(fixtureBoy, fixtureRules),
         dressId
       },
-      [...ownedDefaultIds, dressId, pairedBottomId]
+      [...fixtureOwnedIds, dressId, pairedBottomId],
+      fixtureRules
     ).code,
     "incompatible_item"
   )
@@ -265,96 +280,104 @@ test("loadout validation rejects items fitted for another body", () => {
 })
 
 test("loadout validation rejects malformed, unknown, wrong-slot, and unowned items", () => {
-  const missingShoes = { ...DEFAULT_FEMALE_AVATAR_LOADOUT }
+  const missingShoes = { ...fixtureGirl }
   delete (missingShoes as Partial<typeof missingShoes>).shoesId
-  assert.equal(validateAvatarLoadout(missingShoes, ownedDefaultIds).code, "invalid_shape")
+  assert.equal(validateAvatarLoadout(missingShoes, fixtureOwnedIds, fixtureRules).code, "invalid_shape")
 
   assert.equal(
     validateAvatarLoadout(
-      { ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: "missing_hair" },
-      ownedDefaultIds
+      { ...fixtureGirl, hairId: "missing_hair" },
+      fixtureOwnedIds,
+      fixtureRules
     ).code,
     "unknown_item"
   )
   assert.equal(
     validateAvatarLoadout(
       {
-        ...DEFAULT_FEMALE_AVATAR_LOADOUT,
-        topId: DEFAULT_FEMALE_AVATAR_LOADOUT.hairId
+        ...fixtureGirl,
+        topId: fixtureGirl.hairId
       },
-      ownedDefaultIds
+      fixtureOwnedIds,
+      fixtureRules
     ).code,
     "wrong_slot"
   )
   assert.equal(
     validateAvatarLoadout(
       {
-        ...DEFAULT_FEMALE_AVATAR_LOADOUT,
-        hairId: "avatar_v2_hair_golden_waves"
+        ...fixtureGirl,
+        hairId: T.girlHairPaid
       },
-      ownedDefaultIds
+      fixtureOwnedIds,
+      fixtureRules
     ).code,
     "unowned_item"
   )
 })
 
 test("accessories are unique, bounded, and limited to one per group", () => {
-  const duplicate = "avatar_v2_accessory_cherry_bow_headband"
+  const duplicate = T.paidHeadwear
   assert.equal(
     validateAvatarLoadout(
       {
-        ...DEFAULT_FEMALE_AVATAR_LOADOUT,
+        ...fixtureGirl,
         accessoryIds: [duplicate, duplicate]
       },
-      ownedDefaultIds
+      fixtureOwnedIds,
+      fixtureRules
     ).code,
     "duplicate_accessory"
   )
   assert.equal(
     validateAvatarLoadout(
       {
-        ...DEFAULT_FEMALE_AVATAR_LOADOUT,
+        ...fixtureGirl,
         accessoryIds: [
-          "avatar_v2_accessory_ivory_ribbon_beret",
-          "avatar_v2_accessory_cherry_bow_headband"
+          T.freeHeadwear,
+          T.paidHeadwear
         ]
       },
-      [...ownedDefaultIds, "avatar_v2_accessory_cherry_bow_headband"]
+      [...fixtureOwnedIds, T.paidHeadwear],
+      fixtureRules
     ).code,
     "accessory_group_conflict"
   )
   assert.equal(
     validateAvatarLoadout(
       {
-        ...DEFAULT_FEMALE_AVATAR_LOADOUT,
+        ...fixtureGirl,
         accessoryIds: Array(7).fill(duplicate)
       },
-      ownedDefaultIds
+      fixtureOwnedIds,
+      fixtureRules
     ).code,
     "too_many_accessories"
   )
 })
 
 test("dress tops require their exact paired hidden bottom", () => {
-  const dressTopId = "avatar_v2_top_boho_patchwork_maxi_dress"
-  const dressBottomId = "avatar_v2_bottom_boho_patchwork_maxi_dress"
-  const ownedIds = [...ownedDefaultIds, dressTopId, dressBottomId]
+  const dressTopId = T.dressTop
+  const dressBottomId = T.dressBottom
+  const ownedIds = [...fixtureOwnedIds, dressTopId, dressBottomId]
 
   assert.equal(
     validateAvatarLoadout(
-      { ...DEFAULT_FEMALE_AVATAR_LOADOUT, topId: dressTopId },
-      ownedIds
+      { ...fixtureGirl, topId: dressTopId },
+      ownedIds,
+      fixtureRules
     ).code,
     "outfit_pair_mismatch"
   )
   assert.equal(
     validateAvatarLoadout(
       {
-        ...DEFAULT_FEMALE_AVATAR_LOADOUT,
+        ...fixtureGirl,
         topId: dressTopId,
         bottomId: dressBottomId
       },
-      ownedIds
+      ownedIds,
+      fixtureRules
     ).ok,
     true
   )
@@ -372,4 +395,25 @@ test("every economy avatar entitlement and grant has loadout metadata", () => {
     assert.equal(manifestIds.has(itemId), true, itemId)
   }
   assert.equal(manifestIds.size, new Set(economyAvatarIds).size)
+})
+
+test("the test-only fixture catalog shares no item ID with the live catalogs and the rules default to the live one", () => {
+  const liveIds = new Set([
+    ...AVATAR_LOADOUT_CATALOG.map((item) => item.itemId),
+    ...ECONOMY_CATALOG.map((item) => item.itemId)
+  ])
+  // the bodies are the live bodies; every garment, face piece and accessory is a fixture
+  const liveBodies = [DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId, DEFAULT_MALE_AVATAR_LOADOUT.bodyId]
+  for (const item of fixtureRules.items) {
+    if (item.slot === "body") {
+      assert.ok(liveBodies.includes(item.itemId), item.itemId)
+      continue
+    }
+    assert.equal(liveIds.has(item.itemId), false, item.itemId)
+    assert.match(item.itemId, /^fixture_avatar_/)
+  }
+  // a fixture look is unknown to the default (live) rules: production never reads the fixture
+  assert.equal(validateAvatarLoadout(fixtureGirl, fixtureOwnedIds).code, "unknown_item")
+  assert.equal(validateAvatarLoadout(fixtureGirl, fixtureOwnedIds, fixtureRules).ok, true)
+  assert.equal(validateAvatarLoadout(fixtureBoy, fixtureOwnedIds, fixtureRules).ok, true)
 })

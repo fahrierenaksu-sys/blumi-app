@@ -437,24 +437,6 @@ export const DEFAULT_MALE_AVATAR_LOADOUT: ReadonlyAvatarLoadout<AvatarLoadoutV1>
   },
 );
 
-export function isAvatarLoadoutItemCompatibleWithBody(
-  itemId: string,
-  bodyId: string,
-): boolean {
-  const body = AVATAR_LOADOUT_CATALOG.find(
-    (item) =>
-      item.itemId === bodyId &&
-      item.slot === "body" &&
-      item.supportedBodyIds.includes(bodyId),
-  );
-  if (!body) return false;
-
-  const item = AVATAR_LOADOUT_CATALOG.find((entry) => entry.itemId === itemId);
-  if (!item) return false;
-  if (item.slot === "body") return item.itemId === bodyId;
-  return item.supportedBodyIds.includes(bodyId);
-}
-
 function freezeCatalog(
   catalog: AvatarLoadoutCatalogItem[],
 ): readonly AvatarLoadoutCatalogItem[] {
