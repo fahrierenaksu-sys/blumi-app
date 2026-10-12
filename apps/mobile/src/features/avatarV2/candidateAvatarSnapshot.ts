@@ -15,7 +15,10 @@ import {
   normalizeAvatarSelection,
   normalizeCompleteAvatarSelection
 } from "./avatarSelectionModel"
-import { projectAvatarV2ToRoomAvatarAppearance } from "./room/avatarRoomProjection"
+import {
+  projectAvatarV2ToRoomAvatarAppearance,
+  type ProjectAvatarV2ToRoomAvatarAppearanceInput
+} from "./room/avatarRoomProjection"
 
 export const MALE_AVATAR_PRESET_ID = "avatar_v2_body_male_light"
 
@@ -90,13 +93,21 @@ export function readCandidateAvatarSnapshot(
   })
 }
 
+/** Test seam: the catalog and room mapping a stored look is drawn from. The defaults are the live ones. */
+export type CandidateAvatarProjectionSource = Pick<
+  ProjectAvatarV2ToRoomAvatarAppearanceInput,
+  "avatarCatalog" | "projectionMap"
+>
+
 export function createCandidateAvatarAppearance(
-  snapshot: CandidateAvatarSnapshot
+  snapshot: CandidateAvatarSnapshot,
+  projectionSource: CandidateAvatarProjectionSource = {}
 ): RoomAvatarAppearance {
   const complete = normalizeCompleteAvatarSelection(snapshot.avatarSelection)
   if (complete) {
     return projectAvatarV2ToRoomAvatarAppearance({
-      avatar: loadoutToUserAvatar(complete.loadout)
+      avatar: loadoutToUserAvatar(complete.loadout),
+      ...projectionSource
     }).appearance
   }
   if (snapshot.bodyPreset === "male") {

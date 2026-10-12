@@ -21,9 +21,11 @@ const STARTER_CATEGORY_LIMITS: Readonly<
 }
 
 /** The starter pieces offered at avatar setup: exactly the body's starter look (plan X15). */
-const STARTER_ITEM_IDS: Readonly<
+export type AvatarStarterItemIds = Readonly<
   Record<string, Readonly<Record<StarterCategory, readonly string[]>>>
-> = {
+>
+
+const STARTER_ITEM_IDS: AvatarStarterItemIds = {
   [FEMALE_STARTER_BODY_ID]: starterItemIds(DEFAULT_FEMALE_AVATAR_LOADOUT),
   [MALE_STARTER_BODY_ID]: starterItemIds(DEFAULT_MALE_AVATAR_LOADOUT)
 }
@@ -43,9 +45,10 @@ export function getAvatarStarterCategoryItems(
   catalog: readonly AvatarCatalogItem[],
   type: StarterCategory,
   bodyId: string,
-  canEquipItem: (item: AvatarCatalogItem) => boolean
+  canEquipItem: (item: AvatarCatalogItem) => boolean,
+  starterItemIds: AvatarStarterItemIds = STARTER_ITEM_IDS
 ): AvatarCatalogItem[] {
-  const configuredIds = STARTER_ITEM_IDS[bodyId]?.[type]
+  const configuredIds = starterItemIds[bodyId]?.[type]
   if (configuredIds) {
     const itemsById = new Map(catalog.map((item) => [item.id, item]))
     const configuredItems = configuredIds.flatMap((id) => {

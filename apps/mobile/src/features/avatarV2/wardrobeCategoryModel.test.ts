@@ -50,9 +50,34 @@ test("wardrobe exposes both starter body bases after onboarding", () => {
   )
 })
 
+// Plan X15 retired every old dress and accessory, so the tab tests add one fixture dress (a top with an outfit key)
+// and one fixture accessory, both wearable on the girl, to the live catalog.
+const STUDIO_FIXTURE_CATALOG = [
+  ...AVATAR_V2_CATALOG,
+  {
+    id: "fixture_studio_dress_top",
+    type: "top",
+    name: "Fixture dress top",
+    sortOrder: 9001,
+    layerOrder: 10,
+    assets: {},
+    outfitKey: "fixture_studio_dress",
+    compatibleBodyIds: [DEFAULT_AVATAR_V2.bodyId]
+  },
+  {
+    id: "fixture_studio_accessory",
+    type: "accessory",
+    name: "Fixture accessory",
+    sortOrder: 9002,
+    layerOrder: 20,
+    assets: {},
+    compatibleBodyIds: [DEFAULT_AVATAR_V2.bodyId]
+  }
+] as typeof AVATAR_V2_CATALOG
+
 test("each Studio section shows four tabs and hair lives only under My Character", () => {
-  const closet = getAvatarStudioTabs("closet", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
-  const appearance = getAvatarStudioTabs("appearance", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
+  const closet = getAvatarStudioTabs("closet", STUDIO_FIXTURE_CATALOG, DEFAULT_AVATAR_V2)
+  const appearance = getAvatarStudioTabs("appearance", STUDIO_FIXTURE_CATALOG, DEFAULT_AVATAR_V2)
   assert.deepEqual(closet.map((tab) => tab.id), ["top", "bottom", "shoes", "accessory"])
   assert.deepEqual(appearance.map((tab) => tab.id), ["hair", "face", "eyes", "nose"])
   assert.equal(closet.some((tab) => tab.categories.includes("hair")), false)
@@ -65,7 +90,7 @@ test("each Studio section shows four tabs and hair lives only under My Character
 })
 
 test("a tab is found from any of its categories and the active category stays valid", () => {
-  const tabs = getAvatarStudioTabs("closet", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2)
+  const tabs = getAvatarStudioTabs("closet", STUDIO_FIXTURE_CATALOG, DEFAULT_AVATAR_V2)
   assert.equal(findAvatarStudioTab(tabs, "dress")?.id, "top")
   assert.equal(findAvatarStudioTab(tabs, "hair"), undefined)
   assert.equal(resolveAvatarStudioCategory(tabs, "dress"), "dress")
@@ -111,7 +136,7 @@ test("switching body refits every incompatible starter slot as one loadout", () 
     eyesId: "avatar_v2_eyes_male_warm_brown",
     noseId: "avatar_v2_nose_male_gentle_bridge",
     mouthId: "avatar_v2_mouth_male_soft_smile",
-    hairId: "avatar_v2_hair_male_cocoa_textured_quiff",
+    hairId: "avatar_v2_hair_male_soft_black_side_part",
     topId: "avatar_v2_top_male_powder_blue_crew_tee",
     bottomId: "avatar_v2_bottom_male_navy_straight_pants",
     shoesId: "avatar_v2_shoes_male_milk_tea_court",

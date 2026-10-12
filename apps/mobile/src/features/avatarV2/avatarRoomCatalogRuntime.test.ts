@@ -479,8 +479,27 @@ test("female trouser occlusion is driven by the shared promotion contract", () =
   assert.deepEqual(actualOverShoeIds, [...FEMALE_PANTS_OVER_SHOE_UPPER_IDS].sort())
 })
 
+// Plan X15 retired the old cream tee and sage shorts, so the "kept" layers are fixture copies of them under fixture
+// IDs that map to the same room art. The retired hair stays a real retired item.
+const keptMaleLayers = ([
+  ["avatar_v2_top_male_cream_basic_tee", "fixture_kept_male_top"],
+  ["avatar_v2_bottom_male_sage_cuffed_shorts", "fixture_kept_male_bottom"]
+] as const).map(([realId, fixtureId]) => {
+  const item = AVATAR_V2_CATALOG.find((entry) => entry.id === realId)
+  assert.ok(item, realId)
+  return {
+    catalogItem: { ...item, id: fixtureId, hiddenFromShop: false, hiddenFromWardrobe: false },
+    mapping: [fixtureId, DEFAULT_AVATAR_ROOM_PROJECTION_MAP[realId]] as const
+  }
+})
+
 test("a persisted cream and sage male loadout falls back from retired hair and keeps other layers", () => {
   const { appearance, unmappedItemIds } = projectAvatarV2ToRoomAvatarAppearance({
+    avatarCatalog: [...AVATAR_V2_CATALOG, ...keptMaleLayers.map((layer) => layer.catalogItem)],
+    projectionMap: {
+      ...DEFAULT_AVATAR_ROOM_PROJECTION_MAP,
+      ...Object.fromEntries(keptMaleLayers.map((layer) => layer.mapping))
+    },
     avatar: {
       bodyId: "avatar_v2_body_male_light",
       faceId: "avatar_v2_face_male_warm_friendly",
@@ -488,8 +507,8 @@ test("a persisted cream and sage male loadout falls back from retired hair and k
       noseId: "avatar_v2_nose_male_gentle_bridge",
       mouthId: "avatar_v2_mouth_male_soft_smile",
       hairId: "avatar_v2_hair_male_espresso_crop",
-      topId: "avatar_v2_top_male_cream_basic_tee",
-      bottomId: "avatar_v2_bottom_male_sage_cuffed_shorts",
+      topId: "fixture_kept_male_top",
+      bottomId: "fixture_kept_male_bottom",
       shoesId: "avatar_v2_shoes_male_milk_tea_court",
       accessoryIds: []
     }
@@ -499,7 +518,7 @@ test("a persisted cream and sage male loadout falls back from retired hair and k
   assert.equal(appearance.baseId, DEFAULT_ROOM_AVATAR_MALE.baseId)
   assert.equal(appearance.faceId, DEFAULT_ROOM_AVATAR_MALE.faceId)
   assert.equal(appearance.hairBackId, undefined)
-  assert.equal(appearance.hairFrontId, DEFAULT_ROOM_AVATAR_MALE.hairFrontId)
+  assert.equal(appearance.hairFrontId, "room_avatar_hair_front_male_soft_black_side_part_v1", "the boy starter hair (X15)")
   assert.equal(appearance.eyesId, undefined)
   assert.equal(appearance.noseId, undefined)
   assert.equal(appearance.mouthId, undefined)
