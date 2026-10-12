@@ -12,6 +12,7 @@ import { createChatService } from "./chat/chatService"
 import { createInMemoryConnectionRepository } from "./connections/connectionRepository"
 import type { ConnectionService } from "./connections/connectionService"
 import { createEconomyService } from "./economy/economyService"
+import { TEST_AVATAR_PAID_ITEM_ID, TEST_ECONOMY_CATALOG } from "./economy/testRoomCatalog"
 import { createNotificationService } from "./notifications/notificationService"
 import {
   createInMemoryMatchRepository,
@@ -1959,7 +1960,7 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     store: createBlumiBackendStore(),
     codeFactory: () => "482931"
   })
-  const economyService = createEconomyService()
+  const economyService = createEconomyService({ catalog: TEST_ECONOMY_CATALOG })
   const app = createServer({ authService, economyService })
 
   const unauthenticated = await app.inject({
@@ -2024,7 +2025,7 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     },
     payload: {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
+      itemId: TEST_AVATAR_PAID_ITEM_ID,
       priceCoins: 1
     }
   })
@@ -2040,7 +2041,7 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     },
     payload: {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket"
+      itemId: TEST_AVATAR_PAID_ITEM_ID
     }
   })
   assert.equal(repeat.statusCode, 400)
@@ -2064,7 +2065,7 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     },
     payload: {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
+      itemId: TEST_AVATAR_PAID_ITEM_ID,
       avatarBodyId: "avatar_v2_body_default"
     }
   })

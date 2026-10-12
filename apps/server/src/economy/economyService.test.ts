@@ -4,8 +4,14 @@ import {
   createInMemoryEconomyRepository,
   createDefaultEconomyInventory
 } from "./economyRepository"
+import { DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT, isRetiredAvatarItemId } from "@blumi/domain"
 import { createEconomyService } from "./economyService"
 import {
+  TEST_AVATAR_OUTFIT_GRANTED_ITEM_ID,
+  TEST_AVATAR_PAID_ITEM_ID,
+  TEST_AVATAR_PAID_ITEM_PRICE,
+  TEST_ECONOMY_CATALOG as avatarCatalog,
+  TEST_OUTFIT_ECONOMY_CATALOG as outfitCatalog,
   TEST_ROOM_ECONOMY_CATALOG as catalog,
   TEST_ROOM_PAID_ITEM_ID,
   TEST_ROOM_PAID_ITEM_PRICE,
@@ -105,34 +111,34 @@ test("economy creates a starter inventory once per user", async () => {
 })
 
 test("an active mobile shop garment can be purchased at the server price", async () => {
-  const service = createEconomyService()
+  const service = createEconomyService({ catalog: avatarCatalog })
 
   const result = await service.purchaseItem(
     "user_a",
     {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
+      itemId: TEST_AVATAR_PAID_ITEM_ID,
       avatarBodyId: "avatar_v2_body_default"
     },
     new Date("2026-06-26T12:00:00.000Z")
   )
 
-  assert.equal(result.priceCoins, 410)
+  assert.equal(result.priceCoins, TEST_AVATAR_PAID_ITEM_PRICE)
   assert.equal(result.inventory.coins, 840)
   assert.ok(
     result.inventory.ownedAvatarItemIds.includes(
-      "avatar_v2_top_sage_ribbon_knit_jacket"
+      TEST_AVATAR_PAID_ITEM_ID
     )
   )
 })
 
 test("avatar purchases reject wearables that do not fit the active body", async () => {
-  const service = createEconomyService()
+  const service = createEconomyService({ catalog: avatarCatalog })
 
   await assert.rejects(
     () => service.purchaseItem("male_user", {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
+      itemId: TEST_AVATAR_PAID_ITEM_ID,
       avatarBodyId: "avatar_v2_body_male_light"
     }),
     /does not fit your avatar/i
@@ -167,32 +173,24 @@ test("existing inventories gain current free starter items and legacy replacemen
       "avatar_v2_top_powder_blue_ribbon_corset_top"
     )
   )
-  assert.ok(inventory.ownedAvatarItemIds.includes("avatar_v2_body_male_light"))
-  assert.ok(inventory.ownedAvatarItemIds.includes("avatar_v2_face_warm_peach_foundation"))
-  assert.ok(inventory.ownedAvatarItemIds.includes("avatar_v2_eyes_sage_glass"))
-  assert.ok(inventory.ownedAvatarItemIds.includes("avatar_v2_nose_petal_curve"))
-  assert.ok(inventory.ownedAvatarItemIds.includes("avatar_v2_mouth_rose_gloss_smile"))
-  assert.ok(
-    inventory.ownedAvatarItemIds.includes(
-      "avatar_v2_top_male_powder_blue_crew_tee"
-    )
-  )
-  assert.ok(
-    inventory.ownedAvatarItemIds.includes(
-      "avatar_v2_bottom_male_navy_straight_pants"
-    )
-  )
+  // the 2.5D starters of both bodies are granted (plan X15); the old free defaults are retired and not granted
+  for (const starter of [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT]) {
+    for (const id of [starter.bodyId, starter.faceId, starter.hairId, starter.topId, starter.bottomId, starter.shoesId]) {
+      assert.ok(inventory.ownedAvatarItemIds.includes(id), id)
+    }
+  }
+  assert.equal(inventory.ownedAvatarItemIds.includes("avatar_v2_face_warm_peach_foundation"), false)
   // the retired old bed stays in the row but is read past; the current free starter is granted
   assert.deepEqual(inventory.ownedRoomItemIds, [TEST_ROOM_STARTER_ITEM_ID])
   assert.ok((await repository.getInventory("returning_user"))?.ownedRoomItemIds.includes("room_v2_cozy_bed"))
 })
 
 test("purchasing a dress grants its hidden paired bottom", async () => {
-  const service = createEconomyService()
+  const service = createEconomyService({ catalog: outfitCatalog })
 
   const result = await service.purchaseItem("dress_user", {
     type: "avatar",
-    itemId: "avatar_v2_top_boho_patchwork_maxi_dress",
+    itemId: TEST_AVATAR_PAID_ITEM_ID,
     avatarBodyId: "avatar_v2_body_default"
   })
 
@@ -205,18 +203,18 @@ test("purchasing a dress grants its hidden paired bottom", async () => {
 
 test("two service instances cannot both purchase the same item", async () => {
   const repository = createInMemoryEconomyRepository()
-  const firstService = createEconomyService({ repository })
-  const secondService = createEconomyService({ repository })
+  const firstService = createEconomyService({ catalog: avatarCatalog, repository })
+  const secondService = createEconomyService({ catalog: avatarCatalog, repository })
 
   const attempts = await Promise.allSettled([
     firstService.purchaseItem("shared_user", {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
+      itemId: TEST_AVATAR_PAID_ITEM_ID,
       avatarBodyId: "avatar_v2_body_default"
     }),
     secondService.purchaseItem("shared_user", {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
+      itemId: TEST_AVATAR_PAID_ITEM_ID,
       avatarBodyId: "avatar_v2_body_default"
     })
   ])
@@ -233,7 +231,7 @@ test("two service instances cannot both purchase the same item", async () => {
   assert.equal(inventory.coins, 840)
   assert.equal(
     inventory.ownedAvatarItemIds.filter(
-      (itemId) => itemId === "avatar_v2_top_sage_ribbon_knit_jacket"
+      (itemId) => itemId === TEST_AVATAR_PAID_ITEM_ID
     ).length,
     1
   )
@@ -293,9 +291,11 @@ test("unpromoted Universal Core room products are unavailable to direct server p
 
 test("invalid, already owned, and unaffordable purchases are rejected", async () => {
   const repository = createInMemoryEconomyRepository()
-  const service = createEconomyService({ repository })
+  const service = createEconomyService({ catalog: avatarCatalog, repository })
+  const starter = createDefaultEconomyInventory("user_a")
   await repository.saveInventory({
-    ...createDefaultEconomyInventory("user_a"),
+    ...starter,
+    ownedAvatarItemIds: starter.ownedAvatarItemIds.filter((itemId) => itemId !== TEST_AVATAR_PAID_ITEM_ID),
     coins: 100
   })
 
@@ -320,7 +320,7 @@ test("invalid, already owned, and unaffordable purchases are rejected", async ()
     () =>
       service.purchaseItem("user_a", {
         type: "avatar",
-        itemId: "avatar_v2_top_default",
+        itemId: "avatar_v2_face_default",
         avatarBodyId: "avatar_v2_body_default"
       }),
     /already own/
@@ -329,7 +329,7 @@ test("invalid, already owned, and unaffordable purchases are rejected", async ()
     () =>
       service.purchaseItem("user_a", {
         type: "avatar",
-        itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
+        itemId: TEST_AVATAR_PAID_ITEM_ID,
         avatarBodyId: "avatar_v2_body_default"
       }),
     /Not enough coins/
@@ -499,4 +499,48 @@ test("retired room ids are refused for purchase and left out of the inventory re
     (await repository.getInventory("legacy_user"))?.ownedRoomItemIds,
     ["room_v2_table_round", "room_v2_cozy_bed", TEST_ROOM_STARTER_ITEM_ID]
   )
+})
+
+test("a returning account keeps every retired item it owns, gains the 2.5D starters and cannot buy a retired item again", async () => {
+  const repository = createInMemoryEconomyRepository()
+  const ownedRetired = ["avatar_v2_hair_mocha_ribbon_blowout", TEST_AVATAR_PAID_ITEM_ID, "avatar_v2_shoes_male_cloud_white_trainers"]
+  for (const id of ownedRetired) assert.equal(isRetiredAvatarItemId(id), true, id)
+  await repository.saveInventory({
+    userId: "old_wardrobe_user",
+    coins: 300,
+    coinDebt: 0,
+    ownedAvatarItemIds: [...ownedRetired],
+    ownedRoomItemIds: [TEST_ROOM_STARTER_ITEM_ID],
+    updatedAt: "2026-06-01T00:00:00.000Z"
+  })
+  const service = createEconomyService({ catalog, repository })
+
+  const inventory = await service.getInventory("old_wardrobe_user", new Date("2026-10-12T10:00:00.000Z"))
+  const stored = await repository.getInventory("old_wardrobe_user")
+
+  for (const id of ownedRetired) {
+    assert.ok(inventory.ownedAvatarItemIds.includes(id), `${id} left the inventory read`)
+    assert.ok(stored?.ownedAvatarItemIds.includes(id), `${id} left the stored row`)
+  }
+  for (const id of [DEFAULT_FEMALE_AVATAR_LOADOUT.hairId, DEFAULT_FEMALE_AVATAR_LOADOUT.topId, DEFAULT_FEMALE_AVATAR_LOADOUT.bottomId]) {
+    assert.ok(inventory.ownedAvatarItemIds.includes(id), id)
+  }
+  assert.equal(inventory.coins, 300)
+  await assert.rejects(
+    service.purchaseItem("old_wardrobe_user", { itemId: "avatar_v2_top_lilac_cloud_wrap_top", type: "avatar", avatarBodyId: "avatar_v2_body_default" }),
+    /not available/
+  )
+  assert.equal((await repository.getInventory("old_wardrobe_user"))?.coins, 300)
+})
+
+test("a new account owns exactly the active avatar starters and no retired item", async () => {
+  const service = createEconomyService({ catalog, repository: createInMemoryEconomyRepository() })
+  const inventory = await service.getInventory("brand_new_user", new Date("2026-10-12T10:00:00.000Z"))
+  for (const starter of [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT]) {
+    for (const id of [starter.bodyId, starter.faceId, starter.eyesId, starter.noseId, starter.mouthId,
+      starter.hairId, starter.topId, starter.bottomId, starter.shoesId]) {
+      assert.ok(inventory.ownedAvatarItemIds.includes(id), id)
+    }
+  }
+  for (const id of inventory.ownedAvatarItemIds) assert.equal(isRetiredAvatarItemId(id), false, `${id} is retired`)
 })
