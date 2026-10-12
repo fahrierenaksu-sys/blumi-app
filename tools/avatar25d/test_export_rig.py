@@ -327,5 +327,92 @@ class BlinkGateTest(unittest.TestCase):
                 self.assertTrue(any(c[key] for c in cases if c['outfit'] == 'dressed'), broken)
 
 
+def data_uri(image):
+    import io, base64
+    buf = io.BytesIO()
+    image.save(buf, 'PNG')
+    return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+
+
+@unittest.skipUnless(A4.exists(), 'lab40 rig not on this machine')
+class ExportMirrorCardsTest(unittest.TestCase):
+    """Mirror cards: a part with `pngMirror` gets its card in free page space and the item a `mirrorUv`; nothing else moves."""
+
+    def test_a_card_is_packed_beside_its_part_and_everything_else_is_unchanged(self):
+        import io, base64
+        from PIL import Image, ImageOps
+        lab = json.loads(A4.read_text())
+        iid = 'hair_ink_pageboy_star'
+        for view in ('front', 'back'):
+            part = lab[view]['items'][iid]['parts'][0]
+            card = ImageOps.mirror(Image.open(io.BytesIO(base64.b64decode(part['png'].split(',', 1)[1]))).convert('RGBA'))
+            part['pngMirror'] = data_uri(card)
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b, tempfile.TemporaryDirectory() as tmp:
+            withCards = pathlib.Path(tmp) / 'cards.json'
+            withCards.write_text(json.dumps(lab))
+            self.assertEqual(export_full_resolution(A4, a).returncode, 0)
+            self.assertEqual(export_full_resolution(withCards, b).returncode, 0)
+            base = json.loads((pathlib.Path(a) / 'rig25.json').read_text())
+            cards = json.loads((pathlib.Path(b) / 'rig25.json').read_text())
+            for view in ('front', 'back'):
+                old, new = base['views'][view], cards['views'][view]
+                for other, item in old['items'].items():
+                    self.assertNotIn('mirrorUv', item)
+                    self.assertNotIn('mirrorPage', item)
+                    if other != iid:
+                        self.assertEqual(new['items'][other], item, other)   # untouched items: identical entries
+                item, oldItem = new['items'][iid], old['items'][iid]
+                self.assertEqual({k: v for k, v in item.items() if k != 'mirrorUv'}, oldItem)   # same mesh, weights, page
+                uv = item['mirrorUv']
+                self.assertEqual(len(uv), len(item['mesh']['uv']))
+                self.assertNotEqual(uv, item['mesh']['uv'])
+                # the page texels under the card's uv are the card, and the drawing under the old uv is untouched
+                page = Image.open(pathlib.Path(b) / new['pages'][item['page']]).convert('RGBA')
+                oldPage = Image.open(pathlib.Path(a) / old['pages'][oldItem['page']]).convert('RGBA')
+                self.assertEqual(page.size, oldPage.size)
+                W, H = page.size
+                part = lab[view]['items'][iid]['parts'][0]
+                cardImage = Image.open(io.BytesIO(base64.b64decode(part['pngMirror'].split(',', 1)[1]))).convert('RGBA')
+                rect = next(r for r in item['mesh']['ranges'] if r['name'] == 'part0')
+                vertices = sorted(set(item['mesh']['index'][rect['start']:rect['start'] + rect['count']]))
+                ux = [uv[i * 2] - item['mesh']['uv'][i * 2] for i in vertices]
+                uy = [uv[i * 2 + 1] - item['mesh']['uv'][i * 2 + 1] for i in vertices]
+                self.assertTrue(max(ux) - min(ux) < 1e-5 and max(uy) - min(uy) < 1e-5)   # one rigid shift: same layout
+                dx, dy = round(ux[0] * W), round(uy[0] * H)
+                # only the marked part moves: the sit and wave quads keep their uv
+                others = set(range(len(uv) // 2)) - set(vertices)
+                self.assertTrue(others and all(uv[i * 2:i * 2 + 2] == item['mesh']['uv'][i * 2:i * 2 + 2] for i in others))
+                xs = [item['mesh']['uv'][i * 2] * W for i in vertices]
+                ys = [item['mesh']['uv'][i * 2 + 1] * H for i in vertices]
+                x0, y0 = round(min(xs)), round(min(ys))
+                self.assertEqual(page.crop((x0 + dx, y0 + dy, x0 + dx + cardImage.width, y0 + dy + cardImage.height)).tobytes(), cardImage.tobytes())
+                self.assertEqual(page.crop((x0, y0, x0 + cardImage.width, y0 + cardImage.height)).tobytes(),
+                                 oldPage.crop((x0, y0, x0 + cardImage.width, y0 + cardImage.height)).tobytes())
+                self.assertNotIn('mirrorPage', item)   # it fits in the item's own page
+
+    def test_cards_that_do_not_fit_the_page_go_to_one_new_page_and_a_wrong_size_is_refused(self):
+        from PIL import Image
+        ex = load_exporter()
+        img = Image.new('RGBA', (200, 100), (200, 30, 30, 255))
+        it = {'parts': [{'layer': 'head', 'png': data_uri(img), 'pngMirror': data_uri(img)}]}
+        mesh = {'uv': [0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.0, 0.5], 'index': [0, 1, 2, 0, 2, 3],
+                'ranges': [{'name': 'part0', 'start': 0, 'count': 6}]}
+        # the page is full: the only part fills it, so the card needs a page of its own
+        pages = [Image.new('RGBA', (256, 128), (0, 0, 0, 0))]
+        pages[0].paste(img, (ex.PAD, ex.PAD))
+        taken = {0: [(ex.PAD, ex.PAD, 200, 100)]}
+        out = ex.pack_mirror_cards('x', it, {'part0': (ex.PAD, ex.PAD, 200, 100)}, mesh, 0, pages, taken)
+        self.assertEqual(out['mirrorPage'], 1)
+        self.assertEqual(len(pages), 2)
+        self.assertEqual(len(out['mirrorUv']), len(mesh['uv']))
+        # an item without cards is left alone (no fields, no page)
+        plain = {'parts': [{'layer': 'head', 'png': data_uri(img)}]}
+        self.assertIsNone(ex.pack_mirror_cards('y', plain, {'part0': (ex.PAD, ex.PAD, 200, 100)}, mesh, 0, pages, taken))
+        self.assertEqual(len(pages), 2)
+        bad = {'parts': [{'layer': 'head', 'png': data_uri(img), 'pngMirror': data_uri(img.crop((0, 0, 100, 100)))}]}
+        with self.assertRaises(SystemExit):
+            ex.pack_mirror_cards('z', bad, {'part0': (ex.PAD, ex.PAD, 200, 100)}, mesh, 0, pages, taken)
+
+
 if __name__ == '__main__':
     unittest.main()

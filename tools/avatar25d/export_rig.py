@@ -16,6 +16,12 @@ A view's `breath` (life/NATIVE_PLAN.md) is passed through unchanged. A view's `b
 byte-identically), and the view carries `blink` = the eye rect in page-0 px (`rect`; `pad` = how far around it the
 frames also hold the head, so the runtime may redirect that much more), each frame's px offset from it and the timing.
 
+A worn item part with `pngMirror` (same size as its `png`; a drawing already flipped for the mirrored directions, so the
+marker sits on the right side AFTER the renderer's whole-avatar flip) gets that card packed into FREE space of the
+item's page (else one extra page): the item then carries `mirrorUv` (same length as its mesh `uv`; only the vertices of
+parts with a card differ) and, only when the cards overflowed, `mirrorPage`. Mesh, weights and ids are unchanged; an
+item without `pngMirror` exports exactly as before.
+
 --motion (or a `motion` already inside a rig view): the retargeted 3D walk (lab40, rig25d/walk3d/v3/a4). Each view
 with one carries it as `motion` (per key pose: hips offset, near-leg-in-front flag, turn + stretch per bone in the
 view's bone order) and drops its painted walk cards (body and items): the standing drawing walks instead.
@@ -425,6 +431,64 @@ def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pag
     return out
 
 
+def pack_mirror_cards(iid, it, ir, mesh, page, pages, page_taken, blink_layer=None, holds_blink_patch=False):
+    """Mirror cards (see the docstring): returns {'mirrorUv': [...], 'mirrorPage': n?} for an item whose parts carry
+    `pngMirror`, else None. Each card is pasted at the same phase modulo BLINK_ALIGN as its part (so both resample
+    alike), in free space of the item's page, else together on one new page appended to `pages`."""
+    cards = [(k, decode(p['pngMirror'])) for k, p in enumerate(it.get('parts', [])) if p.get('pngMirror')]
+    if not cards:
+        return None
+    for k, card in cards:
+        part = it['parts'][k]
+        if card.size != decode(part['png']).size:
+            raise SystemExit(f"mirror: {iid} part{k} card is {card.size}, its drawing is {decode(part['png']).size}")
+        if holds_blink_patch and part['layer'] == blink_layer:
+            raise SystemExit(f'mirror: {iid} part{k} is the blink layer and the item holds an eye patch; cut the patch from the card first')
+    page_size = pages[page].size
+
+    def place(taken):
+        spots, taken = [], list(taken)
+        if target != page:
+            # on a new page a card must not land on its drawing's own position: the runtime tells cards apart by uv
+            taken += [(ir[f'part{k}'][0], ir[f'part{k}'][1], 1, 1) for k, _ in cards]
+        for k, card in cards:
+            r = ir[f'part{k}']
+            spot = free_spot(card.size, taken, page_size, (r[0] % BLINK_ALIGN, r[1] % BLINK_ALIGN), BLINK_ALIGN)
+            if spot is None:
+                return None
+            taken.append((spot[0], spot[1], card.width, card.height))
+            spots.append(spot)
+        return spots
+
+    target = page
+    spots = place(page_taken[page])
+    if spots is None:
+        target = len(pages)
+        pages.append(Image.new('RGBA', page_size, (0, 0, 0, 0)))
+        page_taken[target] = []
+        spots = place([])
+        if spots is None:
+            raise SystemExit(f'mirror: the cards of {iid} do not fit one page')
+    uv = list(mesh['uv'])
+    ranges = {r['name']: r for r in mesh['ranges']}
+    for (k, card), spot in zip(cards, spots):
+        box = (spot[0], spot[1], spot[0] + card.width, spot[1] + card.height)
+        if pages[target].crop(box).getbbox() is not None:
+            raise SystemExit(f'mirror: the spot for the {iid} part{k} card is not empty')
+        pages[target].paste(card, spot)
+        page_taken[target].append((spot[0], spot[1], card.width, card.height))
+        r, rng = ir[f'part{k}'], ranges[f'part{k}']
+        du, dv = (spot[0] - r[0]) / page_size[0], (spot[1] - r[1]) / page_size[1]
+        for vtx in sorted(set(mesh['index'][rng['start']:rng['start'] + rng['count']])):
+            uv[vtx * 2], uv[vtx * 2 + 1] = round(mesh['uv'][vtx * 2] + du, 6), round(mesh['uv'][vtx * 2 + 1] + dv, 6)
+            if target != page and (uv[vtx * 2], uv[vtx * 2 + 1]) == (mesh['uv'][vtx * 2], mesh['uv'][vtx * 2 + 1]):
+                raise SystemExit(f'mirror: {iid} part{k} card sits at its own drawing\'s uv on another page (the runtime tells the cards apart by uv)')
+    out = {'mirrorUv': uv}
+    if target != page:
+        out['mirrorPage'] = target
+    return out
+
+
 def restore_blink_item_hair(stored, scale, keeps):
     """The page is resized as a whole (LANCZOS spreads a cleared pixel ~3 stored px), so a patch's hair would drift
     a few levels next to the cut. Give every stored patch texel that no cut source px falls in the item's own stored
@@ -592,6 +656,15 @@ def export_view(name, v, motion=None):
             blink_keeps.setdefault(pt['_keep'][0], []).append(pt.pop('_keep')[1:])
         if patches:
             blink['items'] = patches
+
+    # mirror cards: after the blink patches, so they take only space that is still free
+    blink_layer = v['blink'].get('layer') if blink is not None else None
+    patched = {pt['item'] for pt in blink.get('items', [])} if blink is not None else set()
+    for iid, it in sorted(v.get('items', {}).items()):
+        mirror = pack_mirror_cards(iid, it, item_rects[iid], items[iid]['mesh'], items[iid]['page'], pages, page_taken,
+                                   blink_layer, iid in patched)
+        if mirror:
+            items[iid].update(mirror)
 
     page_names = []
     for k, pg in enumerate(pages):
