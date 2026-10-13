@@ -131,6 +131,9 @@ function mount(options: MountOptions = {}) {
           SUPPORTED_MOBILE_CAPABILITIES: []
         },
         "../roomV2/personalRoomDecorApi": { savePersonalRoomDecorReplacingCurrent: async () => ({ kind: "saved" }) },
+        "../roomV2/roomStarterModel": {
+          saveOnboardingRoomKeepingSignupAlive: (room: unknown, save: (decor: unknown) => Promise<unknown>) => save(room)
+        },
         "./sessionApi": {
           ...sessionApi,
           fetchProductionAccountSnapshot: async (_url: string, _token: string, _fetch: unknown, signal: AbortSignal) => {

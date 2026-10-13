@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { saveOnboardingRoomKeepingSignupAlive } from "../roomV2/roomStarterModel"
 import { AppState } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import type {
@@ -34,6 +33,7 @@ import type { UserRoomDecor } from "../roomV2/roomV2.types"
 import {
   savePersonalRoomDecorReplacingCurrent
 } from "../roomV2/personalRoomDecorApi"
+import { saveOnboardingRoomKeepingSignupAlive } from "../roomV2/roomStarterModel"
 import {
   completeProductionOnboardingStep,
   acknowledgeAccountModeration,
