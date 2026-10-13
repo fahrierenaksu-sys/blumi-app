@@ -474,6 +474,13 @@ class LegVariantOwnersTest(unittest.TestCase):
         self.assertEqual(owners, {'pants': [('bottom', 'bottom'), ('bottom+shoes', 'bottom+shoes')],
                                   'sneakers': [('shoes', 'shoes')]})
 
+    def test_a_slot_key_belongs_to_the_one_item_of_that_slot_without_its_own_key(self):
+        # the girl: her starter pants keep the QA'd slot drawings; the black trousers bring a drawing keyed by their id
+        items = {'pants': {'slot': 'bottom'}, 'trousers': {'slot': 'bottom'}, 'sneakers': {'slot': 'shoes'}}
+        owners = self.ex.leg_variant_owners(dict.fromkeys(['bottom', 'bottom+shoes', 'shoes', 'trousers'], {}), items)
+        self.assertEqual(owners, {'pants': [('bottom', 'bottom'), ('bottom+shoes', 'bottom+shoes')],
+                                  'sneakers': [('shoes', 'shoes')], 'trousers': [('trousers', 'bottom')]})
+
     def test_bad_keys_stop_the_export(self):
         for key in ('top_a', 'nobody', 'bottom_a+bottom_b', 'bottom_a+shoes_a+shoes_b', 'bottom'):
             with self.assertRaises(SystemExit, msg=key):

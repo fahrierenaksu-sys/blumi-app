@@ -659,13 +659,15 @@ def replacement_range(body, partner):
     return f'{body}@with:{partner}' if partner else f'{body}@body'
 
 
-def _leg_part(part, items, slot_item):
-    """One part of a legVariants key -> (owner item id, role). A part is a slot name (one item per slot, the girl's
-    rig) or a rig item id (the factory's keys, one per worn item)."""
+def _leg_part(part, items, slot_item, keyed=frozenset()):
+    """One part of a legVariants key -> (owner item id, role). A part is a slot name (the girl's rig) or a rig item id
+    (the factory's keys, one per worn item). A slot name is the lab's fallback (doll25.js: the item-id key first, then
+    the slot key), so it belongs to the one item of that slot without a drawing keyed by its own id (`keyed`)."""
     if part in LEG_ROLES:
-        owners = slot_item.get(part, [])
+        owners = [o for o in slot_item.get(part, []) if o not in keyed]
         if len(owners) != 1:
-            raise SystemExit(f'leg variant {part}: {len(owners)} items in that slot (a slot key needs exactly one)')
+            raise SystemExit(f'leg variant {part}: {len(owners)} items in that slot without their own key '
+                             '(a slot key needs exactly one)')
         return owners[0], part
     if part not in items:
         raise SystemExit(f'leg variant {part}: not a slot and not an item of this view')
@@ -688,11 +690,12 @@ def leg_variant_owners(leg_variants, items):
     for iid, it in sorted(items.items()):
         slot_item.setdefault(it['slot'], []).append(iid)
     owners, seen = {}, set()
+    keyed = frozenset(p for key in leg_variants for p in key.split('+') if p not in LEG_ROLES)
     for key in leg_variants:
         parts = key.split('+')
         if len(parts) > 2:
             raise SystemExit(f'leg variant {key}: more than two parts')
-        resolved = [_leg_part(p, items, slot_item) for p in parts]
+        resolved = [_leg_part(p, items, slot_item, keyed) for p in parts]
         if len(parts) == 2 and sorted(r for _, r in resolved) != ['bottom', 'shoes']:
             raise SystemExit(f'leg variant {key}: a pair is one bottom and one pair of shoes')
         if len(parts) == 2 and not all(p in LEG_ROLES for p in parts):
