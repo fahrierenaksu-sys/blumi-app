@@ -9,14 +9,15 @@ import {
   TEST_ROOM_ECONOMY_CATALOG as catalog,
   TEST_ROOM_PAID_ITEM_ID,
   TEST_ROOM_PAID_ITEM_PRICE,
-  TEST_ROOM_STARTER_ITEM_ID
+  TEST_ROOM_STARTER_ITEM_ID,
+  TEST_ROOM_DEFAULT_OWNED_IDS
 } from "./testRoomCatalog"
 
 test("complete inventory reads stay authoritative without reconciliation writes", async () => {
   const backing = createInMemoryEconomyRepository()
   const original = {
     ...createDefaultEconomyInventory("complete_user"),
-    ownedRoomItemIds: [TEST_ROOM_STARTER_ITEM_ID]
+    ownedRoomItemIds: [...TEST_ROOM_DEFAULT_OWNED_IDS]
   }
   await backing.saveInventory(original)
   let reads = 0
@@ -62,7 +63,7 @@ test("missing starter ownership is repaired once without replacing balances", as
   const repaired = await service.getInventory(inventory.userId)
   assert.equal(repaired.coins, 700)
   assert.equal(repaired.coinDebt, 25)
-  assert.deepEqual(repaired.ownedRoomItemIds, [TEST_ROOM_STARTER_ITEM_ID])
+  assert.deepEqual(repaired.ownedRoomItemIds, [...TEST_ROOM_DEFAULT_OWNED_IDS])
   assert.deepEqual(await service.getInventory(inventory.userId), repaired)
   assert.equal(repairs, 1)
 })
@@ -101,7 +102,7 @@ test("economy creates a starter inventory once per user", async () => {
       "avatar_v2_shoes_milk_tea_court_sneakers"
     )
   )
-  assert.deepEqual(first.ownedRoomItemIds, [TEST_ROOM_STARTER_ITEM_ID])
+  assert.deepEqual(first.ownedRoomItemIds, [...TEST_ROOM_DEFAULT_OWNED_IDS])
 })
 
 test("an active mobile shop garment can be purchased at the server price", async () => {
@@ -183,7 +184,7 @@ test("existing inventories gain current free starter items and legacy replacemen
     )
   )
   // the retired old bed stays in the row but is read past; the current free starter is granted
-  assert.deepEqual(inventory.ownedRoomItemIds, [TEST_ROOM_STARTER_ITEM_ID])
+  assert.deepEqual(inventory.ownedRoomItemIds, [...TEST_ROOM_DEFAULT_OWNED_IDS])
   assert.ok((await repository.getInventory("returning_user"))?.ownedRoomItemIds.includes("room_v2_cozy_bed"))
 })
 
@@ -454,13 +455,12 @@ test("room reward keys accept only anchored, non-future UTC dates", async () => 
   )
 })
 
-test("held pricing-pending furniture, the reserved starter bed and legacy ids cannot be bought", async () => {
+test("held pricing-pending furniture, the free starter bed and legacy ids cannot be bought", async () => {
   const service = createEconomyService()
   for (const itemId of [
     "room_v3_sofa_japon_cream",
     "room_v3_armchair_japon_cream",
     "room_v2_chair_blush",
-    "room_v3_bed_blumi_starter",
     "universal_bench_a"
   ]) {
     await assert.rejects(
@@ -469,9 +469,11 @@ test("held pricing-pending furniture, the reserved starter bed and legacy ids ca
       itemId
     )
   }
+  // the starter bed is every account's own already (F9): there is nothing to buy
+  await assert.rejects(() => service.purchaseItem("held_user", { type: "room", itemId: "room_v3_bed_blumi_starter" }))
   const inventory = await service.getInventory("held_user")
   assert.equal(inventory.coins, 1250)
-  assert.equal(inventory.ownedRoomItemIds.some((id) => id.startsWith("room_v3_")), false)
+  assert.deepEqual(inventory.ownedRoomItemIds.filter((id) => id.startsWith("room_v3_")), ["room_v3_bed_blumi_starter"])
 })
 
 test("retired room ids are refused for purchase and left out of the inventory read without a row write", async () => {
@@ -481,7 +483,7 @@ test("retired room ids are refused for purchase and left out of the inventory re
     coins: 900,
     coinDebt: 0,
     ownedAvatarItemIds: [],
-    ownedRoomItemIds: ["room_v2_table_round", "room_v2_cozy_bed", TEST_ROOM_STARTER_ITEM_ID],
+    ownedRoomItemIds: ["room_v2_table_round", "room_v2_cozy_bed", ...TEST_ROOM_DEFAULT_OWNED_IDS],
     updatedAt: "2026-07-01T00:00:00.000Z"
   })
   const service = createEconomyService({ catalog, repository })
@@ -493,10 +495,10 @@ test("retired room ids are refused for purchase and left out of the inventory re
     )
   }
   const inventory = await service.getInventory("legacy_user")
-  assert.deepEqual(inventory.ownedRoomItemIds, [TEST_ROOM_STARTER_ITEM_ID])
+  assert.deepEqual(inventory.ownedRoomItemIds, [...TEST_ROOM_DEFAULT_OWNED_IDS])
   assert.equal(inventory.coins, 900)
   assert.deepEqual(
     (await repository.getInventory("legacy_user"))?.ownedRoomItemIds,
-    ["room_v2_table_round", "room_v2_cozy_bed", TEST_ROOM_STARTER_ITEM_ID]
+    ["room_v2_table_round", "room_v2_cozy_bed", ...TEST_ROOM_DEFAULT_OWNED_IDS]
   )
 })

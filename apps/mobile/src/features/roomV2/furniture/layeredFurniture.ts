@@ -32,6 +32,7 @@ import rawJaponSofa from "./room_v3_sofa_japon_cream/item.json"
 import rawTeasetJaponZaisu from "./room_v3_teaset_japon_zaisu/item.json"
 import rawTvunitJaponRattan from "./room_v3_tvunit_japon_rattan/item.json"
 import rawBedOyunGingham from "./room_v3_bed_oyun_gingham/item.json"
+import rawBedBlumiStarter from "./room_v3_bed_blumi_starter/item.json"
 import rawBookshelfOyunCream from "./room_v3_bookshelf_oyun_cream/item.json"
 import rawDresserOyunHoney from "./room_v3_dresser_oyun_honey/item.json"
 import rawNightstandOyunHoney from "./room_v3_nightstand_oyun_honey/item.json"
@@ -149,6 +150,8 @@ export const LAYERED_FURNITURE_SPECS: Readonly<Record<string, LayeredFurnitureSp
   room_v3_teaset_japon_zaisu: parseLayeredFurnitureSpec(rawTeasetJaponZaisu),
   room_v3_tvunit_japon_rattan: parseLayeredFurnitureSpec(rawTvunitJaponRattan),
   room_v3_bed_oyun_gingham: parseLayeredFurnitureSpec(rawBedOyunGingham),
+  // the free starter bed (plan F9), Workbench furniture/work/bed_starter_a; its lying poses are pending like the others
+  room_v3_bed_blumi_starter: parseLayeredFurnitureSpec(rawBedBlumiStarter),
   room_v3_bookshelf_oyun_cream: parseLayeredFurnitureSpec(rawBookshelfOyunCream),
   room_v3_dresser_oyun_honey: parseLayeredFurnitureSpec(rawDresserOyunHoney),
   room_v3_nightstand_oyun_honey: parseLayeredFurnitureSpec(rawNightstandOyunHoney),

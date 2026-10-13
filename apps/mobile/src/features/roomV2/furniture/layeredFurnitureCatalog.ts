@@ -29,6 +29,8 @@ interface LayeredCatalogEntry {
 
 /** The floor pieces, in the order the inventory lists them. */
 export const ROOM_AVATAR_25D_LAYERED_FLOOR_ENTRIES: readonly LayeredCatalogEntry[] = Object.freeze([
+  // the free starter bed every account owns (plan F9); the default room and the room setup step place it
+  { id: "room_v3_bed_blumi_starter", name: "Blumi Starter Bed", category: "seating" },
   { id: ROOM_AVATAR_25D_SOFA_ID, name: "Japon Cream Sofa", category: "seating" },
   // the old blush chair keeps its canonical id; since X8 it is drawn only from its layered art
   { id: "room_v2_chair_blush", name: "Blush Lounge Chair", category: "seating" },

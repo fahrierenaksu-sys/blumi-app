@@ -3,8 +3,8 @@ import type { RoomFurnitureRotation, UserRoomDecor } from "./roomV2.types"
 import type { RoomSetupCopy } from "./roomSetupCopy"
 
 /**
- * The one free starter bed (a new canonical id, reserved in the domain catalog). The default room holds only this bed.
- * Its art lands later; until then no room catalog entry draws it and the default room is the empty shell.
+ * The one free starter bed (canonical id, owned by every account, plan F9). The default room holds only this bed; the
+ * room setup step places it (art: Workbench furniture/work/bed_starter_a, design A).
  */
 export const STARTER_ROOM_BED_ITEM_ID = "room_v3_bed_blumi_starter"
 export const STARTER_ROOM_BED_DEFAULT_POINT: RoomWorldPoint = Object.freeze({
@@ -102,4 +102,26 @@ export function canCompleteRoomSetup(input: {
 }): boolean {
   if (input.decor.roomShellId !== input.defaultRoomShellId) return false
   return input.starterBedAvailable ? hasPlacedStarterBed(input.decor) && input.placedBedIsValid : true
+}
+
+/**
+ * Saves the onboarding room. A server that does not know the starter bed yet (the API before the 2.5D release) refuses
+ * the whole room; then the empty default room is saved instead, so creating the account never gets stuck on the bed.
+ * Any other failure, or a failure of the empty room too, surfaces the first error.
+ */
+export async function saveOnboardingRoomKeepingSignupAlive<Result>(
+  room: UserRoomDecor,
+  save: (decor: UserRoomDecor) => Promise<Result>
+): Promise<Result> {
+  try {
+    return await save(room)
+  } catch (error) {
+    const withoutBed = room.placedItems.filter((item) => item.itemId !== STARTER_ROOM_BED_ITEM_ID)
+    if (withoutBed.length === room.placedItems.length) throw error
+    try {
+      return await save({ ...room, placedItems: withoutBed.map((item) => ({ ...item })) })
+    } catch {
+      throw error
+    }
+  }
 }

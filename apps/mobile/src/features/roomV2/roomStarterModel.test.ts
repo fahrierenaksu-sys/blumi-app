@@ -8,7 +8,8 @@ import {
   hasPlacedStarterBed,
   placeStarterBed,
   resolveRoomSetupSummary,
-  rotateStarterBed
+  rotateStarterBed,
+  saveOnboardingRoomKeepingSignupAlive
 } from "./roomStarterModel"
 import { getRoomSetupCopy } from "./roomSetupCopy"
 
@@ -131,4 +132,37 @@ test("room setup promises no gift bed while the starter bed is not available", (
     const placed = resolveRoomSetupSummary({ starterBedAvailable: true, starterRoomReady: true, copy })
     assert.deepEqual(placed, { text: copy.bedPlacedSummary, showGiftBadge: true })
   }
+})
+
+test("an older server that refuses the starter bed still lets the account finish with the empty room", async () => {
+  const room = placeStarterBed(createStarterRoomDecor("room-shell"), STARTER_ROOM_BED_DEFAULT_POINT)
+  const saved: number[] = []
+  const result = await saveOnboardingRoomKeepingSignupAlive(room, async (decor) => {
+    saved.push(decor.placedItems.length)
+    if (decor.placedItems.some((item) => item.itemId === STARTER_ROOM_BED_ITEM_ID)) {
+      throw new Error("Your room includes an item you do not own.")
+    }
+    return "saved"
+  })
+  assert.equal(result, "saved")
+  assert.deepEqual(saved, [1, 0])
+  assert.equal(room.placedItems.length, 1, "the caller's room is not changed")
+})
+
+test("the onboarding room save keeps the bed when the server accepts it, and reports other failures", async () => {
+  const room = placeStarterBed(createStarterRoomDecor("room-shell"), STARTER_ROOM_BED_DEFAULT_POINT)
+  const sent: number[] = []
+  await saveOnboardingRoomKeepingSignupAlive(room, async (decor) => { sent.push(decor.placedItems.length) })
+  assert.deepEqual(sent, [1])
+
+  await assert.rejects(
+    saveOnboardingRoomKeepingSignupAlive(createStarterRoomDecor("room-shell"), async () => {
+      throw new Error("offline")
+    }),
+    /offline/
+  )
+  await assert.rejects(
+    saveOnboardingRoomKeepingSignupAlive(room, async () => { throw new Error("first") }),
+    /first/
+  )
 })

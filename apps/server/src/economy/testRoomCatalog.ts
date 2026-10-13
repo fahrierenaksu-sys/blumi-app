@@ -14,3 +14,8 @@ export const TEST_ROOM_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = Object.f
   { itemId: TEST_ROOM_STARTER_ITEM_ID, type: "room", title: "Test Starter Bed", priceCoins: 0, ownedByDefault: true },
   { itemId: TEST_ROOM_PAID_ITEM_ID, type: "room", title: "Test Side Table", priceCoins: TEST_ROOM_PAID_ITEM_PRICE }
 ])
+
+/** Every room id the test catalog gives each account by default, in catalog order (the stand-in and the real starter bed). */
+export const TEST_ROOM_DEFAULT_OWNED_IDS: readonly string[] = Object.freeze(
+  TEST_ROOM_ECONOMY_CATALOG.filter((item) => item.type === "room" && item.ownedByDefault === true).map((item) => item.itemId)
+)

@@ -6,8 +6,8 @@ import {
   type EconomyCatalogItem
 } from "@blumi/domain"
 
-/** Room ids that are reserved without art: never granted, even to QA. */
-const QA_ROOM_GRANT_EXCLUDED_IDS = new Set(["room_v3_bed_blumi_starter"])
+/** Room ids that are reserved without art: never granted, even to QA (none since the starter bed got its art, F9). */
+const QA_ROOM_GRANT_EXCLUDED_IDS = new Set<string>()
 
 /**
  * Simulator QA on the memory server needs to sit on furniture that is still held for pricing. With

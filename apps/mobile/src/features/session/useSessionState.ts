@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { saveOnboardingRoomKeepingSignupAlive } from "../roomV2/roomStarterModel"
 import { AppState } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import type {
@@ -676,10 +677,12 @@ export function useSessionState(): UseSessionStateResult {
             completedActor = replaceSessionActorAvatar(activeActor, result.selection)
           },
           saveRoom: async (actor, room) => {
-            const result = await savePersonalRoomDecorReplacingCurrent(
-              MOBILE_HTTP_BASE_URL,
-              actor.session.sessionToken,
-              room
+            const result = await saveOnboardingRoomKeepingSignupAlive(room, (decor) =>
+              savePersonalRoomDecorReplacingCurrent(
+                MOBILE_HTTP_BASE_URL,
+                actor.session.sessionToken,
+                decor
+              )
             )
             if (result.kind === "conflict") {
               throw new Error("Your room already has newer changes. Sign in to continue safely.")

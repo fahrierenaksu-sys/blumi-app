@@ -1,4 +1,9 @@
-import { PRICING_PENDING_PLACEHOLDER_COINS, ROOM_V3_FURNITURE } from "./roomFurnitureIds"
+import {
+  PRICING_PENDING_PLACEHOLDER_COINS,
+  ROOM_V3_FURNITURE,
+  STARTER_ROOM_BED_ID,
+  STARTER_ROOM_BED_TITLE
+} from "./roomFurnitureIds"
 
 export type EconomyItemType = "avatar" | "room"
 
@@ -386,6 +391,8 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
 
   // the old flat pieces are retired (legacy registry); the chair keeps its id with layered art, held until §12
   roomItem("room_v2_chair_blush", "Blush Lounge Chair", 0),
+  // the free starter bed (F9): owned by every account, so the default room and room setup may place it
+  roomItem(STARTER_ROOM_BED_ID, STARTER_ROOM_BED_TITLE, 0, true),
   // the 2.5D furniture: held in the release catalog's `pricing-pending` scope until the economy proposal (§12)
   ...ROOM_V3_FURNITURE.map(({ itemId, title }) => roomItem(itemId, title, PRICING_PENDING_PLACEHOLDER_COINS))
 ]

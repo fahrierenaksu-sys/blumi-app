@@ -34,12 +34,15 @@ export const ROOM_V3_FURNITURE: readonly { readonly itemId: string; readonly tit
   { itemId: "room_v3_poster_oyun_controller", title: "Oyun Controller Poster" }
 ])
 
+/** The free starter bed (F9): every account owns it, the default room holds only it; never sold, never held. */
+export const STARTER_ROOM_BED_ID = "room_v3_bed_blumi_starter"
+export const STARTER_ROOM_BED_TITLE = "Blumi Starter Bed"
+
 /**
  * Ids reserved for items whose art is not in the app yet: no economy entry, nobody owns them, every request for
- * them is refused as unknown. `room_v3_bed_blumi_starter` is the free starter bed (F9); it becomes `ownedByDefault`
- * in the commit that adds its art.
+ * them is refused as unknown. Empty since the starter bed's art landed (it became `ownedByDefault` then, F9).
  */
-export const RESERVED_ROOM_ITEM_IDS: readonly string[] = Object.freeze(["room_v3_bed_blumi_starter"])
+export const RESERVED_ROOM_ITEM_IDS: readonly string[] = Object.freeze([])
 
 /** Placeholder price of a held piece until the economy proposal (plan §12) sets it; never sold while held. */
 export const PRICING_PENDING_PLACEHOLDER_COINS = 0

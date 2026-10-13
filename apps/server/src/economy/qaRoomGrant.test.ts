@@ -23,7 +23,8 @@ test("on a local memory server the grant owns and places held furniture but neve
   const inventory = await service.getInventory("qa_user")
   assert.ok(inventory.ownedRoomItemIds.includes("room_v3_sofa_japon_cream"))
   assert.ok(inventory.ownedRoomItemIds.includes("room_v2_chair_blush"))
-  assert.equal(inventory.ownedRoomItemIds.includes("room_v3_bed_blumi_starter"), false)
+  // the free starter bed is owned by every account anyway (F9)
+  assert.ok(inventory.ownedRoomItemIds.includes("room_v3_bed_blumi_starter"))
   assert.equal(inventory.ownedRoomItemIds.some((id) => id === "room_v2_cozy_bed"), false)
   assert.equal(service.isActiveRoomItemId?.("room_v3_sofa_japon_cream"), true)
   await assert.rejects(

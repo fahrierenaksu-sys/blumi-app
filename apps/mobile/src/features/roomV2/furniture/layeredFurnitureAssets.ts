@@ -16,6 +16,7 @@ import type { LayeredWallAssets } from "./layeredWallFurniture"
 const art = (itemId: string, key: string, source: number) => ({ key: `${itemId}_layered_${key}`, source })
 const chair = (key: string, source: number) => art("room_v2_chair_blush", key, source)
 const sofa = (key: string, source: number) => art("room_v3_sofa_japon_cream", key, source)
+const starterBed = (key: string, source: number) => art("room_v3_bed_blumi_starter", key, source)
 
 export const LAYERED_FURNITURE_ASSETS: LayeredFurnitureAssets = {
   room_v2_chair_blush: {
@@ -60,6 +61,29 @@ export const LAYERED_FURNITURE_ASSETS: LayeredFurnitureAssets = {
       back: sofa("r3_back", require("./room_v3_sofa_japon_cream/r3_back.png")),
       front: sofa("r3_front", require("./room_v3_sofa_japon_cream/r3_front.png")),
       shadow: sofa("r3_shadow", require("./room_v3_sofa_japon_cream/r3_shadow.png"))
+    }
+  },
+  // the free starter bed (plan F9): Workbench furniture/work/bed_starter_a (design A), world scale D, sprite scale 2.0,
+  // transparent colour zeroed; rotation 0 has no front pixels, so it bundles none
+  room_v3_bed_blumi_starter: {
+    0: {
+      back: starterBed("r0_back", require("./room_v3_bed_blumi_starter/r0_back.png")),
+      shadow: starterBed("r0_shadow", require("./room_v3_bed_blumi_starter/r0_shadow.png"))
+    },
+    1: {
+      back: starterBed("r1_back", require("./room_v3_bed_blumi_starter/r1_back.png")),
+      front: starterBed("r1_front", require("./room_v3_bed_blumi_starter/r1_front.png")),
+      shadow: starterBed("r1_shadow", require("./room_v3_bed_blumi_starter/r1_shadow.png"))
+    },
+    2: {
+      back: starterBed("r2_back", require("./room_v3_bed_blumi_starter/r2_back.png")),
+      front: starterBed("r2_front", require("./room_v3_bed_blumi_starter/r2_front.png")),
+      shadow: starterBed("r2_shadow", require("./room_v3_bed_blumi_starter/r2_shadow.png"))
+    },
+    3: {
+      back: starterBed("r3_back", require("./room_v3_bed_blumi_starter/r3_back.png")),
+      front: starterBed("r3_front", require("./room_v3_bed_blumi_starter/r3_front.png")),
+      shadow: starterBed("r3_shadow", require("./room_v3_bed_blumi_starter/r3_shadow.png"))
     }
   },
   ...JAPON_LAYERED_FURNITURE_ASSETS,

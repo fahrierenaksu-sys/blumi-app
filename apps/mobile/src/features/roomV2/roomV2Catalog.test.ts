@@ -227,3 +227,36 @@ test("the held-piece tray override is the local QA guard's decision and changes 
   // Node tests, like release bundles, run without a dev build: the shipped tray stays filtered.
   assert.equal(ROOM_EDITOR_TRAY_CATALOG.some((item) => isReleaseCatalogItemHeld(item.id)), false)
 })
+
+test("the free starter bed is drawable and fits the default room at its default spot in every rotation", async () => {
+  // Arrange
+  const { ROOM_V2_FURNITURE_CATALOG, ROOM_V2_SHELL_CATALOG, DEFAULT_ROOM_V2_SHELL_ID } = await import("./roomV2Catalog")
+  const { resolvePlacedFurnitureRenderItem, resolveRoomV2Scene, validateRoomV2FurniturePlacement } =
+    await import("./roomV2Selectors")
+  const { createStarterRoomDecor, placeStarterBed, STARTER_ROOM_BED_DEFAULT_POINT, STARTER_ROOM_BED_ITEM_ID } =
+    await import("./roomStarterModel")
+  const { ECONOMY_CATALOG } = await import("@blumi/domain")
+  const bed = ROOM_V2_FURNITURE_CATALOG.find((item) => item.id === STARTER_ROOM_BED_ITEM_ID)
+  const emptyScene = resolveRoomV2Scene({
+    roomShellCatalog: ROOM_V2_SHELL_CATALOG,
+    furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
+    decor: createStarterRoomDecor(DEFAULT_ROOM_V2_SHELL_ID),
+    defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
+  })
+
+  // Assert: in the room catalog, owned by every account on the server, never sold
+  assert.ok(bed, "the starter bed must be in the room catalog")
+  const economy = ECONOMY_CATALOG.find((item) => item.itemId === STARTER_ROOM_BED_ITEM_ID)
+  assert.equal(economy?.ownedByDefault, true)
+  assert.equal(economy?.priceCoins, 0)
+  for (const rotation of ["front", "right", "back", "left"] as const) {
+    const placed = placeStarterBed(createStarterRoomDecor(DEFAULT_ROOM_V2_SHELL_ID), STARTER_ROOM_BED_DEFAULT_POINT, rotation)
+    const candidate = resolvePlacedFurnitureRenderItem(placed.placedItems[0]!, bed)
+    assert.ok(candidate, `the bed draws in rotation ${rotation}`)
+    assert.equal(
+      validateRoomV2FurniturePlacement({ scene: emptyScene, candidate }).isValid,
+      true,
+      `the default spot is valid in rotation ${rotation}`
+    )
+  }
+})
