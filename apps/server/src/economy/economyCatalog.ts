@@ -1,6 +1,7 @@
 import {
   ECONOMY_CATALOG as DOMAIN_ECONOMY_CATALOG,
   STARTER_COIN_BALANCE,
+  getDefaultOwnedItemIds as getDomainDefaultOwnedItemIds,
   getLegacyAvatarReplacementIds,
   resolveR1PublishedEconomyCatalog,
   resolveUnheldEconomyCatalog,
@@ -41,7 +42,5 @@ export function getDefaultOwnedItemIds(
   type: EconomyItemType,
   catalog: readonly EconomyCatalogItem[] = ECONOMY_CATALOG
 ): string[] {
-  return catalog
-    .filter((item) => item.type === type && item.ownedByDefault === true)
-    .map((item) => item.itemId)
+  return getDomainDefaultOwnedItemIds(type, catalog)
 }

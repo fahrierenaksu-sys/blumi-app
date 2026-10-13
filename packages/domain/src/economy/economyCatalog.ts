@@ -5,6 +5,7 @@ import {
   STARTER_ROOM_BED_TITLE
 } from "./roomFurnitureIds"
 import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "../avatar/boyWardrobePreview"
+import { isRetiredAvatarItemId } from "../avatar/retiredAvatarItems"
 
 export type EconomyItemType = "avatar" | "room"
 
@@ -228,7 +229,7 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   ),
   avatarItem("avatar_v2_hair_chestnut_butterfly_bob", "Chestnut Butterfly Bob", 440),
   avatarItem("avatar_v2_hair_golden_waves", "Golden Waves", 450),
-  avatarItem("avatar_v2_hair_ink_pageboy_star", "Ink Pageboy Star", 460),
+  avatarItem("avatar_v2_hair_ink_pageboy_star", "Ink Pageboy Star", 0, true),
   avatarItem("avatar_v2_hair_ink_twin_braids", "Ink Twin Braids", 470),
   avatarItem("avatar_v2_hair_pale_golden_bow_bob", "Pale Golden Bow Bob", 480),
   avatarItem("avatar_v2_hair_copper_bow_waves", "Copper Bow Waves", 490),
@@ -376,7 +377,7 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   ),
 
   avatarItem("avatar_v2_top_rosebud_picnic_peplum", "Rosebud Picnic Peplum", 80),
-  avatarItem("avatar_v2_top_coral_wave_polo", "Coral Wave Polo", 80),
+  avatarItem("avatar_v2_top_coral_wave_polo", "Coral Wave Polo", 0, true),
   avatarItem("avatar_v2_top_lilac_cloud_wrap_top", "Lilac Cloud Wrap Top", 75),
   avatarItem("avatar_v2_top_buttercream_bow_tee", "Buttercream Bow Tee", 0, true),
   avatarItem("avatar_v2_top_azure_garden_halter", "Azure Garden Halter", 85),
@@ -385,7 +386,7 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   avatarItem("avatar_v2_top_midnight_velvet_bolero", "Midnight Velvet Bolero", 140),
   avatarItem("avatar_v2_bottom_midnight_ribbon_wide_leg_pants", "Midnight Ribbon Wide-Leg Pants", 460),
   avatarItem("avatar_v2_bottom_buttercream_pearl_tailored_pants", "Buttercream Pearl Tailored Pants", 440),
-  avatarItem("avatar_v2_bottom_coral_wave_pants", "Coral Wave Pants", 440),
+  avatarItem("avatar_v2_bottom_coral_wave_pants", "Coral Wave Pants", 0, true),
   avatarItem("avatar_v2_bottom_rose_picnic_pleated_shorts", "Rose Picnic Pleated Shorts", 360),
   avatarItem("avatar_v2_bottom_lavender_bow_twill_shorts", "Lavender Bow Twill Shorts", 0, true),
   avatarItem("avatar_v2_shoes_rose_satin_bow_heels", "Rose Satin Bow Heels", 520),
@@ -428,12 +429,17 @@ export function findEconomyCatalogItem(
   )
 }
 
+/**
+ * What every account is granted. A retired avatar item is no longer granted (rows that already hold it are
+ * kept and read past), so a new account owns exactly the active starters.
+ */
 export function getDefaultOwnedItemIds(
   type: EconomyItemType,
   catalog: readonly EconomyCatalogItem[] = ECONOMY_CATALOG
 ): string[] {
   return catalog
     .filter((item) => item.type === type && item.ownedByDefault === true)
+    .filter((item) => item.type !== "avatar" || !isRetiredAvatarItemId(item.itemId))
     .map((item) => item.itemId)
 }
 

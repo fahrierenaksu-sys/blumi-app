@@ -5,6 +5,7 @@ import { join } from "node:path"
 import test from "node:test"
 import { computeAvatarArtPackHash } from "../avatar/avatarPortrait"
 import { createServer } from "../server"
+import { readDeployedCommit } from "./deployedCommit"
 
 test("liveness stays healthy while failed DB readiness and new work return unavailable", async () => {
   let accepting = true
@@ -59,4 +60,27 @@ test("art-pack hash follows the avatar art and ignores everything else", async (
     write({ "avatar/x.webp": "h2", "rooms/a.webp": "r1" })
     assert.notEqual(computeAvatarArtPackHash(dir), first)
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("health reports the deployed commit as a short SHA, or null when the deploy does not say", async () => {
+  const withCommit = createServer({ logger: false, deployedCommit: "0123456789ab" })
+  const withoutCommit = createServer({ logger: false, deployedCommit: null })
+  try {
+    assert.equal((await withCommit.inject("/health")).json().commit, "0123456789ab")
+    assert.equal((await withoutCommit.inject("/health")).json().commit, null)
+  } finally {
+    await withCommit.close()
+    await withoutCommit.close()
+  }
+})
+
+test("the deployed commit comes from the deploy environment and is never arbitrary text", () => {
+  const sha = "e5bcb2ede42319ec376002af38b85c703197ee03"
+  assert.equal(readDeployedCommit({ RAILWAY_GIT_COMMIT_SHA: sha }), "e5bcb2ede423")
+  assert.equal(readDeployedCommit({ BLUMI_BUILD_COMMIT_SHA: sha.toUpperCase() }), "e5bcb2ede423")
+  assert.equal(readDeployedCommit({ RAILWAY_GIT_COMMIT_SHA: sha, BLUMI_BUILD_COMMIT_SHA: "abcdef0" }), "e5bcb2ede423")
+  assert.equal(readDeployedCommit({}), null)
+  assert.equal(readDeployedCommit({ RAILWAY_GIT_COMMIT_SHA: "" }), null)
+  assert.equal(readDeployedCommit({ RAILWAY_GIT_COMMIT_SHA: "main branch, not a sha" }), null)
+  assert.equal(readDeployedCommit({ RAILWAY_GIT_COMMIT_SHA: "abc" }), null)
 })

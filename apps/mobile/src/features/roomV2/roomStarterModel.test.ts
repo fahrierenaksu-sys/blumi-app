@@ -12,6 +12,9 @@ import {
   saveOnboardingRoomKeepingSignupAlive
 } from "./roomStarterModel"
 import { getRoomSetupCopy } from "./roomSetupCopy"
+import { ROOM_DECOR_UNOWNED_ITEM_MESSAGE } from "./personalRoomDecorErrors"
+import { savePersonalRoomDecor } from "./personalRoomDecorApi"
+import type { UserRoomDecor } from "./roomV2.types"
 
 test("onboarding starts with one standard empty room", () => {
   const decor = createStarterRoomDecor("room-shell")
@@ -134,35 +137,87 @@ test("room setup promises no gift bed while the starter bed is not available", (
   }
 })
 
-test("an older server that refuses the starter bed still lets the account finish with the empty room", async () => {
-  const room = placeStarterBed(createStarterRoomDecor("room-shell"), STARTER_ROOM_BED_DEFAULT_POINT)
-  const saved: number[] = []
-  const result = await saveOnboardingRoomKeepingSignupAlive(room, async (decor) => {
-    saved.push(decor.placedItems.length)
-    if (decor.placedItems.some((item) => item.itemId === STARTER_ROOM_BED_ITEM_ID)) {
-      throw new Error("Your room includes an item you do not own.")
+const BED_ROOM = () => placeStarterBed(createStarterRoomDecor("room-shell"), STARTER_ROOM_BED_DEFAULT_POINT)
+
+function sendRoom(sent: number[], fetcher: (init: RequestInit) => Response | Promise<Response>) {
+  return (decor: UserRoomDecor) => savePersonalRoomDecor(
+    "https://api.blumi.test",
+    "session-token",
+    { expectedRevision: 0, decor },
+    async (_url, init) => {
+      sent.push(JSON.parse(String(init?.body)).decor.placedItems.length)
+      return fetcher(init ?? {})
     }
-    return "saved"
-  })
-  assert.equal(result, "saved")
-  assert.deepEqual(saved, [1, 0])
+  )
+}
+
+const SAVED_BODY = JSON.stringify({
+  roomDecor: {
+    userId: "u",
+    revision: 1,
+    decor: { roomShellId: "room-shell", placedItems: [] },
+    updatedAt: "2026-10-13T00:00:00.000Z"
+  }
+})
+
+test("an older server that refuses the starter bed as unowned still lets the account finish with the empty room", async () => {
+  const room = BED_ROOM()
+  const sent: number[] = []
+  const result = await saveOnboardingRoomKeepingSignupAlive(room, sendRoom(sent, () =>
+    sent.length === 1
+      ? new Response(JSON.stringify({ error: ROOM_DECOR_UNOWNED_ITEM_MESSAGE }), { status: 400 })
+      : new Response(SAVED_BODY, { status: 200 })
+  ))
+  assert.equal(result.kind, "saved")
+  assert.deepEqual(sent, [1, 0])
   assert.equal(room.placedItems.length, 1, "the caller's room is not changed")
 })
 
-test("the onboarding room save keeps the bed when the server accepts it, and reports other failures", async () => {
-  const room = placeStarterBed(createStarterRoomDecor("room-shell"), STARTER_ROOM_BED_DEFAULT_POINT)
+test("a timeout, network failure or 5xx keeps the user's bed and surfaces the error without a second save", async () => {
+  const timeout = Object.assign(new Error("This is taking too long. Check your connection and try again."), { name: "TimeoutError" })
+  const failures: Array<[string, () => Response | Promise<Response>, RegExp]> = [
+    ["timeout", () => { throw timeout }, /taking too long/],
+    ["network", () => { throw new TypeError("Network request failed") }, /Network request failed/],
+    ["5xx", () => new Response(JSON.stringify({ error: "Try again soon." }), { status: 503 }), /Try again soon/],
+    ["400 other", () => new Response(JSON.stringify({ error: "Refresh your room and try again." }), { status: 400 }), /Refresh your room/],
+    ["unowned message on a 5xx", () => new Response(JSON.stringify({ error: ROOM_DECOR_UNOWNED_ITEM_MESSAGE }), { status: 500 }), /do not own/]
+  ]
+  for (const [label, respond, expected] of failures) {
+    const room = BED_ROOM()
+    const sent: number[] = []
+    await assert.rejects(saveOnboardingRoomKeepingSignupAlive(room, sendRoom(sent, respond)), expected, label)
+    assert.deepEqual(sent, [1], `${label}: the bed room is saved once and never replaced by the empty room`)
+    assert.equal(room.placedItems.length, 1, label)
+  }
+})
+
+test("a plain error that only repeats the refusal text is not treated as the ownership refusal", async () => {
   const sent: number[] = []
-  await saveOnboardingRoomKeepingSignupAlive(room, async (decor) => { sent.push(decor.placedItems.length) })
+  await assert.rejects(
+    saveOnboardingRoomKeepingSignupAlive(BED_ROOM(), async (decor) => {
+      sent.push(decor.placedItems.length)
+      throw new Error(ROOM_DECOR_UNOWNED_ITEM_MESSAGE)
+    }),
+    /do not own/
+  )
+  assert.deepEqual(sent, [1])
+})
+
+test("the onboarding room save keeps the bed when the server accepts it, and still reports the first error when the empty room fails too", async () => {
+  const room = BED_ROOM()
+  const sent: number[] = []
+  const result = await saveOnboardingRoomKeepingSignupAlive(room, sendRoom(sent, () => new Response(SAVED_BODY, { status: 200 })))
+  assert.equal(result.kind, "saved")
   assert.deepEqual(sent, [1])
 
+  const bothFail: number[] = []
   await assert.rejects(
-    saveOnboardingRoomKeepingSignupAlive(createStarterRoomDecor("room-shell"), async () => {
-      throw new Error("offline")
-    }),
-    /offline/
+    saveOnboardingRoomKeepingSignupAlive(room, sendRoom(bothFail, () =>
+      bothFail.length === 1
+        ? new Response(JSON.stringify({ error: ROOM_DECOR_UNOWNED_ITEM_MESSAGE }), { status: 400 })
+        : new Response(JSON.stringify({ error: "Try again soon." }), { status: 503 })
+    )),
+    /do not own/
   )
-  await assert.rejects(
-    saveOnboardingRoomKeepingSignupAlive(room, async () => { throw new Error("first") }),
-    /first/
-  )
+  assert.deepEqual(bothFail, [1, 0])
 })

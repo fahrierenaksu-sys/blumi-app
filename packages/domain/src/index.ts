@@ -9,6 +9,8 @@ export * from "./economy/roomFurnitureIds";
 export * from "./legacy/legacyItemIds";
 export * from "./release/releaseCatalog";
 export * from "./avatar/avatarLoadoutCatalog";
+export * from "./avatar/avatarItemRules";
+export * from "./avatar/avatarItemRulesFixture";
 export * from "./avatar/avatarLoadoutRules";
 export * from "./avatar/avatarLoadoutCoercion";
 export * from "./avatar/retiredAvatarItems";

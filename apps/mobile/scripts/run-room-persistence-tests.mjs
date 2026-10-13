@@ -17,6 +17,7 @@ const sourceFiles = [
   "src/features/roomV2/roomV2EditorSession.test.ts",
   "src/features/roomV2/roomV2EditorConfirmedSave.ts",
   "src/features/roomV2/roomV2EditorConfirmedSave.test.ts",
+  "src/features/roomV2/personalRoomDecorErrors.ts",
   "src/features/roomV2/roomStarterModel.ts",
   "src/features/roomV2/roomStarterModel.test.ts",
   "src/features/roomV2/roomV2Persistence.ts",

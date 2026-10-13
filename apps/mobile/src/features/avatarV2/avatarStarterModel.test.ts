@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { AvatarCatalogItem, UserAvatar } from "./avatarV2.types"
 import {
+  type AvatarStarterItemIds,
   applyOnboardingStarterBody,
   FEMALE_STARTER_BODY_ID,
   getAvatarStarterBodyItems,
@@ -73,25 +74,44 @@ const starterCatalog = [
     ownedByDefault: false
   }),
   ...([
-    [FEMALE_STARTER_BODY_ID, "hair", "avatar_v2_hair_mocha_ribbon_blowout"],
-    [FEMALE_STARTER_BODY_ID, "hair", "avatar_v2_hair_midnight_french_bob"],
-    [FEMALE_STARTER_BODY_ID, "top", "avatar_v2_top_default"],
-    [FEMALE_STARTER_BODY_ID, "top", "avatar_v2_top_buttercream_bow_tee"],
-    [FEMALE_STARTER_BODY_ID, "bottom", "avatar_v2_bottom_default"],
-    [FEMALE_STARTER_BODY_ID, "bottom", "avatar_v2_bottom_lavender_bow_twill_shorts"],
-    [FEMALE_STARTER_BODY_ID, "shoes", "avatar_v2_shoes_milk_tea_court_sneakers"],
-    [FEMALE_STARTER_BODY_ID, "shoes", "avatar_v2_shoes_mint_ribbon_court_sneakers"],
-    [MALE_STARTER_BODY_ID, "hair", "avatar_v2_hair_male_cocoa_textured_quiff"],
-    [MALE_STARTER_BODY_ID, "top", "avatar_v2_top_male_powder_blue_crew_tee"],
-    [MALE_STARTER_BODY_ID, "top", "avatar_v2_top_male_cream_basic_tee"],
-    [MALE_STARTER_BODY_ID, "bottom", "avatar_v2_bottom_male_navy_straight_pants"],
-    [MALE_STARTER_BODY_ID, "bottom", "avatar_v2_bottom_male_sage_cuffed_shorts"],
-    [MALE_STARTER_BODY_ID, "shoes", "avatar_v2_shoes_male_milk_tea_court"],
-    [MALE_STARTER_BODY_ID, "shoes", "avatar_v2_shoes_male_cloud_white_trainers"]
+    [FEMALE_STARTER_BODY_ID, "hair", "fixture_starter_female_hair_a"],
+    [FEMALE_STARTER_BODY_ID, "hair", "fixture_starter_female_hair_b"],
+    [FEMALE_STARTER_BODY_ID, "top", "fixture_starter_female_top_a"],
+    [FEMALE_STARTER_BODY_ID, "top", "fixture_starter_female_top_b"],
+    [FEMALE_STARTER_BODY_ID, "bottom", "fixture_starter_female_bottom_a"],
+    [FEMALE_STARTER_BODY_ID, "bottom", "fixture_starter_female_bottom_b"],
+    [FEMALE_STARTER_BODY_ID, "shoes", "fixture_starter_female_shoes_a"],
+    [FEMALE_STARTER_BODY_ID, "shoes", "fixture_starter_female_shoes_b"],
+    [MALE_STARTER_BODY_ID, "hair", "fixture_starter_male_hair_a"],
+    [MALE_STARTER_BODY_ID, "top", "fixture_starter_male_top_a"],
+    [MALE_STARTER_BODY_ID, "top", "fixture_starter_male_top_b"],
+    [MALE_STARTER_BODY_ID, "bottom", "fixture_starter_male_bottom_a"],
+    [MALE_STARTER_BODY_ID, "bottom", "fixture_starter_male_bottom_b"],
+    [MALE_STARTER_BODY_ID, "shoes", "fixture_starter_male_shoes_a"],
+    [MALE_STARTER_BODY_ID, "shoes", "fixture_starter_male_shoes_b"]
   ] as const).map(([bodyId, type, id], index) =>
     starterItem(bodyId, type, index + 20, { id })
   )
 ]
+
+/**
+ * Test-only starter configuration. The live starters are the 2.5D looks (X15),
+ * so these rule tests inject their own ids instead of reading real ones.
+ */
+const fixtureStarterItemIds: AvatarStarterItemIds = {
+  [FEMALE_STARTER_BODY_ID]: {
+    hair: ["fixture_starter_female_hair_a", "fixture_starter_female_hair_b"],
+    top: ["fixture_starter_female_top_a", "fixture_starter_female_top_b"],
+    bottom: ["fixture_starter_female_bottom_a", "fixture_starter_female_bottom_b"],
+    shoes: ["fixture_starter_female_shoes_a", "fixture_starter_female_shoes_b"]
+  },
+  [MALE_STARTER_BODY_ID]: {
+    hair: ["fixture_starter_male_hair_a"],
+    top: ["fixture_starter_male_top_a", "fixture_starter_male_top_b"],
+    bottom: ["fixture_starter_male_bottom_a", "fixture_starter_male_bottom_b"],
+    shoes: ["fixture_starter_male_shoes_a", "fixture_starter_male_shoes_b"]
+  }
+}
 
 function isFree(item: AvatarCatalogItem): boolean {
   return item.ownedByDefault === true
@@ -170,13 +190,13 @@ test("starter styling ignores other owned or previously purchased wardrobe items
     FEMALE_STARTER_BODY_ID,
     "bottom",
     1,
-    { id: "avatar_v2_bottom_default" }
+    { id: "fixture_starter_female_bottom_a" }
   )
   const lavenderShorts = starterItem(
     FEMALE_STARTER_BODY_ID,
     "bottom",
     2,
-    { id: "avatar_v2_bottom_lavender_bow_twill_shorts" }
+    { id: "fixture_starter_female_bottom_b" }
   )
 
   assert.deepEqual(
@@ -184,11 +204,12 @@ test("starter styling ignores other owned or previously purchased wardrobe items
       [leakedPremiumItem, classicShorts, lavenderShorts],
       "bottom",
       FEMALE_STARTER_BODY_ID,
-      () => true
+      () => true,
+      fixtureStarterItemIds
     ).map((item) => item.id),
     [
-      "avatar_v2_bottom_default",
-      "avatar_v2_bottom_lavender_bow_twill_shorts"
+      "fixture_starter_female_bottom_a",
+      "fixture_starter_female_bottom_b"
     ]
   )
 })
@@ -227,7 +248,7 @@ test("legacy female items without an explicit compatibility list never leak into
     (item) =>
       item.type === "top" &&
       item.compatibleBodyIds?.includes(MALE_STARTER_BODY_ID) &&
-      item.id.startsWith("avatar_v2_top_male_")
+      item.id.startsWith("fixture_starter_male_top_")
   )
 
   assert.deepEqual(
@@ -235,11 +256,12 @@ test("legacy female items without an explicit compatibility list never leak into
       [legacyFemaleTop, ...maleTops],
       "top",
       MALE_STARTER_BODY_ID,
-      isFree
+      isFree,
+      fixtureStarterItemIds
     ).map((item) => item.id),
     [
-      "avatar_v2_top_male_powder_blue_crew_tee",
-      "avatar_v2_top_male_cream_basic_tee"
+      "fixture_starter_male_top_a",
+      "fixture_starter_male_top_b"
     ]
   )
 })

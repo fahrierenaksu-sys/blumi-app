@@ -3,8 +3,10 @@ import {
   type CompleteAvatarSelection
 } from "@blumi/contracts"
 import {
+  AVATAR_ITEM_RULES,
   createAvatarSelection,
   validateAvatarLoadout,
+  type AvatarItemRules,
   type AvatarLoadoutValidationCode
 } from "@blumi/domain"
 import type { AuthService } from "../auth/authService"
@@ -35,9 +37,12 @@ export interface AvatarService {
 export interface AvatarServiceOptions {
   authService: AuthService
   economyService: EconomyService
+  /** Avatar item facts the save rules read. Defaults to the live catalog; tests pass the fixture rules. */
+  avatarRules?: AvatarItemRules
 }
 
 export function createAvatarService(options: AvatarServiceOptions): AvatarService {
+  const avatarRules = options.avatarRules ?? AVATAR_ITEM_RULES
   return {
     async saveAvatar(sessionToken, input, now = new Date()) {
       const expectedRevision = input.revision
@@ -63,11 +68,12 @@ export function createAvatarService(options: AvatarServiceOptions): AvatarServic
       const currentLoadout = resolved.account.profile.avatar.loadout
       const semanticLoadout = isAcceptedAvatarLoadout(input.loadout) &&
           isAcceptedAvatarLoadout(currentLoadout)
-        ? resolveSemanticAvatarWrite(input.loadout, currentLoadout)
+        ? resolveSemanticAvatarWrite(input.loadout, currentLoadout, avatarRules)
         : input.loadout
       const validation = validateAvatarLoadout(
         semanticLoadout,
-        inventory.ownedAvatarItemIds
+        inventory.ownedAvatarItemIds,
+        avatarRules
       )
       if (!validation.ok) {
         return {
@@ -95,7 +101,7 @@ export function createAvatarService(options: AvatarServiceOptions): AvatarServic
         presetId: update.account.profile.avatar.presetId,
         loadout: update.account.profile.avatar.loadout,
         revision: update.account.profile.avatar.revision
-      })
+      }, avatarRules)
       return {
         kind: "updated",
         selection: cloneSelection(canonicalSelection)

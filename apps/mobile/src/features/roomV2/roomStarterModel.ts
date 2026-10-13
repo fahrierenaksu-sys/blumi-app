@@ -1,6 +1,7 @@
 import type { RoomWorldPoint } from "../roomWorld/roomWorldGeometry"
 import type { RoomFurnitureRotation, UserRoomDecor } from "./roomV2.types"
 import type { RoomSetupCopy } from "./roomSetupCopy"
+import { RoomDecorItemNotOwnedError } from "./personalRoomDecorErrors"
 
 /**
  * The one free starter bed (canonical id, owned by every account, plan F9). The default room holds only this bed; the
@@ -106,8 +107,9 @@ export function canCompleteRoomSetup(input: {
 
 /**
  * Saves the onboarding room. A server that does not know the starter bed yet (the API before the 2.5D release) refuses
- * the whole room; then the empty default room is saved instead, so creating the account never gets stuck on the bed.
- * Any other failure, or a failure of the empty room too, surfaces the first error.
+ * the whole room as an item the account does not own; only then the empty default room is saved instead, so creating
+ * the account never gets stuck on the bed. Every other failure (timeout, network, 5xx) keeps the room as the user made
+ * it and surfaces its own error, as does a failure of the empty room.
  */
 export async function saveOnboardingRoomKeepingSignupAlive<Result>(
   room: UserRoomDecor,
@@ -116,6 +118,7 @@ export async function saveOnboardingRoomKeepingSignupAlive<Result>(
   try {
     return await save(room)
   } catch (error) {
+    if (!(error instanceof RoomDecorItemNotOwnedError)) throw error
     const withoutBed = room.placedItems.filter((item) => item.itemId !== STARTER_ROOM_BED_ITEM_ID)
     if (withoutBed.length === room.placedItems.length) throw error
     try {

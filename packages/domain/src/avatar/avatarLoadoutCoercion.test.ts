@@ -8,6 +8,8 @@ import {
 import { coerceAvatarLoadout } from "./avatarLoadoutCoercion"
 import { toAvatarLoadoutV2, validateAvatarLoadout } from "./avatarLoadoutRules"
 import { RETIRED_AVATAR_ITEM_IDS } from "./retiredAvatarItems"
+import { AVATAR_ITEM_RULES, type AvatarItemRules } from "./avatarItemRules"
+import { TEST_AVATAR_ITEM_RULES } from "./avatarItemRulesFixture"
 
 const ALL_IDS = AVATAR_LOADOUT_CATALOG.map((item) => item.itemId)
 const SLOT_KEYS = ["faceId", "eyesId", "noseId", "mouthId", "hairId", "topId", "bottomId", "shoesId"] as const
@@ -49,16 +51,19 @@ test("every catalog item placed in every slot coerces to a wearable look without
   }
 })
 
+// Plan X15: the live catalog has no second top per body, so this runs on the injected test-only catalog.
 test("wearable items are kept; other-body, retired and outerwear items are not", () => {
-  const girlOnlyTop = AVATAR_LOADOUT_CATALOG.find((item) =>
-    item.slot === "top" && !item.pairedItemId && item.itemId !== DEFAULT_FEMALE_AVATAR_LOADOUT.topId &&
-    !RETIRED_AVATAR_ITEM_IDS.has(item.itemId) && !item.supportedBodyIds.includes(DEFAULT_MALE_AVATAR_LOADOUT.bodyId))
+  const rules = TEST_AVATAR_ITEM_RULES
+  const { female, male } = rules.starters
+  const girlOnlyTop = rules.items.find((item) =>
+    item.slot === "top" && !item.pairedItemId && item.itemId !== female.topId &&
+    !rules.retiredItemIds.has(item.itemId) && !item.supportedBodyIds.includes(male.bodyId))
   assert.ok(girlOnlyTop)
-  const girl = coerceAvatarLoadout({ ...DEFAULT_FEMALE_AVATAR_LOADOUT, topId: girlOnlyTop.itemId })
+  const girl = coerceAvatarLoadout({ ...female, topId: girlOnlyTop.itemId }, {}, rules)
   assert.equal(girl.topId, girlOnlyTop.itemId)
-  const boy = coerceAvatarLoadout({ ...DEFAULT_MALE_AVATAR_LOADOUT, topId: girlOnlyTop.itemId })
-  assert.equal(boy.topId, DEFAULT_MALE_AVATAR_LOADOUT.topId)
-  const v2 = coerceAvatarLoadout({ ...toAvatarLoadoutV2(DEFAULT_FEMALE_AVATAR_LOADOUT), outerwearId: "avatar_v2_outerwear_future_coat" })
+  const boy = coerceAvatarLoadout({ ...male, topId: girlOnlyTop.itemId }, {}, rules)
+  assert.equal(boy.topId, male.topId)
+  const v2 = coerceAvatarLoadout({ ...toAvatarLoadoutV2(female, rules), outerwearId: "avatar_v2_outerwear_future_coat" }, {}, rules)
   assert.equal(v2.schemaVersion === 2 ? v2.outerwearId : "v1", null)
 })
 
@@ -79,23 +84,28 @@ test("coercion never changes its input", () => {
 
 // Review A F2: a look the strict save rules accept must read back unchanged,
 // so the tolerant reader never silently changes a valid saved look.
+// Plan X15: the live catalog alone now yields too few valid looks, so the injected test-only catalog
+// (dresses, accessories, several pieces per slot) runs too; the threshold is unchanged.
 test("a loadout the strict rules accept is returned unchanged", () => {
   let checked = 0
-  for (const starter of [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT]) {
-    for (const baseline of [starter, toAvatarLoadoutV2(starter)]) {
-      const variants: unknown[] = [baseline]
-      for (const item of AVATAR_LOADOUT_CATALOG) {
-        for (const key of SLOT_KEYS) variants.push({ ...baseline, [key]: item.itemId })
-        variants.push({ ...baseline, accessoryIds: [item.itemId] })
-        if (baseline.schemaVersion === 2 && item.pairedItemId) {
-          variants.push({ ...baseline, topId: item.itemId, bottomId: item.pairedItemId, dressId: item.itemId })
+  for (const rules of [AVATAR_ITEM_RULES, TEST_AVATAR_ITEM_RULES] satisfies AvatarItemRules[]) {
+    const allIds = rules.items.map((item) => item.itemId)
+    for (const starter of [rules.starters.female, rules.starters.male]) {
+      for (const baseline of [starter, toAvatarLoadoutV2(starter, rules)]) {
+        const variants: unknown[] = [baseline]
+        for (const item of rules.items) {
+          for (const key of SLOT_KEYS) variants.push({ ...baseline, [key]: item.itemId })
+          variants.push({ ...baseline, accessoryIds: [item.itemId] })
+          if (baseline.schemaVersion === 2 && item.pairedItemId) {
+            variants.push({ ...baseline, topId: item.itemId, bottomId: item.pairedItemId, dressId: item.itemId })
+          }
         }
-      }
-      for (const variant of variants) {
-        const strict = validateAvatarLoadout(variant, ALL_IDS)
-        if (!strict.ok) continue
-        checked += 1
-        assert.deepEqual(coerceAvatarLoadout(variant, { presetId: starter.bodyId }), strict.loadout)
+        for (const variant of variants) {
+          const strict = validateAvatarLoadout(variant, allIds, rules)
+          if (!strict.ok) continue
+          checked += 1
+          assert.deepEqual(coerceAvatarLoadout(variant, { presetId: starter.bodyId }, rules), strict.loadout)
+        }
       }
     }
   }

@@ -92,7 +92,32 @@ test("female preview seeds are deterministic and render without fallback layers"
   }
 })
 
+// Plan X15 retired every old avatar item, so the "purchased" layers of this test are fixture items: each is a copy
+// of the old item under a fixture ID that the room mapping sends to the same room art as before. The retired top
+// stays a real retired item.
+const { AVATAR_V2_CATALOG } = require("./avatarV2Catalog") as typeof import("./avatarV2Catalog") // eslint-disable-line @typescript-eslint/no-require-imports
+const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("./room/avatarRoomProjection") as typeof import("./room/avatarRoomProjection") // eslint-disable-line @typescript-eslint/no-require-imports
+const { DEFAULT_FEMALE_AVATAR_LOADOUT } = require("@blumi/domain") as typeof import("@blumi/domain") // eslint-disable-line @typescript-eslint/no-require-imports
+
+function fixtureCopyOf(realId: string, fixtureId: string) {
+  const item = AVATAR_V2_CATALOG.find((entry) => entry.id === realId)
+  assert.ok(item, realId)
+  return {
+    catalogItem: { ...item, id: fixtureId, hiddenFromShop: false, hiddenFromWardrobe: false },
+    mapping: [fixtureId, DEFAULT_AVATAR_ROOM_PROJECTION_MAP[realId]] as const
+  }
+}
+
 test("a retired remote top falls back safely while other purchased layers remain exact", () => {
+  const copies = [
+    fixtureCopyOf("avatar_v2_bottom_yellow_bow_lace_ruffle_skirt", "fixture_remote_bottom"),
+    fixtureCopyOf("avatar_v2_shoes_cherry_satin_ballets", "fixture_remote_shoes"),
+    fixtureCopyOf("avatar_v2_accessory_ivory_ribbon_beret", "fixture_remote_beret")
+  ]
+  const fixtureSource = {
+    avatarCatalog: [...AVATAR_V2_CATALOG, ...copies.map((copy) => copy.catalogItem)],
+    projectionMap: { ...DEFAULT_AVATAR_ROOM_PROJECTION_MAP, ...Object.fromEntries(copies.map((copy) => copy.mapping)) }
+  }
   const loadout = {
     schemaVersion: 1 as const,
     bodyId: "avatar_v2_body_default",
@@ -102,9 +127,9 @@ test("a retired remote top falls back safely while other purchased layers remain
     mouthId: "avatar_v2_mouth_peach_whisper_smile",
     hairId: "avatar_v2_hair_mocha_ribbon_blowout",
     topId: "avatar_v2_top_blush_lace_cardigan",
-    bottomId: "avatar_v2_bottom_yellow_bow_lace_ruffle_skirt",
-    shoesId: "avatar_v2_shoes_cherry_satin_ballets",
-    accessoryIds: ["avatar_v2_accessory_ivory_ribbon_beret"]
+    bottomId: "fixture_remote_bottom",
+    shoesId: "fixture_remote_shoes",
+    accessoryIds: ["fixture_remote_beret"]
   }
   const snapshot = createCandidateAvatarSnapshot({
     userId: "remote-exact",
@@ -115,8 +140,12 @@ test("a retired remote top falls back safely while other purchased layers remain
       loadout
     }
   })
-  const appearance = createCandidateAvatarAppearance(snapshot)
-  assert.equal(appearance.topId, "room_avatar_top_female_cream_basic_tee_v2")
+  const appearance = createCandidateAvatarAppearance(snapshot, fixtureSource)
+  // the retired top is drawn as the girl's starter top (before X15 that was the cream tee)
+  assert.equal(
+    appearance.topId,
+    DEFAULT_AVATAR_ROOM_PROJECTION_MAP[DEFAULT_FEMALE_AVATAR_LOADOUT.topId].topId
+  )
   assert.equal(
     appearance.bottomId,
     "room_avatar_bottom_female_yellow_bow_lace_ruffle_skirt_v2"

@@ -1,7 +1,12 @@
 import { avatarV2LayerAssets } from "./avatarV2Assets"
 import { FEMALE_SWEET_CAPSULE_LAYERS } from "./femaleSweetCapsuleDefinitions"
 import { MALE_PREMIUM_CAPSULE_RUNTIME } from "./malePremiumCapsulePilotDefinitions"
-import { BOY_WARDROBE_PREVIEW_ITEM_IDS, isRetiredAvatarItemId } from "@blumi/domain"
+import {
+  BOY_WARDROBE_PREVIEW_ITEM_IDS,
+  DEFAULT_FEMALE_AVATAR_LOADOUT,
+  getDefaultOwnedItemIds,
+  isRetiredAvatarItemId
+} from "@blumi/domain"
 import type {
   AvatarCatalogItem,
   AvatarCategory,
@@ -37,16 +42,17 @@ export const AVATAR_V2_LAYER_ORDER: Record<AvatarItemType, number> = {
   accessory: 70
 }
 
+/** The 2.5D girl starter (domain `DEFAULT_FEMALE_AVATAR_LOADOUT`); the old default pieces are retired (X15). */
 export const DEFAULT_AVATAR_V2: UserAvatar = {
   bodyId: "avatar_v2_body_default",
   faceId: "avatar_v2_face_default",
   eyesId: "avatar_v2_eyes_mocha_doe",
   noseId: "avatar_v2_nose_soft_button",
   mouthId: "avatar_v2_mouth_peach_whisper_smile",
-  hairId: "avatar_v2_hair_mocha_ribbon_blowout",
-  topId: "avatar_v2_top_default",
-  bottomId: "avatar_v2_bottom_default",
-  shoesId: "avatar_v2_shoes_milk_tea_court_sneakers",
+  hairId: DEFAULT_FEMALE_AVATAR_LOADOUT.hairId,
+  topId: DEFAULT_FEMALE_AVATAR_LOADOUT.topId,
+  bottomId: DEFAULT_FEMALE_AVATAR_LOADOUT.bottomId,
+  shoesId: DEFAULT_FEMALE_AVATAR_LOADOUT.shoesId,
   accessoryIds: []
 }
 
@@ -502,7 +508,7 @@ const AVATAR_V2_CATALOG_SOURCE: AvatarCatalogItem[] = [
     assets: { idle_front: avatarV2LayerAssets.mouthRosewaterCupidBow }
   },
   {
-    id: DEFAULT_AVATAR_V2.hairId,
+    id: "avatar_v2_hair_mocha_ribbon_blowout",
     type: "hair",
     name: "Mocha Ribbon Blowout",
     sortOrder: 10,
@@ -609,7 +615,7 @@ const AVATAR_V2_CATALOG_SOURCE: AvatarCatalogItem[] = [
     assets: { idle_front: avatarV2LayerAssets.hairCopperBowWaves }
   },
   {
-    id: DEFAULT_AVATAR_V2.topId,
+    id: "avatar_v2_top_default",
     type: "top",
     name: "Basic Tee",
     sortOrder: 10,
@@ -619,7 +625,7 @@ const AVATAR_V2_CATALOG_SOURCE: AvatarCatalogItem[] = [
     ownedByDefault: true
   },
   {
-    id: DEFAULT_AVATAR_V2.bottomId,
+    id: "avatar_v2_bottom_default",
     type: "bottom",
     name: "Classic Shorts",
     sortOrder: 10,
@@ -629,7 +635,7 @@ const AVATAR_V2_CATALOG_SOURCE: AvatarCatalogItem[] = [
     ownedByDefault: true
   },
   {
-    id: DEFAULT_AVATAR_V2.shoesId,
+    id: "avatar_v2_shoes_milk_tea_court_sneakers",
     type: "shoes",
     name: "Milk Tea Court Sneakers",
     sortOrder: 10,
@@ -955,11 +961,14 @@ const AVATAR_V2_CATALOG_SOURCE: AvatarCatalogItem[] = [
   },
 ]
 
+// every account owns the server's free starters (`ownedByDefault` in the economy, retired ones excluded)
+const ECONOMY_STARTER_ITEM_IDS: ReadonlySet<string> = new Set(getDefaultOwnedItemIds("avatar"))
+
 export const AVATAR_V2_CATALOG: AvatarCatalogItem[] =
   AVATAR_V2_CATALOG_SOURCE.map((item) =>
     isRetiredAvatarItemId(item.id)
       ? { ...item, hiddenFromShop: true, hiddenFromWardrobe: true }
-      : AVATAR_STUDIO_FREE_ITEM_TYPES.has(item.type)
+      : AVATAR_STUDIO_FREE_ITEM_TYPES.has(item.type) || ECONOMY_STARTER_ITEM_IDS.has(item.id)
       ? { ...item, ownedByDefault: true }
       : item
   )

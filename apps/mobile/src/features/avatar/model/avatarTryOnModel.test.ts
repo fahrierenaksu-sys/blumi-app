@@ -1,7 +1,9 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  AVATAR_ITEM_RULES,
   AVATAR_STILL_MANIFEST,
+  type AvatarItemRules,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT,
   coerceAvatarLoadout
@@ -22,10 +24,32 @@ const GIRL_2_5D = {
   accessoryIds: []
 }
 
-/** A catalog item the girl can wear in `slotKey` that has no 2.5D art for her yet (an old item). */
+/**
+ * Test-only "old pieces": after X15 every real old item is retired, so coercion would turn one into the starter.
+ * These fixture items are wearable on the girl and have no 2.5D art, which is what an old piece used to be.
+ */
+const OLD_PIECE = {
+  hairId: "fixture_old_hair",
+  topId: "fixture_old_top",
+  bottomId: "fixture_old_bottom",
+  shoesId: "fixture_old_shoes"
+} as const
+const OLD_PIECE_RULES: AvatarItemRules = {
+  ...AVATAR_ITEM_RULES,
+  items: [
+    ...AVATAR_ITEM_RULES.items,
+    ...(["hair", "top", "bottom", "shoes"] as const).map((slot) => ({
+      itemId: OLD_PIECE[`${slot}Id`],
+      slot,
+      supportedBodyIds: [DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId]
+    }))
+  ]
+}
+
+/** A piece the girl can wear in `slotKey` that has no 2.5D art for her (an old piece). */
 function oldGirlItem(slotKey: "hairId" | "topId" | "bottomId" | "shoesId"): string {
-  const worn = DEFAULT_FEMALE_AVATAR_LOADOUT[slotKey]
-  assert.equal(female.items[worn], undefined, "the default old piece has no 2.5D art in this fixture")
+  const worn = OLD_PIECE[slotKey]
+  assert.equal(female.items[worn], undefined, "the old piece has no 2.5D art in this fixture")
   return worn
 }
 
@@ -37,8 +61,8 @@ test("trying on one old piece keeps the old drawing for the whole figure, for ev
   for (const slotKey of ["hairId", "topId", "bottomId", "shoesId"] as const) {
     const look = { ...GIRL_2_5D, [slotKey]: oldGirlItem(slotKey) }
     // the piece is a valid, kept choice: coercion does not turn it into the starter
-    assert.equal(coerceAvatarLoadout(look)[slotKey], look[slotKey])
-    assert.equal(avatarTryOnRenderer(look), "legacy", `${slotKey} with an old piece must not draw as the starter`)
+    assert.equal(coerceAvatarLoadout(look, {}, OLD_PIECE_RULES)[slotKey], look[slotKey])
+    assert.equal(avatarTryOnRenderer(look, { rules: OLD_PIECE_RULES }), "legacy", `${slotKey} with an old piece must not draw as the starter`)
   }
 })
 

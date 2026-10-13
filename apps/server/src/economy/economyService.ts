@@ -1,8 +1,10 @@
 import {
+  AVATAR_ITEM_RULES,
+  isAvatarItemRetired,
   isAvatarLoadoutItemCompatibleWithBody,
   isLegacyItemId,
   isReleaseCatalogItemHeld,
-  isRetiredAvatarItemId
+  type AvatarItemRules
 } from "@blumi/domain"
 import { isActiveRoomItemIdIn, projectInventoryRoomItems } from "../rooms/roomItemProjection"
 import {
@@ -83,12 +85,15 @@ export interface CreateEconomyServiceOptions {
   repository?: EconomyRepository
   /** Defaults to the catalog of this environment (`economyCatalog.ts`); tests and memory QA pass their own. */
   catalog?: readonly EconomyCatalogItem[]
+  /** Avatar item facts (retired items, body fit). Defaults to the live catalog; tests pass the fixture rules. */
+  avatarRules?: AvatarItemRules
 }
 
 export function createEconomyService(
   options: CreateEconomyServiceOptions = {}
 ): EconomyService {
   const catalog = options.catalog ?? ECONOMY_CATALOG
+  const avatarRules = options.avatarRules ?? AVATAR_ITEM_RULES
   const repository = options.repository ?? createInMemoryEconomyRepository()
   const isActiveRoomItemId = isActiveRoomItemIdIn(catalog)
   const project = (inventory: EconomyInventoryRecord) =>
@@ -128,7 +133,7 @@ export function createEconomyService(
       if (isLegacyItemId(itemId)) {
         throw new PublicRequestError("That shop item is not available.")
       }
-      if (input.type === "avatar" && isRetiredAvatarItemId(itemId)) {
+      if (input.type === "avatar" && isAvatarItemRetired(avatarRules, itemId)) {
         throw new PublicRequestError("That shop item is not available.")
       }
       // a held item (pricing pending, promotion hold, QA id) is never sold, in any environment
@@ -147,7 +152,8 @@ export function createEconomyService(
         input.type === "avatar" &&
         !isAvatarLoadoutItemCompatibleWithBody(
           item.itemId,
-          input.avatarBodyId
+          input.avatarBodyId,
+          avatarRules
         )
       ) {
         throw new PublicRequestError("That item does not fit your avatar.")

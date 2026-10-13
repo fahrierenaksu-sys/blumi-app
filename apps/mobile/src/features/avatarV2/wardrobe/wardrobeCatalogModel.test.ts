@@ -103,6 +103,20 @@ const {
 } = require("./wardrobeCopy") as typeof import("./wardrobeCopy")
 
 const copy = AVATAR_STUDIO_COPY.en
+// Plan X15 retired every old paid piece, so the locked-card tests add one paid fixture piece per slot to the live
+// catalog. They are wearable on the girl, not owned by default, and have no room art, so the tests say they preview.
+const PAID_FIXTURE_ITEMS = (["hair", "top", "shoes"] as const).map((type, index) => ({
+  id: `fixture_wardrobe_${type}_paid`,
+  type,
+  name: `Fixture paid ${type}`,
+  sortOrder: 9000 + index,
+  layerOrder: 10,
+  assets: {},
+  compatibleBodyIds: [DEFAULT_AVATAR_V2.bodyId]
+})) as unknown as typeof AVATAR_V2_CATALOG
+const WARDROBE_FIXTURE_CATALOG = [...AVATAR_V2_CATALOG, ...PAID_FIXTURE_ITEMS]
+const isFixturePreviewSupported = (item: (typeof AVATAR_V2_CATALOG)[number]) =>
+  PAID_FIXTURE_ITEMS.some((fixture) => fixture.id === item.id) || isAvatarItemRoomPreviewSupported(item)
 const ownAll = { ownedItemIds: AVATAR_V2_CATALOG.map((item) => item.id) }
 const ownNothing = { ownedItemIds: [] as string[] }
 
@@ -132,10 +146,11 @@ test("active items keep only body-compatible, room-supported, equippable entries
 
 test("cards resolve state labels, lock state, and preview source per item", () => {
   const hair = getWardrobeActiveItems({
-    catalog: AVATAR_V2_CATALOG,
+    catalog: WARDROBE_FIXTURE_CATALOG,
     category: "hair",
     bodyId: DEFAULT_AVATAR_V2.bodyId,
-    canEquipItem: () => true
+    canEquipItem: () => true,
+    isPreviewSupported: isFixturePreviewSupported
   })
   const target = hair[hair.length - 1]
   const displayedAvatar = equipAvatarV2Item(DEFAULT_AVATAR_V2, target)
@@ -145,7 +160,8 @@ test("cards resolve state labels, lock state, and preview source per item", () =
     displayedAvatar,
     canEquipItem: () => true,
     copy,
-    getPreviewSource: () => source
+    getPreviewSource: () => source,
+    isPreviewSupported: isFixturePreviewSupported
   })
   assert.equal(cards.length, hair.length)
   const targetCard = cards.find((card) => card.item.id === target.id)
@@ -161,7 +177,8 @@ test("cards resolve state labels, lock state, and preview source per item", () =
     displayedAvatar: DEFAULT_AVATAR_V2,
     canEquipItem: () => false,
     copy,
-    getPreviewSource: () => undefined
+    getPreviewSource: () => undefined,
+    isPreviewSupported: isFixturePreviewSupported
   })
   assert.ok(locked.every((card) => card.locked && !card.previewSource))
 })
@@ -206,32 +223,35 @@ test("locked items the Shop sells stay visible after the owned ones (owner decis
   const soldInShop = (item: (typeof AVATAR_V2_CATALOG)[number]) => !owned.has(item.id)
   for (const category of ["hair", "top", "shoes"] as const) {
     const items = getWardrobeActiveItems({
-      catalog: AVATAR_V2_CATALOG,
+      catalog: WARDROBE_FIXTURE_CATALOG,
       category,
       bodyId: DEFAULT_AVATAR_V2.bodyId,
       canEquipItem,
-      isAvailableInShop: soldInShop
+      isAvailableInShop: soldInShop,
+      isPreviewSupported: isFixturePreviewSupported
     })
     const ownedOnly = getWardrobeActiveItems({
-      catalog: AVATAR_V2_CATALOG,
+      catalog: WARDROBE_FIXTURE_CATALOG,
       category,
       bodyId: DEFAULT_AVATAR_V2.bodyId,
-      canEquipItem
+      canEquipItem,
+      isPreviewSupported: isFixturePreviewSupported
     })
     assert.ok(items.length > ownedOnly.length, `${category} shows locked Shop items`)
     const firstLocked = items.findIndex((item) => !canEquipItem(item))
     assert.ok(firstLocked >= ownedOnly.length, "owned items come first")
     assert.ok(items.slice(firstLocked).every((item) => !canEquipItem(item)))
     for (const item of items) {
-      assert.equal(isAvatarItemRoomPreviewSupported(item), true, item.id)
+      assert.equal(isFixturePreviewSupported(item), true, item.id)
     }
   }
   const nothingListed = getWardrobeActiveItems({
-    catalog: AVATAR_V2_CATALOG,
+    catalog: WARDROBE_FIXTURE_CATALOG,
     category: "hair",
     bodyId: DEFAULT_AVATAR_V2.bodyId,
     canEquipItem,
-    isAvailableInShop: () => false
+    isAvailableInShop: () => false,
+    isPreviewSupported: isFixturePreviewSupported
   })
   assert.ok(nothingListed.every((item) => canEquipItem(item)), "unlisted, unowned items stay hidden")
 })

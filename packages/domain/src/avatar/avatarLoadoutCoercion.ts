@@ -1,14 +1,17 @@
 import type { AvatarLoadout, AvatarLoadoutV1, AvatarLoadoutV2 } from "@blumi/contracts"
-import {
-  AVATAR_LOADOUT_CATALOG,
-  DEFAULT_FEMALE_AVATAR_LOADOUT,
-  DEFAULT_MALE_AVATAR_LOADOUT,
-  type AvatarLoadoutCatalogItem,
-  type AvatarLoadoutSlot,
-  type ReadonlyAvatarLoadout
+import type {
+  AvatarLoadoutCatalogItem,
+  AvatarLoadoutSlot,
+  ReadonlyAvatarLoadout
 } from "./avatarLoadoutCatalog"
+import {
+  AVATAR_ITEM_RULES,
+  avatarStarterLooks,
+  findAvatarRuleItem,
+  isAvatarItemRetired,
+  type AvatarItemRules
+} from "./avatarItemRules"
 import { cloneAvatarLoadout, validateAvatarLoadout } from "./avatarLoadoutRules"
-import { isRetiredAvatarItemId } from "./retiredAvatarItems"
 
 /**
  * Tolerant READ of a stored avatar loadout (plan §2.4). Stored rows can hold
@@ -37,74 +40,78 @@ const ITEM_SLOTS: readonly (readonly [ItemKey, AvatarLoadoutSlot])[] = [
   ["shoesId", "shoes"]
 ]
 const MAX_ACCESSORIES = 6
-const STARTERS: readonly ReadonlyAvatarLoadout<AvatarLoadoutV1>[] = [
-  DEFAULT_FEMALE_AVATAR_LOADOUT,
-  DEFAULT_MALE_AVATAR_LOADOUT
-]
-const ALL_CATALOG_ITEM_IDS = AVATAR_LOADOUT_CATALOG.map((item) => item.itemId)
-const CATALOG_BY_ID = new Map(AVATAR_LOADOUT_CATALOG.map((item) => [item.itemId, item]))
 
 /** Never throws: any input becomes a loadout that the strict rules accept (ownership aside). */
 export function coerceAvatarLoadout(
   raw: unknown,
-  hints: AvatarLoadoutCoercionHints = {}
+  hints: AvatarLoadoutCoercionHints = {},
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
 ): AvatarLoadout {
   const stored = isRecord(raw) ? raw : {}
-  const bodyId = resolveAvatarBodyId(stored.bodyId, hints)
-  const starter = starterLoadoutForBody(bodyId)
+  const bodyId = resolveAvatarBodyId(stored.bodyId, hints, rules)
+  const starter = starterLoadoutForBody(bodyId, rules)
   const items = Object.fromEntries(
-    ITEM_SLOTS.map(([key, slot]) => [key, wearableId(stored[key], slot, bodyId) ?? starter[key]])
+    ITEM_SLOTS.map(([key, slot]) => [key, wearableId(stored[key], slot, bodyId, rules) ?? starter[key]])
   ) as Record<ItemKey, string>
   const base: AvatarLoadoutV1 = {
     schemaVersion: 1,
     bodyId,
     ...items,
-    accessoryIds: wearableAccessories(stored.accessoryIds, bodyId)
+    accessoryIds: wearableAccessories(stored.accessoryIds, bodyId, rules)
   }
   if (stored.schemaVersion === 2) {
     return firstValid([
-      toV2(base, wearableDressId(stored.dressId, bodyId)),
+      toV2(base, wearableDressId(stored.dressId, bodyId, rules)),
       toV2(base, null),
       toV2(withStarterOutfit(base, starter), null),
       toV2(cloneAvatarLoadout(starter), null)
-    ])
+    ], rules)
   }
-  return firstValid([base, withStarterOutfit(base, starter), cloneAvatarLoadout(starter)])
+  return firstValid([base, withStarterOutfit(base, starter), cloneAvatarLoadout(starter)], rules)
 }
 
 /** The stored body when it is a wearable body; else the preset hint, then gender, then the girl. */
-export function resolveAvatarBodyId(rawBodyId: unknown, hints: AvatarLoadoutCoercionHints = {}): string {
-  if (isBodyId(rawBodyId)) return rawBodyId
-  if (isBodyId(hints.presetId)) return hints.presetId
-  return hints.gender === "man" ? DEFAULT_MALE_AVATAR_LOADOUT.bodyId : DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId
+export function resolveAvatarBodyId(
+  rawBodyId: unknown,
+  hints: AvatarLoadoutCoercionHints = {},
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
+): string {
+  if (isBodyId(rawBodyId, rules)) return rawBodyId
+  if (isBodyId(hints.presetId, rules)) return hints.presetId
+  return hints.gender === "man" ? rules.starters.male.bodyId : rules.starters.female.bodyId
 }
 
-function starterLoadoutForBody(bodyId: string): ReadonlyAvatarLoadout<AvatarLoadoutV1> {
-  return STARTERS.find((starter) => starter.bodyId === bodyId) ?? DEFAULT_FEMALE_AVATAR_LOADOUT
+function starterLoadoutForBody(bodyId: string, rules: AvatarItemRules): ReadonlyAvatarLoadout<AvatarLoadoutV1> {
+  return avatarStarterLooks(rules).find((starter) => starter.bodyId === bodyId) ?? rules.starters.female
 }
 
-function isBodyId(value: unknown): value is string {
-  if (typeof value !== "string" || isRetiredAvatarItemId(value)) return false
-  const item = CATALOG_BY_ID.get(value)
+function isBodyId(value: unknown, rules: AvatarItemRules): value is string {
+  if (typeof value !== "string" || isAvatarItemRetired(rules, value)) return false
+  const item = findAvatarRuleItem(rules, value)
   return item?.slot === "body" && item.supportedBodyIds.includes(value) &&
-    STARTERS.some((starter) => starter.bodyId === value)
+    avatarStarterLooks(rules).some((starter) => starter.bodyId === value)
 }
 
-function wearableItem(value: unknown, slot: AvatarLoadoutSlot, bodyId: string): AvatarLoadoutCatalogItem | null {
-  if (typeof value !== "string" || isRetiredAvatarItemId(value)) return null
-  const item = CATALOG_BY_ID.get(value)
+function wearableItem(
+  value: unknown,
+  slot: AvatarLoadoutSlot,
+  bodyId: string,
+  rules: AvatarItemRules
+): AvatarLoadoutCatalogItem | null {
+  if (typeof value !== "string" || isAvatarItemRetired(rules, value)) return null
+  const item = findAvatarRuleItem(rules, value)
   return item?.slot === slot && item.supportedBodyIds.includes(bodyId) ? item : null
 }
 
-function wearableId(value: unknown, slot: AvatarLoadoutSlot, bodyId: string): string | null {
-  return wearableItem(value, slot, bodyId)?.itemId ?? null
+function wearableId(value: unknown, slot: AvatarLoadoutSlot, bodyId: string, rules: AvatarItemRules): string | null {
+  return wearableItem(value, slot, bodyId, rules)?.itemId ?? null
 }
 
-function wearableAccessories(value: unknown, bodyId: string): string[] {
+function wearableAccessories(value: unknown, bodyId: string, rules: AvatarItemRules): string[] {
   if (!Array.isArray(value)) return []
   const kept: AvatarLoadoutCatalogItem[] = []
   for (const candidate of value) {
-    const item = wearableItem(candidate, "accessory", bodyId)
+    const item = wearableItem(candidate, "accessory", bodyId, rules)
     if (!item || kept.length >= MAX_ACCESSORIES) continue
     if (kept.some((other) => other.itemId === item.itemId || other.accessoryGroup === item.accessoryGroup)) continue
     kept.push(item)
@@ -112,10 +119,10 @@ function wearableAccessories(value: unknown, bodyId: string): string[] {
   return kept.map((item) => item.itemId)
 }
 
-function wearableDressId(value: unknown, bodyId: string): string | null {
-  const top = wearableItem(value, "top", bodyId)
+function wearableDressId(value: unknown, bodyId: string, rules: AvatarItemRules): string | null {
+  const top = wearableItem(value, "top", bodyId, rules)
   if (!top?.pairedItemId) return null
-  return wearableItem(top.pairedItemId, "bottom", bodyId) ? top.itemId : null
+  return wearableItem(top.pairedItemId, "bottom", bodyId, rules) ? top.itemId : null
 }
 
 function withStarterOutfit(
@@ -129,9 +136,10 @@ function toV2(loadout: ReadonlyAvatarLoadout<AvatarLoadoutV1>, dressId: string |
   return { ...loadout, schemaVersion: 2, dressId, outerwearId: null, accessoryIds: [...loadout.accessoryIds] }
 }
 
-function firstValid(candidates: readonly AvatarLoadout[]): AvatarLoadout {
+function firstValid(candidates: readonly AvatarLoadout[], rules: AvatarItemRules): AvatarLoadout {
+  const allItemIds = rules.items.map((item) => item.itemId)
   for (const candidate of candidates) {
-    const result = validateAvatarLoadout(candidate, ALL_CATALOG_ITEM_IDS)
+    const result = validateAvatarLoadout(candidate, allItemIds, rules)
     if (result.ok) return result.loadout
   }
   // The last candidate is a starter, which the catalog tests prove valid.

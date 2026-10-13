@@ -6,6 +6,7 @@ import {
   coerceAvatarLoadout,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT,
+  type AvatarItemRules,
   type AvatarLoadoutCoercionHints,
   type AvatarStillManifest
 } from "@blumi/domain"
@@ -27,10 +28,15 @@ export type AvatarTryOnRenderer = "showcase" | "legacy"
  */
 export function avatarTryOnRenderer(
   look: unknown,
-  options: { readonly hints?: AvatarLoadoutCoercionHints; readonly manifest?: AvatarStillManifest } = {}
+  options: {
+    readonly hints?: AvatarLoadoutCoercionHints
+    readonly manifest?: AvatarStillManifest
+    /** Test seam: the item rules coercion reads. The default is the live catalog. */
+    readonly rules?: AvatarItemRules
+  } = {}
 ): AvatarTryOnRenderer {
   const manifest = options.manifest ?? AVATAR_STILL_MANIFEST
-  const loadout = coerceAvatarLoadout(look, options.hints ?? {})
+  const loadout = coerceAvatarLoadout(look, options.hints ?? {}, options.rules)
   // the 2.5D resolvers ignore a dress (its pair is drawn per slot), so a worn dress is not truthful there yet
   if ("dressId" in loadout && loadout.dressId) return "legacy"
   const rig = avatarStillRigForBody(loadout.bodyId)

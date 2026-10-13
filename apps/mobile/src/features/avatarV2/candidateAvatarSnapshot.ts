@@ -15,7 +15,10 @@ import {
   normalizeAvatarSelection,
   normalizeCompleteAvatarSelection
 } from "./avatarSelectionModel"
-import { projectAvatarV2ToRoomAvatarAppearance } from "./room/avatarRoomProjection"
+import {
+  projectAvatarV2ToRoomAvatarAppearance,
+  type AvatarRoomProjectionSource
+} from "./room/avatarRoomProjection"
 
 export const MALE_AVATAR_PRESET_ID = "avatar_v2_body_male_light"
 
@@ -91,12 +94,14 @@ export function readCandidateAvatarSnapshot(
 }
 
 export function createCandidateAvatarAppearance(
-  snapshot: CandidateAvatarSnapshot
+  snapshot: CandidateAvatarSnapshot,
+  projectionSource: AvatarRoomProjectionSource = {}
 ): RoomAvatarAppearance {
   const complete = normalizeCompleteAvatarSelection(snapshot.avatarSelection)
   if (complete) {
     return projectAvatarV2ToRoomAvatarAppearance({
-      avatar: loadoutToUserAvatar(complete.loadout)
+      avatar: loadoutToUserAvatar(complete.loadout),
+      ...projectionSource
     }).appearance
   }
   if (snapshot.bodyPreset === "male") {

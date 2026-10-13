@@ -19,13 +19,16 @@ import { createEconomyService } from "./economyService"
 const STORED_AT = "2026-06-01T00:00:00.000Z"
 const READ_AT = new Date("2026-10-11T10:00:00.000Z")
 
-/** A paid, still-sold old item of this slot for this body: the kind of item a returning player bought. */
+/**
+ * A paid old item of this slot for this body: the kind of item a returning player bought. Plan X15 retired every
+ * paid old item (owner yes 2026-10-12), so it is now hidden; it was sold before.
+ */
 function paidRetiringItem(slot: string, bodyId: string): string {
   const item = AVATAR_LOADOUT_CATALOG.find((entry) =>
     entry.slot === slot &&
     entry.supportedBodyIds.includes(bodyId) &&
     isRetiringAvatarItemId(entry.itemId) &&
-    !RETIRED_AVATAR_ITEM_IDS.has(entry.itemId) &&
+    RETIRED_AVATAR_ITEM_IDS.has(entry.itemId) &&
     ECONOMY_CATALOG.some((sold) => sold.itemId === entry.itemId && sold.priceCoins > 0 && !sold.ownedByDefault)
   )
   assert.ok(item, `no paid ${slot} for ${bodyId}`)
@@ -81,7 +84,8 @@ for (const starter of [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOU
     const validation = validateAvatarLoadout(selection.loadout, inventory.ownedAvatarItemIds)
     assert.ok(validation.ok, validation.ok ? "" : validation.code)
     assert.equal(selection.loadout.bodyId, bodyId)
-    assert.equal(selection.loadout.shoesId, paidShoes, "an owned, still-sold old item stays worn")
+    // plan X15: a bought old item stays owned (asserted above) but is retired, so the look reads its starter piece
+    assert.equal(selection.loadout.shoesId, starter.shoesId, "an owned, retired old item reads as the starter piece")
     assert.equal(selection.loadout.topId, starter.topId)
     assert.equal(selection.loadout.bottomId, starter.bottomId)
     assert.equal(selection.revision, 9)

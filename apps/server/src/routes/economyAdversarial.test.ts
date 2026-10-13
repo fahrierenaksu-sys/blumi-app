@@ -2,13 +2,14 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createHmac } from "node:crypto"
 import {
-  DEFAULT_FEMALE_AVATAR_LOADOUT,
-  DEFAULT_MALE_AVATAR_LOADOUT
+  TEST_AVATAR_ITEM,
+  TEST_AVATAR_ITEM_RULES
 } from "@blumi/domain"
 import { createAuthService, type AuthService } from "../auth/authService"
+import { createAvatarService } from "../avatar/avatarService"
 import { createEconomyService } from "../economy/economyService"
 import {
-  TEST_ROOM_ECONOMY_CATALOG,
+  TEST_ECONOMY_CATALOG,
   TEST_ROOM_PAID_ITEM_ID,
   TEST_ROOM_STARTER_ITEM_ID
 } from "../economy/testRoomCatalog"
@@ -21,9 +22,13 @@ import { createServer } from "../server"
 // economyAdversarial.postgres.test.ts.
 
 const CODE = "482931"
-const FEMALE_TOP = "avatar_v2_top_sage_ribbon_knit_jacket" // 410 coins
-const CHEAP_TOP = "avatar_v2_top_rosebud_picnic_peplum" // 80 coins
-const MALE_TOP = "avatar_v2_top_male_tonal_geometric_camp_collar_shirt"
+// Plan X15: the live catalog sells no avatar item, so the avatar attacks run on the test-only fixture catalog
+// (`TEST_AVATAR_ITEM_RULES` + `TEST_ECONOMY_CATALOG`); the rules, prices and assertions are unchanged.
+const FEMALE_TOP = TEST_AVATAR_ITEM.girlTopPaid // 410 coins
+const CHEAP_TOP = TEST_AVATAR_ITEM.sharedTopPaid // 80 coins
+const MALE_TOP = TEST_AVATAR_ITEM.boyTopPaid
+const DEFAULT_FEMALE_AVATAR_LOADOUT = TEST_AVATAR_ITEM_RULES.starters.female
+const DEFAULT_MALE_AVATAR_LOADOUT = TEST_AVATAR_ITEM_RULES.starters.male
 const ROOM_ITEM = TEST_ROOM_PAID_ITEM_ID // 240 coins (test-only stand-in; no live room piece is sellable yet)
 const STARTER_COINS = 1250
 const ROOM_SHELL = "room_v2_shell_blumi_world_v1"
@@ -59,9 +64,10 @@ async function onboardedAccount(authService: AuthService, options: { onboard?: b
 
 function harness() {
   const authService = createAuthService({ codeFactory: () => CODE })
-  const economyService = createEconomyService({ catalog: TEST_ROOM_ECONOMY_CATALOG })
+  const economyService = createEconomyService({ catalog: TEST_ECONOMY_CATALOG, avatarRules: TEST_AVATAR_ITEM_RULES })
+  const avatarService = createAvatarService({ authService, economyService, avatarRules: TEST_AVATAR_ITEM_RULES })
   const referralService = createReferralService()
-  const app = createServer({ authService, economyService, referralService })
+  const app = createServer({ authService, economyService, avatarService, referralService })
   return { app, authService, economyService }
 }
 
@@ -103,9 +109,9 @@ test("A2 twenty concurrent identical purchases debit once", async () => {
 test("A3 concurrent different purchases never overdraw the balance", async () => {
   const { app, authService } = harness()
   const user = await onboardedAccount(authService)
-  const items = [FEMALE_TOP, "avatar_v2_top_azure_garden_halter", "avatar_v2_top_coral_wave_polo",
-    "avatar_v2_shoes_pearl_slingback_sandals", "avatar_v2_accessory_cherry_micro_bag", "avatar_v2_shoes_onyx_heart_mary_janes",
-    "avatar_v2_accessory_honey_blossom_square_glasses", "avatar_v2_accessory_rose_round_glasses"]
+  const items = [FEMALE_TOP, TEST_AVATAR_ITEM.girlHairPaid, TEST_AVATAR_ITEM.sharedHairPaid,
+    TEST_AVATAR_ITEM.girlBottomPaid, TEST_AVATAR_ITEM.paidEarrings, TEST_AVATAR_ITEM.sharedShoesPaid,
+    TEST_AVATAR_ITEM.paidHeadwear, TEST_AVATAR_ITEM.paidEyewear]
   const responses = await Promise.all(items.map((itemId) =>
     app.inject({ method: "POST", url: "/v1/economy/purchase", headers: user.headers, payload: { itemId, type: "avatar" } })
   ))
@@ -126,7 +132,8 @@ test("A4 unknown, cross-category, default-owned, retired and wrong-body items ar
     { itemId: "avatar_v2_top_does_not_exist", type: "avatar", error: /not available/i },
     { itemId: FEMALE_TOP, type: "room", error: /not available/i },
     { itemId: ROOM_ITEM, type: "avatar", error: /not available/i },
-    { itemId: "avatar_v2_top_default", type: "avatar", error: /already own/i },
+    { itemId: DEFAULT_FEMALE_AVATAR_LOADOUT.topId, type: "avatar", error: /already own/i },
+    { itemId: TEST_AVATAR_ITEM.retiredTop, type: "avatar", error: /not available/i },
     { itemId: TEST_ROOM_STARTER_ITEM_ID, type: "room", error: /already own/i },
     { itemId: "room_v2_cozy_bed", type: "room", error: /not available/i },
     { itemId: "room_v3_sofa_japon_cream", type: "room", error: /not available/i },

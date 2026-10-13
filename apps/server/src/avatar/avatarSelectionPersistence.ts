@@ -8,9 +8,11 @@ import {
   isAvatarLoadoutV2
 } from "@blumi/contracts"
 import {
+  AVATAR_ITEM_RULES,
   cloneAvatarLoadout,
   coerceAvatarLoadout,
-  toAvatarLoadoutV2
+  toAvatarLoadoutV2,
+  type AvatarItemRules
 } from "@blumi/domain"
 
 export interface StoredAvatarSelectionInput {
@@ -32,7 +34,8 @@ export interface StoredAvatarSelectionInput {
  * save stores a loadout that `validateAvatarLoadout` checks strictly.
  */
 export function normalizeStoredAvatarSelection(
-  input: StoredAvatarSelectionInput
+  input: StoredAvatarSelectionInput,
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
 ): CompleteAvatarSelection {
   if (!isRecord(input.loadout) || !isAvatarRevision(input.revision)) {
     throw invalidStoredAvatarSelection()
@@ -40,7 +43,7 @@ export function normalizeStoredAvatarSelection(
   const loadout = coerceAvatarLoadout(input.loadout, {
     presetId: input.presetId,
     gender: input.genderHint
-  })
+  }, rules)
   return {
     presetId: loadout.bodyId,
     loadout,
@@ -62,11 +65,12 @@ export function cloneCompleteAvatarSelection(
  */
 export function resolveSemanticAvatarWrite(
   requested: AvatarLoadout,
-  current: AvatarLoadout
+  current: AvatarLoadout,
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
 ): AvatarLoadout {
   if (!isAvatarLoadoutV1(requested)) return cloneAvatarLoadout(requested)
 
-  const converted = toAvatarLoadoutV2(requested)
+  const converted = toAvatarLoadoutV2(requested, rules)
   if (!isAvatarLoadoutV2(current) && converted.dressId === null) {
     return cloneAvatarLoadout(requested)
   }

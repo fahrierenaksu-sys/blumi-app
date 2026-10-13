@@ -1,6 +1,7 @@
 import manifestJson from "./avatarStillManifest.json";
 import { DEFAULT_MALE_AVATAR_LOADOUT } from "./avatarLoadoutCatalog";
 import { coerceAvatarLoadout, type AvatarLoadoutCoercionHints } from "./avatarLoadoutCoercion";
+import type { AvatarItemRules } from "./avatarItemRules";
 import type { AvatarLoadout } from "@blumi/contracts";
 
 /**
@@ -194,10 +195,16 @@ export function avatarStillLayersFor(
 export function resolveAvatarStillLayers(
   rawLoadout: unknown,
   product: AvatarStillProduct,
-  options: { readonly hints?: AvatarLoadoutCoercionHints; readonly mirror?: boolean; readonly manifest?: AvatarStillManifest } = {},
+  options: {
+    readonly hints?: AvatarLoadoutCoercionHints;
+    readonly mirror?: boolean;
+    readonly manifest?: AvatarStillManifest;
+    /** The item facts the loadout is coerced with; the live catalog unless a test injects its fixture. */
+    readonly rules?: AvatarItemRules;
+  } = {},
 ): AvatarStillResolved {
   const manifest = options.manifest ?? AVATAR_STILL_MANIFEST;
-  const loadout = coerceAvatarLoadout(rawLoadout, options.hints ?? {});
+  const loadout = coerceAvatarLoadout(rawLoadout, options.hints ?? {}, options.rules);
   const rig = avatarStillRigForBody(loadout.bodyId);
   const body = manifest.bodies[rig];
   const drawn = avatarStillDrawnItems(body, loadout);

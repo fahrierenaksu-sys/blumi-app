@@ -1,6 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { AVATAR_STILL_MANIFEST, DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT } from "@blumi/domain"
+import {
+  AVATAR_ITEM_RULES,
+  AVATAR_STILL_MANIFEST,
+  type AvatarItemRules,
+  DEFAULT_FEMALE_AVATAR_LOADOUT,
+  DEFAULT_MALE_AVATAR_LOADOUT
+} from "@blumi/domain"
 import { avatarTryOnRenderer } from "../../avatar/model/avatarTryOnModel"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../../testing/hookHarness"
 
@@ -40,6 +46,31 @@ const GIRL_2_5D = {
   accessoryIds: []
 }
 
+/**
+ * Test-only "old pieces": after X15 every real old item is retired, so coercion would turn one into the starter.
+ * These fixture items are wearable on the girl and have no 2.5D art, which is what an old piece used to be.
+ */
+const OLD_PIECE = {
+  hairId: "fixture_old_hair",
+  topId: "fixture_old_top",
+  bottomId: "fixture_old_bottom",
+  shoesId: "fixture_old_shoes"
+} as const
+const OLD_PIECE_RULES: AvatarItemRules = {
+  ...AVATAR_ITEM_RULES,
+  items: [
+    ...AVATAR_ITEM_RULES.items,
+    ...(["hair", "top", "bottom", "shoes"] as const).map((slot) => ({
+      itemId: OLD_PIECE[`${slot}Id`],
+      slot,
+      supportedBodyIds: [DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId]
+    }))
+  ]
+}
+
+/** The figure's renderer choice, reading the fixture rules so an old piece stays a kept piece. */
+const avatarTryOnRendererWithOldPieces = (look: unknown) => avatarTryOnRenderer(look, { rules: OLD_PIECE_RULES })
+
 function mountFigure() {
   const runtime = createFakeReactRuntime()
   const legacyLooks: unknown[] = []
@@ -49,7 +80,7 @@ function mountFigure() {
     {
       modules: {
         "../../avatar/components/AvatarShowcase": { AvatarShowcase },
-        "../../avatar/model/avatarTryOnModel": { avatarTryOnRenderer },
+        "../../avatar/model/avatarTryOnModel": { avatarTryOnRenderer: avatarTryOnRendererWithOldPieces },
         "../avatarV2Catalog": { AVATAR_V2_CATALOG: [] },
         "../room/avatarRoomCatalog": { ROOM_AVATAR_CATALOG: [] },
         "../room/avatarRoomProjection": {
@@ -86,7 +117,7 @@ test("a look the 2.5D art covers is the showcase figure of exactly that look, in
 
 test("trying on an old piece draws that piece (old drawing, whole figure), never the 2.5D starter in its place", () => {
   const figure = mountFigure()
-  const look = { ...GIRL_2_5D, topId: DEFAULT_FEMALE_AVATAR_LOADOUT.topId }
+  const look = { ...GIRL_2_5D, topId: OLD_PIECE.topId }
   const output = figure.render({ avatar: look, width: 200, height: 300, accessibilityLabel: "Karakterim" })
   assert.equal(find(output, AvatarShowcase), undefined)
   const legacy = find(output, RoomAvatarRenderer2D)

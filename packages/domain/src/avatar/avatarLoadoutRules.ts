@@ -8,15 +8,18 @@ import {
   isAvatarLoadoutV1,
   isAvatarLoadoutV2
 } from "@blumi/contracts"
-import {
-  AVATAR_LOADOUT_CATALOG,
-  DEFAULT_FEMALE_AVATAR_LOADOUT,
-  DEFAULT_MALE_AVATAR_LOADOUT,
-  type AvatarLoadoutCatalogItem,
-  type AvatarLoadoutSlot,
-  type ReadonlyAvatarLoadout
+import type {
+  AvatarLoadoutCatalogItem,
+  AvatarLoadoutSlot,
+  ReadonlyAvatarLoadout
 } from "./avatarLoadoutCatalog"
-import { isRetiredAvatarItemId } from "./retiredAvatarItems"
+import {
+  AVATAR_ITEM_RULES,
+  avatarStarterLooks,
+  findAvatarRuleItem,
+  isAvatarItemRetired,
+  type AvatarItemRules
+} from "./avatarItemRules"
 
 export type AvatarLoadoutValidationCode =
   | "invalid_shape"
@@ -69,7 +72,8 @@ const REQUIRED_SLOTS: readonly [RequiredLoadoutItemKey, AvatarLoadoutSlot][] = [
 
 export function validateAvatarLoadout(
   input: unknown,
-  ownedItemIds: readonly string[]
+  ownedItemIds: readonly string[],
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
 ): AvatarLoadoutValidationResult {
   const loadout = parseAvatarLoadout(input)
   if (!loadout) return invalid("invalid_shape", "Choose a complete avatar look.")
@@ -77,7 +81,7 @@ export function validateAvatarLoadout(
     loadout.mouthId, loadout.hairId, loadout.topId, loadout.bottomId,
     loadout.shoesId, ...loadout.accessoryIds,
     ...(loadout.schemaVersion === 2 ? [loadout.dressId, loadout.outerwearId] : [])]
-    .some((itemId) => itemId !== null && isRetiredAvatarItemId(itemId))) {
+    .some((itemId) => itemId !== null && isAvatarItemRetired(rules, itemId))) {
     return invalid("retired_item", "This avatar item is temporarily unavailable.")
   }
   if (loadout.accessoryIds.length > MAX_ACCESSORIES) {
@@ -89,12 +93,12 @@ export function validateAvatarLoadout(
 
   const selectedItems: AvatarLoadoutCatalogItem[] = []
   for (const [loadoutKey, slot] of REQUIRED_SLOTS) {
-    const result = resolveSelectedItem(loadout[loadoutKey] as string, slot)
+    const result = resolveSelectedItem(loadout[loadoutKey] as string, slot, rules)
     if ("error" in result) return result.error
     selectedItems.push(result.item)
   }
   for (const accessoryId of loadout.accessoryIds) {
-    const result = resolveSelectedItem(accessoryId, "accessory")
+    const result = resolveSelectedItem(accessoryId, "accessory", rules)
     if ("error" in result) return result.error
     selectedItems.push(result.item)
   }
@@ -103,7 +107,7 @@ export function validateAvatarLoadout(
       return invalid("unknown_item", "Outerwear is not available in the room yet.")
     }
     if (loadout.dressId !== null) {
-      const result = resolveDressItems(loadout.dressId)
+      const result = resolveDressItems(loadout.dressId, rules)
       if ("error" in result) return result.error
       selectedItems.push(...result.items)
     }
@@ -129,7 +133,7 @@ export function validateAvatarLoadout(
       "Choose only one accessory from each style group."
     )
   }
-  if (!hasValidOutfitPair(loadout)) {
+  if (!hasValidOutfitPair(loadout, rules)) {
     return invalid("outfit_pair_mismatch", "Choose the complete matching outfit.")
   }
   return { ok: true, loadout: cloneAvatarLoadout(loadout) }
@@ -168,14 +172,15 @@ export function cloneAvatarLoadout(
 }
 
 export function toAvatarLoadoutV2(
-  loadout: ReadonlyAvatarLoadout
+  loadout: ReadonlyAvatarLoadout,
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
 ): AvatarLoadoutV2 {
   if (loadout.schemaVersion === 2) {
     return cloneAvatarLoadout(loadout)
   }
-  const legacyDress = findLegacyDressItems(loadout)
+  const legacyDress = findLegacyDressItems(loadout, rules)
   if (legacyDress) {
-    const starter = findStarterLoadout(loadout.bodyId)
+    const starter = findStarterLoadout(loadout.bodyId, rules)
     if (!starter) {
       throw new Error("No starter separates are configured for this avatar body.")
     }
@@ -199,10 +204,11 @@ export function toAvatarLoadoutV2(
 }
 
 export function projectAvatarLoadoutV1(
-  loadout: ReadonlyAvatarLoadout
+  loadout: ReadonlyAvatarLoadout,
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
 ): AvatarLoadoutV1 {
   const dressItems = loadout.schemaVersion === 2 && loadout.dressId !== null
-    ? findDressItems(loadout.dressId)
+    ? findDressItems(loadout.dressId, rules)
     : null
   if (loadout.schemaVersion === 2 && loadout.dressId !== null && !dressItems) {
     throw new Error("Cannot project an unknown or incomplete dress entitlement.")
@@ -230,11 +236,12 @@ function parseAvatarLoadout(input: unknown): AvatarLoadout | null {
 
 function resolveSelectedItem(
   itemId: string,
-  slot: AvatarLoadoutSlot
+  slot: AvatarLoadoutSlot,
+  rules: AvatarItemRules
 ):
   | { ok: true; item: AvatarLoadoutCatalogItem }
   | { ok: false; error: AvatarLoadoutValidationResult & { ok: false } } {
-  const item = AVATAR_LOADOUT_CATALOG.find((entry) => entry.itemId === itemId)
+  const item = findAvatarRuleItem(rules, itemId)
   if (!item) {
     return { ok: false, error: invalid("unknown_item", "Unknown avatar item.") }
   }
@@ -245,11 +252,12 @@ function resolveSelectedItem(
 }
 
 function resolveDressItems(
-  itemId: string
+  itemId: string,
+  rules: AvatarItemRules
 ):
   | { ok: true; items: readonly [AvatarLoadoutCatalogItem, AvatarLoadoutCatalogItem] }
   | { ok: false; error: AvatarLoadoutValidationResult & { ok: false } } {
-  const dressTop = AVATAR_LOADOUT_CATALOG.find((entry) => entry.itemId === itemId)
+  const dressTop = findAvatarRuleItem(rules, itemId)
   if (!dressTop) {
     return { ok: false, error: invalid("unknown_item", "Unknown avatar item.") }
   }
@@ -259,7 +267,7 @@ function resolveDressItems(
       error: invalid("wrong_slot", "Avatar item is in the wrong slot.")
     }
   }
-  const dressItems = findDressItems(itemId)
+  const dressItems = findDressItems(itemId, rules)
   if (!dressItems) {
     return {
       ok: false,
@@ -270,15 +278,14 @@ function resolveDressItems(
 }
 
 function findDressItems(
-  itemId: string
+  itemId: string,
+  rules: AvatarItemRules
 ): readonly [AvatarLoadoutCatalogItem, AvatarLoadoutCatalogItem] | null {
-  const dressTop = AVATAR_LOADOUT_CATALOG.find((entry) => entry.itemId === itemId)
+  const dressTop = findAvatarRuleItem(rules, itemId)
   if (dressTop?.slot !== "top" || !dressTop.outfitKey || !dressTop.pairedItemId) {
     return null
   }
-  const pairedBottom = AVATAR_LOADOUT_CATALOG.find(
-    (entry) => entry.itemId === dressTop.pairedItemId
-  )
+  const pairedBottom = findAvatarRuleItem(rules, dressTop.pairedItemId)
   if (
     pairedBottom?.slot !== "bottom" ||
     pairedBottom.outfitKey !== dressTop.outfitKey ||
@@ -290,16 +297,18 @@ function findDressItems(
 }
 
 function findLegacyDressItems(
-  loadout: ReadonlyAvatarLoadout<AvatarLoadoutV1>
+  loadout: ReadonlyAvatarLoadout<AvatarLoadoutV1>,
+  rules: AvatarItemRules
 ): readonly [AvatarLoadoutCatalogItem, AvatarLoadoutCatalogItem] | null {
-  const dressItems = findDressItems(loadout.topId)
+  const dressItems = findDressItems(loadout.topId, rules)
   return dressItems?.[1].itemId === loadout.bottomId ? dressItems : null
 }
 
 function findStarterLoadout(
-  bodyId: string
+  bodyId: string,
+  rules: AvatarItemRules
 ): ReadonlyAvatarLoadout<AvatarLoadoutV1> | null {
-  return [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT].find(
+  return avatarStarterLooks(rules).find(
     (loadout) => loadout.bodyId === bodyId
   ) ?? null
 }
@@ -313,11 +322,9 @@ function hasAccessoryGroupConflict(
   return new Set(groups).size !== groups.length
 }
 
-function hasValidOutfitPair(loadout: AvatarLoadout): boolean {
-  const top = AVATAR_LOADOUT_CATALOG.find((item) => item.itemId === loadout.topId)
-  const bottom = AVATAR_LOADOUT_CATALOG.find(
-    (item) => item.itemId === loadout.bottomId
-  )
+function hasValidOutfitPair(loadout: AvatarLoadout, rules: AvatarItemRules): boolean {
+  const top = findAvatarRuleItem(rules, loadout.topId)
+  const bottom = findAvatarRuleItem(rules, loadout.bottomId)
   if (loadout.schemaVersion === 2) {
     return !top?.pairedItemId && !bottom?.pairedItemId
   }

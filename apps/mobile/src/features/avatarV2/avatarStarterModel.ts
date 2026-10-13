@@ -1,3 +1,4 @@
+import { DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT } from "@blumi/domain"
 import type { AvatarCatalogItem, UserAvatar } from "./avatarV2.types"
 import {
   isAvatarV2ItemCompatibleWithBody,
@@ -19,43 +20,24 @@ const STARTER_CATEGORY_LIMITS: Readonly<
   [MALE_STARTER_BODY_ID]: { hair: 2, top: 2, bottom: 2, shoes: 2 }
 }
 
-const STARTER_ITEM_IDS: Readonly<
+/** The starter pieces offered at avatar setup: exactly the body's starter look (plan X15). */
+export type AvatarStarterItemIds = Readonly<
   Record<string, Readonly<Record<StarterCategory, readonly string[]>>>
-> = {
-  [FEMALE_STARTER_BODY_ID]: {
-    hair: [
-      "avatar_v2_hair_mocha_ribbon_blowout",
-      "avatar_v2_hair_midnight_french_bob"
-    ],
-    top: [
-      "avatar_v2_top_default",
-      "avatar_v2_top_buttercream_bow_tee"
-    ],
-    bottom: [
-      "avatar_v2_bottom_default",
-      "avatar_v2_bottom_lavender_bow_twill_shorts"
-    ],
-    shoes: [
-      "avatar_v2_shoes_milk_tea_court_sneakers",
-      "avatar_v2_shoes_mint_ribbon_court_sneakers"
-    ]
-  },
-  [MALE_STARTER_BODY_ID]: {
-    hair: [
-      "avatar_v2_hair_male_cocoa_textured_quiff"
-    ],
-    top: [
-      "avatar_v2_top_male_powder_blue_crew_tee",
-      "avatar_v2_top_male_cream_basic_tee"
-    ],
-    bottom: [
-      "avatar_v2_bottom_male_navy_straight_pants",
-      "avatar_v2_bottom_male_sage_cuffed_shorts"
-    ],
-    shoes: [
-      "avatar_v2_shoes_male_milk_tea_court",
-      "avatar_v2_shoes_male_cloud_white_trainers"
-    ]
+>
+
+const STARTER_ITEM_IDS: AvatarStarterItemIds = {
+  [FEMALE_STARTER_BODY_ID]: starterItemIds(DEFAULT_FEMALE_AVATAR_LOADOUT),
+  [MALE_STARTER_BODY_ID]: starterItemIds(DEFAULT_MALE_AVATAR_LOADOUT)
+}
+
+function starterItemIds(
+  loadout: Pick<UserAvatar, "hairId" | "topId" | "bottomId" | "shoesId">
+): Readonly<Record<StarterCategory, readonly string[]>> {
+  return {
+    hair: [loadout.hairId],
+    top: [loadout.topId],
+    bottom: [loadout.bottomId],
+    shoes: [loadout.shoesId]
   }
 }
 
@@ -63,9 +45,10 @@ export function getAvatarStarterCategoryItems(
   catalog: readonly AvatarCatalogItem[],
   type: StarterCategory,
   bodyId: string,
-  canEquipItem: (item: AvatarCatalogItem) => boolean
+  canEquipItem: (item: AvatarCatalogItem) => boolean,
+  starterItemIds: AvatarStarterItemIds = STARTER_ITEM_IDS
 ): AvatarCatalogItem[] {
-  const configuredIds = STARTER_ITEM_IDS[bodyId]?.[type]
+  const configuredIds = starterItemIds[bodyId]?.[type]
   if (configuredIds) {
     const itemsById = new Map(catalog.map((item) => [item.id, item]))
     const configuredItems = configuredIds.flatMap((id) => {
