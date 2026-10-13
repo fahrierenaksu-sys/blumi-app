@@ -207,7 +207,7 @@ test("every old avatar id has one defined behaviour: legacy and replaced, or ret
 })
 
 test("only the kept ids stay out of the retiring list: bodies, face constants and the rig starters", () => {
-  const kept = new Set<string>(["avatar_v2_hair_male_soft_black_side_part"])
+  const kept = new Set<string>()
   for (const starter of STARTERS) {
     for (const id of [starter.bodyId, starter.faceId, starter.eyesId, starter.noseId, starter.mouthId]) kept.add(id)
   }

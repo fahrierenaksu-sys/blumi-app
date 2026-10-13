@@ -36,6 +36,26 @@ const {
 } = require("./room/avatarRoomMotionContract") as typeof import("./room/avatarRoomMotionContract")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset tables contain static requires.
 const { roomAvatarLayerAssets } = require("./room/avatarRoomAssets") as typeof import("./room/avatarRoomAssets")
+
+/**
+ * The boy's starter (curls + basic_a) is drawn only by his 2.5D rig, so the legacy room projection leaves those pieces
+ * unmapped and draws its own default layer for them. Any other unmapped piece is a real gap.
+ */
+function assertOnlyRigDrawnUnmapped(unmappedItemIds: readonly string[]) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  const { hasAvatarItemRigArt } = require("../avatar/model/avatarItemArt") as typeof import("../avatar/model/avatarItemArt")
+  for (const id of unmappedItemIds) assert.ok(hasAvatarItemRigArt(id), `${id} has neither a room projection nor rig art`)
+}
+
+/** A retired male piece under a fixture ID that is still wearable and maps to the same room art (plan X15 pattern). */
+function keptMaleFixture(realId: string, fixtureId: string) {
+  const item = AVATAR_V2_CATALOG.find((entry) => entry.id === realId)
+  assert.ok(item, realId)
+  return {
+    avatarCatalog: [...AVATAR_V2_CATALOG, { ...item, id: fixtureId, hiddenFromShop: false, hiddenFromWardrobe: false }],
+    projectionMap: { ...DEFAULT_AVATAR_ROOM_PROJECTION_MAP, [fixtureId]: DEFAULT_AVATAR_ROOM_PROJECTION_MAP[realId] }
+  }
+}
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset tables contain static requires.
 const { roomAvatarMotionLayerAssets } = require("./room/avatarRoomMotionAssets") as typeof import("./room/avatarRoomMotionAssets")
 
@@ -245,8 +265,9 @@ test("room snapshots fail closed when a female accessory is supplied to a male a
   )
 })
 
-test("the free masculine crew tee projects and renders only on the male fitted stack", () => {
-  const topId = "avatar_v2_top_male_powder_blue_crew_tee"
+test("the masculine crew tee room art projects and renders only on the male fitted stack", () => {
+  // the crew tee itself is retired with the boy's former starter; a fixture copy keeps its room art wearable
+  const topId = "fixture_kept_male_crew_tee"
   const roomTopId = "room_avatar_top_male_powder_blue_crew_tee_v1"
   const roomTop = ROOM_AVATAR_CATALOG.find((item) => item.id === roomTopId)
 
@@ -255,6 +276,7 @@ test("the free masculine crew tee projects and renders only on the male fitted s
   assert.match(String(roomTop?.asset.source), /avatar_room_top_male_powder_blue_crew_tee_v1\.png$/)
 
   const { appearance, unmappedItemIds } = projectAvatarV2ToRoomAvatarAppearance({
+    ...keptMaleFixture("avatar_v2_top_male_powder_blue_crew_tee", topId),
     avatar: {
       bodyId: "avatar_v2_body_male_light",
       faceId: "avatar_v2_face_male_warm_friendly",
@@ -269,15 +291,16 @@ test("the free masculine crew tee projects and renders only on the male fitted s
     }
   })
 
-  assert.deepEqual(unmappedItemIds, [])
+  assertOnlyRigDrawnUnmapped(unmappedItemIds)
   assert.equal(appearance.topId, roomTopId)
   const layers = getRoomAvatarRenderLayers({ appearance })
   assert.ok(layers.some((layer) => layer.id === roomTopId))
   assert.ok(layers.every((layer) => !layer.id.includes("female")))
 })
 
-test("the free navy straight pants project above the shoes on the male fitted stack", () => {
-  const bottomId = "avatar_v2_bottom_male_navy_straight_pants"
+test("the navy straight pants room art projects above the shoes on the male fitted stack", () => {
+  // the pants themselves are retired with the boy's former starter; a fixture copy keeps their room art wearable
+  const bottomId = "fixture_kept_male_navy_pants"
   const roomBottomId = "room_avatar_bottom_male_navy_straight_pants_v1"
   const roomBottom = ROOM_AVATAR_CATALOG.find((item) => item.id === roomBottomId)
   const shoes = ROOM_AVATAR_CATALOG.find(
@@ -291,6 +314,7 @@ test("the free navy straight pants project above the shoes on the male fitted st
   assert.ok(roomBottom!.layerOrder > shoes!.layerOrder)
 
   const { appearance, unmappedItemIds } = projectAvatarV2ToRoomAvatarAppearance({
+    ...keptMaleFixture("avatar_v2_bottom_male_navy_straight_pants", bottomId),
     avatar: {
       bodyId: "avatar_v2_body_male_light",
       faceId: "avatar_v2_face_male_warm_friendly",
@@ -305,7 +329,7 @@ test("the free navy straight pants project above the shoes on the male fitted st
     }
   })
 
-  assert.deepEqual(unmappedItemIds, [])
+  assertOnlyRigDrawnUnmapped(unmappedItemIds)
   assert.equal(appearance.bottomId, roomBottomId)
   const layers = getRoomAvatarRenderLayers({ appearance })
   const shoesIndex = layers.findIndex((layer) => layer.id === DEFAULT_ROOM_AVATAR_MALE.shoesId)
@@ -522,7 +546,8 @@ test("a persisted cream and sage male loadout falls back from retired hair and k
   assert.equal(appearance.baseId, DEFAULT_ROOM_AVATAR_MALE.baseId)
   assert.equal(appearance.faceId, DEFAULT_ROOM_AVATAR_MALE.faceId)
   assert.equal(appearance.hairBackId, undefined)
-  assert.equal(appearance.hairFrontId, "room_avatar_hair_front_male_soft_black_side_part_v1", "the boy starter hair (X15)")
+  // the retired hair reads as the starter curls, which only the 2.5D rig draws; the legacy stack shows its default hair
+  assert.equal(appearance.hairFrontId, DEFAULT_ROOM_AVATAR_MALE.hairFrontId, "the legacy default male hair")
   assert.equal(appearance.eyesId, undefined)
   assert.equal(appearance.noseId, undefined)
   assert.equal(appearance.mouthId, undefined)
@@ -530,7 +555,7 @@ test("a persisted cream and sage male loadout falls back from retired hair and k
   assert.equal(appearance.bottomId, "room_avatar_bottom_male_sage_cuffed_shorts_v1")
   assert.equal(appearance.shoesId, DEFAULT_ROOM_AVATAR_MALE.shoesId)
   assert.deepEqual(appearance.accessoryIds, [])
-  assert.deepEqual(unmappedItemIds, [])
+  assertOnlyRigDrawnUnmapped(unmappedItemIds)
   const layers = getRoomAvatarRenderLayers({ appearance })
   assert.ok(layers.length >= 6)
   assert.ok(layers.every((layer) => layer.fitProfileId === "blumi_male_room_avatar_v1"))

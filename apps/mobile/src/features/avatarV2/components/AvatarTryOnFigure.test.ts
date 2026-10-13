@@ -126,8 +126,8 @@ test("trying on an old piece draws that piece (old drawing, whole figure), never
   for (const drawn of figure.legacyLooks) assert.equal(drawn, look, "the old drawing gets the tried-on look itself")
 })
 
-test("the boy before his 2.5D pieces land keeps his old dressed drawing, not a bald base", () => {
+test("the boy's starter (curls + basic_a) draws as his 2.5D showcase figure, not the old drawing", () => {
   const output = mountFigure().render({ avatar: DEFAULT_MALE_AVATAR_LOADOUT, width: 200, height: 300, accessibilityLabel: "x" })
-  assert.equal(find(output, AvatarShowcase), undefined)
-  assert.ok(find(output, RoomAvatarRenderer2D))
+  assert.ok(find(output, AvatarShowcase))
+  assert.equal(find(output, RoomAvatarRenderer2D), undefined)
 })

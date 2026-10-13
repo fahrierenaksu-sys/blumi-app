@@ -252,6 +252,11 @@ async function assertResetState(client: PoolClient, accounts: Accounts, untouche
     assert.equal(rows[0]?.avatar_preset_id, loadout.bodyId)
     assert.equal(rows[0]?.avatar_revision, name === "fresh" ? 0 : 1, "only a changed look bumps its revision")
     assert.equal(validateAvatarLoadout(rows[0]?.avatar_selection, defaultsOwned).ok, true)
+    if (loadout === DEFAULT_MALE_AVATAR_LOADOUT) {
+      const worn = rows[0]?.avatar_selection as { hairId?: string; topId?: string } | undefined
+      assert.equal(worn?.hairId, "avatar_v2_hair_male_blue_black_curls", `${name} wears the curls`)
+      assert.equal(worn?.topId, "avatar_v2_top_male_white_basic_tee", `${name} wears basic_a`)
+    }
   }
 
   const rooms = createPersonalRoomDecorService({

@@ -112,6 +112,31 @@ function accountRow(avatarSelection: unknown, extra: Record<string, unknown> = {
   }
 }
 
+test("a boy stored in his former starter (side part + interim garments) reads as the curls and basic_a starter", async () => {
+  const former = {
+    ...toAvatarLoadoutV2(DEFAULT_MALE_AVATAR_LOADOUT),
+    hairId: "avatar_v2_hair_male_soft_black_side_part",
+    topId: "avatar_v2_top_male_powder_blue_crew_tee",
+    bottomId: "avatar_v2_bottom_male_navy_straight_pants",
+    shoesId: "avatar_v2_shoes_male_milk_tea_court"
+  }
+  const repository = createPostgresAuthRepository(fakePool([accountRow(former, { avatar_preset_id: DEFAULT_MALE_AVATAR_LOADOUT.bodyId })]))
+  const account = await repository.findAccountByUserId("user-fixture")
+  assert.ok(account)
+  const read = account.profile.avatar.loadout
+  assert.ok(read)
+  assert.deepEqual(
+    [read.hairId, read.topId, read.bottomId, read.shoesId],
+    [
+      "avatar_v2_hair_male_blue_black_curls",
+      "avatar_v2_top_male_white_basic_tee",
+      "avatar_v2_bottom_male_black_straight_trousers",
+      "avatar_v2_shoes_male_black_clean_sneakers"
+    ]
+  )
+  assert.equal(account.profile.avatar.presetId, DEFAULT_MALE_AVATAR_LOADOUT.bodyId)
+})
+
 test("an account with legacy item IDs still loads, as the starter look of the body its gender implies", async () => {
   const legacy = { ...legacyLoadout(DEFAULT_MALE_AVATAR_LOADOUT), bodyId: LEGACY }
   // Rows arrive as parsed JSON from pg, or as a JSON string from older drivers.

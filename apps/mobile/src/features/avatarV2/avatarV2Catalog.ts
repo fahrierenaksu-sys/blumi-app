@@ -4,6 +4,7 @@ import { MALE_PREMIUM_CAPSULE_RUNTIME } from "./malePremiumCapsulePilotDefinitio
 import {
   BOY_WARDROBE_PREVIEW_ITEM_IDS,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
+  DEFAULT_MALE_AVATAR_LOADOUT,
   getDefaultOwnedItemIds,
   isRetiredAvatarItemId
 } from "@blumi/domain"
@@ -88,10 +89,17 @@ const titleOf = (id: string): string =>
 
 /**
  * The boy's 2.5D wardrobe (domain boyWardrobePreview.ts): free and owned by every account during testing (economy
- * entry at 0 coins, ownedByDefault), so ownership arrives with the server inventory. Not marked ownedByDefault here, so
- * the client's slot fallback for a retired or incompatible piece stays the boy's starter look. Never sold (hidden from
- * the shop, no receipt).
+ * entry at 0 coins, ownedByDefault), so ownership arrives with the server inventory. His four starter pieces (curls +
+ * basic_a, `DEFAULT_MALE_AVATAR_LOADOUT`) are also marked ownedByDefault here, like the girl's starter, so avatar setup
+ * can offer them before the inventory loads. Never sold (hidden from the shop, no receipt).
  */
+const MALE_STARTER_ITEM_IDS: ReadonlySet<string> = new Set([
+  DEFAULT_MALE_AVATAR_LOADOUT.hairId,
+  DEFAULT_MALE_AVATAR_LOADOUT.topId,
+  DEFAULT_MALE_AVATAR_LOADOUT.bottomId,
+  DEFAULT_MALE_AVATAR_LOADOUT.shoesId
+])
+
 const BOY_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top", "bottom", "shoes"] as const).flatMap((type) =>
   BOY_WARDROBE_PREVIEW_ITEM_IDS[type].map((id, index) => ({
     id,
@@ -101,6 +109,7 @@ const BOY_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top", 
     layerOrder: AVATAR_V2_LAYER_ORDER[type],
     assets: {},
     hiddenFromShop: true,
+    ...(MALE_STARTER_ITEM_IDS.has(id) ? { ownedByDefault: true } : {}),
     compatibleBodyIds: ["avatar_v2_body_male_light"]
   })))
 

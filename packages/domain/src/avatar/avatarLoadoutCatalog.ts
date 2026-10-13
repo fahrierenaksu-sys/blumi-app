@@ -423,8 +423,9 @@ export const DEFAULT_FEMALE_AVATAR_LOADOUT: ReadonlyAvatarLoadout<AvatarLoadoutV
   });
 
 /**
- * The boy starter: his 2.5D hair plus the interim garments (`INTERIM_MALE_STARTER_ITEM_IDS`) until his
- * outfit 2 lands.
+ * The 2.5D boy starter (2026-10-13): the curls and the basic_a outfit, the four pieces his rig and stills draw.
+ * All are free `ownedByDefault` wardrobe pieces (`boyWardrobePreview.ts`). His previous starter pieces (the side
+ * part and the interim garments) are retired, never deleted, so a stored look that holds one reads as this one.
  */
 export const DEFAULT_MALE_AVATAR_LOADOUT: ReadonlyAvatarLoadout<AvatarLoadoutV1> = freezeLoadout(
   {
@@ -434,10 +435,10 @@ export const DEFAULT_MALE_AVATAR_LOADOUT: ReadonlyAvatarLoadout<AvatarLoadoutV1>
     eyesId: "avatar_v2_eyes_male_warm_brown",
     noseId: "avatar_v2_nose_male_gentle_bridge",
     mouthId: "avatar_v2_mouth_male_soft_smile",
-    hairId: "avatar_v2_hair_male_soft_black_side_part",
-    topId: "avatar_v2_top_male_powder_blue_crew_tee",
-    bottomId: "avatar_v2_bottom_male_navy_straight_pants",
-    shoesId: "avatar_v2_shoes_male_milk_tea_court",
+    hairId: "avatar_v2_hair_male_blue_black_curls",
+    topId: "avatar_v2_top_male_white_basic_tee",
+    bottomId: "avatar_v2_bottom_male_black_straight_trousers",
+    shoesId: "avatar_v2_shoes_male_black_clean_sneakers",
     accessoryIds: [],
   },
 );

@@ -215,8 +215,8 @@ test("female and male starter loadouts are valid immutable selections", () => {
   }
 })
 
-test("the free masculine crew tee is valid only with the male body", () => {
-  const topId = "avatar_v2_top_male_powder_blue_crew_tee"
+test("a free masculine tee is valid only with the male body", () => {
+  const topId = "avatar_v2_top_male_black_basic_tee"
   const ownedIds = [...ownedDefaultIds, topId]
 
   assert.equal(
@@ -235,8 +235,8 @@ test("the free masculine crew tee is valid only with the male body", () => {
   )
 })
 
-test("the free navy straight pants are valid only with the male body", () => {
-  const bottomId = "avatar_v2_bottom_male_navy_straight_pants"
+test("free masculine trousers are valid only with the male body", () => {
+  const bottomId = "avatar_v2_bottom_male_black_pocket_trousers"
   const ownedIds = [...ownedDefaultIds, bottomId]
 
   assert.equal(

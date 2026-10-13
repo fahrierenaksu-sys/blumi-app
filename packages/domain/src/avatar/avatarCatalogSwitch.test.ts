@@ -15,27 +15,81 @@ import {
 import { coerceAvatarLoadout } from "./avatarLoadoutCoercion"
 import { validateAvatarLoadout } from "./avatarLoadoutRules"
 import { AVATAR_STILL_MANIFEST } from "./avatarStills"
-import { INTERIM_MALE_STARTER_ITEM_IDS, RETIRED_AVATAR_ITEM_IDS, isRetiredAvatarItemId } from "./retiredAvatarItems"
+import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "./boyWardrobePreview"
+import { RETIRED_AVATAR_ITEM_IDS, isRetiredAvatarItemId } from "./retiredAvatarItems"
 
 // Plan X15 (owner yes 2026-10-12): the old avatarV2 items are retired, never deleted; the 2.5D starters are free.
 const STARTERS = [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT]
 const WORN_KEYS = ["bodyId", "faceId", "eyesId", "noseId", "mouthId", "hairId", "topId", "bottomId", "shoesId"] as const
 const CATALOG_IDS = new Set([...AVATAR_LOADOUT_CATALOG.map((item) => item.itemId), ...ECONOMY_CATALOG.map((item) => item.itemId)])
 
-test("every old avatar id is hidden except the boy's interim garments, and no hidden id leaves the catalogs", () => {
-  for (const id of RETIRING_AVATAR_ITEM_IDS) {
-    assert.equal(isRetiredAvatarItemId(id), !INTERIM_MALE_STARTER_ITEM_IDS.includes(id), id)
-  }
+// the boy's starter before 2026-10-13: the side part and three interim garments
+const FORMER_BOY_STARTER_IDS = [
+  "avatar_v2_hair_male_soft_black_side_part",
+  "avatar_v2_top_male_powder_blue_crew_tee",
+  "avatar_v2_bottom_male_navy_straight_pants",
+  "avatar_v2_shoes_male_milk_tea_court"
+]
+
+test("every old avatar id is hidden, and no hidden id leaves the catalogs", () => {
+  for (const id of RETIRING_AVATAR_ITEM_IDS) assert.equal(isRetiredAvatarItemId(id), true, id)
   for (const id of RETIRED_AVATAR_ITEM_IDS) assert.ok(CATALOG_IDS.has(id), `${id} was deleted instead of hidden`)
-  for (const id of INTERIM_MALE_STARTER_ITEM_IDS) assert.ok(CATALOG_IDS.has(id), id)
 })
 
-test("the girl's starter look is exactly the piece set her rig and stills draw", () => {
-  const drawn = AVATAR_STILL_MANIFEST.bodies.female.starter
+test("the boy's former starter pieces are retired, never deleted", () => {
+  for (const id of FORMER_BOY_STARTER_IDS) {
+    assert.equal(isRetiredAvatarItemId(id), true, id)
+    assert.ok(CATALOG_IDS.has(id), `${id} was deleted instead of hidden`)
+  }
+})
+
+for (const rig of ["female", "male"] as const) {
+  test(`the ${rig} starter look is exactly the piece set the ${rig} rig and stills draw`, () => {
+    const drawn = AVATAR_STILL_MANIFEST.bodies[rig].starter
+    const starter = rig === "male" ? DEFAULT_MALE_AVATAR_LOADOUT : DEFAULT_FEMALE_AVATAR_LOADOUT
+    assert.deepEqual(
+      { hair: starter.hairId, top: starter.topId, bottom: starter.bottomId, shoes: starter.shoesId },
+      { hair: drawn.hair, top: drawn.top, bottom: drawn.bottom, shoes: drawn.shoes }
+    )
+  })
+}
+
+test("the boy starts in the curls and the basic_a outfit from his free wardrobe", () => {
+  const boy = DEFAULT_MALE_AVATAR_LOADOUT
+  assert.deepEqual(
+    [boy.hairId, boy.topId, boy.bottomId, boy.shoesId],
+    [
+      "avatar_v2_hair_male_blue_black_curls",
+      "avatar_v2_top_male_white_basic_tee",
+      "avatar_v2_bottom_male_black_straight_trousers",
+      "avatar_v2_shoes_male_black_clean_sneakers"
+    ]
+  )
+  for (const id of [boy.hairId, boy.topId, boy.bottomId, boy.shoesId]) assert.ok(BOY_WARDROBE_PREVIEW_ALL_IDS.includes(id), id)
+})
+
+test("a boy who still wears his former starter reads as the new starter, and the stored value is untouched", () => {
+  const boy = DEFAULT_MALE_AVATAR_LOADOUT
+  const [hairId, topId, bottomId, shoesId] = FORMER_BOY_STARTER_IDS
+  const stored = { ...boy, hairId, topId, bottomId, shoesId, accessoryIds: [] }
+  const before = JSON.stringify(stored)
+  const read = coerceAvatarLoadout(stored, { presetId: boy.bodyId })
+  assert.equal(JSON.stringify(stored), before)
+  assert.deepEqual({ ...read, accessoryIds: [...read.accessoryIds] }, { ...boy, accessoryIds: [] })
+  assert.equal(validateAvatarLoadout(stored, getDefaultOwnedItemIds("avatar")).ok, false, "a new save of the old look is refused")
+})
+
+test("the girl's starter look is unchanged by the boy's new starter", () => {
   const girl = DEFAULT_FEMALE_AVATAR_LOADOUT
   assert.deepEqual(
-    { hair: girl.hairId, top: girl.topId, bottom: girl.bottomId, shoes: girl.shoesId },
-    { hair: drawn.hair, top: drawn.top, bottom: drawn.bottom, shoes: drawn.shoes }
+    [girl.bodyId, girl.hairId, girl.topId, girl.bottomId, girl.shoesId],
+    [
+      "avatar_v2_body_default",
+      "avatar_v2_hair_ink_pageboy_star",
+      "avatar_v2_top_coral_wave_polo",
+      "avatar_v2_bottom_coral_wave_pants",
+      "avatar_v2_shoes_mint_ribbon_court_sneakers"
+    ]
   )
 })
 

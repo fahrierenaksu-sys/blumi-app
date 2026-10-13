@@ -73,8 +73,14 @@ test("another face than the body's one drawn face keeps the old drawing", () => 
   assert.equal(avatarTryOnRenderer(look), "legacy")
 })
 
-test("a body without 2.5D pieces (the boy before his art lands) keeps the old drawing, never a bald base", () => {
-  assert.equal(avatarTryOnRenderer(DEFAULT_MALE_AVATAR_LOADOUT), "legacy")
+test("the boy's starter (curls + basic_a) is fully drawn by his 2.5D art, so it draws as the showcase figure", () => {
+  assert.equal(avatarTryOnRenderer(DEFAULT_MALE_AVATAR_LOADOUT), "showcase")
+})
+
+test("a body without 2.5D pieces for its look keeps the old drawing, never a bald base", () => {
+  const male = AVATAR_STILL_MANIFEST.bodies.male
+  const manifest = { ...AVATAR_STILL_MANIFEST, bodies: { ...AVATAR_STILL_MANIFEST.bodies, male: { ...male, items: {} } } }
+  assert.equal(avatarTryOnRenderer(DEFAULT_MALE_AVATAR_LOADOUT, { manifest }), "legacy")
 })
 
 test("once the boy's pieces have 2.5D art, his look draws as the showcase figure", () => {

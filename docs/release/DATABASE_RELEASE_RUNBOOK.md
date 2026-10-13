@@ -171,7 +171,8 @@ command; stop at the first STOP.
    → counts, `activity`, `starter`, `commit=`, `fingerprint=`, `expect=`. STOP if
    `commit` is not step 1's or says "modified", if `activity` is not all 0, if
    `starter` is not the release's starter look (girl: coral wave polo and pants,
-   ink pageboy hair) and room (`room_v3_bed_blumi_starter`), or if
+   ink pageboy hair; boy: blue-black curls, white basic tee, black straight
+   trousers, black clean sneakers) and room (`room_v3_bed_blumi_starter`), or if
    `keep.blumi_accounts` differs from the read-only audit's account count.
 5. Send the owner the short Turkish list (counts only): what is removed, what
    each user gets, what is kept. The reset is pre-approved; this is a notice.

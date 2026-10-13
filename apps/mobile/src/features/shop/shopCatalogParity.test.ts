@@ -75,6 +75,7 @@ test("every mobile shop item is represented by the shared economy catalog", () =
 });
 
 test("every Shop product is priced exactly as the shared economy catalog", () => {
+  let checked = 0;
   for (const bodyId of ["avatar_v2_body_default", "avatar_v2_body_male_light"]) {
     const products = buildShopCatalogItems({
       avatar: resolveInitialAvatarV2(bodyId),
@@ -90,13 +91,14 @@ test("every Shop product is priced exactly as the shared economy catalog", () =>
         placedItems: [],
       },
     });
-    assert.ok(products.length > 0);
     for (const product of products) {
       const type = product.sectionId === "avatar" ? "avatar" : "room";
       const economyItem = findEconomyCatalogItem(product.sourceItemId, type);
       assert.equal(product.priceCoins, economyItem?.priceCoins ?? null, product.sourceItemId);
+      checked += 1;
     }
   }
+  assert.ok(checked > 0, "no Shop product was checked");
 });
 
 test("room shop accepts an explicitly gated QA catalog and treats its QA-owned pieces as placeable", () => {
@@ -318,18 +320,18 @@ test("server loadout metadata exactly follows the runtime mobile avatar catalog"
   }
 });
 
-test("male starter basics are browsable, owned, and have real shop previews", () => {
-  // the boy's visible starters after X15 (the old cocoa quiff and cream tee are retired)
-  const visibleMaleBasics = [
+test("the boy's starter pieces (curls + basic_a) are free, owned by default, and never sold in the Shop", () => {
+  const starterIds = [
     DEFAULT_MALE_AVATAR_LOADOUT.hairId,
     DEFAULT_MALE_AVATAR_LOADOUT.topId,
+    DEFAULT_MALE_AVATAR_LOADOUT.bottomId,
     DEFAULT_MALE_AVATAR_LOADOUT.shoesId,
   ];
 
-  for (const itemId of visibleMaleBasics) {
+  for (const itemId of starterIds) {
     const avatarItem = AVATAR_V2_CATALOG.find((item) => item.id === itemId);
     assert.ok(avatarItem, itemId);
-    assert.equal(avatarItem.hiddenFromShop, undefined, itemId);
+    assert.equal(avatarItem.hiddenFromShop, true, itemId);
     assert.equal(avatarItem.ownedByDefault, true, itemId);
     assert.deepEqual(
       avatarItem.compatibleBodyIds,
@@ -343,7 +345,6 @@ test("male starter basics are browsable, owned, and have real shop previews", ()
     assert.ok(economyItem, itemId);
     assert.equal(economyItem.priceCoins, 0, itemId);
     assert.equal(economyItem.ownedByDefault, true, itemId);
-    assert.ok(getAvatarItemPreviewSource(itemId), `${itemId} needs a local preview source`);
   }
 });
 
@@ -358,11 +359,9 @@ test("every visible starter garment has a local shop preview", () => {
   }
 });
 
-test("a male avatar fixture never receives female-compatible shop products", () => {
-  const maleBodyId = "avatar_v2_body_male_light";
-  const maleAvatar = resolveInitialAvatarV2(maleBodyId);
-  const products = buildShopCatalogItems({
-    avatar: maleAvatar,
+function avatarShopProductsFor(bodyId: string) {
+  return buildShopCatalogItems({
+    avatar: resolveInitialAvatarV2(bodyId),
     inventory: {
       coins: 1_250,
       ownedAvatarItemIds: [],
@@ -374,36 +373,28 @@ test("a male avatar fixture never receives female-compatible shop products", () 
       roomShellId: "room_v2_shell_blumi_world_v1",
       placedItems: [],
     },
-  });
-  const avatarProducts = products.filter(
-    (product) => product.sectionId === "avatar",
-  );
+  }).filter((product) => product.sectionId === "avatar");
+}
 
-  assert.ok(avatarProducts.length > 0);
-  for (const product of avatarProducts) {
-    assert.ok(product.avatarItem, product.sourceItemId);
-    assert.deepEqual(
-      product.avatarItem.compatibleBodyIds,
-      [maleBodyId],
-      product.sourceItemId,
-    );
+test("each body's Shop lists only avatar products made for that body", () => {
+  const maleBodyId = "avatar_v2_body_male_light";
+  const femaleBodyId = "avatar_v2_body_default";
+  const femaleProducts = avatarShopProductsFor(femaleBodyId);
+  const maleProducts = avatarShopProductsFor(maleBodyId);
+
+  assert.ok(femaleProducts.length > 0, "the girl's Shop lists her avatar products");
+  for (const [bodyId, products] of [[femaleBodyId, femaleProducts], [maleBodyId, maleProducts]] as const) {
+    for (const product of products) {
+      assert.ok(product.avatarItem, product.sourceItemId);
+      assert.ok(
+        (product.avatarItem.compatibleBodyIds ?? [femaleBodyId]).includes(bodyId),
+        `${bodyId} was offered ${product.sourceItemId}`,
+      );
+    }
   }
-  assert.ok(
-    avatarProducts.some(
-      (product) =>
-        product.sourceItemId === DEFAULT_MALE_AVATAR_LOADOUT.topId,
-    ),
-  );
-  assert.ok(
-    avatarProducts.every(
-      (product) => product.sourceItemId !== DEFAULT_FEMALE_AVATAR_LOADOUT.topId,
-    ),
-  );
-  assert.ok(
-    avatarProducts.every(
-      (product) => product.sourceItemId !== "avatar_v2_top_blush_lace_cardigan",
-    ),
-  );
+  assert.ok(femaleProducts.some((product) => product.sourceItemId === DEFAULT_FEMALE_AVATAR_LOADOUT.topId));
+  assert.ok(maleProducts.every((product) => product.sourceItemId !== DEFAULT_FEMALE_AVATAR_LOADOUT.topId));
+  assert.ok(maleProducts.every((product) => product.sourceItemId !== "avatar_v2_top_blush_lace_cardigan"));
 });
 
 test("purchase catalog does not expose disabled status pseudo-products", () => {

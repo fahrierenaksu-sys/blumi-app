@@ -216,3 +216,54 @@ test("avatar PUT gates V2 writes and projects reads from server-resolved client 
 
   await app.close()
 })
+
+test("a new boy account starts in the curls and the basic_a outfit and can save it, but not his former look", async () => {
+  const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => "482931" })
+  const app = createServer({ authService })
+  await app.inject({ method: "POST", url: "/v1/auth/send-code", payload: { phoneNumber: "+905551112266" } })
+  const verified = await app.inject({
+    method: "POST",
+    url: "/v1/accounts/register",
+    payload: { termsAcceptance: { version: "test-terms-v1", locale: "tr" }, phoneNumber: "+905551112266", verificationCode: "482931" }
+  })
+  const headers = { authorization: `Bearer ${verified.json().session.sessionToken as string}` }
+  const boyStarter = {
+    hairId: "avatar_v2_hair_male_blue_black_curls",
+    topId: "avatar_v2_top_male_white_basic_tee",
+    bottomId: "avatar_v2_bottom_male_black_straight_trousers",
+    shoesId: "avatar_v2_shoes_male_black_clean_sneakers"
+  }
+  assert.deepEqual(
+    { hairId: DEFAULT_MALE_AVATAR_LOADOUT.hairId, topId: DEFAULT_MALE_AVATAR_LOADOUT.topId,
+      bottomId: DEFAULT_MALE_AVATAR_LOADOUT.bottomId, shoesId: DEFAULT_MALE_AVATAR_LOADOUT.shoesId },
+    boyStarter
+  )
+
+  const saved = await app.inject({
+    method: "PUT",
+    url: "/v1/users/me/avatar",
+    headers,
+    payload: { loadout: DEFAULT_MALE_AVATAR_LOADOUT, revision: 0 }
+  })
+  assert.equal(saved.statusCode, 200)
+  assert.equal(saved.json().avatar.presetId, DEFAULT_MALE_AVATAR_LOADOUT.bodyId)
+  assert.deepEqual({ ...saved.json().avatar.loadout, ...boyStarter }, saved.json().avatar.loadout)
+
+  const former = await app.inject({
+    method: "PUT",
+    url: "/v1/users/me/avatar",
+    headers,
+    payload: {
+      loadout: {
+        ...DEFAULT_MALE_AVATAR_LOADOUT,
+        hairId: "avatar_v2_hair_male_soft_black_side_part",
+        topId: "avatar_v2_top_male_powder_blue_crew_tee",
+        bottomId: "avatar_v2_bottom_male_navy_straight_pants",
+        shoesId: "avatar_v2_shoes_male_milk_tea_court"
+      },
+      revision: 1
+    }
+  })
+  assert.equal(former.statusCode, 400)
+  await app.close()
+})
