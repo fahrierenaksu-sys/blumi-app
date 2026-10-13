@@ -1,5 +1,9 @@
+import { isPhoneCodeError, phoneCodeError } from "./phoneCodeFailure"
+
 type AppCheckModule = typeof import("@react-native-firebase/app-check")
 type AppCheckHandle = Awaited<ReturnType<AppCheckModule["initializeAppCheck"]>>
+
+const DEVICE_VERIFICATION_MESSAGE = "We could not securely verify this device. Update Blumi and try again."
 
 let initialization: Promise<{ module: AppCheckModule; handle: AppCheckHandle }> | null = null
 
@@ -31,13 +35,13 @@ async function configuredAppCheck() {
     }
     return configured
   } catch {
-    throw new Error("We could not securely verify this device. Update Blumi and try again.")
+    throw phoneCodeError(DEVICE_VERIFICATION_MESSAGE, "INIT")
   }
 }
 
 export async function requireFirebasePhoneAppCheck(): Promise<void> {
+  const { module, handle } = await configuredAppCheck()
   try {
-    const { module, handle } = await configuredAppCheck()
     // Cached valid tokens avoid needless assessments. The SDK refreshes an
     // expired/missing token; no token or a provider error means no SMS call.
     const result = await module.getToken(handle, false)
@@ -46,7 +50,7 @@ export async function requireFirebasePhoneAppCheck(): Promise<void> {
     // Token outages retry with the existing initialized SDK. Only a failed
     // initialization is reset above; duplicate initialization can itself fail.
     // Never log native errors or token material, or downgrade verification.
-    throw new Error("We could not securely verify this device. Update Blumi and try again.")
+    throw phoneCodeError(DEVICE_VERIFICATION_MESSAGE, "TOKEN")
   }
 }
 
@@ -60,5 +64,7 @@ export async function getFirebaseSmsGateContext() {
     if (!token || !projectId || !/^[a-z][a-z0-9-]{4,61}[a-z0-9]$/.test(projectId) ||
       !projectNumber || !/^\d+$/.test(projectNumber)) throw new Error()
     return { token, projectId, projectNumber }
-  } catch { throw new Error("We could not securely verify this device. Update Blumi and try again.") }
+  } catch (error) {
+    throw isPhoneCodeError(error) ? error : phoneCodeError(DEVICE_VERIFICATION_MESSAGE, "LIMITED")
+  }
 }

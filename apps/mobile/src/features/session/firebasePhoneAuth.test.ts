@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import Module, { createRequire } from "node:module"
 import { resolve } from "node:path"
 import test from "node:test"
+import { phoneCodeError } from "./phoneCodeFailure"
 
 type FirebasePhoneAuth = typeof import("./firebasePhoneAuth")
 
@@ -176,4 +177,34 @@ test("phone auth uses Firebase when the native module is present", async () => {
   assert.deepEqual(seen, [null])
   await phoneAuth.requestFirebasePhoneCode("+905321234567")
   assert.deepEqual(requested, ["+905321234567"])
+})
+
+test("release builds show which step failed as a short code, never native details", async () => {
+  const succeed = async () => {}
+  const cases: { appCheck: () => Promise<void>; permit: () => Promise<void>; send: () => Promise<never>; code: string }[] = [
+    { appCheck: async () => { throw phoneCodeError("App Attest refused", "TOKEN") }, permit: succeed,
+      send: async () => assert.fail("no SMS after App Check failure"), code: "(E-APPCHECK-TOKEN)" },
+    { appCheck: succeed, permit: async () => { throw phoneCodeError("refused", "GATE403") },
+      send: async () => assert.fail("no SMS without a permit"), code: "(E-PERMIT-GATE403)" },
+    { appCheck: succeed, permit: async () => { throw new Error("socket closed for +12025550101") },
+      send: async () => assert.fail("no SMS without a permit"), code: "(E-PERMIT)" },
+    { appCheck: succeed, permit: succeed,
+      send: async () => { throw Object.assign(new Error("secret detail"), { code: "auth/invalid-app-credential" }) },
+      code: "(E-FIREBASE-invalid-app-credential)" },
+    { appCheck: succeed, permit: succeed,
+      send: async () => { throw Object.assign(new Error("x"), { code: "auth/+12025550101 token" }) },
+      code: "(E-FIREBASE)" }
+  ]
+  for (const { appCheck, permit, send, code } of cases) {
+    const phoneAuth = loadFirebasePhoneAuth(() => ({
+      getAuth: () => ({ currentUser: null }), signInWithPhoneNumber: send
+    }), appCheck, permit)
+    await assert.rejects(phoneAuth.requestFirebasePhoneCode("+12025550101"), (error: unknown) => {
+      const message = String((error as Error).message)
+      assert.match(message, /^We could not send a verification code right now\./)
+      assert.ok(message.endsWith(` ${code}`), message)
+      assert.doesNotMatch(message, /5550101|secret|socket|refused|Attest/)
+      return true
+    })
+  }
 })

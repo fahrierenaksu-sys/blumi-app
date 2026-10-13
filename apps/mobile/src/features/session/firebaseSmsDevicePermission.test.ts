@@ -3,6 +3,7 @@ import { createHash } from "node:crypto"
 import Module, { createRequire } from "node:module"
 import { resolve } from "node:path"
 import test from "node:test"
+import { describePhoneCodeFailure } from "./phoneCodeFailure"
 
 type Permission = typeof import("./firebaseSmsDevicePermission")
 async function fixture(platform: "ios" | "android", run: (context: {
@@ -47,7 +48,7 @@ async function fixture(platform: "ios" | "android", run: (context: {
       expiresAt: new Date(Date.now() + 120_000).toISOString()
     } }) }
     registered = accepted
-    return { ok: accepted, json: async () => accepted
+    return { ok: accepted, status: accepted ? 200 : 403, json: async () => accepted
       ? { result: { expiresAt: new Date(Date.now() + 60_000).toISOString() } }
       : { error: { message: "unavailable" } } }
   }) as typeof fetch
@@ -83,5 +84,15 @@ test("a refused permit never resets a stored installation", async () => {
     assert.equal(stored.size, 1)
     await assert.rejects(permission.requireFirebaseSmsDevicePermission("+12025550102"), /unavailable/)
     assert.equal(requests[1]!.installationId, requests[3]!.installationId)
+  })
+})
+
+test("a refused permit names the gate's HTTP status, so a screenshot shows the failed step", async () => {
+  await fixture("ios", async ({ permission, setPermitAccepted }) => {
+    setPermitAccepted(false)
+    await assert.rejects(permission.requireFirebaseSmsDevicePermission("+12025550101"), (error: unknown) => {
+      assert.equal(describePhoneCodeFailure("PERMIT", error), "E-PERMIT-GATE403")
+      return true
+    })
   })
 })
