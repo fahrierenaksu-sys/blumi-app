@@ -177,8 +177,7 @@ def specks(bare_frame, frame, zone):
     """Item pixels showing in a blink frame inside the eye zone that are not joined to the item outside it: loose
     bits of an eye copy left floating over the closed eye."""
     item = changed(frame, bare_frame) & (frame[..., 3] > 0)
-    border = np.zeros(item.shape, bool); border[0] = border[-1] = border[:, 0] = border[:, -1] = True
-    joined = _flood(_flood(border & item & ~zone, item & ~zone), item)
+    joined = _flood(item & ~zone, item)    # tied to the item anywhere outside the zone (a hair inside the head box never reaches the render border)
     visible = np.abs(frame - bare_frame).max(-1) >= VISIBLE      # filter drift next to a cut is not a speck
     return item & visible & zone & ~joined
 

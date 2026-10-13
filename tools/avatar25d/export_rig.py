@@ -391,8 +391,19 @@ def blink_item_cut(head_open, frames, item):
     return cut | loose
 
 
-def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pages, page_taken):
-    """The item patches (see above) for the view's `blink.items`; pastes each into free space of its item's page."""
+def part_uv_box(mesh, name, page_size):
+    """[x0, y0, x1, y1] in page px of the vertices of one mesh range (the drawn area of a part: its png can be larger)."""
+    import numpy as np
+    rg = next(r for r in mesh['ranges'] if r['name'] == name)
+    ids = sorted(set(mesh['index'][rg['start']:rg['start'] + rg['count']]))
+    uv = np.asarray(mesh['uv'], float).reshape(-1, 2)[ids] * np.asarray(page_size, float)
+    return [float(uv[:, 0].min()), float(uv[:, 1].min()), float(uv[:, 0].max()), float(uv[:, 1].max())]
+
+
+def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pages, page_taken, meshes=None):
+    """The item patches (see above) for the view's `blink.items`; pastes each into free space of its item's page.
+    `meshes` ({item id: mesh}) clips each redirect rect to the drawn area of its part: a hair that ends above the
+    eye rect's lower edge never samples past its mesh, and the redirect must not reach the next part on the page."""
     import numpy as np
     rx, ry, rw, rh = src_blink['rect']
     sx, sy = head_box[0] + rx, head_box[1] + ry          # the eye rect in sheet px
@@ -429,7 +440,16 @@ def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pag
             page_taken[page].append((spot[0], spot[1], tile.width, tile.height))
             pad = max(0, min(BLINK_REDIRECT_PAD, ox, oy, img.width - ox - rw, img.height - oy - rh))   # never leaves the part
             full_cut = np.zeros((tile.height, tile.width), bool); full_cut[M:M + rh, M:M + rw] = cut
-            out.append({'item': iid, 'page': page, 'rect': [ix + ox, iy + oy, rw, rh], 'pad': pad,
+            rect = [ix + ox, iy + oy, rw, rh]
+            if meshes is not None:
+                bx0, by0, bx1, by1 = part_uv_box(meshes[iid], f'part{k}', pages[page].size)
+                x0, y0 = max(rect[0], int(np.ceil(bx0))), max(rect[1], int(np.ceil(by0)))
+                x1, y1 = min(rect[0] + rw, int(np.floor(bx1))), min(rect[1] + rh, int(np.floor(by1)))
+                if x1 <= x0 or y1 <= y0:
+                    continue
+                rect = [x0, y0, x1 - x0, y1 - y0]
+                pad = max(0, min(pad, x0 - int(np.ceil(bx0)), y0 - int(np.ceil(by0)), int(np.floor(bx1)) - x1, int(np.floor(by1)) - y1))
+            out.append({'item': iid, 'page': page, 'rect': rect, 'pad': pad,
                         'offset': [spot[0] + M - (ix + ox), spot[1] + M - (iy + oy)], 'cutPx': int(cut.sum()),
                         '_keep': (page, (ix + ox - M, iy + oy - M), spot, full_cut)})
     return out
@@ -526,11 +546,16 @@ def restore_blink_item_hair(stored, scale, keeps):
     a = np.asarray(stored).copy()
     for (sx, sy), (tx, ty), cut in keeps:
         h, w = cut.shape
-        x0, y0 = int(sx * scale), int(sy * scale); X0, Y0 = int(tx * scale), int(ty * scale)
-        sw, sh = int(np.ceil(w * scale)), int(np.ceil(h * scale))
+        # texel of source px X is floor(X * scale): a tile whose origin is odd (or negative) at scale 0.5 starts in the
+        # middle of a texel, so both the copied block and the cut's footprint are counted from that texel (int() would
+        # shift them by one texel and copy cut eye-copy px back into the patch)
+        x0, y0 = int(np.floor(sx * scale)), int(np.floor(sy * scale))
+        X0, Y0 = int(np.floor(tx * scale)), int(np.floor(ty * scale))
+        sw = int(np.floor((sx + w - 1) * scale)) - x0 + 1
+        sh = int(np.floor((sy + h - 1) * scale)) - y0 + 1
         foot = np.zeros((sh, sw), bool)
         ys, xs = np.nonzero(cut)
-        foot[(ys * scale).astype(int), (xs * scale).astype(int)] = True
+        foot[np.floor((sy + ys) * scale).astype(int) - y0, np.floor((sx + xs) * scale).astype(int) - x0] = True
         # a patch whose margin reaches past the page edge (a part packed at the edge): copy only the texels on the page
         H, W = a.shape[:2]
         lx, ly = max(0, -x0, -X0), max(0, -y0, -Y0)
@@ -755,7 +780,7 @@ def export_view(name, v, motion=None):
         head = v['blink'].get('layer')
         head_box = next((L['box'] for L in v['layers'] if L['name'] == head), None)   # the head layer in sheet px
         patches = pack_blink_items(v['blink'], layer_images[head], head_box, items_src,
-                                   item_rects, pages, page_taken) if head_box is not None else []
+                                   item_rects, pages, page_taken, {k: i['mesh'] for k, i in items.items()}) if head_box is not None else []
         # no item copies an eye: the entry stays exactly as before (rigs without one export byte-identically)
         for pt in patches:
             blink_keeps.setdefault(pt['_keep'][0], []).append(pt.pop('_keep')[1:])
