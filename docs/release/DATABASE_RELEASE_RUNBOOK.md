@@ -126,24 +126,74 @@ project and environment have not been independently confirmed.
 `apps/server/scripts/betaReset.ts` is the only way to run it; never ad-hoc SQL.
 It sets coins to 1,250, every loadout to its body's starter look, every finished
 room to the starter room with the bed, and deletes all chats, messages, matches,
-discovery decisions, mini rooms, invites, reactions, pending pushes about them,
-room presence, realtime payloads and old room renders. It never writes profile
-columns, sessions, push devices, settings, blocks, reports, bans, money ledgers,
-owned items or `blumi_migrations`. Output is counts only. Run it last, after the
-new server is live. From the repository root, after `npm run build:packages`:
+discovery decisions (except the likes the test personas hand out), mini rooms,
+invites, reactions, pending pushes about them, room presence, realtime payloads
+and old room renders. It never writes profile columns, sessions, push devices,
+settings, blocks, reports, bans, money ledgers, owned items, test personas or
+`blumi_migrations`. Deleting a mini room queues a LiveKit media revocation per
+participant (database trigger, as when the app ends a room; voice is off).
+Output is counts, catalog item IDs and commit SHAs only.
 
-1. Dump first (PostgreSQL 17 client on PATH, e.g.
-   `PATH=/opt/homebrew/opt/postgresql@17/bin:$PATH node --env-file-if-exists=.env.local scripts/automation/local-backup.mjs`),
-   then, if time allows, prove it with `restore-upgrade-gate.mjs` (below; on macOS also set `LC_ALL=en_US.UTF-8`).
-2. Dry run (default, READ ONLY): `node --env-file-if-exists=.env.local --import tsx apps/server/scripts/betaReset.ts --project-ref <ref>`.
-   It prints the counts, `fingerprint=<fp>` and `expect=<sha256>`.
-3. Apply: the same command with `--apply --expect <sha256> --fingerprint <fp>` and
-   `BLUMI_BETA_RESET_CONFIRM=reset-beta-<ref>` set for that one command. It locks the written tables, refuses if
-   the counts or the database changed since the dry run, and rolls back unless the post-check finds nothing left to
-   reset and every kept table at its old row count.
-4. Re-run the dry run: every delete and reset count must be 0. The schema has no generic audit table, so record
-   the printed counts (never IDs) in `LAUNCH_CONTROL.md`. After a commit the only undo is restoring the dump into a
-   new database.
+The starter looks and room come from the code that runs the script, so it must
+run from the exact release that is live:
+
+- a clean checkout of the commit `/health` reports as `commit` (12 characters;
+  if it is null, take the commit from the Railway deployment), with
+  `npm ci` and `npm run build:packages` run in that checkout;
+- the script prints `commit=<sha>` and the starter item IDs. The dry-run hash
+  covers the commit, the starter digest, the counts and the content of every row
+  the reset reads, so an apply from another checkout, a stale build or after any
+  app write is refused (`hash mismatch`). It also refuses to start when the built
+  `@blumi/domain` differs from the checkout's source;
+- `DATABASE_URL` must be the Supabase **Session pooler** URL (user
+  `postgres.<ref>`); any other user is refused.
+
+Run it last, after the new server is live and smoke-tested. Every step is one
+command; stop at the first STOP.
+
+1. Release check: `curl -s https://<api-host>/health` → note `commit`. In the
+   checkout: `git rev-parse --short=12 HEAD` and `git status --short
+   --untracked-files=no`. STOP if the commits differ or the status is not empty.
+2. Quiet step (stop app writes). There is no maintenance flag in the server, so
+   the window is "no running instance". Stopping and restarting the Railway
+   deployment is a Railway action: get the owner's yes in the current
+   conversation first, and tell testers the app is down for about 15 minutes.
+   - Railway → project → service `blumi-app` → Deployments → the active
+     deployment (its commit = step 1) → ⋮ → **Remove** (stops it; the build is
+     kept). Labels can differ; the goal is that no instance of the service runs.
+   - Wait 2 minutes, so realtime leases (90 s) and room presence expire.
+3. Dump right before the apply (PostgreSQL 17 client on PATH):
+   `PATH=/opt/homebrew/opt/postgresql@17/bin:$PATH node --env-file-if-exists=.env.local scripts/automation/local-backup.mjs`
+   → note the archive path and SHA-256. STOP if it fails. Restore proof if time
+   allows: `restore-upgrade-gate.mjs` (below; on macOS also `LC_ALL=en_US.UTF-8`).
+4. Dry run (default, READ ONLY):
+   `node --env-file-if-exists=.env.local --import tsx apps/server/scripts/betaReset.ts --project-ref <ref>`
+   → counts, `activity`, `starter`, `commit=`, `fingerprint=`, `expect=`. STOP if
+   `commit` is not step 1's or says "modified", if `activity` is not all 0, if
+   `starter` is not the release's starter look (girl: coral wave polo and pants,
+   ink pageboy hair) and room (`room_v3_bed_blumi_starter`), or if
+   `keep.blumi_accounts` differs from the read-only audit's account count.
+5. Send the owner the short Turkish list (counts only): what is removed, what
+   each user gets, what is kept. The reset is pre-approved; this is a notice.
+6. Apply: the same command plus `--apply --expect <sha256> --fingerprint <fp>
+   --deployed-commit <step 1 commit>`, with `BLUMI_BETA_RESET_CONFIRM=reset-beta-<ref>`
+   set for that one command. It locks the tables it writes, refuses on a hash,
+   fingerprint or commit mismatch or when a live connection or room presence
+   exists, and rolls back unless the post-check finds nothing left to reset, the
+   accounts, inventories and persona likes at their old counts. `hash mismatch`
+   means something wrote since step 4: check step 2, then repeat from step 4.
+7. Verify: re-run step 4; every delete and reset count must be 0. Run the
+   read-only audit (Safe inspection above).
+8. Restart: Railway → the removed deployment → **Redeploy** (the same commit;
+   covered by the owner's yes in step 2). Check `/health` shows the step 1
+   commit. The restart also drops any in-memory room or chat state.
+9. Record the counts (never IDs) in `LAUNCH_CONTROL.md` and tell the owner in
+   Turkish, counts only.
+
+Undo: after the COMMIT the only undo is restoring the step 3 dump into a new
+Supabase project and pointing Railway's `DATABASE_URL` at it, which needs the
+owner's yes and loses everything written after the dump. After Phase F, retire
+the script: a later dry run plus apply would wipe the new chats again.
 
 ## Environments and migration order
 
