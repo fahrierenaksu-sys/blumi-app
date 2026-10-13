@@ -789,9 +789,18 @@ def export_view(name, v, motion=None):
         for key, out_key in variant_owner.get(iid, []):
             for ln, png in sorted(leg_variants[key].items()):
                 ia.add(f'{ln}@{out_key}', decode(png))
+        # an item's identical body drawings (one pair drawing made for several partners) are packed once and share it
+        packed, same_as = {}, {}
         for body, png, partner in replacements.get(iid, []):
-            ia.add(replacement_range(body, partner), decode(png))
-        item_atlases[iid] = (*ia.pack(PAGE_W // 2), walk_card is not None, cards)
+            rname = replacement_range(body, partner)
+            if png in packed:
+                same_as[rname] = packed[png]
+                continue
+            packed[png] = rname
+            ia.add(rname, decode(png))
+        item_img, item_rects = ia.pack(PAGE_W // 2)
+        item_rects.update({rname: item_rects[first] for rname, first in same_as.items()})
+        item_atlases[iid] = (item_img, item_rects, walk_card is not None, cards)
     page_h = max([img.height] + [a[0].height for a in item_atlases.values()])
     page_h = (page_h + 15) // 16 * 16
     PAGE = (PAGE_W, page_h)
