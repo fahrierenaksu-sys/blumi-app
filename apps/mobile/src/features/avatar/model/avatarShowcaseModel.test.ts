@@ -6,7 +6,14 @@ import {
   DEFAULT_MALE_AVATAR_LOADOUT,
   type AvatarStillManifest
 } from "@blumi/domain"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { createAvatarShowcasePlanCache, planAvatarShowcase, type AvatarShowcasePlan } from "./avatarShowcaseModel"
+
+/** The bundled still table as the app has it (keys of stillAssets.ts; the requires themselves need Metro). */
+const AVATAR_STILL_ASSETS: Readonly<Record<string, unknown>> = Object.fromEntries(
+  [...readFileSync(join(import.meta.dirname, "../stills/stillAssets.ts"), "utf8").matchAll(/^ {2}"([^"]+)": require\(/gm)].map((m) => [m[1]!, m[1]!])
+)
 
 const HAIR = "avatar_v2_hair_ink_pageboy_star"
 const TOP = "avatar_v2_top_coral_wave_polo"
@@ -117,4 +124,27 @@ test("the plan cache stays bounded: the oldest look is dropped first", () => {
   const again = plan(GIRL_OUTFIT, "card", { width: 100, height: 100 }, options)
   assert.notEqual(again, first)
   assert.deepEqual(again, first)
+})
+
+test("every baked item of both bodies draws its front look from bundled layers", () => {
+  const field = { top: "topId", bottom: "bottomId", shoes: "shoesId", hair: "hairId" } as const
+  const looks = { female: DEFAULT_FEMALE_AVATAR_LOADOUT, male: DEFAULT_MALE_AVATAR_LOADOUT } as const
+  for (const rig of ["female", "male"] as const) {
+    const items = Object.entries(AVATAR_STILL_MANIFEST.bodies[rig].items).filter(([, item]) => item.showcase)
+    assert.ok(items.length > 0, `${rig}: front art is baked`)
+    for (const [itemId, item] of items) {
+      const loadout = { ...looks[rig], [field[item.slot as keyof typeof field]]: itemId }
+      const plan = planAvatarShowcase(loadout, "card", CARD_BOX, { assets: AVATAR_STILL_ASSETS })
+      assert.equal(plan.kind, "showcase", `${rig} ${itemId}: every layer of its look is bundled`)
+    }
+  }
+})
+
+test("a mixed look whose body-under layer is not bundled draws the whole 3/4 still", () => {
+  const look = { ...DEFAULT_MALE_AVATAR_LOADOUT, topId: "avatar_v2_top_male_olive_overshirt", bottomId: "avatar_v2_bottom_male_charcoal_trousers" }
+  const assets = Object.fromEntries(Object.entries(AVATAR_STILL_ASSETS).filter(([key]) => key !== "male/showcase/avatar_v2_bottom_male_charcoal_trousers__under"))
+  assert.equal(planAvatarShowcase(look, "card", CARD_BOX, { assets: AVATAR_STILL_ASSETS }).kind, "showcase")
+  const plan = planAvatarShowcase(look, "card", CARD_BOX, { assets })
+  assert.equal(plan.kind, "still")
+  if (plan.kind === "still") assert.equal(plan.reason, "missing-asset")
 })

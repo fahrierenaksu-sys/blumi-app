@@ -44,22 +44,98 @@
         "avatar_v2_shoes_mint_ribbon_court_sneakers": {
           "slot": "shoes",
           "rigItemId": "shoes_mint_ribbon_court_sneakers",
-          "thumb": "avatar_v2_shoes_mint_ribbon_court_sneakers"
+          "thumb": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+          "showcase": {
+            "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__front",
+            "rect": [
+              146,
+              1384,
+              317,
+              178
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__under",
+              "rect": [
+                146,
+                1381,
+                317,
+                181
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_coral_wave_pants": {
           "slot": "bottom",
           "rigItemId": "bottom_coral_wave_pants",
-          "thumb": "avatar_v2_bottom_coral_wave_pants"
+          "thumb": "avatar_v2_bottom_coral_wave_pants",
+          "showcase": {
+            "key": "avatar_v2_bottom_coral_wave_pants__front",
+            "rect": [
+              18,
+              708,
+              576,
+              682
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_coral_wave_pants__under",
+              "rect": [
+                17,
+                809,
+                577,
+                587
+              ]
+            }
+          }
         },
         "avatar_v2_top_coral_wave_polo": {
           "slot": "top",
           "rigItemId": "top_coral_wave_polo",
-          "thumb": "avatar_v2_top_coral_wave_polo"
+          "thumb": "avatar_v2_top_coral_wave_polo",
+          "showcase": {
+            "key": "avatar_v2_top_coral_wave_polo__front",
+            "rect": [
+              113,
+              395,
+              378,
+              373
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_coral_wave_polo__under",
+              "rect": [
+                121,
+                404,
+                362,
+                243
+              ]
+            }
+          }
         },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
-          "thumb": "avatar_v2_hair_ink_pageboy_star"
+          "thumb": "avatar_v2_hair_ink_pageboy_star",
+          "showcase": {
+            "key": "avatar_v2_hair_ink_pageboy_star__front",
+            "rect": [
+              140,
+              66,
+              326,
+              372
+            ],
+            "order": 4,
+            "back": {
+              "key": "avatar_v2_hair_ink_pageboy_star__back",
+              "rect": [
+                116,
+                52,
+                384,
+                386
+              ]
+            }
+          }
         }
       },
       "layers": {
@@ -462,6 +538,42 @@
             ]
           }
         ]
+      },
+      "showcaseBase": {
+        "key": "base__front",
+        "canvas": {
+          "width": 604,
+          "height": 1572
+        },
+        "ground": [
+          302,
+          1560
+        ],
+        "windows": {
+          "card": [
+            0,
+            0,
+            604,
+            1572
+          ],
+          "head": [
+            103,
+            13,
+            400,
+            400
+          ],
+          "push": [
+            23,
+            13,
+            560,
+            560
+          ]
+        },
+        "underSlots": [
+          "shoes",
+          "bottom",
+          "top"
+        ]
       }
     },
     "male": {
@@ -506,132 +618,626 @@
         "avatar_v2_shoes_male_tan_loafers": {
           "slot": "shoes",
           "rigItemId": "shoes_male_c2",
-          "thumb": "avatar_v2_shoes_male_tan_loafers"
+          "thumb": "avatar_v2_shoes_male_tan_loafers",
+          "showcase": {
+            "key": "avatar_v2_shoes_male_tan_loafers__front",
+            "rect": [
+              82,
+              1393,
+              448,
+              140
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_male_tan_loafers__under",
+              "rect": [
+                84,
+                1362,
+                438,
+                176
+              ]
+            }
+          }
         },
         "avatar_v2_shoes_male_sand_desert_boots": {
           "slot": "shoes",
           "rigItemId": "shoes_male_c3",
-          "thumb": "avatar_v2_shoes_male_sand_desert_boots"
+          "thumb": "avatar_v2_shoes_male_sand_desert_boots",
+          "showcase": {
+            "key": "avatar_v2_shoes_male_sand_desert_boots__front",
+            "rect": [
+              80,
+              1365,
+              454,
+              169
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_male_sand_desert_boots__under",
+              "rect": [
+                84,
+                1362,
+                438,
+                176
+              ]
+            }
+          }
         },
         "avatar_v2_shoes_male_brown_loafers": {
           "slot": "shoes",
           "rigItemId": "shoes_male_c4",
-          "thumb": "avatar_v2_shoes_male_brown_loafers"
+          "thumb": "avatar_v2_shoes_male_brown_loafers",
+          "showcase": {
+            "key": "avatar_v2_shoes_male_brown_loafers__front",
+            "rect": [
+              83,
+              1385,
+              444,
+              152
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_male_brown_loafers__under",
+              "rect": [
+                84,
+                1362,
+                438,
+                176
+              ]
+            }
+          }
         },
         "avatar_v2_shoes_male_cream_chunky_sneakers": {
           "slot": "shoes",
           "rigItemId": "shoes_male_c12",
-          "thumb": "avatar_v2_shoes_male_cream_chunky_sneakers"
+          "thumb": "avatar_v2_shoes_male_cream_chunky_sneakers",
+          "showcase": {
+            "key": "avatar_v2_shoes_male_cream_chunky_sneakers__front",
+            "rect": [
+              72,
+              1344,
+              461,
+              201
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_male_cream_chunky_sneakers__under",
+              "rect": [
+                84,
+                1362,
+                437,
+                178
+              ]
+            }
+          }
         },
         "avatar_v2_shoes_male_dark_leather_sneakers": {
           "slot": "shoes",
           "rigItemId": "shoes_male_c13",
-          "thumb": "avatar_v2_shoes_male_dark_leather_sneakers"
+          "thumb": "avatar_v2_shoes_male_dark_leather_sneakers",
+          "showcase": {
+            "key": "avatar_v2_shoes_male_dark_leather_sneakers__front",
+            "rect": [
+              81,
+              1372,
+              443,
+              170
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_male_dark_leather_sneakers__under",
+              "rect": [
+                84,
+                1362,
+                438,
+                177
+              ]
+            }
+          }
         },
         "avatar_v2_shoes_male_green_skate_shoes": {
           "slot": "shoes",
           "rigItemId": "shoes_male_c14w",
-          "thumb": "avatar_v2_shoes_male_green_skate_shoes"
+          "thumb": "avatar_v2_shoes_male_green_skate_shoes",
+          "showcase": {
+            "key": "avatar_v2_shoes_male_green_skate_shoes__front",
+            "rect": [
+              75,
+              1397,
+              470,
+              148
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_male_green_skate_shoes__under",
+              "rect": [
+                84,
+                1362,
+                438,
+                177
+              ]
+            }
+          }
         },
         "avatar_v2_shoes_male_black_clean_sneakers": {
           "slot": "shoes",
           "rigItemId": "shoes_male_basic_a",
-          "thumb": "avatar_v2_shoes_male_black_clean_sneakers"
+          "thumb": "avatar_v2_shoes_male_black_clean_sneakers",
+          "showcase": {
+            "key": "avatar_v2_shoes_male_black_clean_sneakers__front",
+            "rect": [
+              79,
+              1360,
+              455,
+              179
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_male_black_clean_sneakers__under",
+              "rect": [
+                84,
+                1362,
+                438,
+                176
+              ]
+            }
+          }
         },
         "avatar_v2_shoes_male_black_everyday_sneakers": {
           "slot": "shoes",
           "rigItemId": "shoes_male_basic_b",
-          "thumb": "avatar_v2_shoes_male_black_everyday_sneakers"
+          "thumb": "avatar_v2_shoes_male_black_everyday_sneakers",
+          "showcase": {
+            "key": "avatar_v2_shoes_male_black_everyday_sneakers__front",
+            "rect": [
+              75,
+              1360,
+              459,
+              178
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_male_black_everyday_sneakers__under",
+              "rect": [
+                84,
+                1362,
+                438,
+                176
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_male_cream_pleated_trousers": {
           "slot": "bottom",
           "rigItemId": "bottom_male_c2",
-          "thumb": "avatar_v2_bottom_male_cream_pleated_trousers"
+          "thumb": "avatar_v2_bottom_male_cream_pleated_trousers",
+          "showcase": {
+            "key": "avatar_v2_bottom_male_cream_pleated_trousers__front",
+            "rect": [
+              21,
+              726,
+              568,
+              698
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_male_cream_pleated_trousers__under",
+              "rect": [
+                22,
+                714,
+                568,
+                600
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_male_dark_straight_jeans": {
           "slot": "bottom",
           "rigItemId": "bottom_male_c3",
-          "thumb": "avatar_v2_bottom_male_dark_straight_jeans"
+          "thumb": "avatar_v2_bottom_male_dark_straight_jeans",
+          "showcase": {
+            "key": "avatar_v2_bottom_male_dark_straight_jeans__front",
+            "rect": [
+              39,
+              726,
+              551,
+              650
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_male_dark_straight_jeans__under",
+              "rect": [
+                22,
+                714,
+                568,
+                600
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_male_charcoal_trousers": {
           "slot": "bottom",
           "rigItemId": "bottom_male_c4",
-          "thumb": "avatar_v2_bottom_male_charcoal_trousers"
+          "thumb": "avatar_v2_bottom_male_charcoal_trousers",
+          "showcase": {
+            "key": "avatar_v2_bottom_male_charcoal_trousers__front",
+            "rect": [
+              21,
+              726,
+              569,
+              677
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_male_charcoal_trousers__under",
+              "rect": [
+                22,
+                714,
+                568,
+                600
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_male_cream_drawstring_trousers": {
           "slot": "bottom",
           "rigItemId": "bottom_male_c12",
-          "thumb": "avatar_v2_bottom_male_cream_drawstring_trousers"
+          "thumb": "avatar_v2_bottom_male_cream_drawstring_trousers",
+          "showcase": {
+            "key": "avatar_v2_bottom_male_cream_drawstring_trousers__front",
+            "rect": [
+              114,
+              666,
+              437,
+              749
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_male_cream_drawstring_trousers__under",
+              "rect": [
+                22,
+                714,
+                568,
+                600
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_male_ecru_wide_trousers": {
           "slot": "bottom",
           "rigItemId": "bottom_male_c13",
-          "thumb": "avatar_v2_bottom_male_ecru_wide_trousers"
+          "thumb": "avatar_v2_bottom_male_ecru_wide_trousers",
+          "showcase": {
+            "key": "avatar_v2_bottom_male_ecru_wide_trousers__front",
+            "rect": [
+              132,
+              701,
+              347,
+              706
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_male_ecru_wide_trousers__under",
+              "rect": [
+                22,
+                714,
+                568,
+                600
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_male_grey_wide_jeans": {
           "slot": "bottom",
           "rigItemId": "bottom_male_c14w",
-          "thumb": "avatar_v2_bottom_male_grey_wide_jeans"
+          "thumb": "avatar_v2_bottom_male_grey_wide_jeans",
+          "showcase": {
+            "key": "avatar_v2_bottom_male_grey_wide_jeans__front",
+            "rect": [
+              22,
+              726,
+              568,
+              718
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_male_grey_wide_jeans__under",
+              "rect": [
+                22,
+                714,
+                568,
+                600
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_male_black_straight_trousers": {
           "slot": "bottom",
           "rigItemId": "bottom_male_basic_a",
-          "thumb": "avatar_v2_bottom_male_black_straight_trousers"
+          "thumb": "avatar_v2_bottom_male_black_straight_trousers",
+          "showcase": {
+            "key": "avatar_v2_bottom_male_black_straight_trousers__front",
+            "rect": [
+              40,
+              726,
+              549,
+              640
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_male_black_straight_trousers__under",
+              "rect": [
+                22,
+                714,
+                568,
+                600
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_male_black_pocket_trousers": {
           "slot": "bottom",
           "rigItemId": "bottom_male_basic_b",
-          "thumb": "avatar_v2_bottom_male_black_pocket_trousers"
+          "thumb": "avatar_v2_bottom_male_black_pocket_trousers",
+          "showcase": {
+            "key": "avatar_v2_bottom_male_black_pocket_trousers__front",
+            "rect": [
+              22,
+              726,
+              568,
+              640
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_male_black_pocket_trousers__under",
+              "rect": [
+                22,
+                714,
+                568,
+                600
+              ]
+            }
+          }
         },
         "avatar_v2_top_male_navy_knit_polo": {
           "slot": "top",
           "rigItemId": "top_male_c2",
-          "thumb": "avatar_v2_top_male_navy_knit_polo"
+          "thumb": "avatar_v2_top_male_navy_knit_polo",
+          "showcase": {
+            "key": "avatar_v2_top_male_navy_knit_polo__front",
+            "rect": [
+              96,
+              369,
+              414,
+              393
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_male_navy_knit_polo__under",
+              "rect": [
+                52,
+                359,
+                500,
+                426
+              ]
+            }
+          }
         },
         "avatar_v2_top_male_olive_overshirt": {
           "slot": "top",
           "rigItemId": "top_male_c3",
-          "thumb": "avatar_v2_top_male_olive_overshirt"
+          "thumb": "avatar_v2_top_male_olive_overshirt",
+          "showcase": {
+            "key": "avatar_v2_top_male_olive_overshirt__front",
+            "rect": [
+              56,
+              369,
+              495,
+              497
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_male_olive_overshirt__under",
+              "rect": [
+                52,
+                359,
+                500,
+                426
+              ]
+            }
+          }
         },
         "avatar_v2_top_male_forest_collar_sweater": {
           "slot": "top",
           "rigItemId": "top_male_c4",
-          "thumb": "avatar_v2_top_male_forest_collar_sweater"
+          "thumb": "avatar_v2_top_male_forest_collar_sweater",
+          "showcase": {
+            "key": "avatar_v2_top_male_forest_collar_sweater__front",
+            "rect": [
+              52,
+              369,
+              500,
+              452
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_male_forest_collar_sweater__under",
+              "rect": [
+                52,
+                359,
+                500,
+                426
+              ]
+            }
+          }
         },
         "avatar_v2_top_male_black_embroidered_sweatshirt": {
           "slot": "top",
           "rigItemId": "top_male_c12",
-          "thumb": "avatar_v2_top_male_black_embroidered_sweatshirt"
+          "thumb": "avatar_v2_top_male_black_embroidered_sweatshirt",
+          "showcase": {
+            "key": "avatar_v2_top_male_black_embroidered_sweatshirt__front",
+            "rect": [
+              30,
+              397,
+              547,
+              428
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_male_black_embroidered_sweatshirt__under",
+              "rect": [
+                52,
+                359,
+                500,
+                426
+              ]
+            }
+          }
         },
         "avatar_v2_top_male_taupe_waffle_blouson": {
           "slot": "top",
           "rigItemId": "top_male_c13",
-          "thumb": "avatar_v2_top_male_taupe_waffle_blouson"
+          "thumb": "avatar_v2_top_male_taupe_waffle_blouson",
+          "showcase": {
+            "key": "avatar_v2_top_male_taupe_waffle_blouson__front",
+            "rect": [
+              41,
+              369,
+              524,
+              438
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_male_taupe_waffle_blouson__under",
+              "rect": [
+                52,
+                359,
+                500,
+                426
+              ]
+            }
+          }
         },
         "avatar_v2_top_male_check_flannel_white_tee": {
           "slot": "top",
           "rigItemId": "top_male_c14w",
-          "thumb": "avatar_v2_top_male_check_flannel_white_tee"
+          "thumb": "avatar_v2_top_male_check_flannel_white_tee",
+          "showcase": {
+            "key": "avatar_v2_top_male_check_flannel_white_tee__front",
+            "rect": [
+              54,
+              369,
+              496,
+              509
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_male_check_flannel_white_tee__under",
+              "rect": [
+                52,
+                359,
+                500,
+                426
+              ]
+            }
+          }
         },
         "avatar_v2_top_male_white_basic_tee": {
           "slot": "top",
           "rigItemId": "top_male_basic_a",
-          "thumb": "avatar_v2_top_male_white_basic_tee"
+          "thumb": "avatar_v2_top_male_white_basic_tee",
+          "showcase": {
+            "key": "avatar_v2_top_male_white_basic_tee__front",
+            "rect": [
+              78,
+              369,
+              450,
+              415
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_male_white_basic_tee__under",
+              "rect": [
+                52,
+                359,
+                500,
+                426
+              ]
+            }
+          }
         },
         "avatar_v2_top_male_black_basic_tee": {
           "slot": "top",
           "rigItemId": "top_male_basic_b",
-          "thumb": "avatar_v2_top_male_black_basic_tee"
+          "thumb": "avatar_v2_top_male_black_basic_tee",
+          "showcase": {
+            "key": "avatar_v2_top_male_black_basic_tee__front",
+            "rect": [
+              82,
+              369,
+              444,
+              416
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_male_black_basic_tee__under",
+              "rect": [
+                52,
+                359,
+                500,
+                426
+              ]
+            }
+          }
         },
         "avatar_v2_hair_male_blue_black_curls": {
           "slot": "hair",
           "rigItemId": "hair_male_curls",
-          "thumb": "avatar_v2_hair_male_blue_black_curls"
+          "thumb": "avatar_v2_hair_male_blue_black_curls",
+          "showcase": {
+            "key": "avatar_v2_hair_male_blue_black_curls__front",
+            "rect": [
+              155,
+              66,
+              300,
+              322
+            ],
+            "order": 4,
+            "back": {
+              "key": "avatar_v2_hair_male_blue_black_curls__back",
+              "rect": [
+                124,
+                51,
+                364,
+                337
+              ]
+            }
+          }
         },
         "avatar_v2_hair_male_textured_twists": {
           "slot": "hair",
           "rigItemId": "hair_male_twists",
-          "thumb": "avatar_v2_hair_male_textured_twists"
+          "thumb": "avatar_v2_hair_male_textured_twists",
+          "showcase": {
+            "key": "avatar_v2_hair_male_textured_twists__front",
+            "rect": [
+              163,
+              67,
+              284,
+              193
+            ],
+            "order": 4,
+            "back": {
+              "key": "avatar_v2_hair_male_textured_twists__back",
+              "rect": [
+                137,
+                61,
+                348,
+                201
+              ]
+            }
+          }
         }
       },
       "layers": {
@@ -6190,6 +6796,42 @@
               90
             ]
           }
+        ]
+      },
+      "showcaseBase": {
+        "key": "base__front",
+        "canvas": {
+          "width": 600,
+          "height": 1555
+        },
+        "ground": [
+          300,
+          1538
+        ],
+        "windows": {
+          "card": [
+            0,
+            0,
+            600,
+            1555
+          ],
+          "head": [
+            105,
+            13,
+            400,
+            400
+          ],
+          "push": [
+            25,
+            13,
+            560,
+            560
+          ]
+        },
+        "underSlots": [
+          "shoes",
+          "bottom",
+          "top"
         ]
       }
     }

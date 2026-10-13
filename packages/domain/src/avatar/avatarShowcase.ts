@@ -23,7 +23,10 @@ import {
 export interface AvatarShowcaseFront {
   readonly kind: "showcase";
   readonly rig: AvatarStillRigId;
-  /** Layer asset keys `<rig>/showcase/<key>` in draw order: parts behind the body, the base, then the front layers. */
+  /**
+   * Layer asset keys `<rig>/showcase/<key>` in draw order: parts behind the body, the base, the body under each worn
+   * piece (its erase mask applied), then the front layers.
+   */
   readonly layers: readonly { readonly asset: string; readonly rect: AvatarStillRect }[];
   /** The showcase base canvas the rects are in. */
   readonly space: AvatarShowcaseBase["canvas"];
@@ -89,23 +92,31 @@ export function resolveShowcaseLayers(
   const hasCanvas = Number.isFinite(base?.canvas?.width) && Number.isFinite(base?.canvas?.height);
   if (!base || !hasCanvas) return fallback("no-showcase-base");
   const drawn = avatarStillDrawnItems(body, loadout);
+  const underSlots = new Set(base.underSlots ?? []);
   const front: DrawnFrontLayer[] = [];
   for (const [slot, itemId] of drawn) {
     const layer = body.items[itemId]?.showcase;
     if (!layer) return fallback("item-without-showcase");
+    // The base has no body in this slot's region: an item that cannot draw it would leave a hole.
+    if (underSlots.has(slot) && !layer.under) return fallback("item-without-showcase");
     front.push({ slot, layer });
   }
+  for (const slot of underSlots) {
+    if (!front.some((entry) => entry.slot === slot)) return fallback("item-without-showcase");
+  }
   const ordered = frontDrawOrder(front);
-  const behind = [...front]
-    .sort((a, b) => a.layer.order - b.layer.order)
-    .flatMap((entry) => (entry.layer.back ? [{ asset: `${rig}/showcase/${entry.layer.back.key}`, rect: entry.layer.back.rect }] : []));
+  const byOrder = [...front].sort((a, b) => a.layer.order - b.layer.order);
+  const part = (layer: { readonly key: string; readonly rect: AvatarStillRect }) => ({ asset: `${rig}/showcase/${layer.key}`, rect: layer.rect });
+  const behind = byOrder.flatMap((entry) => (entry.layer.back ? [part(entry.layer.back)] : []));
+  const under = byOrder.flatMap((entry) => (entry.layer.under ? [part(entry.layer.under)] : []));
   return {
     kind: "showcase",
     rig,
     layers: [
       ...behind,
       { asset: `${rig}/showcase/${base.key}`, rect: [0, 0, base.canvas.width, base.canvas.height] },
-      ...ordered.map((entry) => ({ asset: `${rig}/showcase/${entry.layer.key}`, rect: entry.layer.rect })),
+      ...under,
+      ...ordered.map((entry) => part(entry.layer)),
     ],
     space: base.canvas,
     windows: base.windows,

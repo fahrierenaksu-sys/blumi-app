@@ -12,10 +12,10 @@ import sharp from "sharp"
 
 const BAKER = pathToFileURL(resolve(import.meta.dirname, "../../../../../../tools/avatar25d/bake-showcase.mjs")).href
 interface Baker {
-  validateAllowlist(list: unknown): void
+  validateAllowlist(list: unknown, options?: { allowPendingOwnerApproval?: boolean }): void
   bakeBody(rig: string, body: unknown, scale: number, pad: number, srcRoot: string): Promise<{
     showcaseBase: { key: string; canvas: { width: number; height: number }; windows: Record<string, number[]> }
-    items: Record<string, { key: string; rect: number[]; order: number; back?: { key: string; rect: number[] } }>
+    items: Record<string, { key: string; rect: number[]; order: number; back?: { key: string; rect: number[] }; under?: { key: string; rect: number[] } }>
     files: Map<string, Buffer>
   }>
 }
@@ -117,6 +117,58 @@ test("a crop window that leaves the canvas stops the bake", async () => {
   try {
     const wide = { ...body, crops: { ...body.crops, push: [-50, 0, 200, 200] } }
     await assert.rejects(bakeBody("female", wide, 0.5, 20, dir), /leaves the canvas/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test("a look the owner has not approved yet is baked only when the work branch asks for it explicitly", async () => {
+  const { validateAllowlist } = await loadBaker()
+  const { dir, body } = await fixture()
+  rmSync(dir, { recursive: true, force: true })
+  const entry = (patch: Record<string, unknown>) => ({ scale: 0.5, bodies: { female: { ...body, qaPass: "qa/PASS.md", ...patch } } })
+  assert.doesNotThrow(() => validateAllowlist(entry({ ownerApproved: false }), { allowPendingOwnerApproval: true }))
+  assert.throws(() => validateAllowlist(entry({ ownerApproved: undefined }), { allowPendingOwnerApproval: true }), /ownerApproved/)
+  assert.throws(() => validateAllowlist(entry({ ownerApproved: false })), /ownerApproved/)
+})
+
+async function mask(rect: readonly [number, number, number, number]) {
+  const [x, y, w, h] = rect
+  const white = await sharp({ create: { width: w, height: h, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer()
+  return sharp({ create: { ...SIZE, channels: 3, background: { r: 0, g: 0, b: 0 } } }).composite([{ input: white, left: x, top: y }])
+    .toColourspace("b-w").png().toBuffer()
+}
+
+test("each piece erases the body only where its own mask says, whichever other piece of the slot erases more", async () => {
+  const { bakeBody } = await loadBaker()
+  const { dir, body } = await fixture()
+  try {
+    const masks = { a: await mask([150, 300, 40, 40]), b: await mask([220, 500, 40, 40]) }
+    for (const [name, bytes] of Object.entries(masks)) writeFileSync(join(dir, "g", `erase_${name}.png`), bytes)
+    const top = body.items.item_top
+    const items = {
+      ...body.items,
+      item_top: { ...top, eraseFile: "g/erase_a.png", eraseSha256: sha(masks.a) },
+      item_top2: { ...top, eraseFile: "g/erase_b.png", eraseSha256: sha(masks.b) }
+    }
+    const baked = await bakeBody("female", { ...body, items }, 0.5, 20, dir)
+    const { width, height } = baked.showcaseBase.canvas
+    const [hx, hy] = baked.showcaseBase.windows.head!
+    const at = (x: number, y: number) => [Math.round((x - (100 - hx! * 2)) / 2), Math.round((y - (60 - hy! * 2)) / 2)] as const
+    const alphaWith = async (itemId: string) => {
+      const under = baked.items[itemId]!.under!
+      const { data } = await sharp({ create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+        .composite([{ input: baked.files.get("base__front")!, left: 0, top: 0 }, { input: baked.files.get(under.key)!, left: under.rect[0]!, top: under.rect[1]! }])
+        .raw().toBuffer({ resolveWithObject: true })
+      return (x: number, y: number) => { const [px, py] = at(x, y); return data[(py * width + px) * 4 + 3]! }
+    }
+    const withA = await alphaWith("item_top"), withB = await alphaWith("item_top2")
+    assert.equal(withA(170, 320), 0, "piece a erases the body under its mask")
+    assert.equal(withB(170, 320), 255, "piece b leaves that body in place")
+    assert.equal(withB(240, 520), 0, "piece b erases under its own mask")
+    assert.equal(withA(240, 520), 255, "piece a leaves that body in place")
+    assert.equal(withA(200, 650), 255, "the body outside every mask is the base itself")
+    assert.equal((baked.showcaseBase as { underSlots?: string[] }).underSlots?.join(), "top", "only the slot that erases is cut from the base")
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

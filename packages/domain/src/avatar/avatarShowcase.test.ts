@@ -169,3 +169,67 @@ test("the baked manifest's front art is complete: a base with windows inside its
     }
   }
 });
+
+const SLOT_FIELD = { top: "topId", bottom: "bottomId", shoes: "shoesId", hair: "hairId" } as const;
+const DEFAULT_LOOK = { female: DEFAULT_FEMALE_AVATAR_LOADOUT, male: DEFAULT_MALE_AVATAR_LOADOUT } as const;
+
+/** The body's default look wearing one item in its slot. */
+function wearing(rig: keyof typeof DEFAULT_LOOK, itemId: string) {
+  const slot = AVATAR_STILL_MANIFEST.bodies[rig].items[itemId]!.slot as keyof typeof SLOT_FIELD;
+  return { ...DEFAULT_LOOK[rig], [SLOT_FIELD[slot]]: itemId };
+}
+
+/** What each drawn layer is: hair back, the base, the body under a piece, or a piece's front. */
+function layerKinds(resolved: AvatarShowcaseResolved): string[] {
+  assert.equal(resolved.kind, "showcase", "expected the front view");
+  if (resolved.kind !== "showcase") return [];
+  return resolved.layers.map((layer) => layer.asset.split("/")[2]!.split("__")[1]!);
+}
+
+test("every baked item of both bodies is drawn in front view on its body's base, with the body under it", () => {
+  for (const rig of ["female", "male"] as const) {
+    const body = AVATAR_STILL_MANIFEST.bodies[rig];
+    const underSlots = body.showcaseBase?.underSlots ?? [];
+    for (const [itemId, item] of Object.entries(body.items)) {
+      if (!item.showcase) continue;
+      const resolved = resolveShowcaseLayers(wearing(rig, itemId), "card");
+      assert.equal(resolved.kind, "showcase", `${rig} ${itemId}: front view`);
+      if (resolved.kind !== "showcase") continue;
+      const assets = resolved.layers.map((layer) => layer.asset);
+      assert.ok(assets.includes(`${rig}/showcase/${item.showcase.key}`), `${rig} ${itemId}: its front layer is drawn`);
+      if (underSlots.includes(item.slot as never)) {
+        assert.ok(item.showcase.under && assets.includes(`${rig}/showcase/${item.showcase.under.key}`), `${rig} ${itemId}: the body under it is drawn`);
+      }
+    }
+  }
+});
+
+test("a mixed look across outfits composes like the factory: hair back, base, the body under each piece, shoes, bottom, top, hair", () => {
+  const mix = {
+    ...DEFAULT_MALE_AVATAR_LOADOUT,
+    hairId: "avatar_v2_hair_male_textured_twists",
+    topId: "avatar_v2_top_male_forest_collar_sweater",
+    bottomId: "avatar_v2_bottom_male_grey_wide_jeans",
+    shoesId: "avatar_v2_shoes_male_cream_chunky_sneakers",
+  };
+  const resolved = resolveShowcaseLayers(mix, "card");
+  assert.deepEqual(layerKinds(resolved), ["back", "front", "under", "under", "under", "front", "front", "front", "front"]);
+  assert.deepEqual(frontOwners(resolved), [
+    mix.hairId, "base", mix.shoesId, mix.bottomId, mix.topId, mix.shoesId, mix.bottomId, mix.topId, mix.hairId,
+  ]);
+});
+
+test("a piece whose body-under layer is missing draws the whole 3/4 still instead of a figure with a hole", () => {
+  const male = AVATAR_STILL_MANIFEST.bodies.male;
+  const topId = DEFAULT_MALE_AVATAR_LOADOUT.topId;
+  const top = male.items[topId]?.showcase;
+  assert.ok(top?.under, "the baked boy top carries the body under it");
+  const { under: _under, ...withoutUnder } = top!;
+  const manifest = {
+    ...AVATAR_STILL_MANIFEST,
+    bodies: { ...AVATAR_STILL_MANIFEST.bodies, male: { ...male, items: { ...male.items, [topId]: { ...male.items[topId]!, showcase: withoutUnder } } } },
+  } as AvatarStillManifest;
+  const resolved = resolveShowcaseLayers(DEFAULT_MALE_AVATAR_LOADOUT, "card", manifest);
+  assert.equal(resolved.kind, "fallback");
+  if (resolved.kind === "fallback") assert.equal(resolved.reason, "item-without-showcase");
+});
