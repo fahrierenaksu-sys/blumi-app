@@ -21,6 +21,15 @@ export const SUPPORTED_MOBILE_CAPABILITIES = [
   "avatar_world_25d"
 ] as const satisfies readonly CapabilityKey[]
 
+/**
+ * Keys added after the server that may still be live: an older server refuses to parse a declaration that names
+ * them (400) and leaves them out of its map. The build retries once without them and reads a missing one as off,
+ * so it keeps every other capability on an older server. Every other key stays required (fail closed).
+ */
+export const LATE_DECLARED_CAPABILITIES: readonly CapabilityKey[] = Object.freeze(["avatar_world_25d"])
+
+const HTTP_BAD_REQUEST = 400
+
 export interface SessionScopedCapabilities {
   sessionToken: string | null
   capabilities: CapabilityMap
@@ -75,28 +84,41 @@ export async function resolveProductionCapabilities(
   fetcher: typeof fetch = fetch
 ): Promise<CapabilityResolution> {
   try {
-    // A stalled request times out and fails closed like any other failure.
-    const { response, payload } = await requestJson(
-      baseHttpUrl,
-      "/v1/capabilities/resolve",
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${sessionToken}`,
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          declaredCapabilities: [...declaredCapabilities]
-        })
-      },
-      fetcher
-    )
-    if (!response.ok) return createFailClosedCapabilityResolution()
-    return normalizeCapabilityResolution(payload) ??
+    const first = await requestCapabilities(baseHttpUrl, sessionToken, declaredCapabilities, fetcher)
+    const earlyDeclared = declaredCapabilities.filter((key) => !LATE_DECLARED_CAPABILITIES.includes(key))
+    const result = first.response.status === HTTP_BAD_REQUEST && earlyDeclared.length < declaredCapabilities.length
+      ? await requestCapabilities(baseHttpUrl, sessionToken, earlyDeclared, fetcher)
+      : first
+    if (!result.response.ok) return createFailClosedCapabilityResolution()
+    return normalizeCapabilityResolution(result.payload) ??
       createFailClosedCapabilityResolution()
   } catch {
     return createFailClosedCapabilityResolution()
   }
+}
+
+function requestCapabilities(
+  baseHttpUrl: string,
+  sessionToken: string,
+  declaredCapabilities: readonly CapabilityKey[],
+  fetcher: typeof fetch
+) {
+  // A stalled request times out and fails closed like any other failure.
+  return requestJson(
+    baseHttpUrl,
+    "/v1/capabilities/resolve",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        declaredCapabilities: [...declaredCapabilities]
+      })
+    },
+    fetcher
+  )
 }
 
 function normalizeCapabilityResolution(
@@ -105,18 +127,18 @@ function normalizeCapabilityResolution(
   if (!isRecord(value) || typeof value.legacy !== "boolean") return null
   const capabilities = value.capabilities
   if (!isRecord(capabilities)) return null
-  const keys = Object.keys(capabilities)
+  const isKnownKey = (key: string) => (CAPABILITY_KEYS as readonly string[]).includes(key)
   if (
-    keys.length !== CAPABILITY_KEYS.length ||
-    CAPABILITY_KEYS.some(
-      (key) => !Object.hasOwn(capabilities, key) ||
-        typeof capabilities[key] !== "boolean"
-    )
+    Object.keys(capabilities).some((key) => !isKnownKey(key)) ||
+    CAPABILITY_KEYS.some((key) => {
+      if (!Object.hasOwn(capabilities, key)) return !LATE_DECLARED_CAPABILITIES.includes(key)
+      return typeof capabilities[key] !== "boolean"
+    })
   ) {
     return null
   }
   const normalized = Object.fromEntries(
-    CAPABILITY_KEYS.map((key) => [key, capabilities[key] as boolean])
+    CAPABILITY_KEYS.map((key) => [key, capabilities[key] === true])
   ) as Record<CapabilityKey, boolean>
   return Object.freeze({
     legacy: value.legacy,

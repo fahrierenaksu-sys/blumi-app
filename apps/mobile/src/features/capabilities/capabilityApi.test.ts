@@ -5,6 +5,7 @@ import {
   createCapabilityResolutionSingleFlight,
   createFailClosedCapabilityResolution,
   getSessionScopedCapabilities,
+  LATE_DECLARED_CAPABILITIES,
   resolveProductionCapabilities,
   SUPPORTED_MOBILE_CAPABILITIES
 } from "./capabilityApi"
@@ -170,4 +171,55 @@ test("mobile declares only known capabilities, each once", () => {
 
 test("a build that draws the 2.5D avatar declares avatar_world_25d so the server can tell it from older builds", () => {
   assert.ok((SUPPORTED_MOBILE_CAPABILITIES as readonly string[]).includes("avatar_world_25d"))
+})
+
+test("an older server that refuses a late key keeps every other capability on, the late key off", async () => {
+  // Arrange: the live server predates avatar_world_25d: it refuses the declaration (400) and leaves the key out
+  const olderServerKeys = CAPABILITY_KEYS.filter((key) => !LATE_DECLARED_CAPABILITIES.includes(key))
+  const bodies: unknown[] = []
+  const olderServer: typeof fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body)) as { declaredCapabilities: string[] }
+    bodies.push(body)
+    if (body.declaredCapabilities.some((key) => LATE_DECLARED_CAPABILITIES.includes(key as never))) {
+      return new Response(JSON.stringify({ error: "Declare valid client capabilities." }), { status: 400 })
+    }
+    return new Response(JSON.stringify({
+      legacy: false,
+      capabilities: Object.fromEntries(olderServerKeys.map((key) => [key, true]))
+    }), { status: 200 })
+  }
+
+  // Act
+  const result = await resolveProductionCapabilities(
+    "https://api.blumi.test", "session-token", SUPPORTED_MOBILE_CAPABILITIES, olderServer
+  )
+
+  // Assert
+  assert.equal(bodies.length, 2)
+  assert.equal(result.capabilities.chat_typing, true)
+  assert.equal(result.capabilities.chat_read_receipts, true)
+  assert.equal(result.capabilities.avatar_world_25d, false)
+})
+
+test("a refused declaration without late keys, or a map missing an older key, still fails closed", async () => {
+  const expected = createFailClosedCapabilityResolution()
+  let calls = 0
+  const refusing: typeof fetch = async () => {
+    calls += 1
+    return new Response(JSON.stringify({ error: "no" }), { status: 400 })
+  }
+  assert.deepEqual(
+    await resolveProductionCapabilities("https://api.blumi.test", "session-token", ["chat_typing"], refusing),
+    expected
+  )
+  assert.equal(calls, 1)
+
+  const missingOlderKey: typeof fetch = async () => new Response(JSON.stringify({
+    legacy: false,
+    capabilities: Object.fromEntries(CAPABILITY_KEYS.filter((key) => key !== "chat_typing").map((key) => [key, true]))
+  }), { status: 200 })
+  assert.deepEqual(
+    await resolveProductionCapabilities("https://api.blumi.test", "session-token", ["chat_typing"], missingOlderKey),
+    expected
+  )
 })
