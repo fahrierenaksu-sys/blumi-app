@@ -143,6 +143,8 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     return index > 0 ? state?.routes[index - 1]?.name : undefined
   })
   const showBackButton = shouldShowShopBackButton(routeNameBelow)
+  const openWardrobe = useCallback(() => navigation.navigate("WardrobeV2"), [navigation])
+  const openRoom = useCallback(() => navigation.navigate("MyRoom"), [navigation])
   const shopLayoutMetrics = useMemo(
     () => getShopLayoutMetrics({
       width: viewportMetrics.safeWidth,
@@ -536,6 +538,9 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                   state="error"
                   isRetrying={inventoryStore.hydrationStatus === "loading"}
                   onRetry={handleRetryShop}
+                  mode={shopMode}
+                  onOpenWardrobe={openWardrobe}
+                  onOpenRoom={openRoom}
                   locale={locale}
                 />
               ) : null}
@@ -575,6 +580,9 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
               state={shopStatusState}
               isRetrying={inventoryStore.hydrationStatus === "loading"}
               onRetry={handleRetryShop}
+              mode={shopMode}
+              onOpenWardrobe={openWardrobe}
+              onOpenRoom={openRoom}
               locale={locale}
             />
           )}

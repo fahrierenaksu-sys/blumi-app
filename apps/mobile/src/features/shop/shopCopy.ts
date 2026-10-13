@@ -12,7 +12,8 @@ export interface ShopCopy {
   homeShopAccessibility: string
   loading: { title: string; body: string }
   offline: { title: string; body: string; actionUnavailable: string }
-  empty: { title: string; body: string }
+  /** Nothing is for sale on this tab: says so plainly and points to what the person already owns. */
+  empty: Record<"avatar" | "home", { title: string; body: string; action: string; actionAccessibility: string }>
   error: { title: string; body: string }
   retry: string
   retryAccessibility: string
@@ -128,7 +129,20 @@ const COPY: Record<AppLocale, ShopCopy> = {
       body: "You can browse saved items, but purchases and saved changes need a connection.",
       actionUnavailable: "Reconnect to unlock or save this item."
     },
-    empty: { title: "Nothing here yet", body: "This collection is taking a short pause. Try again in a moment." },
+    empty: {
+      avatar: {
+        title: "New pieces are on the way",
+        body: "Nothing is for sale right now. The pieces you own are waiting in your Wardrobe.",
+        action: "Open my Wardrobe",
+        actionAccessibility: "Open your Wardrobe"
+      },
+      home: {
+        title: "New home pieces are on the way",
+        body: "Nothing for your home is for sale right now. You can set up your room with what you own.",
+        action: "Go to my room",
+        actionAccessibility: "Open your room"
+      }
+    },
     error: { title: "We couldn’t refresh your store", body: "Your collection is safe. Please try again." },
     retry: "Try again",
     retryAccessibility: "Retry loading store",
@@ -244,7 +258,20 @@ const COPY: Record<AppLocale, ShopCopy> = {
       body: "Kayıtlı öğelere göz atabilirsin; satın alma ve kaydetme için bağlantı gerekir.",
       actionUnavailable: "Bu öğeyi açmak veya kaydetmek için yeniden bağlan."
     },
-    empty: { title: "Henüz bir şey yok", body: "Bu koleksiyon kısa bir arada. Biraz sonra tekrar dene." },
+    empty: {
+      avatar: {
+        title: "Yeni parçalar yolda",
+        body: "Şu an satışta parça yok. Sahip olduğun parçalar Dolabında seni bekliyor.",
+        action: "Dolabıma git",
+        actionAccessibility: "Dolabını aç"
+      },
+      home: {
+        title: "Yeni ev parçaları yolda",
+        body: "Şu an satışta ev parçası yok. Odanı sahip olduğun eşyalarla düzenleyebilirsin.",
+        action: "Odama git",
+        actionAccessibility: "Odanı aç"
+      }
+    },
     error: { title: "Mağazan yenilenemedi", body: "Koleksiyonun güvende. Lütfen tekrar dene." },
     retry: "Tekrar dene",
     retryAccessibility: "Mağaza yüklemesini yeniden dene",

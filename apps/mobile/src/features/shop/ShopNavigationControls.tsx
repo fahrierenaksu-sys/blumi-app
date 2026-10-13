@@ -8,7 +8,7 @@ import {
   View
 } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
-import type { ShopPresentationState } from "./shopPresentationModel"
+import { getShopStatusContent, type ShopPresentationState } from "./shopPresentationModel"
 import type { AppLocale } from "../session/appLocale"
 import { getShopCopy } from "./shopCopy"
 import { animateTo, useMotion } from "../../ui/motion"
@@ -27,36 +27,21 @@ const SHOP_MODE_OPTIONS: {
 
 export function ShopStatusCard(props: {
   state: Exclude<ShopPresentationState, "ready">
+  /** The tab the card stands in for; an empty tab points to what the person owns. */
+  mode: ShopMode
   isRetrying: boolean
   onRetry: () => void
+  onOpenWardrobe: () => void
+  onOpenRoom: () => void
   locale: AppLocale
 }) {
-  const copy = getShopCopy(props.locale)
-  const details = (() => {
-    switch (props.state) {
-      case "loading":
-        return {
-          ...copy.loading,
-          testID: "shop-status-loading"
-        }
-      case "offline":
-        return {
-          ...copy.offline,
-          testID: "shop-status-offline"
-        }
-      case "empty":
-        return {
-          ...copy.empty,
-          testID: "shop-status-empty"
-        }
-      case "error":
-        return {
-          ...copy.error,
-          testID: "shop-status-error"
-        }
-    }
-  })()
-  const canRetry = props.state !== "loading"
+  const details = getShopStatusContent({ state: props.state, mode: props.mode, locale: props.locale })
+  const action = details.action
+  const isRetry = action?.kind === "retry"
+  const isDisabled = isRetry && props.isRetrying
+  const onAction = action?.kind === "openWardrobe"
+    ? props.onOpenWardrobe
+    : action?.kind === "openRoom" ? props.onOpenRoom : props.onRetry
 
   return (
     <View
@@ -79,21 +64,21 @@ export function ShopStatusCard(props: {
       )}
       <Text maxFontSizeMultiplier={1.25} style={styles.shopStatusTitle}>{details.title}</Text>
       <Text maxFontSizeMultiplier={1.25} style={styles.shopStatusBody}>{details.body}</Text>
-      {canRetry ? (
+      {action ? (
         <Pressable
-          testID="shop-status-retry"
+          testID={isRetry ? "shop-status-retry" : "shop-status-action"}
           accessibilityRole="button"
-          accessibilityLabel={copy.retryAccessibility}
-          accessibilityState={{ disabled: props.isRetrying }}
-          disabled={props.isRetrying}
-          onPress={props.onRetry}
+          accessibilityLabel={action.accessibilityLabel}
+          accessibilityState={{ disabled: isDisabled }}
+          disabled={isDisabled}
+          onPress={onAction}
           style={({ pressed }) => [
             styles.shopStatusRetry,
-            pressed && !props.isRetrying ? styles.shopStatusRetryPressed : null,
-            props.isRetrying ? styles.shopStatusRetryDisabled : null
+            pressed && !isDisabled ? styles.shopStatusRetryPressed : null,
+            isDisabled ? styles.shopStatusRetryDisabled : null
           ]}
         >
-          <Text maxFontSizeMultiplier={1.2} style={styles.shopStatusRetryText}>{copy.retry}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={styles.shopStatusRetryText}>{action.label}</Text>
         </Pressable>
       ) : null}
     </View>
