@@ -452,5 +452,82 @@ class ExportMirrorCardsTest(unittest.TestCase):
         self.assertIn('mirrorUv', pack(card_with(True), eye_context=far))
 
 
+BOY_ITEMS = {'bottom_a': {'slot': 'bottom'}, 'bottom_b': {'slot': 'bottom'}, 'shoes_a': {'slot': 'shoes'},
+             'shoes_b': {'slot': 'shoes'}, 'top_a': {'slot': 'top'}}
+
+
+class LegVariantOwnersTest(unittest.TestCase):
+    """Leg drawings are owned per item and exported under their role, so any bottom mixes with any shoes."""
+
+    def setUp(self):
+        self.ex = load_exporter()
+
+    def test_item_keyed_drawings_go_to_their_own_item_and_item_pairs_are_composed_not_exported(self):
+        keys = ['bottom_a', 'bottom_a+shoes_b', 'bottom_b', 'shoes_a', 'shoes_b']
+        owners = self.ex.leg_variant_owners(dict.fromkeys(keys, {}), BOY_ITEMS)
+        self.assertEqual(owners, {'bottom_a': [('bottom_a', 'bottom')], 'bottom_b': [('bottom_b', 'bottom')],
+                                  'shoes_a': [('shoes_a', 'shoes')], 'shoes_b': [('shoes_b', 'shoes')]})
+
+    def test_slot_keys_of_a_one_item_per_slot_rig_keep_their_pair_on_the_bottom(self):
+        items = {'pants': {'slot': 'bottom'}, 'sneakers': {'slot': 'shoes'}, 'polo': {'slot': 'top'}}
+        owners = self.ex.leg_variant_owners(dict.fromkeys(['bottom', 'bottom+shoes', 'shoes'], {}), items)
+        self.assertEqual(owners, {'pants': [('bottom', 'bottom'), ('bottom+shoes', 'bottom+shoes')],
+                                  'sneakers': [('shoes', 'shoes')]})
+
+    def test_bad_keys_stop_the_export(self):
+        for key in ('top_a', 'nobody', 'bottom_a+bottom_b', 'bottom_a+shoes_a+shoes_b', 'bottom'):
+            with self.assertRaises(SystemExit, msg=key):
+                self.ex.leg_variant_owners({key: {}}, BOY_ITEMS)   # 'bottom': two items share the slot
+
+
+class ItemCardBoxTest(unittest.TestCase):
+    """Seated / waving item cards sit at their own sheet box, so cards cut from different fits mix."""
+
+    def setUp(self):
+        from PIL import Image
+        self.ex = load_exporter()
+        self.body = Image.new('RGBA', (40, 30), (0, 0, 0, 0))
+        self.card = Image.new('RGBA', (40, 30), (0, 0, 0, 0))
+        self.card.paste((200, 10, 10, 255), (12, 20, 18, 26))     # drawn px: x 12..17, y 20..25
+
+    def test_a_card_without_its_own_box_keeps_the_body_box_untrimmed(self):
+        cards = self.ex.item_cards('shoes_a', {'sit': data_uri(self.card)}, {'sit': (self.body, [100, 200])})
+        self.assertEqual(cards['sit'][1], (100, 200))
+        self.assertEqual(cards['sit'][0].size, (40, 30))
+
+    def test_a_card_with_its_own_box_is_trimmed_and_placed_at_its_drawn_pixels(self):
+        cards = self.ex.item_cards('shoes_a', {'sit': data_uri(self.card), 'sitBox': [90, 210]},
+                                   {'sit': (self.body, [100, 200])})
+        image, box = cards['sit']
+        self.assertEqual(box, (90 + 12, 210 + 20))
+        self.assertEqual(image.size, (6, 6))
+        self.assertEqual(image.getpixel((0, 0)), (200, 10, 10, 255))
+
+    def test_a_card_of_another_size_without_a_box_stops_the_export(self):
+        from PIL import Image
+        with self.assertRaises(SystemExit):
+            self.ex.item_cards('shoes_a', {'sit': data_uri(Image.new('RGBA', (41, 30)))}, {'sit': (self.body, [0, 0])})
+
+
+MIXED_BOY = pathlib.Path.home() / 'BlumiArtWorkbench/avatar25-v2/factory/work/boy_pipeline_v8/smoke/basic_a/post/rig.json'
+
+
+@unittest.skipUnless(MIXED_BOY.exists(), 'factory boy rig not on this machine')
+class ExportItemKeyedBoyTest(unittest.TestCase):
+    def test_a_factory_fit_exports_one_leg_drawing_per_item_on_the_body_leg_mesh(self):
+        with tempfile.TemporaryDirectory() as a:
+            subprocess.run([sys.executable, str(HERE / 'export_rig.py'), str(MIXED_BOY), '--out', a], check=True, capture_output=True)
+            rig = json.loads((pathlib.Path(a) / 'rig25.json').read_text())
+        for name, view in rig['views'].items():
+            body = {r['name']: r for r in view['mesh']['ranges']}
+            for iid, it in view['items'].items():
+                legs = {r['name']: r for r in it['mesh']['ranges'] if r.get('legVariant')}
+                role = it['slot'] if it['slot'] in ('bottom', 'shoes') else None
+                self.assertEqual(sorted(legs), sorted(f'{ln}@{role}' for ln in ('farLeg', 'nearLeg')) if role else [], f'{name} {iid}')
+                for r in legs.values():
+                    self.assertEqual(r['legVariant'], role)
+                    self.assertEqual(r['count'], body[r['layer']]['count'])   # the body leg's own triangles
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -22,6 +22,10 @@ item's page (else one extra page): the item then carries `mirrorUv` (same length
 parts with a card differ) and, only when the cards overflowed, `mirrorPage`. Mesh, weights and ids are unchanged; an
 item without `pngMirror` exports exactly as before.
 
+Leg drawings (`hybrid.legVariants`) are exported per item: each bottom owns a 'bottom' range and each pair of shoes a
+'shoes' range per leg (keys may name slots or rig item ids); the runtime composes any worn pair as the AND of the two
+(leg_variant_owners). Item sit / wave cards may carry their own sheet box (`sitBox` / `waveBox`, item_cards).
+
 --motion (or a `motion` already inside a rig view): the retargeted 3D walk (lab40, rig25d/walk3d/v3/a4). Each view
 with one carries it as `motion` (per key pose: hips offset, near-leg-in-front flag, turn + stretch per bone in the
 view's bone order) and drops its painted walk cards (body and items): the standing drawing walks instead.
@@ -546,6 +550,78 @@ def export_motion(M, bone_names):
     return {'stancePx': [round(x, 3) for x in M['stancePx']], 'frames': frames}
 
 
+LEG_ROLES = ('bottom', 'shoes')
+
+
+def _leg_part(part, items, slot_item):
+    """One part of a legVariants key -> (owner item id, role). A part is a slot name (one item per slot, the girl's
+    rig) or a rig item id (the factory's keys, one per worn item)."""
+    if part in LEG_ROLES:
+        owners = slot_item.get(part, [])
+        if len(owners) != 1:
+            raise SystemExit(f'leg variant {part}: {len(owners)} items in that slot (a slot key needs exactly one)')
+        return owners[0], part
+    if part not in items:
+        raise SystemExit(f'leg variant {part}: not a slot and not an item of this view')
+    role = items[part]['slot']
+    if role not in LEG_ROLES:
+        raise SystemExit(f'leg variant {part}: a {role} item cannot own a leg drawing')
+    return part, role
+
+
+def leg_variant_owners(leg_variants, items):
+    """{owner item id: [(source key, exported key), ...]} for the view's legVariants.
+
+    Each bottom owns its 'bottom' drawing and each pair of shoes its 'shoes' drawing (role keys, whatever the source
+    named them). The runtime draws the leg for any worn bottom + shoes as the AND of those two drawings' coverage
+    (avatar25Pose: the bottom's drawing masked by the shoes'), so a pair keyed by two item ids is not exported: it is
+    exactly that AND up to a hidden heel rim (integration/combo_proof_0750/PROOF.md). A pair keyed by slots
+    ('bottom+shoes', the girl's QA'd drawing) is kept on the bottom and drawn instead of the AND (byte-identical
+    girl export)."""
+    slot_item = {}
+    for iid, it in sorted(items.items()):
+        slot_item.setdefault(it['slot'], []).append(iid)
+    owners, seen = {}, set()
+    for key in leg_variants:
+        parts = key.split('+')
+        if len(parts) > 2:
+            raise SystemExit(f'leg variant {key}: more than two parts')
+        resolved = [_leg_part(p, items, slot_item) for p in parts]
+        if len(parts) == 2 and sorted(r for _, r in resolved) != ['bottom', 'shoes']:
+            raise SystemExit(f'leg variant {key}: a pair is one bottom and one pair of shoes')
+        if len(parts) == 2 and not all(p in LEG_ROLES for p in parts):
+            continue   # item-id pair: composed at runtime
+        owner = next(o for o, r in resolved if r == 'bottom') if len(parts) == 2 else resolved[0][0]
+        out_key = '+'.join(LEG_ROLES) if len(parts) == 2 else resolved[0][1]
+        if (owner, out_key) in seen:
+            raise SystemExit(f'leg variant {key}: {owner} already owns a {out_key} drawing')
+        seen.add((owner, out_key))
+        owners.setdefault(owner, []).append((key, out_key))
+    return owners
+
+
+def item_cards(iid, it, body_cards):
+    """{pose: (card image, sheet box [x, y])} of an item's seated / waving cards. Without `sitBox` / `waveBox` a card
+    is the body card's size and sits at the body's box (one fit: every card shares the union box). With one, the
+    card sits at its own box (cards from different fits mix) and is trimmed to its drawn pixels (lossless)."""
+    out = {}
+    for pose, (body_img, body_box) in body_cards.items():
+        if not it.get(pose):
+            continue
+        card = decode(it[pose])
+        own_box = it.get(f'{pose}Box')
+        if own_box is None:
+            if card.size != body_img.size:
+                raise SystemExit(f'{iid} {pose} card is {card.size}, the body card {body_img.size}: give it `{pose}Box`')
+            out[pose] = (card, (body_box[0], body_box[1]))
+            continue
+        bbox = card.getchannel('A').getbbox()
+        if bbox is None:
+            continue   # nothing drawn
+        out[pose] = (card.crop(bbox), (own_box[0] + bbox[0], own_box[1] + bbox[1]))
+    return out
+
+
 def export_view(name, v, motion=None):
     hy = v['hybrid']
     motion = motion or v.get('motion')
@@ -560,17 +636,11 @@ def export_view(name, v, motion=None):
     for k in TORSO_VARIANTS[1:]:
         if hy.get(k):
             atlas.add(k, decode(hy[k]))
-    # bare legs drawn for what is worn (lab40 fix_rig.py `legVariants`, key 'bottom', 'shoes' or 'bottom+shoes'):
-    # a range `<leg>@<key>` with the body leg layer's mesh and that drawing, stored with the item that key needs
-    # (trousers for 'bottom…', else shoes), so its texels load only while that item is worn
+    # bare legs drawn for what is worn (lab40 fix_rig.py `legVariants`): a range `<leg>@<role>` with the body leg
+    # layer's mesh and that drawing, stored with the item that owns it, so its texels load only while it is worn
+    # (leg_variant_owners: item-owned 'bottom' / 'shoes' drawings, plus the girl's legacy 'bottom+shoes' pair)
     leg_variants = {k: m for k, m in sorted((hy.get('legVariants') or {}).items())}
-    slot_item = {it['slot']: iid for iid, it in v.get('items', {}).items()}
-    variant_owner = {}
-    for key in leg_variants:
-        owner = slot_item.get('bottom' if 'bottom' in key.split('+') else 'shoes')
-        if owner is None:
-            raise SystemExit(f'leg variant {key}: no item in that slot')
-        variant_owner.setdefault(owner, []).append(key)
+    variant_owner = leg_variant_owners(leg_variants, v.get('items', {}))
     # no painted walk yet (lab39 2026-10-08): the runtime steps the standing drawing's own skinned legs
     # a retargeted walk replaces the painted walk cards (body and items): they are not bundled
     walk_img = decode(hy['walk']['atlas']) if hy.get('walk') and not motion else None
@@ -587,15 +657,15 @@ def export_view(name, v, motion=None):
         ia = Atlas()
         for k, p in enumerate(it.get('parts', [])):
             ia.add(f'part{k}', decode(p['png']))
-        for pose in ('sit', 'wave'):
-            if it.get(pose):
-                ia.add(pose, decode(it[pose]))
+        cards = item_cards(iid, it, {'sit': (sit_img, hy['sit']['box']), 'wave': (wave_img, hy['wave']['box'])})
+        for pose, (card, _) in cards.items():
+            ia.add(pose, card)
         if walk_card is not None:
             ia.add('walk', walk_card)
-        for key in variant_owner.get(iid, []):
+        for key, out_key in variant_owner.get(iid, []):
             for ln, png in sorted(leg_variants[key].items()):
-                ia.add(f'{ln}@{key}', decode(png))
-        item_atlases[iid] = (*ia.pack(PAGE_W // 2), walk_card is not None)
+                ia.add(f'{ln}@{out_key}', decode(png))
+        item_atlases[iid] = (*ia.pack(PAGE_W // 2), walk_card is not None, cards)
     page_h = max([img.height] + [a[0].height for a in item_atlases.values()])
     page_h = (page_h + 15) // 16 * 16
     PAGE = (PAGE_W, page_h)
@@ -633,7 +703,7 @@ def export_view(name, v, motion=None):
     for k_item, (iid, it) in enumerate(sorted(v.get('items', {}).items())):
         page = 1 + k_item // 2
         xoff = (k_item % 2) * (PAGE[0] // 2)
-        iimg, ir, has_walk = item_atlases[iid]
+        iimg, ir, has_walk, cards = item_atlases[iid]
         while len(pages) <= page:
             pages.append(Image.new('RGBA', PAGE, (0, 0, 0, 0)))
         pages[page].paste(iimg, (xoff, 0))
@@ -650,18 +720,21 @@ def export_view(name, v, motion=None):
                          lambda p=p, k=k: im.skinned(p, ir[f'part{k}'], PAGE, bone_idx, page, ARM_CODE.get(p['layer'], 0)),
                          layer=p['layer'], standOnly=stand_only)
         body_layers = {L['name']: L for L in v['layers']}
-        for key in variant_owner.get(iid, []):
+        for key, out_key in variant_owner.get(iid, []):
             for ln in sorted(leg_variants[key]):
                 # drawn exactly where (and as) the body leg is: its order, its mesh, its own weights
-                im.add_range(f'{ln}@{key}', layer_order[ln],
-                             lambda ln=ln, key=key: im.skinned({**body_layers[ln], 'walkWeights': None}, ir[f'{ln}@{key}'], PAGE, bone_idx, page, 0),
-                             layer=ln, legVariant=key)
-        if it.get('sit'):
+                im.add_range(f'{ln}@{out_key}', layer_order[ln],
+                             lambda ln=ln, k=out_key: im.skinned({**body_layers[ln], 'walkWeights': None}, ir[f'{ln}@{k}'], PAGE, bone_idx, page, 0),
+                             layer=ln, legVariant=out_key)
+        # each card at its own sheet box (the body's box unless the item carries `sitBox` / `waveBox`)
+        if 'sit' in cards:
+            card, (bx, by) = cards['sit']
             im.add_range('sit', (4.5 if S.get('front') else LOWER_Z) + f,
-                         lambda: im.quad(S['box'][0], S['box'][1], sit_img.width, sit_img.height, ir['sit'], PAGE, ROOT, None, page))
-        if it.get('wave'):
+                         lambda: im.quad(bx, by, card.width, card.height, ir['sit'], PAGE, ROOT, None, page))
+        if 'wave' in cards:
+            wcard, (wx, wy) = cards['wave']
             im.add_range('wave', layer_order['nearArm'] + f,
-                         lambda: im.quad(Wv['box'][0], Wv['box'][1], wave_img.width, wave_img.height, ir['wave'], PAGE, WAVE, None, page))
+                         lambda: im.quad(wx, wy, wcard.width, wcard.height, ir['wave'], PAGE, WAVE, None, page))
         if has_walk:
             iw = ir['walk']
             for i, fr in enumerate(wl['frames']):
