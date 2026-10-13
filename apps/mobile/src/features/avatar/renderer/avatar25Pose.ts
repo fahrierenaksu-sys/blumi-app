@@ -230,8 +230,10 @@ function itemPoseMask(range: Rig25Mesh["ranges"][number], v: Rig25View, motion: 
   if (range.poseOnly) mask &= range.poseOnly.reduce((m, pose) => m | (POSE_BITS[pose] ?? 0), 0)
   if (range.standOnly) mask &= ~(sit | (skinnedWalk ? 0 : walk))
   if (range.layer === "nearArm") mask &= ~wave
-  if ((range.layer === "nearArm" && (cardArms.includes("near") || v.sit.hideArms)) ||
-    (range.layer === "farArm" && (cardArms.includes("far") || v.sit.hideArms))) mask &= ~sit
+  // seated, a sleeve hides only when its standing arm is gone and the seated drawing brings no arm for that side
+  // (lab40 doll25 `hideF = noArms && !ca.includes('far')`): over a drawn seated arm the item's own sleeve stays on
+  if (v.sit.hideArms && (range.layer === "nearArm" || range.layer === "farArm") &&
+    !cardArms.includes(range.layer === "nearArm" ? "near" : "far")) mask &= ~sit
   return { mask, frame: -1 }
 }
 
@@ -756,6 +758,11 @@ export function writeAvatarPalette(
         sx[sd.fa] = 1e-3
         sy[sd.fa] = 1e-3
         rot[sd.ua] = view.sitArmTurn[sd.name] ?? 0
+      } else {
+        // hands toward the lap (doll25 sit): the near upper arm a little forward, its forearm more. Over a drawn
+        // seated arm (cardArms) the standing arm hides but its sleeve stays on and follows these bones
+        rot[sd.ua] = sd.name === "near" ? fwd * 0.12 : 0
+        rot[sd.fa] = sd.name === "near" ? fwd * 0.35 : -sd.out * 0.12
       }
     }
     rot[idx.chest] = 0.004 * br

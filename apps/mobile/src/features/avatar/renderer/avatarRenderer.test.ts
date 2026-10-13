@@ -191,14 +191,28 @@ test("seated, the folded forearm layers are clipped just under the elbow; standi
   assert.ok(clip[0] < -1e8 && clip[1] < -1e8)
 })
 
-test("seated with the drawing's own arms, the standing arms and their sleeves are not drawn", () => {
-  const v = rig.views.front
-  if (!v.sit.cardArms.length) return
-  const compiled = compileAvatar(rig, "front", ["top_coral_wave_polo"])
-  const arm = (vertex: number) => new Uint8Array(compiled.vertexData)[vertex * 32 + 25]
-  const [start, count] = [compiled.variants[VARIANT_SIT * 2], compiled.variants[VARIANT_SIT * 2 + 1]]
-  const armsSeated = new Set(Array.from(compiled.indexData.subarray(start, start + count), arm))
-  for (const side of v.sit.cardArms) assert.ok(!armsSeated.has(side === "near" ? 1 : 2), side)
+test("seated, the standing arms hide under a drawn seated arm but the top's sleeves stay on, as the lab draws it", () => {
+  // the factory renders QA approved (lab40 doll25: hideF = noArms && !cardArms.includes('far')) keep each sleeve over
+  // the seated drawing's own arm; a sleeve hides only when its arm is hidden and no drawn arm takes its place
+  const armsSeated = (r: Rig25, worn: string[]) => {
+    const compiled = compileAvatar(r, "front", worn)
+    const arm = (vertex: number) => new Uint8Array(compiled.vertexData)[vertex * 32 + 25]
+    const [start, count] = [compiled.variants[VARIANT_SIT * 2], compiled.variants[VARIANT_SIT * 2 + 1]]
+    return new Set(Array.from(compiled.indexData.subarray(start, start + count), arm))
+  }
+  const sideBit = (side: string) => (side === "near" ? 1 : 2)
+  for (const [r, top] of [[rig, "top_coral_wave_polo"], [maleRig, "top_male_c3"]] as const) {
+    const front = r.views.front
+    assert.ok(front.sit.cardArms.length > 0)
+    const bare = armsSeated(r, [])
+    for (const side of front.sit.cardArms) assert.ok(!bare.has(sideBit(side)), `bare ${side} arm hidden`)
+    const dressed = armsSeated(r, [top])
+    for (const side of front.sit.cardArms) assert.ok(dressed.has(sideBit(side)), `${top} ${side} sleeve kept`)
+    // no drawn seated arms and the arms hidden: the sleeves go with them
+    const armless = { ...r, views: { ...r.views, front: { ...front, sit: { ...front.sit, cardArms: [], hideArms: true } } } }
+    const hidden = armsSeated(armless, [top])
+    assert.ok(!hidden.has(1) && !hidden.has(2), `${top} sleeves hidden with the arms`)
+  }
 })
 
 test("walking, she faces the screen quadrant she moves toward (the four drawn diagonals)", () => {
