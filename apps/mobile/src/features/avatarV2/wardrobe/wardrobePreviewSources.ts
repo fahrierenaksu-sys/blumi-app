@@ -169,11 +169,27 @@ export const WARDROBE_SQUARE_THUMBNAIL_SOURCES: Partial<Record<string, ImageSour
     require("../assets/shop-thumbnails/avatar_v2_shoes_pearl_slingback_sandals.png")
 }
 
+/** The 2.5D item thumbnail: the whole garment, cropped tight to its pixels (not a 256x384 room canvas). */
+function getStillThumbnailSource(itemId: string): ImageSourcePropType | undefined {
+  return AVATAR_STILL_ASSETS[`male/thumb/${itemId}`] ?? AVATAR_STILL_ASSETS[`female/thumb/${itemId}`]
+}
+
+function getLegacyPreviewSource(itemId: string): ImageSourcePropType | undefined {
+  return getGarmentThumbnailOverride(itemId)?.source
+    ?? WARDROBE_SQUARE_THUMBNAIL_SOURCES[itemId]
+    ?? AVATAR_ITEM_PREVIEW_SOURCES[itemId]
+}
+
 export function getAvatarItemPreviewSource(
   item: AvatarCatalogItem
 ): ImageSourcePropType | undefined {
-  return getGarmentThumbnailOverride(item.id)?.source
-    ?? WARDROBE_SQUARE_THUMBNAIL_SOURCES[item.id]
-    ?? AVATAR_ITEM_PREVIEW_SOURCES[item.id]
-    ?? AVATAR_STILL_ASSETS[`male/thumb/${item.id}`]
+  return getLegacyPreviewSource(item.id) ?? getStillThumbnailSource(item.id)
+}
+
+/**
+ * True when the card's picture is a whole-garment cutout (the 2.5D thumbnails): it is fitted whole into the card,
+ * never shifted like the old room-canvas layers, or a shoe falls out of the frame and a top shows only its hem.
+ */
+export function isAvatarItemCutoutPreview(item: Pick<AvatarCatalogItem, "id">): boolean {
+  return !getLegacyPreviewSource(item.id) && Boolean(getStillThumbnailSource(item.id))
 }

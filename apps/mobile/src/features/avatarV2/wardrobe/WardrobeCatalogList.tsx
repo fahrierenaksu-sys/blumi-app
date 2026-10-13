@@ -140,6 +140,7 @@ const WardrobeCategoryShelf = memo(function WardrobeCategoryShelf(props: Omit<Wa
             <WardrobeCatalogCard
               key={card.item.id}
               item={card.item}
+              name={card.name}
               equipped={card.equipped}
               itemStateLabel={card.itemStateLabel}
               wearingLabel={copy.wearing}

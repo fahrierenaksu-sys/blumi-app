@@ -1,6 +1,8 @@
 import type { ImageSourcePropType } from "react-native"
 import { isAvatarV2ItemCompatibleWithBody } from "../avatarBodyCompatibility"
 import type { AvatarCatalogItem, UserAvatar } from "../avatarV2.types"
+import { getAvatarItemDisplayName } from "../avatarItemDisplayNames"
+import type { AppLocale } from "../../session/appLocale"
 import { isAvatarV2ItemEquipped } from "../avatarV2Selectors"
 import { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } from "../room/avatarRoomProjection"
 import { hasAvatarItemRigArt } from "../../avatar/model/avatarItemArt"
@@ -11,6 +13,8 @@ import {
 
 export interface WardrobeCatalogCardModel {
   item: AvatarCatalogItem
+  /** The piece's name in the app's language. */
+  name: string
   equipped: boolean
   itemStateLabel: string
   locked: boolean
@@ -37,7 +41,7 @@ export function reuseWardrobeCards(
   if (!previous || previous.length !== next.length) return next
   return previous.every((card, index) => {
     const update = next[index]
-    return card.item === update.item && card.equipped === update.equipped &&
+    return card.item === update.item && card.name === update.name && card.equipped === update.equipped &&
       card.itemStateLabel === update.itemStateLabel && card.locked === update.locked &&
       card.previewing === update.previewing && card.previewSource === update.previewSource
   }) ? previous : next
@@ -109,6 +113,8 @@ export function buildWardrobeCards(input: {
   displayedAvatar: UserAvatar
   canEquipItem: (item: AvatarCatalogItem) => boolean
   copy: WardrobeCatalogCopy
+  /** The app's language for piece names; English names when omitted. */
+  locale?: AppLocale
   getPreviewSource: (item: AvatarCatalogItem) => ImageSourcePropType | undefined
   /** The locked item being previewed on the stage, if any. */
   previewingItemId?: string | null
@@ -135,6 +141,7 @@ export function buildWardrobeCards(input: {
 
     return {
       item,
+      name: getAvatarItemDisplayName(item, input.locale ?? "en"),
       equipped,
       itemStateLabel,
       locked,
