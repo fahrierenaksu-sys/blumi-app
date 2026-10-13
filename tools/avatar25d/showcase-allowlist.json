@@ -8,8 +8,8 @@
       "base": "base/girl_a.png",
       "baseSha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0",
       "qaPass": "line_1900/REPORT.md (o_g1fix8 16:37 FINAL; G5 starter-shoes waiver = owner yes 2026-10-12 20:07)",
-      "ownerApproved": false,
-      "ownerApprovalNote": "Pending: fresh-QA PASS is recorded, the owner has not yet approved this front look. Set true only after his yes.",
+      "ownerApproved": true,
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed.",
       "crops": {
         "head": [
           876,
@@ -64,8 +64,8 @@
       "base": "base/boy_a.png",
       "baseSha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648",
       "qaPass": "integration/RESUME_INTEGRATION.md STATE 2026-10-13 06:33 (boy SHOWCASE 26/26 full pass); prov_boy_2145/REPORT.md; curls_install_1030/REPORT.md",
-      "ownerApproved": false,
-      "ownerApprovalNote": "Pending: fresh-QA PASS is recorded, the owner has not yet approved this front look. Set true only after his yes.",
+      "ownerApproved": true,
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed.",
       "crops": {
         "head": [
           870,

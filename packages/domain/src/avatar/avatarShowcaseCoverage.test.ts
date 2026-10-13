@@ -10,8 +10,8 @@ import { GIRL_WARDROBE_PREVIEW_ALL_IDS } from "./girlWardrobePreview";
  * must ship with its front layer; adding an entry needs a reason in the same commit.
  *
  * 2026-10-13: the girl starter (factory o_g1fix8) and the boy's 26 pieces have front layers, so their entries are
- * gone. They are baked with `ownerApproved: false` until the owner approves the front look; preview and production
- * builds refuse such a bake (apps/mobile/scripts/mobile-release-assets.cjs).
+ * gone. The owner approved those front looks on 2026-10-13 21:22 (OWNER_DECISIONS), so both bodies are baked with
+ * `ownerApproved: true`; preview and production builds refuse a body that is not (mobile-release-assets.cjs).
  *
  * Reason for the girl wardrobe entries (2026-10-13, release/2.5d-beta-3): the ribbon waves and white sneakers ship
  * their QA'd room art; their factory front layers exist but are not owner-approved and allowlisted yet (same rule).

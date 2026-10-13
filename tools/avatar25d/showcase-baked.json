@@ -3,7 +3,7 @@
   "scale": 0.5,
   "bodies": {
     "female": {
-      "ownerApproved": false,
+      "ownerApproved": true,
       "showcaseBase": {
         "key": "base__front",
         "canvas": {
@@ -135,7 +135,7 @@
       }
     },
     "male": {
-      "ownerApproved": false,
+      "ownerApproved": true,
       "showcaseBase": {
         "key": "base__front",
         "canvas": {
