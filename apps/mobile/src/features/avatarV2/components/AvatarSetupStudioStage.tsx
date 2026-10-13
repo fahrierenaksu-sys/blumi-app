@@ -212,7 +212,10 @@ export function AvatarSetupStudioStage({
         />
       ))}
 
-      <View style={[styles.genderRail, { width: metrics.genderRailWidth }]}>
+      <View style={[
+        styles.genderRail,
+        { height: metrics.genderRailHeight, top: metrics.genderRailTop, width: metrics.genderRailWidth }
+      ]}>
         <GenderButton
           active={!isMale}
           disabled={disabled}
@@ -496,9 +499,7 @@ const styles = StyleSheet.create({
   },
   genderRail: {
     position: "absolute",
-    top: 8,
     alignSelf: "center",
-    height: 62,
     padding: 5,
     flexDirection: "row",
     borderRadius: 32,

@@ -117,6 +117,7 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
       displayedAvatar,
       canEquipItem,
       copy: studioCopy,
+      locale: getAppLocale(),
       getPreviewSource: getAvatarItemPreviewSource,
       previewingItemId: lockedItem?.id ?? null
     }))

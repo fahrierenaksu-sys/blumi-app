@@ -20,6 +20,8 @@ export type AvatarStudioCategory =
 export interface AvatarStudioStageMetrics {
   avatarBottomInset: number
   avatarSize: number
+  genderRailHeight: number
+  genderRailTop: number
   genderRailWidth: number
   orbitPod: Readonly<Record<AvatarStudioCategory, AvatarStudioOrbitPodPosition>>
   orbitPodHeight: number
@@ -31,6 +33,25 @@ export interface AvatarStudioStageMetrics {
 export interface AvatarStudioOrbitPodPosition {
   side: "left" | "right"
   top: number
+}
+
+/** The Kadın/Erkek switch floats over the top of the stage. */
+const GENDER_RAIL_TOP = 8
+const GENDER_RAIL_HEIGHT = 62
+/** Breathing room between the switch and the highest drawn hair. */
+const GENDER_RAIL_HEAD_GAP = 6
+/**
+ * Where the highest drawn hair may start inside the figure box (share of its height, from the top). The boy's front
+ * still measured 0.12 in the beta-2 smoke; 0.08 leaves room for taller hair styles.
+ */
+const FIGURE_HEAD_TOP_FRACTION = 0.08
+/** The figure box is the old 256x384 canvas: height = 1.5 x width. */
+const FIGURE_BOX_ASPECT = 1.5
+
+/** The largest figure width whose head still clears the gender switch on a stage of this height. */
+function getHeadClearAvatarSize(stageHeight: number, avatarBottomInset: number): number {
+  const headroom = stageHeight - avatarBottomInset - (GENDER_RAIL_TOP + GENDER_RAIL_HEIGHT + GENDER_RAIL_HEAD_GAP)
+  return Math.floor(headroom / (1 - FIGURE_HEAD_TOP_FRACTION) / FIGURE_BOX_ASPECT)
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -108,11 +129,13 @@ export function getAvatarStudioStageMetrics(
   // The studio is character-led: the canonical rig gets a taller centre
   // silhouette, while the surrounding pod lanes stay deliberately compact.
   const preferredAvatarSize = compact ? 260 : 292
+  const avatarBottomInset = compact ? 14 : 18
+  // The head must never sit behind the gender switch (beta-2 smoke): on short stages the figure shrinks instead.
   const avatarSize = Math.min(
     preferredAvatarSize,
-    Math.max(compact ? 210 : 240, stageWidth - (compact ? 52 : 56))
+    Math.max(compact ? 210 : 240, stageWidth - (compact ? 52 : 56)),
+    getHeadClearAvatarSize(stageHeight, avatarBottomInset)
   )
-  const avatarBottomInset = compact ? 14 : 18
   const orbitPodHeight = compact ? 44 : 46
   const orbitPodWidth = Math.min(
     compact ? 102 : 106,
@@ -122,7 +145,7 @@ export function getAvatarStudioStageMetrics(
   // Each pod follows the real rendered rig, not a screen row. This keeps the
   // controls tied to hair, torso, lower outfit and shoes when the avatar size
   // changes between Pro Max and compact layouts.
-  const avatarHeight = avatarSize * 1.5
+  const avatarHeight = avatarSize * FIGURE_BOX_ASPECT
   const avatarTop = stageHeight - avatarBottomInset - avatarHeight
   const podTopForRigZone = (zoneRatio: number) =>
     Math.round(avatarTop + avatarHeight * zoneRatio - orbitPodHeight / 2)
@@ -143,6 +166,8 @@ export function getAvatarStudioStageMetrics(
     // horizontal inset, so the size follows the viewport instead of letting
     // the controls collapse onto the body on narrower phones.
     avatarSize,
+    genderRailHeight: GENDER_RAIL_HEIGHT,
+    genderRailTop: GENDER_RAIL_TOP,
     genderRailWidth: compact ? 256 : 288,
     orbitPod,
     orbitPodHeight,

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { readFileSync } from "node:fs"
+import { readFileSync, statSync } from "node:fs"
+import { RETIRED_AVATAR_ITEM_IDS } from "@blumi/domain"
 import { runInNewContext } from "node:vm"
 import ts from "typescript"
 import { getShopThumbnailLayout } from "../../shop/shopThumbnailLayout"
@@ -39,6 +40,7 @@ test("female and male previews centre visible pixels inside narrow and wide card
       getMaleRigLayerThumbnailPresentation: () => ({ top: 44.5, scale: 3.2 }),
       MALE_CAPSULE_PREVIEW_SOURCES: Object.fromEntries(samples.filter(([id]) => id.includes("_male_")).map(([id]) => [id, 1])),
       WARDROBE_SQUARE_THUMBNAIL_SOURCES: {},
+      isAvatarItemCutoutPreview: () => false,
       getAvatarAutomationSlug: (id: string) => id,
       WARDROBE_ART_ASPECT: 0.82, WARDROBE_THUMB_BOX: { width: 100, height: 68 },
       CATEGORY_ICONS: {}, wardrobeTheme: {},
@@ -52,7 +54,7 @@ test("female and male previews centre visible pixels inside narrow and wide card
   for (const width of [80, 110, 145]) {
     for (const [id, type] of samples) {
       const tree = module.exports.WardrobeCatalogCard({
-        item: { id, type, name: type }, width, previewSource: 1,
+        item: { id, type, name: type }, name: type, width, previewSource: 1,
         equipped: false, locked: false, previewing: false
       })
       const box = tree.props.children[0].props.children[0]
@@ -103,6 +105,12 @@ const {
 } = require("./wardrobeCopy") as typeof import("./wardrobeCopy")
 
 const copy = AVATAR_STUDIO_COPY.en
+const { getAvatarItemPreviewSource, isAvatarItemCutoutPreview
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+} = require("./wardrobePreviewSources") as typeof import("./wardrobePreviewSources")
+const { getAvatarItemDisplayName
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+} = require("../avatarItemDisplayNames") as typeof import("../avatarItemDisplayNames")
 // Plan X15 retired every old paid piece, so the locked-card tests add one paid fixture piece per slot to the live
 // catalog. They are wearable on the girl, not owned by default, and have no room art, so the tests say they preview.
 const PAID_FIXTURE_ITEMS = (["hair", "top", "shoes"] as const).map((type, index) => ({
@@ -294,4 +302,106 @@ test("locked cards read as Shop items in the app language and mark the one being
     previewingItemId: hair[0].id
   })
   assert.equal(ownedCards[0].previewing, false, "only locked items are previewed without saving")
+})
+
+// Beta-2 smoke: the boy's 2.5D thumbnails are whole-garment cutouts. Shifted like the old 256x384 room layers, every
+// shoe card was blank and tops/bottoms showed only a hem. Each card must contain its whole garment, unshifted.
+const LIVE_WARDROBE_ITEMS = AVATAR_V2_CATALOG.filter((item) =>
+  !RETIRED_AVATAR_ITEM_IDS.has(item.id) && !item.hiddenFromWardrobe)
+const BOY_PIECES = LIVE_WARDROBE_ITEMS.filter((item) =>
+  (item.compatibleBodyIds ?? []).includes("avatar_v2_body_male_light") &&
+  ["hair", "top", "bottom", "shoes"].includes(item.type))
+
+function renderCardWithLivePreview(item: (typeof AVATAR_V2_CATALOG)[number], width: number) {
+  const cardSource = readFileSync(new URL("./WardrobeCatalogCard.tsx", import.meta.url), "utf8")
+  const jsx = (type: unknown, props: any) => ({ type, props })
+  const module = { exports: {} as any }
+  runInNewContext(ts.transpileModule(cardSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 }
+  }).outputText, {
+    module, exports: module.exports,
+    require: () => ({
+      jsx, jsxs: jsx, memo: (component: unknown) => component,
+      Image: "Image", View: "View", Pressable: "Pressable", Text: "Text",
+      getShopProductThumbnailBounds: () => undefined,
+      getShopThumbnailLayout, getWardrobeThumbnailPresentation,
+      getGarmentThumbnailOverride: () => undefined,
+      getStarterLayerThumbnail: () => undefined,
+      getAvatarItemPreviewImageStyle: () => ({ width: 196, height: 294, transform: [{ translateY: -130 }] }),
+      getMaleRigLayerThumbnailPresentation: () => undefined,
+      MALE_CAPSULE_PREVIEW_SOURCES: {},
+      WARDROBE_SQUARE_THUMBNAIL_SOURCES: {},
+      isAvatarItemCutoutPreview,
+      getAvatarAutomationSlug: (id: string) => id,
+      WARDROBE_ART_ASPECT: 0.82, WARDROBE_THUMB_BOX: { width: 100, height: 68 },
+      CATEGORY_ICONS: {}, wardrobeTheme: {},
+      wardrobeV2Styles: { itemThumbBox: {}, itemPreviewSquare: { width: "100%", height: "100%" } }
+    })
+  })
+  return module.exports.WardrobeCatalogCard({
+    item, name: item.name, width, previewSource: getAvatarItemPreviewSource(item),
+    equipped: false, locked: false, previewing: false
+  })
+}
+
+test("every boy wardrobe piece card shows a real picture of the whole garment", () => {
+  assert.equal(BOY_PIECES.length, 26)
+  for (const item of BOY_PIECES) {
+    const source = getAvatarItemPreviewSource(item)
+    assert.equal(typeof source, "string", `${item.id} has no card picture`)
+    assert.ok(statSync(source as unknown as string).size > 1024, `${item.id} card picture is empty`)
+    assert.ok(isAvatarItemCutoutPreview(item), `${item.id} must be framed as a whole-garment cutout`)
+  }
+  const flatten = (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean))
+  for (const width of [80, 97, 110, 145]) {
+    const artHeight = Math.round(width * 0.82)
+    for (const item of BOY_PIECES) {
+      const art = renderCardWithLivePreview(item, width).props.children[0]
+      const box = art.props.children[0]
+      assert.equal(box.type, "View", `${item.id} must be fitted in a box`)
+      const viewport = flatten(box.props.style)
+      assert.ok(viewport.width > 0 && viewport.width <= width - 3, `${item.id} box is wider than the card`)
+      assert.ok(viewport.height > 0 && viewport.height <= artHeight - 3, `${item.id} box is taller than the art`)
+      const image = box.props.children
+      assert.equal(image.props.contentFit, "contain", `${item.id} must contain the whole garment`)
+      const style = flatten(image.props.style)
+      assert.equal(style.transform, undefined, `${item.id} must not be shifted out of its box`)
+      assert.equal(style.width, "100%")
+      assert.equal(style.height, "100%")
+    }
+  }
+})
+
+/** Greedy word wrap at the card's narrowest line (a 97pt card on a 375pt phone fits about 13 characters). */
+const WARDROBE_NAME_LINE_CHARS = 13
+const wrapName = (name: string) => name.split(" ").reduce<string[]>((lines, word) => {
+  const last = lines.at(-1)
+  return last !== undefined && `${last} ${word}`.length <= WARDROBE_NAME_LINE_CHARS
+    ? [...lines.slice(0, -1), `${last} ${word}`]
+    : [...lines, word]
+}, [])
+
+test("every visible wardrobe piece has a Turkish name that fits the card's two lines", () => {
+  const seen = new Set<string>()
+  for (const item of LIVE_WARDROBE_ITEMS) {
+    const name = getAvatarItemDisplayName(item, "tr")
+    assert.notEqual(name, item.name, `${item.id} has no Turkish name`)
+    const lines = wrapName(name)
+    assert.ok(lines.length <= 2 && lines.every((line) => line.length <= WARDROBE_NAME_LINE_CHARS),
+      `${item.id}: "${name}" does not fit two card lines`)
+    assert.ok(!seen.has(`${item.type}:${name}`), `${item.id}: "${name}" repeats another piece's name`)
+    seen.add(`${item.type}:${name}`)
+    assert.equal(getAvatarItemDisplayName(item, "en"), item.name)
+  }
+  const cards = buildWardrobeCards({
+    items: BOY_PIECES,
+    displayedAvatar: DEFAULT_AVATAR_V2,
+    canEquipItem: () => true,
+    copy: AVATAR_STUDIO_COPY.tr,
+    locale: "tr",
+    getPreviewSource: () => undefined,
+    isPreviewSupported: () => true
+  })
+  assert.ok(cards.every((card) => card.name === getAvatarItemDisplayName(card.item, "tr")))
+  assert.equal(cards.find((card) => card.item.id === "avatar_v2_shoes_male_tan_loafers")?.name, "Taba Loafer")
 })
