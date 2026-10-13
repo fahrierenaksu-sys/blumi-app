@@ -146,7 +146,11 @@ test("every visible wardrobe item has a non-empty room projection", () => {
     (item) => wardrobeTypes.has(item.type) && item.hiddenFromWardrobe !== true
   )
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  const { hasAvatarItemRigArt } = require("../avatar/model/avatarItemArt") as typeof import("../avatar/model/avatarItemArt")
   for (const item of visibleItems) {
+    // an item the 2.5D rig draws has its room drawing there (the wardrobe's own rule, isAvatarItemRoomPreviewSupported)
+    if (hasAvatarItemRigArt(item.id)) continue
     const projection = DEFAULT_AVATAR_ROOM_PROJECTION_MAP[item.id]
     assert.ok(projection, `${item.id} projection`)
     if (item.type === "body") {
