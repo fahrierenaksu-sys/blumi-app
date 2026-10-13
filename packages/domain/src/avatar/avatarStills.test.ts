@@ -127,9 +127,12 @@ test("a boy pair without a baked cell draws the bottom's legs uncut; one piece a
   assert.deepEqual(legsOf([]), ["male/full/body__o1", "male/full/body__o2"]);
 });
 
-test("the girl keeps her QA'd pair drawing and no layer of hers is a sheet part", () => {
+test("the girl keeps her QA'd pair drawing; only a bottom without a pair drawing has composed (sheet) legs", () => {
   const girl = AVATAR_STILL_MANIFEST.bodies.female;
-  assert.ok([...girl.layers.full, ...girl.layers.bust].every((e) => e.gatedBy === undefined && e.source === undefined));
+  // her starter pants own the QA'd pair drawing, so they never need a composed leg; the black trousers do with her sneakers
+  const composed = new Set([...girl.layers.full, ...girl.layers.bust].filter((e) => e.gatedBy !== undefined || e.source !== undefined).map((e) => e.owner));
+  assert.ok(!composed.has("avatar_v2_bottom_coral_wave_pants"));
+  assert.ok([...composed].every((owner) => girl.items[owner]?.slot === "bottom"), [...composed].join());
   const layers = resolveAvatarStillLayers(GIRL_RIG_OUTFIT, "full").layers;
   assert.ok(layers.every((l) => l.source === undefined));
   assert.deepEqual(legAssets(layers).map((l) => l.asset.split("__").pop()), ["bottom-shoes", "bottom-shoes"]);

@@ -3,6 +3,7 @@ import { FEMALE_SWEET_CAPSULE_LAYERS } from "./femaleSweetCapsuleDefinitions"
 import { MALE_PREMIUM_CAPSULE_RUNTIME } from "./malePremiumCapsulePilotDefinitions"
 import {
   BOY_WARDROBE_PREVIEW_ITEM_IDS,
+  GIRL_WARDROBE_PREVIEW_ITEM_IDS,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT,
   getDefaultOwnedItemIds,
@@ -85,7 +86,7 @@ const MALE_CAPSULE_AVATAR_ITEMS: AvatarCatalogItem[] = ([
 }))
 
 const titleOf = (id: string): string =>
-  id.replace(/^avatar_v2_[a-z]+_male_/, "").split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+  id.replace(/^avatar_v2_[a-z]+_(male_)?/, "").split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
 
 /**
  * The boy's 2.5D wardrobe (domain boyWardrobePreview.ts): free and owned by every account during testing (economy
@@ -111,6 +112,22 @@ const BOY_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top", 
     hiddenFromShop: true,
     ...(MALE_STARTER_ITEM_IDS.has(id) ? { ownedByDefault: true } : {}),
     compatibleBodyIds: ["avatar_v2_body_male_light"]
+  })))
+
+/**
+ * The girl's 2.5D wardrobe additions (domain girlWardrobePreview.ts): on the boy's testing terms, free and owned by every
+ * account through the server inventory (economy entry at 0 coins, ownedByDefault), never sold (hidden from the shop,
+ * no receipt). Not marked ownedByDefault here, so the client's slot fallback stays the girl's starter look.
+ */
+const GIRL_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top", "bottom", "shoes"] as const).flatMap((type) =>
+  GIRL_WARDROBE_PREVIEW_ITEM_IDS[type].map((id, index) => ({
+    id,
+    type,
+    name: titleOf(id),
+    sortOrder: 5 + index,
+    layerOrder: AVATAR_V2_LAYER_ORDER[type],
+    assets: {},
+    hiddenFromShop: true
   })))
 
 const MALE_PREMIUM_CAPSULE_AVATAR_ITEMS: AvatarCatalogItem[] = MALE_PREMIUM_CAPSULE_RUNTIME.map((item, index) => {
@@ -291,6 +308,7 @@ const AVATAR_V2_CATALOG_SOURCE: AvatarCatalogItem[] = [
   ...MALE_CAPSULE_AVATAR_ITEMS,
   ...MALE_PREMIUM_CAPSULE_AVATAR_ITEMS,
   ...BOY_WARDROBE_PREVIEW_AVATAR_ITEMS,
+  ...GIRL_WARDROBE_PREVIEW_AVATAR_ITEMS,
   ...FEMALE_SWEET_CAPSULE_AVATAR_ITEMS,
   {
     id: DEFAULT_AVATAR_V2.faceId,

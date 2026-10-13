@@ -13,63 +13,63 @@
  "sets": {
   "back": {
    "file": "back.astc.zip",
-   "fileBytes": 2426544,
-   "gpuBytes": 2426544,
-   "height": 592,
-   "layers": 3,
+   "fileBytes": 6773040,
+   "gpuBytes": 6773040,
+   "height": 992,
+   "layers": 5,
    "levels": [
     {
-     "bh": 148,
+     "bh": 248,
      "bw": 256,
-     "h": 592,
+     "h": 992,
      "w": 1024
     },
     {
-     "bh": 74,
+     "bh": 124,
      "bw": 128,
-     "h": 296,
+     "h": 496,
      "w": 512
     },
     {
-     "bh": 37,
+     "bh": 62,
      "bw": 64,
-     "h": 148,
+     "h": 248,
      "w": 256
     },
     {
-     "bh": 19,
+     "bh": 31,
      "bw": 32,
-     "h": 74,
+     "h": 124,
      "w": 128
     },
     {
-     "bh": 10,
+     "bh": 16,
      "bw": 16,
-     "h": 37,
+     "h": 62,
      "w": 64
     },
     {
-     "bh": 5,
+     "bh": 8,
      "bw": 8,
-     "h": 18,
+     "h": 31,
      "w": 32
     },
     {
-     "bh": 3,
+     "bh": 4,
      "bw": 4,
-     "h": 9,
+     "h": 15,
      "w": 16
     },
     {
-     "bh": 1,
+     "bh": 2,
      "bw": 2,
-     "h": 4,
+     "h": 7,
      "w": 8
     },
     {
      "bh": 1,
      "bw": 1,
-     "h": 2,
+     "h": 3,
      "w": 4
     },
     {
@@ -88,75 +88,79 @@
    "pages": [
     "back_page0.png",
     "back_page1.png",
-    "back_page2.png"
+    "back_page2.png",
+    "back_page3.png",
+    "back_page4.png"
    ],
-   "sha256": "bbf94f92a5caf5cc599581ec85ca1fa216aae22201c7f23e873c62fdfa680028",
+   "sha256": "87b36fa4e0089338f86531ef0102824eb1753108d4cac005bfeae5f1aa4d98b9",
    "sourceSha256": {
-    "back_page0.png": "c17cfa6aa06062f92fb5744b17261ba1f8efd6518e754296f1eff03b0b4fd211",
-    "back_page1.png": "975b8677d0ed1b556bd424d9c2a4e488b702e86f7fd6b2a671f1c7367973c7e1",
-    "back_page2.png": "1e104eb23da6b8bd63a95c066e83c74448a6f326431820c9f80bc72a3b92797b"
+    "back_page0.png": "2e27c7d6d35bccf4592b15fe45eab9615082465c6b9cfd019c31b0897d1d7e6d",
+    "back_page1.png": "23874e7a8d254e8a8f51d2cd53333ce93f55b68115807202351f71f5c0f7b8c9",
+    "back_page2.png": "a1c4cbb4b0c4d2e8dce47b105c10b36b928cab4e1985deb8289a068fd58e14b0",
+    "back_page3.png": "bb4fb52d4dcb462e2ece32e755258846c4dd5e2328b3b4e46d69836e00a5f3ce",
+    "back_page4.png": "46e1f95c3fade4b33a363590ccd3f7898820d30504053603e754a27fc3dcf9f0"
    },
    "width": 1024
   },
   "front": {
    "file": "front.astc.zip",
-   "fileBytes": 2526384,
-   "gpuBytes": 2526384,
-   "height": 616,
-   "layers": 3,
+   "fileBytes": 6721840,
+   "gpuBytes": 6721840,
+   "height": 984,
+   "layers": 5,
    "levels": [
     {
-     "bh": 154,
+     "bh": 246,
      "bw": 256,
-     "h": 616,
+     "h": 984,
      "w": 1024
     },
     {
-     "bh": 77,
+     "bh": 123,
      "bw": 128,
-     "h": 308,
+     "h": 492,
      "w": 512
     },
     {
-     "bh": 39,
+     "bh": 62,
      "bw": 64,
-     "h": 154,
+     "h": 246,
      "w": 256
     },
     {
-     "bh": 20,
+     "bh": 31,
      "bw": 32,
-     "h": 77,
+     "h": 123,
      "w": 128
     },
     {
-     "bh": 10,
+     "bh": 16,
      "bw": 16,
-     "h": 38,
+     "h": 61,
      "w": 64
     },
     {
-     "bh": 5,
+     "bh": 8,
      "bw": 8,
-     "h": 19,
+     "h": 30,
      "w": 32
     },
     {
-     "bh": 3,
+     "bh": 4,
      "bw": 4,
-     "h": 9,
+     "h": 15,
      "w": 16
     },
     {
-     "bh": 1,
+     "bh": 2,
      "bw": 2,
-     "h": 4,
+     "h": 7,
      "w": 8
     },
     {
      "bh": 1,
      "bw": 1,
-     "h": 2,
+     "h": 3,
      "w": 4
     },
     {
@@ -175,13 +179,17 @@
    "pages": [
     "front_page0.png",
     "front_page1.png",
-    "front_page2.png"
+    "front_page2.png",
+    "front_page3.png",
+    "front_page4.png"
    ],
-   "sha256": "a1d831140a2f9a59e13ccc278ac3d9ac3605f13269a1578a515a99712443c475",
+   "sha256": "1f23a0c9f5bb57928e36b1214b0ffabd55cd922cdbfdb0338aa87c37d55fa2b8",
    "sourceSha256": {
-    "front_page0.png": "aed6b1439a5d0109d3bcf8b0e9d6db8505ba4a3b70883bbdb99b17de5ec4a18c",
-    "front_page1.png": "0b34130e5f4f83f8edac3c22741e3fd636f161190f9e8a66963dda2ee91f9f0c",
-    "front_page2.png": "984184d418043a3ccf3c5247f505c0d3021eab0f0199518fa922093067fe2186"
+    "front_page0.png": "045dc8488adc42fbe14bb054e0576144ffe4fc4fc759e505cbe89a11ede2ba3d",
+    "front_page1.png": "e8036f9cbdb5a9e823e23b88e93c92b0acc1de4be95e11a5d6c01e3e8eab0eea",
+    "front_page2.png": "8590cbc305eb1c46bdf81e3c24aed45500ce8c31f8545b1cbfcfa32efe7ecadb",
+    "front_page3.png": "e02dfdf4829aa9a929fc463cfd9908b66c412d2cda936a41de719fd8bef63a95",
+    "front_page4.png": "2815d7ba95cc7b8683fa29555b4fe38d724a3e24008f45b8f790a97cb329a44b"
    },
    "width": 1024
   }

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import test from "node:test"
-import { AVATAR_STILL_MANIFEST, DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT, resolveAvatarStillLayers, type AvatarStillRigId } from "@blumi/domain"
+import { AVATAR_STILL_MANIFEST, DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT, GIRL_WARDROBE_PREVIEW_ITEM_IDS, resolveAvatarStillLayers, type AvatarStillRigId } from "@blumi/domain"
 import { listAvatarItemArt } from "../model/avatarItemArt"
 import { resolveAvatarDraw } from "../model/resolveAvatarDraw"
 import { avatar25StandEntries } from "../renderer/avatar25Pose"
@@ -76,9 +76,13 @@ function liveGroups(loadout: unknown) {
 }
 
 test("a still stacks its layers in exactly the order the live renderer draws frame 0, for both bodies", () => {
-  const loadouts: unknown[] = [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT, undefined, { bodyId: "x" }, {
-    ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: "avatar_v2_hair_ink_pageboy_star", topId: "avatar_v2_top_coral_wave_polo"
-  }]
+  const girl = { ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: "avatar_v2_hair_ink_pageboy_star", topId: "avatar_v2_top_coral_wave_polo" }
+  // the girl's pieces that draw body ranges (avatar25BodySwap): each alone, mixed with each other and with her starter
+  const [whiteCrop, blackCrop] = GIRL_WARDROBE_PREVIEW_ITEM_IDS.top
+  const [trousers] = GIRL_WARDROBE_PREVIEW_ITEM_IDS.bottom
+  const loadouts: unknown[] = [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT, undefined, { bodyId: "x" }, girl,
+    { ...girl, topId: whiteCrop }, { ...girl, topId: blackCrop }, { ...girl, bottomId: trousers },
+    { ...girl, topId: whiteCrop, bottomId: trousers }, { ...girl, topId: blackCrop, bottomId: trousers }]
   for (const loadout of loadouts) {
     const live = liveGroups(loadout)
     const still = resolveAvatarStillLayers(loadout, "full")

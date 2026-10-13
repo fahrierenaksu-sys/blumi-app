@@ -1,4 +1,5 @@
 import { BOY_WARDROBE_PREVIEW_ITEM_IDS } from "./boyWardrobePreview";
+import { GIRL_WARDROBE_PREVIEW_ITEM_IDS } from "./girlWardrobePreview";
 import type {
   AvatarLoadout,
   AvatarLoadoutV1,
@@ -345,6 +346,10 @@ export const AVATAR_LOADOUT_CATALOG: readonly AvatarLoadoutCatalogItem[] =
     // the boy's 2.5D wardrobe preview (boyWardrobePreview.ts): loadout-valid for the male body only
     ...(["hair", "top", "bottom", "shoes"] as const).flatMap((slot) =>
       slotItems(slot, BOY_WARDROBE_PREVIEW_ITEM_IDS[slot], ["avatar_v2_body_male_light"]),
+    ),
+    // the girl's 2.5D wardrobe additions (girlWardrobePreview.ts): loadout-valid for the girl's body only
+    ...(["hair", "top", "bottom", "shoes"] as const).flatMap((slot) =>
+      slotItems(slot, GIRL_WARDROBE_PREVIEW_ITEM_IDS[slot]),
     ),
     accessoryItem("avatar_v2_accessory_ivory_ribbon_beret", "headwear"),
     accessoryItem("avatar_v2_accessory_cherry_bow_headband", "headwear"),

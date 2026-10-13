@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "c08d66b17b96eeaca3fc9b14abeb0e3757e6b674128842e080977b5597ce71e4",
+      "rigSha256": "c156a4abc599cd99f6d409e2a45115b3a456f77b78318ba70d5c4da5a8c50d0c",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -51,10 +51,82 @@
           "rigItemId": "bottom_coral_wave_pants",
           "thumb": "avatar_v2_bottom_coral_wave_pants"
         },
+        "avatar_v2_bottom_black_highwaist_trousers": {
+          "slot": "bottom",
+          "rigItemId": "bottom_black_highwaist_straight",
+          "thumb": "avatar_v2_bottom_black_highwaist_trousers",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoSit"
+            },
+            {
+              "part": "torsoUpper"
+            },
+            {
+              "part": "torsoWalk"
+            },
+            {
+              "part": "farArm"
+            },
+            {
+              "part": "nearArm"
+            },
+            {
+              "part": "sit"
+            }
+          ]
+        },
         "avatar_v2_top_coral_wave_polo": {
           "slot": "top",
           "rigItemId": "top_coral_wave_polo",
           "thumb": "avatar_v2_top_coral_wave_polo"
+        },
+        "avatar_v2_top_white_cute_crop_top": {
+          "slot": "top",
+          "rigItemId": "top_crop_white",
+          "thumb": "avatar_v2_top_white_cute_crop_top",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoWalk"
+            }
+          ]
+        },
+        "avatar_v2_top_black_cute_crop_top": {
+          "slot": "top",
+          "rigItemId": "top_crop_black",
+          "thumb": "avatar_v2_top_black_cute_crop_top",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoWalk"
+            }
+          ]
         },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
@@ -75,7 +147,22 @@
               274,
               156,
               340
-            ]
+            ],
+            "part": "farArm"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o0__body-farArm",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 0,
+            "seq": 2011,
+            "rect": [
+              126,
+              274,
+              156,
+              340
+            ],
+            "bodyPart": "farArm"
           },
           {
             "key": "avatar_v2_top_coral_wave_polo__o0p45",
@@ -88,6 +175,32 @@
               305,
               25,
               53
+            ]
+          },
+          {
+            "key": "avatar_v2_top_white_cute_crop_top__o0p45",
+            "owner": "avatar_v2_top_white_cute_crop_top",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              206,
+              267,
+              49,
+              90
+            ]
+          },
+          {
+            "key": "avatar_v2_top_black_cute_crop_top__o0p45",
+            "owner": "avatar_v2_top_black_cute_crop_top",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              204,
+              258,
+              53,
+              96
             ]
           },
           {
@@ -135,6 +248,50 @@
             "legVariant": "bottom"
           },
           {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o1__bottom",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              189,
+              833,
+              112,
+              153
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o1__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              189,
+              833,
+              112,
+              142
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "source": {
+              "key": "avatar_v2_bottom_black_highwaist_trousers__o1__bottom-cut",
+              "rect": [
+                0,
+                0,
+                112,
+                142
+              ],
+              "sheet": [
+                112,
+                142
+              ]
+            }
+          },
+          {
             "key": "avatar_v2_bottom_coral_wave_pants__o1__bottom-shoes",
             "owner": "avatar_v2_bottom_coral_wave_pants",
             "slot": "bottom",
@@ -174,6 +331,20 @@
               519,
               109,
               368
+            ],
+            "leg": "farLeg"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o1p3",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 1.3,
+            "seq": 2002,
+            "rect": [
+              225,
+              519,
+              95,
+              397
             ],
             "leg": "farLeg"
           },
@@ -222,6 +393,50 @@
             "legVariant": "bottom"
           },
           {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o2__bottom",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              288,
+              848,
+              120,
+              167
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o2__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              288,
+              848,
+              120,
+              164
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "source": {
+              "key": "avatar_v2_bottom_black_highwaist_trousers__o2__bottom-cut",
+              "rect": [
+                0,
+                0,
+                120,
+                164
+              ],
+              "sheet": [
+                120,
+                164
+              ]
+            }
+          },
+          {
             "key": "avatar_v2_bottom_coral_wave_pants__o2__bottom-shoes",
             "owner": "avatar_v2_bottom_coral_wave_pants",
             "slot": "bottom",
@@ -265,6 +480,20 @@
             "leg": "nearLeg"
           },
           {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o2p3",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 2.3,
+            "seq": 2001,
+            "rect": [
+              291,
+              520,
+              130,
+              426
+            ],
+            "leg": "nearLeg"
+          },
+          {
             "key": "body__o3",
             "owner": "body",
             "slot": "body",
@@ -275,7 +504,50 @@
               250,
               199,
               344
-            ]
+            ],
+            "part": "torso"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2006,
+            "rect": [
+              220,
+              250,
+              185,
+              344
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "avatar_v2_top_white_cute_crop_top__o3__body-torso",
+            "owner": "avatar_v2_top_white_cute_crop_top",
+            "slot": "top",
+            "order": 3,
+            "seq": 3007,
+            "rect": [
+              209,
+              250,
+              199,
+              344
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "avatar_v2_top_black_cute_crop_top__o3__body-torso",
+            "owner": "avatar_v2_top_black_cute_crop_top",
+            "slot": "top",
+            "order": 3,
+            "seq": 3007,
+            "rect": [
+              209,
+              250,
+              199,
+              344
+            ],
+            "bodyPart": "torso"
           },
           {
             "key": "avatar_v2_bottom_coral_wave_pants__o3p3",
@@ -291,6 +563,19 @@
             ]
           },
           {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o3p3",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 3.3,
+            "seq": 2000,
+            "rect": [
+              224,
+              425,
+              166,
+              194
+            ]
+          },
+          {
             "key": "avatar_v2_top_coral_wave_polo__o3p45",
             "owner": "avatar_v2_top_coral_wave_polo",
             "slot": "top",
@@ -299,8 +584,34 @@
             "rect": [
               214,
               248,
-              176,
+              169,
               233
+            ]
+          },
+          {
+            "key": "avatar_v2_top_white_cute_crop_top__o3p45",
+            "owner": "avatar_v2_top_white_cute_crop_top",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              219,
+              266,
+              161,
+              162
+            ]
+          },
+          {
+            "key": "avatar_v2_top_black_cute_crop_top__o3p45",
+            "owner": "avatar_v2_top_black_cute_crop_top",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              219,
+              257,
+              162,
+              160
             ]
           },
           {
@@ -340,7 +651,22 @@
               277,
               114,
               369
-            ]
+            ],
+            "part": "nearArm"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o5__body-nearArm",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 5,
+            "seq": 2012,
+            "rect": [
+              365,
+              277,
+              114,
+              369
+            ],
+            "bodyPart": "nearArm"
           },
           {
             "key": "avatar_v2_top_coral_wave_polo__o5p45",
@@ -353,6 +679,32 @@
               274,
               62,
               110
+            ]
+          },
+          {
+            "key": "avatar_v2_top_white_cute_crop_top__o5p45",
+            "owner": "avatar_v2_top_white_cute_crop_top",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              364,
+              274,
+              61,
+              87
+            ]
+          },
+          {
+            "key": "avatar_v2_top_black_cute_crop_top__o5p45",
+            "owner": "avatar_v2_top_black_cute_crop_top",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              364,
+              263,
+              51,
+              84
             ]
           }
         ],
@@ -368,7 +720,22 @@
               164,
               66,
               92
-            ]
+            ],
+            "part": "farArm"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o0__body-farArm",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 0,
+            "seq": 2011,
+            "rect": [
+              49,
+              164,
+              66,
+              92
+            ],
+            "bodyPart": "farArm"
           },
           {
             "key": "avatar_v2_top_coral_wave_polo__o0p45",
@@ -384,6 +751,32 @@
             ]
           },
           {
+            "key": "avatar_v2_top_white_cute_crop_top__o0p45",
+            "owner": "avatar_v2_top_white_cute_crop_top",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              63,
+              159,
+              35,
+              60
+            ]
+          },
+          {
+            "key": "avatar_v2_top_black_cute_crop_top__o0p45",
+            "owner": "avatar_v2_top_black_cute_crop_top",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              62,
+              154,
+              38,
+              64
+            ]
+          },
+          {
             "key": "body__o3",
             "owner": "body",
             "slot": "body",
@@ -394,7 +787,50 @@
               149,
               112,
               107
-            ]
+            ],
+            "part": "torso"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2006,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "avatar_v2_top_white_cute_crop_top__o3__body-torso",
+            "owner": "avatar_v2_top_white_cute_crop_top",
+            "slot": "top",
+            "order": 3,
+            "seq": 3007,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "avatar_v2_top_black_cute_crop_top__o3__body-torso",
+            "owner": "avatar_v2_top_black_cute_crop_top",
+            "slot": "top",
+            "order": 3,
+            "seq": 3007,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
           },
           {
             "key": "avatar_v2_top_coral_wave_polo__o3p45",
@@ -405,8 +841,34 @@
             "rect": [
               68,
               148,
-              113,
+              107,
               108
+            ]
+          },
+          {
+            "key": "avatar_v2_top_white_cute_crop_top__o3p45",
+            "owner": "avatar_v2_top_white_cute_crop_top",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              71,
+              159,
+              104,
+              97
+            ]
+          },
+          {
+            "key": "avatar_v2_top_black_cute_crop_top__o3p45",
+            "owner": "avatar_v2_top_black_cute_crop_top",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              71,
+              153,
+              104,
+              103
             ]
           },
           {
@@ -446,7 +908,22 @@
               166,
               46,
               90
-            ]
+            ],
+            "part": "nearArm"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o5__body-nearArm",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 5,
+            "seq": 2012,
+            "rect": [
+              161,
+              166,
+              46,
+              90
+            ],
+            "bodyPart": "nearArm"
           },
           {
             "key": "avatar_v2_top_coral_wave_polo__o5p45",
@@ -459,6 +936,32 @@
               164,
               42,
               72
+            ]
+          },
+          {
+            "key": "avatar_v2_top_white_cute_crop_top__o5p45",
+            "owner": "avatar_v2_top_white_cute_crop_top",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              160,
+              164,
+              42,
+              58
+            ]
+          },
+          {
+            "key": "avatar_v2_top_black_cute_crop_top__o5p45",
+            "owner": "avatar_v2_top_black_cute_crop_top",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              160,
+              157,
+              36,
+              56
             ]
           }
         ]

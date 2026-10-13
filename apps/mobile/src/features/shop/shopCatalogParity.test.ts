@@ -20,6 +20,8 @@ const { getAvatarItemPreviewSource } =
   require("./shopAssets") as typeof import("./shopAssets");
 const {
   AVATAR_LOADOUT_CATALOG,
+  BOY_WARDROBE_PREVIEW_ALL_IDS,
+  GIRL_WARDROBE_PREVIEW_ALL_IDS,
   BLUMI_R1_RELEASE_CATALOG,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT,
@@ -426,4 +428,16 @@ test("purchase catalog does not expose disabled status pseudo-products", () => {
         product.previewType === "avatar" || product.previewType === "room",
     ),
   );
+});
+
+test("every 2.5D wardrobe piece of both bodies has a wardrobe card picture of its own", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset loading requires static require.
+  const wardrobe = require("../avatarV2/wardrobe/wardrobePreviewSources") as typeof import("../avatarV2/wardrobe/wardrobePreviewSources");
+  for (const id of [...BOY_WARDROBE_PREVIEW_ALL_IDS, ...GIRL_WARDROBE_PREVIEW_ALL_IDS]) {
+    const item = AVATAR_V2_CATALOG.find((candidate) => candidate.id === id);
+    assert.ok(item, `${id} is in the avatar catalog`);
+    // (the test runner resolves a bundled asset to its path; Metro to a number)
+    const source: unknown = wardrobe.getAvatarItemPreviewSource(item);
+    assert.ok(typeof source === "string" && source.includes(`/thumb/${id}.webp`), `${id} card shows its own baked thumb`);
+  }
 });

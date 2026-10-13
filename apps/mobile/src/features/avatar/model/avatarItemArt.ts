@@ -22,7 +22,11 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     avatar_v2_hair_ink_pageboy_star: "hair_ink_pageboy_star",
     avatar_v2_top_coral_wave_polo: "top_coral_wave_polo",
     avatar_v2_bottom_coral_wave_pants: "bottom_coral_wave_pants",
-    avatar_v2_shoes_mint_ribbon_court_sneakers: "shoes_mint_ribbon_court_sneakers"
+    avatar_v2_shoes_mint_ribbon_court_sneakers: "shoes_mint_ribbon_court_sneakers",
+    // the girl's 2.5D wardrobe additions (domain girlWardrobePreview.ts)
+    avatar_v2_top_white_cute_crop_top: "top_crop_white",
+    avatar_v2_top_black_cute_crop_top: "top_crop_black",
+    avatar_v2_bottom_black_highwaist_trousers: "bottom_black_highwaist_straight"
   },
   // the boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts; QA unlock only, no receipts)
   male: {

@@ -292,8 +292,12 @@ class BlinkGateTest(unittest.TestCase):
 
     def test_the_app_rigs_blink_only_in_the_eyes(self):
         cases = self.assert_gate(APP_RIG / 'girl')
+        # bare, and dressed: one outfit, or each item worn alone when a slot holds several (blink_gate.py)
+        outfits = {c['outfit'] for c in cases}
+        self.assertIn('bare', outfits)
+        self.assertTrue(any(o == 'dressed' or o.startswith('dressed:') for o in outfits), outfits)
         self.assertEqual({(c['outfit'], c['frame'], c['mirror']) for c in cases},
-                         {(o, f, m) for o in ('bare', 'dressed') for f in ('half', 'closed') for m in (False, True)})
+                         {(o, f, m) for o in outfits for f in ('half', 'closed') for m in (False, True)})
         self.assert_gate(APP_RIG / 'boy')
 
     def test_the_gate_fails_when_a_patch_erases_hair_or_leaves_a_speck(self):
@@ -324,7 +328,7 @@ class BlinkGateTest(unittest.TestCase):
                 Image.fromarray(a).save(page)
                 cases = load_gate().check(tmp, scales=(1.0,))
                 key = 'outsideEye' if broken == 'hair' else 'specks'
-                self.assertTrue(any(c[key] for c in cases if c['outfit'] == 'dressed'), broken)
+                self.assertTrue(any(c[key] for c in cases if c['outfit'].startswith('dressed')), broken)
 
 
 def data_uri(image):

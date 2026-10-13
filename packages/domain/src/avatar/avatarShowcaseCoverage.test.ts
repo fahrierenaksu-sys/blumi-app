@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
 import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "./boyWardrobePreview";
+import { GIRL_WARDROBE_PREVIEW_ALL_IDS } from "./girlWardrobePreview";
 
 /**
  * Ratchet: every item with baked rig art needs a front (showcase) layer, so the figure outside the room is never the
@@ -16,6 +17,10 @@ import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "./boyWardrobePreview";
  *
  * Reason for the boy entries (2026-10-13, branch wip/boy-wardrobe-preview): his 26-piece wardrobe preview has room
  * stills but no owner-approved front layer yet (bake-showcase.mjs needs `ownerApproved`). Remove them as fronts land.
+ *
+ * Reason for the girl's crop tops and black trousers (2026-10-13, branch wip/body-replacement-2): their room art is in
+ * (owner-approved bare belly), but their front art is still NEEDS-FIX in the factory (crop waist stubs, trousers shape)
+ * and has no owner approval, so the showcase allowlist cannot list them. Remove them as fronts land.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
   female: [
@@ -23,6 +28,7 @@ const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = 
     "avatar_v2_bottom_coral_wave_pants",
     "avatar_v2_top_coral_wave_polo",
     "avatar_v2_hair_ink_pageboy_star",
+    ...GIRL_WARDROBE_PREVIEW_ALL_IDS,
   ],
   male: [...BOY_WARDROBE_PREVIEW_ALL_IDS],
 };
