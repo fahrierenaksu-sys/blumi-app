@@ -7,11 +7,13 @@ import {
   type AvatarLoadoutV2
 } from "@blumi/contracts"
 import { ECONOMY_CATALOG } from "../economy/economyCatalog"
+import { isReleaseCatalogItemPublished } from "../release/releaseCatalog"
 import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "./boyWardrobePreview"
 import {
   AVATAR_LOADOUT_CATALOG,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT,
+  isAvatarLoadoutItemCompatibleWithBody,
   type AvatarLoadoutCatalogItem
 } from "./avatarLoadoutCatalog"
 import {
@@ -372,11 +374,16 @@ test("every economy avatar entitlement and grant has loadout metadata", () => {
   for (const itemId of economyAvatarIds) {
     assert.equal(manifestIds.has(itemId), true, itemId)
   }
-  // Exception (2026-10-13): the boy's wardrobe PREVIEW ids (boyWardrobePreview.ts) are loadout-valid but deliberately
-  // have no economy entry, so they can never be sold or granted; they are shown only by the dev QA unlock.
+  assert.equal(manifestIds.size, new Set(economyAvatarIds).size)
+})
+
+test("the boy's 2.5D wardrobe is free and owned by every account, for the male body only", () => {
   for (const itemId of BOY_WARDROBE_PREVIEW_ALL_IDS) {
-    assert.equal(economyAvatarIds.includes(itemId), false, `${itemId} must not be sold`)
+    const entry = ECONOMY_CATALOG.find((item) => item.type === "avatar" && item.itemId === itemId)
+    assert.equal(entry?.priceCoins, 0, itemId)
+    assert.equal(entry?.ownedByDefault, true, itemId)
+    assert.equal(isReleaseCatalogItemPublished(itemId), false, `${itemId} has no receipt`)
+    assert.equal(isAvatarLoadoutItemCompatibleWithBody(itemId, "avatar_v2_body_male_light"), true, itemId)
+    assert.equal(isAvatarLoadoutItemCompatibleWithBody(itemId, DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId), false, itemId)
   }
-  const previewIds = new Set(BOY_WARDROBE_PREVIEW_ALL_IDS)
-  assert.equal([...manifestIds].filter((itemId) => !previewIds.has(itemId)).length, new Set(economyAvatarIds).size)
 })

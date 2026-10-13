@@ -4,6 +4,7 @@ import {
   STARTER_ROOM_BED_ID,
   STARTER_ROOM_BED_TITLE
 } from "./roomFurnitureIds"
+import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "../avatar/boyWardrobePreview"
 
 export type EconomyItemType = "avatar" | "room"
 
@@ -45,6 +46,14 @@ const roomItem = (
   priceCoins,
   ...(ownedByDefault ? { ownedByDefault: true } : {})
 })
+
+/** "avatar_v2_top_male_navy_knit_polo" -> "Navy Knit Polo" */
+const titleFromMaleItemId = (itemId: string): string =>
+  itemId
+    .replace(/^avatar_v2_[a-z]+_male_/, "")
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
 
 const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   avatarItem("avatar_v2_body_default", "Warm Base", 0, true),
@@ -388,6 +397,10 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   avatarItem("avatar_v2_top_moonlit_velvet_ballet_dress", "Moonlit Velvet Ballet Dress", 220, false, ["avatar_v2_bottom_moonlit_velvet_ballet_dress"]),
   avatarItem("avatar_v2_top_buttercup_picnic_pinafore_dress", "Buttercup Picnic Pinafore Dress", 180, false, ["avatar_v2_bottom_buttercup_picnic_pinafore_dress"]),
   avatarItem("avatar_v2_top_lavender_garden_ribbon_dress", "Lavender Garden Ribbon Dress", 200, false, ["avatar_v2_bottom_lavender_garden_ribbon_dress"]),
+
+  // the boy's 2.5D wardrobe (boyWardrobePreview.ts), free and owned by every account during testing (owner yes,
+  // 2026-10-13): the inventory self-heal grants them, so no row write is needed up front; never sold, no receipt
+  ...BOY_WARDROBE_PREVIEW_ALL_IDS.map((itemId) => avatarItem(itemId, titleFromMaleItemId(itemId), 0, true)),
 
   // the old flat pieces are retired (legacy registry); the chair keeps its id with layered art, held until §12
   roomItem("room_v2_chair_blush", "Blush Lounge Chair", 0),

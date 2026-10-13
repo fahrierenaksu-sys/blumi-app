@@ -1,9 +1,10 @@
 /**
- * The boy's 2.5D wardrobe, PREVIEW ONLY (2026-10-13, branch wip/boy-wardrobe-preview): 8 outfits × top/bottom/shoes
- * + 2 hairs, with the canonical IDs proposed in docs/release/AVATAR_25D_INTEGRATION_PLAN.md §5.1. The two basic_b
- * bottom/shoes IDs are minted here (§5.1 lists five basic IDs for six pieces). All are NEW IDs (no old ID is renamed or
- * reused), have no economy entry and no receipt, so they are never sold or owned on the server; the app shows them
- * only through the development QA unlock (EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS=1), which never persists a look.
+ * The boy's 2.5D wardrobe (2026-10-13, branch wip/boy-wardrobe-preview): 8 outfits × top/bottom/shoes + 2 hairs, with
+ * the canonical IDs proposed in docs/release/AVATAR_25D_INTEGRATION_PLAN.md §5.1. The two basic_b bottom/shoes IDs are
+ * minted here (§5.1 lists five basic IDs for six pieces). All are NEW IDs (no old ID is renamed or reused). By the
+ * owner's decision for testing they are free and owned by every account: the economy catalog lists them at 0 coins with
+ * ownedByDefault (server-authoritative, the inventory self-heal grants them to existing accounts). They have no receipt
+ * and are never sold (hidden from the shop).
  */
 export const BOY_WARDROBE_PREVIEW_ITEM_IDS = {
   hair: ["avatar_v2_hair_male_blue_black_curls", "avatar_v2_hair_male_textured_twists"],

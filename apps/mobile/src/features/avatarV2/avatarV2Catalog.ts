@@ -81,8 +81,10 @@ const titleOf = (id: string): string =>
   id.replace(/^avatar_v2_[a-z]+_male_/, "").split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
 
 /**
- * The boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts): never sold (no economy entry, no receipt), never
- * owned by default; listed only when the development QA unlock grants it (qa/avatarQaInventory.ts).
+ * The boy's 2.5D wardrobe (domain boyWardrobePreview.ts): free and owned by every account during testing (economy
+ * entry at 0 coins, ownedByDefault), so ownership arrives with the server inventory. Not marked ownedByDefault here, so
+ * the client's slot fallback for a retired or incompatible piece stays the boy's starter look. Never sold (hidden from
+ * the shop, no receipt).
  */
 const BOY_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top", "bottom", "shoes"] as const).flatMap((type) =>
   BOY_WARDROBE_PREVIEW_ITEM_IDS[type].map((id, index) => ({
