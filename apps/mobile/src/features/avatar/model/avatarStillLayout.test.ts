@@ -26,3 +26,15 @@ test("a bust has no ground point and fills its square box", () => {
   assert.equal(layout.scale, 64 / 256)
   assert.equal(layout.ground, null)
 })
+
+test("a layer cut from a shared sheet (a composed leg) shows exactly its part: the sheet is offset inside the clipped frame", () => {
+  const still = resolveAvatarStillLayers(DEFAULT_FEMALE_AVATAR_LOADOUT, "full")
+  const part = { asset: "male/full/bottom__o1__bottom-cut", rect: [40, 300, 20, 30] as const, source: { rect: [0, 32, 20, 30] as const, sheet: [24, 62] as const } }
+  const layout = layoutAvatarStill({ ...still, layers: [...still.layers, part] }, avatarStillWindow(still, "full"), { width: 200, height: 400 })
+  const frame = layout.frames.at(-1)!
+  const whole = layout.frames.slice(0, -1)
+  assert.ok(whole.every((f) => f.sheet === undefined), "a whole layer is drawn as it is")
+  assert.ok(Math.abs(frame.width - 20 * layout.scale) < 1e-9 && Math.abs(frame.height - 30 * layout.scale) < 1e-9)
+  // sheet row 32 lands on the frame's top edge, at the layer's own scale
+  assert.deepEqual(frame.sheet, { left: -0, top: -32 * layout.scale, width: 24 * layout.scale, height: 62 * layout.scale })
+})

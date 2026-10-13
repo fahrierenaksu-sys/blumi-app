@@ -10,6 +10,7 @@ import {
   resolveAvatarStillLayers,
   resolveShowcaseLayers,
   type AvatarStillManifest,
+  type AvatarStillLayer,
   type AvatarStillRect,
   type AvatarStillRigId
 } from "@blumi/domain"
@@ -50,7 +51,7 @@ export interface AvatarPortrait {
 /** One drawable candidate: layers on a canvas, and the window of that canvas that becomes the picture. */
 interface PortraitPlan {
   readonly view: "showcase" | "bust"
-  readonly layers: readonly { readonly asset: string; readonly rect: AvatarStillRect }[]
+  readonly layers: readonly AvatarStillLayer[]
   readonly space: { readonly width: number; readonly height: number }
   readonly window: AvatarStillRect
 }
@@ -193,11 +194,15 @@ async function drawPortrait(
   background: string
 ): Promise<Buffer> {
   if (plan.layers.length === 0) throw new Error("Avatar portrait has no layers.")
-  const composites: OverlayOptions[] = plan.layers.map(({ asset, rect }) => {
+  const composites: OverlayOptions[] = await Promise.all(plan.layers.map(async ({ asset, rect, source }) => {
     const path = `avatar/${asset}.webp`
     if (!art.files.has(path)) throw new Error("Avatar portrait layer is missing from the art pack.")
-    return { input: join(art.dir, path), left: rect[0], top: rect[1] }
-  })
+    // a part of a shared sheet (a composed leg): cut it out, then place it like any layer
+    const input = source
+      ? await sharp(join(art.dir, path)).extract({ left: source.rect[0], top: source.rect[1], width: source.rect[2], height: source.rect[3] }).toBuffer()
+      : join(art.dir, path)
+    return { input, left: rect[0], top: rect[1] }
+  }))
   const figure = await sharp({
     create: { width: plan.space.width, height: plan.space.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
   }).composite(composites).png().toBuffer()

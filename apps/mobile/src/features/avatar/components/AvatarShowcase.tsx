@@ -1,10 +1,10 @@
 import type { AvatarLoadoutCoercionHints, AvatarShowcaseCrop, AvatarStillRect } from "@blumi/domain"
-import { Image } from "expo-image"
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { avatarShowcaseFallbackCrop, createAvatarShowcasePlanCache, type AvatarShowcaseFrontPlan } from "../model/avatarShowcaseModel"
 import type { AvatarStillCrop } from "../model/avatarStillLayout"
 import { AVATAR_STILL_ASSETS } from "../stills/stillAssets"
+import { StillLayerImage } from "./StillLayerImage"
 import { AvatarStill } from "./AvatarStill"
 import { useStillDisplayReceipts } from "./useStillDisplayReceipts"
 
@@ -140,13 +140,9 @@ const ShowcaseFront = memo(function ShowcaseFront(props: ShowcaseFrontProps) {
       ]}
     >
       {plan.frames.map((frame) => (
-        <Image
+        <StillLayerImage
           key={frame.asset}
-          source={AVATAR_STILL_ASSETS[frame.asset]}
-          style={{ position: "absolute", left: frame.left, top: frame.top, width: frame.width, height: frame.height }}
-          contentFit="fill"
-          cachePolicy="memory"
-          transition={0}
+          frame={frame}
           onDisplay={() => onLayerDisplay(frame.asset)}
           onError={() => props.onLayerError(plan.cacheKey)}
         />

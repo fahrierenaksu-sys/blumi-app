@@ -1,9 +1,8 @@
-import { Image } from "expo-image"
 import { memo, useMemo } from "react"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { resolveAvatarStillLayers, type AvatarLoadoutCoercionHints, type AvatarStillRect } from "@blumi/domain"
 import { avatarStillWindow, layoutAvatarStill, type AvatarStillCrop } from "../model/avatarStillLayout"
-import { AVATAR_STILL_ASSETS } from "../stills/stillAssets"
+import { StillLayerImage } from "./StillLayerImage"
 import { useStillDisplayReceipts } from "./useStillDisplayReceipts"
 
 export interface AvatarStillProps {
@@ -48,13 +47,9 @@ export const AvatarStill = memo(function AvatarStill(props: AvatarStillProps) {
       style={[{ width, height }, styles.box, mirror ? styles.mirror : null, props.style]}
     >
       {layout.frames.map((frame) => (
-        <Image
+        <StillLayerImage
           key={frame.asset}
-          source={AVATAR_STILL_ASSETS[frame.asset]}
-          style={{ position: "absolute", left: frame.left, top: frame.top, width: frame.width, height: frame.height }}
-          contentFit="fill"
-          cachePolicy="memory"
-          transition={0}
+          frame={frame}
           onDisplay={() => onLayerDisplay(frame.asset)}
           onError={props.onError}
         />

@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT } from "./avatarLoadoutCatalog";
-import { AVATAR_STILL_MANIFEST, avatarStillThumbAsset, resolveAvatarStillLayers } from "./avatarStills";
+import {
+  AVATAR_STILL_MANIFEST,
+  avatarStillLayersFor,
+  avatarStillThumbAsset,
+  resolveAvatarStillLayers,
+  type AvatarStillBody,
+  type AvatarStillLayer,
+  type AvatarStillLayerEntry,
+  type AvatarStillSlot,
+} from "./avatarStills";
 
 const GIRL_RIG_OUTFIT = {
   ...DEFAULT_FEMALE_AVATAR_LOADOUT,
@@ -63,4 +72,62 @@ test("thumbnails exist for items with baked art on that body only", () => {
   assert.equal(avatarStillThumbAsset("female", "avatar_v2_top_coral_wave_polo"), "female/thumb/avatar_v2_top_coral_wave_polo");
   assert.equal(avatarStillThumbAsset("male", "avatar_v2_top_coral_wave_polo"), null);
   assert.equal(avatarStillThumbAsset("female", "avatar_v2_top_made_up"), null);
+});
+
+/** Where each shoes' cell sits in a bottom's sheet of composed legs. */
+const CELL_Y: Readonly<Record<string, number>> = { shoes_c3: 0, shoes_c2: 12 };
+
+/** A boy wardrobe: two bottoms and two shoes from different outfits, legs drawn per item (factory leg drawings). */
+function mixedBoyBody(): AvatarStillBody {
+  const entry = (key: string, owner: string, slot: string, order: number, seq: number, extra: Partial<AvatarStillLayerEntry> = {}): AvatarStillLayerEntry =>
+    ({ key, owner, slot, order, seq, rect: [0, 0, 10, 10], ...extra });
+  const legs = (owner: string, slot: string, variant: string, seq: number, gatedBy?: string) =>
+    (["farLeg", "nearLeg"] as const).map((leg, k) =>
+      entry(`${owner}__o${k + 1}__${variant}${gatedBy ? `__${gatedBy}` : ""}`, owner, slot, k + 1, seq, {
+        leg, legVariant: variant, ...(gatedBy ? { gatedBy, source: { key: `${owner}__o${k + 1}__gated`, rect: [0, CELL_Y[gatedBy]!, 10, 10] as const, sheet: [10, 22] as const } } : {}),
+      }));
+  const full = [
+    entry("body__o1", "body", "body", 1, 0, { leg: "farLeg" }), entry("body__o2", "body", "body", 2, 1, { leg: "nearLeg" }), entry("body__o3", "body", "body", 3, 2),
+    entry("bottom_c2__o3", "bottom_c2", "bottom", 3, 2000), entry("bottom_a__o3", "bottom_a", "bottom", 3, 2000),
+    entry("shoes_c3__o1", "shoes_c3", "shoes", 1, 1000), entry("shoes_c2__o1", "shoes_c2", "shoes", 1, 1000),
+    ...legs("bottom_c2", "bottom", "bottom", 2001), ...legs("bottom_a", "bottom", "bottom", 2001),
+    ...legs("shoes_c3", "shoes", "shoes", 1001), ...legs("shoes_c2", "shoes", "shoes", 1001),
+    ...legs("bottom_c2", "bottom", "bottom", 2001, "shoes_c3"), ...legs("bottom_c2", "bottom", "bottom", 2001, "shoes_c2"),
+    ...legs("bottom_a", "bottom", "bottom", 2001, "shoes_c2"),
+  ];
+  const items = Object.fromEntries(["bottom_c2", "bottom_a", "shoes_c3", "shoes_c2"].map((id) => [id, { slot: id.split("_")[0]!, rigItemId: id, thumb: id }]));
+  return { ...AVATAR_STILL_MANIFEST.bodies.male, items, layers: { full, bust: [] } };
+}
+/** The leg layers drawn: a body leg band, or an item's leg drawing (`__o<leg>__<variant>`, or a sheet part). */
+const legAssets = (layers: readonly AvatarStillLayer[]) => layers.filter((l) => /^body__o[12]$|__o[12]__/.test(l.asset.split("/")[2]!));
+
+test("a boy bottom worn with shoes from another outfit draws the bottom's legs cut by those shoes, never the bare legs", () => {
+  const body = mixedBoyBody();
+  for (const shoes of ["shoes_c3", "shoes_c2"]) {
+    const layers = avatarStillLayersFor("male", body, new Map([["bottom", "bottom_c2"], ["shoes", shoes]]), "full");
+    const legs = legAssets(layers);
+    assert.deepEqual(legs.map((l) => l.asset), ["male/full/bottom_c2__o1__gated", "male/full/bottom_c2__o2__gated"], shoes);
+    assert.ok(legs.every((l) => l.source && l.source.rect[2] === l.rect[2] && l.source.rect[3] === l.rect[3] && l.source.sheet[1] === 22));
+    assert.ok(!layers.some((l) => l.asset === "male/full/body__o1" || l.asset === "male/full/body__o2"), "bare legs hidden");
+    assert.ok(layers.some((l) => l.asset === `male/full/${shoes}__o1`), "the shoes' own parts are drawn");
+    // the cell drawn is the one cut by these shoes, not by the first shoes of the rig
+    assert.ok(legs.every((l) => l.source!.rect[1] === CELL_Y[shoes]), shoes);
+  }
+});
+
+test("a boy pair without a baked cell draws the bottom's legs uncut; one piece alone draws its own legs; neither the bare legs", () => {
+  const body = mixedBoyBody();
+  const legsOf = (drawn: [string, string][]) => legAssets(avatarStillLayersFor("male", body, new Map(drawn as [AvatarStillSlot, string][]), "full")).map((l) => l.asset);
+  assert.deepEqual(legsOf([["bottom", "bottom_a"], ["shoes", "shoes_c3"]]), ["male/full/bottom_a__o1__bottom", "male/full/bottom_a__o2__bottom"]);
+  assert.deepEqual(legsOf([["bottom", "bottom_c2"]]), ["male/full/bottom_c2__o1__bottom", "male/full/bottom_c2__o2__bottom"]);
+  assert.deepEqual(legsOf([["shoes", "shoes_c3"]]), ["male/full/shoes_c3__o1__shoes", "male/full/shoes_c3__o2__shoes"]);
+  assert.deepEqual(legsOf([]), ["male/full/body__o1", "male/full/body__o2"]);
+});
+
+test("the girl keeps her QA'd pair drawing and no layer of hers is a sheet part", () => {
+  const girl = AVATAR_STILL_MANIFEST.bodies.female;
+  assert.ok([...girl.layers.full, ...girl.layers.bust].every((e) => e.gatedBy === undefined && e.source === undefined));
+  const layers = resolveAvatarStillLayers(GIRL_RIG_OUTFIT, "full").layers;
+  assert.ok(layers.every((l) => l.source === undefined));
+  assert.deepEqual(legAssets(layers).map((l) => l.asset.split("__").pop()), ["bottom-shoes", "bottom-shoes"]);
 });
