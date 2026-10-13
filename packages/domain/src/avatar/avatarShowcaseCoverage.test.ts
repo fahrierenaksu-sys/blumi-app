@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
-import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "./boyWardrobePreview";
 import { GIRL_WARDROBE_PREVIEW_ALL_IDS } from "./girlWardrobePreview";
 
 /**
@@ -10,26 +9,16 @@ import { GIRL_WARDROBE_PREVIEW_ALL_IDS } from "./girlWardrobePreview";
  * The list may only shrink. When an item gets its front layer, this test fails until its entry is removed. A new item
  * must ship with its front layer; adding an entry needs a reason in the same commit.
  *
- * Reason for the girl starter entries (2026-10-12): fresh QA failed her front still (skin blotches on shoes and
- * ankles, white slivers in hair, ragged cuffs, shoulder notches) and the owner has not approved the look, so it was
- * taken out of the bake (tools/avatar25d/showcase-allowlist.json). Remove these four when a QA-passed, owner-approved
- * still is baked.
- *
- * Reason for the boy entries (2026-10-13, branch wip/boy-wardrobe-preview): his 26-piece wardrobe preview has room
- * stills but no owner-approved front layer yet (bake-showcase.mjs needs `ownerApproved`). Remove them as fronts land.
+ * 2026-10-13: the girl starter (factory o_g1fix8) and the boy's 26 pieces have front layers, so their entries are
+ * gone. They are baked with `ownerApproved: false` until the owner approves the front look; preview and production
+ * builds refuse such a bake (apps/mobile/scripts/mobile-release-assets.cjs).
  *
  * Reason for the girl wardrobe entries (2026-10-13, release/2.5d-beta-3): the ribbon waves and white sneakers ship
  * their QA'd room art; their factory front layers exist but are not owner-approved and allowlisted yet (same rule).
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: [
-    "avatar_v2_shoes_mint_ribbon_court_sneakers",
-    "avatar_v2_bottom_coral_wave_pants",
-    "avatar_v2_top_coral_wave_polo",
-    "avatar_v2_hair_ink_pageboy_star",
-    ...GIRL_WARDROBE_PREVIEW_ALL_IDS,
-  ],
-  male: [...BOY_WARDROBE_PREVIEW_ALL_IDS],
+  female: [...GIRL_WARDROBE_PREVIEW_ALL_IDS],
+  male: [],
 };
 
 const rigs = Object.keys(AVATAR_STILL_MANIFEST.bodies) as AvatarStillRigId[];

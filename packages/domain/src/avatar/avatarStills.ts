@@ -41,6 +41,11 @@ export interface AvatarShowcaseBase {
   readonly canvas: { readonly width: number; readonly height: number };
   readonly ground: readonly [number, number];
   readonly windows: Readonly<Record<AvatarShowcaseCrop, AvatarStillRect>>;
+  /**
+   * Slots whose region was cut out of the base because their items erase the body there (the factory's erase masks).
+   * An item in one of these slots draws that region itself (`under`); a front layer without it cannot be drawn.
+   */
+  readonly underSlots?: readonly AvatarStillSlot[];
 }
 
 /**
@@ -55,6 +60,11 @@ export interface AvatarShowcaseItemLayer {
   readonly tucked?: boolean;
   /** A part drawn under the base body (hair behind the head and shoulders); the layer above stays in front. */
   readonly back?: { readonly key: string; readonly rect: AvatarStillRect };
+  /**
+   * The base body inside this slot's region, with this item's erase mask already applied: drawn right after the base,
+   * before any item, so the worn pieces erase the body exactly as the factory compositor does.
+   */
+  readonly under?: { readonly key: string; readonly rect: AvatarStillRect };
 }
 
 export interface AvatarStillItem {

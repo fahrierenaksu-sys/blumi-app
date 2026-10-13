@@ -587,3 +587,21 @@ test("the public mobile brand is Blumi while stable runtime identifiers remain u
 function read(path) {
   return readFileSync(resolve(mobileRoot, path), "utf8")
 }
+
+test("the release check refuses front (showcase) looks the owner has not approved", () => {
+  const dir = mkdtempSync(join(tmpdir(), "blumi-showcase-baked-"))
+  const baked = join(dir, "showcase-baked.json")
+  try {
+    assert.doesNotThrow(() => releaseAssets.assertShowcaseLooksOwnerApproved(join(dir, "missing.json")), "no bake, no front art")
+    writeFileSync(baked, JSON.stringify({ bodies: { female: { ownerApproved: true }, male: { ownerApproved: false } } }))
+    assert.throws(() => releaseAssets.assertShowcaseLooksOwnerApproved(baked), /not approved: male/)
+    writeFileSync(baked, JSON.stringify({ bodies: { female: { ownerApproved: true }, male: {} } }))
+    assert.throws(() => releaseAssets.assertShowcaseLooksOwnerApproved(baked), /male/)
+    writeFileSync(baked, JSON.stringify({ bodies: { female: { ownerApproved: true }, male: { ownerApproved: true } } }))
+    assert.doesNotThrow(() => releaseAssets.assertShowcaseLooksOwnerApproved(baked))
+    writeFileSync(baked, "{ not json")
+    assert.throws(() => releaseAssets.assertShowcaseLooksOwnerApproved(baked), /Cannot read the showcase bake/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

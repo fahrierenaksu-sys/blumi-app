@@ -3,5 +3,301 @@
   "scale": 0.5,
   "pad": 24,
   "note": "RULE: only a still with a fresh-QA PASS may be listed here, and it ships only after the owner approves its look (QA PASS + owner look approval). Listed stills, at exactly these sha256 values, are baked into the app; anything else keeps the 3/4 fallback. Paths are relative to the Workbench showcase root (--src). Remove an entry and re-bake to take a still out. Each body entry needs qaPass (path to its fresh-QA PASS record) and ownerApproved: true, set only after the owner's yes; the baker refuses an entry without both.",
-  "bodies": {}
+  "bodies": {
+    "female": {
+      "base": "base/girl_a.png",
+      "baseSha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0",
+      "qaPass": "line_1900/REPORT.md (o_g1fix8 16:37 FINAL; G5 starter-shoes waiver = owner yes 2026-10-12 20:07)",
+      "ownerApproved": false,
+      "ownerApprovalNote": "Pending: fresh-QA PASS is recorded, the owner has not yet approved this front look. Set true only after his yes.",
+      "crops": {
+        "head": [
+          876,
+          117,
+          800,
+          800
+        ],
+        "push": [
+          716,
+          117,
+          1120,
+          1120
+        ]
+      },
+      "items": {
+        "avatar_v2_top_coral_wave_polo": {
+          "slot": "top",
+          "order": 3,
+          "file": "line_1900/girl/o_g1fix8/layers/girl_top.png",
+          "eraseFile": "line_1900/girl/o_g1fix8/layers/girl_top_erase.png",
+          "tucked": false,
+          "sha256": "e8d38e808bbb184204f0c97cc03db64f4aa99215f5ce223228578f4daffe67b3",
+          "eraseSha256": "67b7ac362103435aa020053217b136939f271ebfc03978701db413daab8878d4"
+        },
+        "avatar_v2_bottom_coral_wave_pants": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "line_1900/girl/o_g1fix8/layers/girl_bottom.png",
+          "eraseFile": "line_1900/girl/o_g1fix8/layers/girl_bottom_erase.png",
+          "sha256": "a32f0af89a96959e9b3e8cae996def06fb4445d52a0cbc594acfde284f7c1abd",
+          "eraseSha256": "3109a0d5ad349f702d7b5b16963eaae35476be4b7a0ce461b5ba2dc93fe4f95a"
+        },
+        "avatar_v2_shoes_mint_ribbon_court_sneakers": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "line_1900/girl/o_g1fix8/layers/girl_shoes.png",
+          "eraseFile": "line_1900/girl/o_g1fix8/layers/girl_shoes_erase.png",
+          "sha256": "9c295ba9658a02b407c463cc342d30d53e39426156bbe412355185c7eb977028",
+          "eraseSha256": "c8d49f42e3e8bb3081df9edc97d0af2f31b9da60de3cde423320b955ab905c47"
+        },
+        "avatar_v2_hair_ink_pageboy_star": {
+          "slot": "hair",
+          "order": 4,
+          "file": "line_1900/girl/o_g1fix8/layers/girl_hair_front.png",
+          "backFile": "line_1900/girl/o_g1fix8/layers/girl_hair_back.png",
+          "sha256": "c3b5c05e12dde72ffecb470fda8253e96d2d36c6a68d28e7fea5e04f89e3f13a",
+          "backSha256": "d3c4d51297869f3ad7a243f4c50a216fc475c58132450e30f76819ed60b7ae85"
+        }
+      }
+    },
+    "male": {
+      "base": "base/boy_a.png",
+      "baseSha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648",
+      "qaPass": "integration/RESUME_INTEGRATION.md STATE 2026-10-13 06:33 (boy SHOWCASE 26/26 full pass); prov_boy_2145/REPORT.md; curls_install_1030/REPORT.md",
+      "ownerApproved": false,
+      "ownerApprovalNote": "Pending: fresh-QA PASS is recorded, the owner has not yet approved this front look. Set true only after his yes.",
+      "crops": {
+        "head": [
+          870,
+          113,
+          800,
+          800
+        ],
+        "push": [
+          710,
+          113,
+          1120,
+          1120
+        ]
+      },
+      "items": {
+        "avatar_v2_top_male_navy_knit_polo": {
+          "slot": "top",
+          "order": 3,
+          "file": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_top.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_top_erase.png",
+          "tucked": false,
+          "sha256": "6aaf39d9fd952d74540c8f7c419d1114159f90eda20726958fed912733030717",
+          "eraseSha256": "ed4aec91dce0457459e0e84850513e4308d9e7d97047528f657b6ad15c43e8b2"
+        },
+        "avatar_v2_bottom_male_cream_pleated_trousers": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_bottom.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_bottom_erase.png",
+          "sha256": "14c675ce20dd2d22b4d5735e0b3f1454d0f49124fe006fd633c50e620e34f4d2",
+          "eraseSha256": "408d8e6b1a237850a1adc9b30a2605a45e1501f0c620ce6a88bd86610b880879"
+        },
+        "avatar_v2_shoes_male_tan_loafers": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_shoes.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_shoes_erase.png",
+          "sha256": "cda5d23388a91ab1c835bb17d143ff57a4ab41a8a40e7b55acb94403d43603c3",
+          "eraseSha256": "8aad85bd7e8aa32adb28ee4e745d92e97e3257a2224babe691fa4f0b9b20d9ac"
+        },
+        "avatar_v2_top_male_forest_collar_sweater": {
+          "slot": "top",
+          "order": 3,
+          "file": "boy_c12_c13_1915/qa_fix/q_c4/layers/boy_top.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c4/layers/boy_top_erase.png",
+          "tucked": false,
+          "sha256": "812de2856765b0b35bd08cddc2590580762c611875ad338bb360f3cacfa36de0",
+          "eraseSha256": "6360df7434bd850a62ee7d87784ebd070fc0edad6b5d847a864e3c3f98ab207d"
+        },
+        "avatar_v2_bottom_male_charcoal_trousers": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "boy_c12_c13_1915/qa_fix/q_c4/layers/boy_bottom.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c4/layers/boy_bottom_erase.png",
+          "sha256": "3200bc2dc4c6728df5eeccd864accdb63457b10f11c2cb583364773ae81cf1a3",
+          "eraseSha256": "2dd8b87989d7704e9310ef9b75d40c0bebd58dceb7f94b2898c9d3fca8209c0a"
+        },
+        "avatar_v2_shoes_male_brown_loafers": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "boy_c12_c13_1915/qa_fix/q_c4/layers/boy_shoes.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c4/layers/boy_shoes_erase.png",
+          "sha256": "e412f424ccaf043a1e952dc94e3377532f9b8fe153f34bcfc5f61478991b9076",
+          "eraseSha256": "67b602c8a99a10da0a92bff4c7ae3f25848242257739452c0990d80b7df4a4a9"
+        },
+        "avatar_v2_top_male_check_flannel_white_tee": {
+          "slot": "top",
+          "order": 3,
+          "file": "boy_c12_c13_1915/qa_fix/q_c14w/layers/boy_top.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c14w/layers/boy_top_erase.png",
+          "tucked": false,
+          "sha256": "0c02fc57b3a51c2e420a01ba52df8c5241b01ecfca7feb538c7ced1a125cb0a6",
+          "eraseSha256": "0ee8e9e88c0c728c458db52dd94dba504da9511888796604d868be90264c7cba"
+        },
+        "avatar_v2_bottom_male_grey_wide_jeans": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "boy_c12_c13_1915/qa_fix/q_c14w/layers/boy_bottom.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c14w/layers/boy_bottom_erase.png",
+          "sha256": "fbbf69a4a0399292c7b4983e7d0a62ce0df340ae5ed219111fba50c5a5cb6fc0",
+          "eraseSha256": "3c30b1f88c080ef5a66992a4c8f8b2bca33f4f4092690ee060971ae0493723e8"
+        },
+        "avatar_v2_shoes_male_green_skate_shoes": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "boy_c12_c13_1915/qa_fix/q_c14w/layers/boy_shoes.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c14w/layers/boy_shoes_erase.png",
+          "sha256": "8f092a88b6b3b827222a2422e65d8e0c75a474fd660dd56b8117b1ab0d2b71b3",
+          "eraseSha256": "a15f0c528fa415b228a7d552f9d70577db02b18c17900ed2dcbe8f23eb5bfcef"
+        },
+        "avatar_v2_top_male_white_basic_tee": {
+          "slot": "top",
+          "order": 3,
+          "file": "boy_c12_c13_1915/qa_fix/q_basic_a/layers/boy_top.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_basic_a/layers/boy_top_erase.png",
+          "tucked": false,
+          "sha256": "1e5dfb785d6749ec90489926e758137612dae5a5df3d36e69e909eed926946dc",
+          "eraseSha256": "4108ff404ac60e17c14e59989544d92833ee5db3ebefc7768b3f65718ecf0bc6"
+        },
+        "avatar_v2_bottom_male_black_straight_trousers": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "boy_c12_c13_1915/qa_fix/q_basic_a/layers/boy_bottom.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_basic_a/layers/boy_bottom_erase.png",
+          "sha256": "67c9d45a4527917f3a0fb598d06e152ea5dc58f18ea8c00e6480b2cc198b5a89",
+          "eraseSha256": "8e87205e98dcd1b85f799d0ef7ac8350507720319892b2c0ac5aaa21c6b41e0d"
+        },
+        "avatar_v2_shoes_male_black_clean_sneakers": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "boy_c12_c13_1915/qa_fix/q_basic_a/layers/boy_shoes.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_basic_a/layers/boy_shoes_erase.png",
+          "sha256": "79320675c82e62caca16d85378825355e0e0c9a33e4c615f68db4eedb5210ba3",
+          "eraseSha256": "7ba7c02139164bbe91d8c7369f2016f233b76e2e8c76277dfa38bf59f1dde2cb"
+        },
+        "avatar_v2_top_male_black_basic_tee": {
+          "slot": "top",
+          "order": 3,
+          "file": "boy_c12_c13_1915/qa_fix/q_basic_b/layers/boy_top.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_basic_b/layers/boy_top_erase.png",
+          "tucked": false,
+          "sha256": "82999c3c651e953041d40fdfd152d26db1c9182e2653b7a5cdac44f839510871",
+          "eraseSha256": "4bf500c8f6b9774cb7ecafc5213fc20f49a62143dc4b3d1c3bfd60bedc324581"
+        },
+        "avatar_v2_bottom_male_black_pocket_trousers": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "boy_c12_c13_1915/qa_fix/q_basic_b/layers/boy_bottom.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_basic_b/layers/boy_bottom_erase.png",
+          "sha256": "b43a919c7f22f661a42e667a05d0ada07d8d2c72fae217a7fd871c08de55f67c",
+          "eraseSha256": "98652cd3abf6c82c85def675483d4a8eed10f9163624b7157871d776d84ead5b"
+        },
+        "avatar_v2_shoes_male_black_everyday_sneakers": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "boy_c12_c13_1915/qa_fix/q_basic_b/layers/boy_shoes.png",
+          "eraseFile": "boy_c12_c13_1915/qa_fix/q_basic_b/layers/boy_shoes_erase.png",
+          "sha256": "fa3225588e527979232bdf5e100eb322f4bb6fa133edf50ca8d1bb853a962b31",
+          "eraseSha256": "b7293b1dfe24b5f3675d3c361b37bdd608df3e2be604fc362fa1c5811ef4742b"
+        },
+        "avatar_v2_top_male_black_embroidered_sweatshirt": {
+          "slot": "top",
+          "order": 3,
+          "file": "boy_c12_c13_1915/r8/o_c12/layers/boy_top.png",
+          "eraseFile": "boy_c12_c13_1915/r8/o_c12/layers/boy_top_erase.png",
+          "tucked": false,
+          "sha256": "aafbb4eca9ff86b31a083c90a42deca86834d77aaff50144e1ae84092ecd7dff",
+          "eraseSha256": "ab582d3c6cc76d570a16432523af660f507054906aad132e2167936a80476eec"
+        },
+        "avatar_v2_bottom_male_cream_drawstring_trousers": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "boy_c12_c13_1915/r8/o_c12/layers/boy_bottom.png",
+          "eraseFile": "boy_c12_c13_1915/r8/o_c12/layers/boy_bottom_erase.png",
+          "sha256": "0aeb7d362d254c970267ae236014580f1fe9aec12d53e244277d81b3127a54fc",
+          "eraseSha256": "5ebc5c73600d93569e0823352b239afa7144a40b4d960d41b5890811de8d3a55"
+        },
+        "avatar_v2_shoes_male_cream_chunky_sneakers": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "boy_c12_c13_1915/r8/o_c12/layers/boy_shoes.png",
+          "eraseFile": "boy_c12_c13_1915/r8/o_c12/layers/boy_shoes_erase.png",
+          "sha256": "e9492b8035029d04d77400a7205919ea1d6d313b5b4ba0a59fc2fe4af5fd8f1f",
+          "eraseSha256": "6234aa85cc3c012a3e4e244b22e93f8e50505d74701ca1f5275a6be3fb5605b8"
+        },
+        "avatar_v2_top_male_taupe_waffle_blouson": {
+          "slot": "top",
+          "order": 3,
+          "file": "boy_c12_c13_1915/r8/o_c13/layers/boy_top.png",
+          "eraseFile": "boy_c12_c13_1915/r8/o_c13/layers/boy_top_erase.png",
+          "tucked": false,
+          "sha256": "812326c02b16724e500ee98517c0681844eb9c1b734dd4129da3bf21022b1d15",
+          "eraseSha256": "2ae7e7251d250ebd9ae7538b30faac9f455cc005726802a5a045177260295073"
+        },
+        "avatar_v2_bottom_male_ecru_wide_trousers": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "boy_c12_c13_1915/r8/o_c13/layers/boy_bottom.png",
+          "eraseFile": "boy_c12_c13_1915/r8/o_c13/layers/boy_bottom_erase.png",
+          "sha256": "a9c40c4c1034c9a62eee9886dd4cf409f477d994fffe60819ed2b2cd7aebce9b",
+          "eraseSha256": "e3809bd839e17dd5db5aef13ed2b96032a4d8a4e3621b0357503881b700ea9a8"
+        },
+        "avatar_v2_shoes_male_dark_leather_sneakers": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "boy_c12_c13_1915/r8/o_c13/layers/boy_shoes.png",
+          "eraseFile": "boy_c12_c13_1915/r8/o_c13/layers/boy_shoes_erase.png",
+          "sha256": "cd31d5c68a00c59c75a3127c9c71da3dfac7d3569f898c8c9ee3a3ec4a679abd",
+          "eraseSha256": "60f22835361af779a4fff07d3245167b80b85b769f5e5c93661173850ba801f0"
+        },
+        "avatar_v2_top_male_olive_overshirt": {
+          "slot": "top",
+          "order": 3,
+          "file": "boy_line_r3/o_c3/layers/boy_top.png",
+          "eraseFile": "boy_line_r3/o_c3/layers/boy_top_erase.png",
+          "tucked": false,
+          "sha256": "6fe93ec1ce7be76c397b66df50659847ba15712be52e31b8c9290835bb68759b",
+          "eraseSha256": "827799d9fbef2c0efe7c4982d572f427ce84a73dcda56cfd371f7bdb943fe434"
+        },
+        "avatar_v2_bottom_male_dark_straight_jeans": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "boy_line_r3/o_c3/layers/boy_bottom.png",
+          "eraseFile": "boy_line_r3/o_c3/layers/boy_bottom_erase.png",
+          "sha256": "a21f50423a4738377a287b2a4410fc03d02abe9df520f46b5d2609e66e29413d",
+          "eraseSha256": "9f27744e4c3b1d6a0b7643253d1d7dd31e1fff10d15c705b06fdd0d5dbed601d"
+        },
+        "avatar_v2_shoes_male_sand_desert_boots": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "boy_line_r3/o_c3/layers/boy_shoes.png",
+          "eraseFile": "boy_line_r3/o_c3/layers/boy_shoes_erase.png",
+          "sha256": "3b6ee49cdf96e2eb177c17fe32ed80d9f5209b034d2e462281e87c4e74020cf5",
+          "eraseSha256": "3e13e23248938f2575451b394f63ff969592a42f0f4ebb1da0123ff64440a8a4"
+        },
+        "avatar_v2_hair_male_blue_black_curls": {
+          "slot": "hair",
+          "order": 4,
+          "file": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_hair_front.png",
+          "backFile": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_hair_back.png",
+          "sha256": "26b219995f5c06f51d373212aebafddddc2d15640374aeb1aa2fc09dd8d68e63",
+          "backSha256": "4cd8d3f38f85fd4aee1e36e409c922dc616da401358b463dbebae61a7939ff69"
+        },
+        "avatar_v2_hair_male_textured_twists": {
+          "slot": "hair",
+          "order": 4,
+          "file": "boy_line_r3/o_twists/layers/boy_hair_front.png",
+          "backFile": "boy_line_r3/o_twists/layers/boy_hair_back.png",
+          "sha256": "87ab1bff2f0de3b8b4ff7681a12d4cc6a199b1c6a9915d867db4534a38096c08",
+          "backSha256": "b622ce20c3a4dbe6f7416f562b29fd6f60a2afd08dc12b8fd98f435abf5efc02"
+        }
+      }
+    }
+  }
 }

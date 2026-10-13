@@ -35,6 +35,34 @@ function assertNoCandidateAssetImportsInSourceRoot(sourceRoot) {
   )
 }
 
+/**
+ * Front (showcase) looks are baked with `ownerApproved` per body (tools/avatar25d/showcase-baked.json). A work branch
+ * may bake a look the owner has not approved yet (bake-showcase.mjs --pending-owner-approval) so he can review it in a
+ * development build; the TestFlight workflows refuse it before building. A missing file or body list means no front art.
+ */
+function findShowcaseBodiesPendingOwnerApproval(baked) {
+  const bodies = baked && typeof baked === "object" && baked.bodies && typeof baked.bodies === "object" ? baked.bodies : {}
+  return Object.entries(bodies)
+    .filter(([, body]) => body?.ownerApproved !== true)
+    .map(([rig]) => rig)
+}
+
+function assertShowcaseLooksOwnerApproved(bakedPath) {
+  let baked
+  try {
+    baked = JSON.parse(readFileSync(bakedPath, "utf8"))
+  } catch (error) {
+    if (error && error.code === "ENOENT") return
+    throw new Error(`Cannot read the showcase bake at ${bakedPath}: ${error.message}`)
+  }
+  const pending = findShowcaseBodiesPendingOwnerApproval(baked)
+  if (pending.length === 0) return
+  throw new Error(
+    `Release builds cannot ship front (showcase) looks the owner has not approved: ${pending.join(", ")}. ` +
+    `Set ownerApproved in tools/avatar25d/showcase-allowlist.json after his yes and re-bake, or bake without them.`
+  )
+}
+
 function collectRuntimeSources(sourceRoot) {
   const sources = []
   const visit = (directory) => {
@@ -62,5 +90,7 @@ function collectRuntimeSources(sourceRoot) {
 
 module.exports = {
   assertNoCandidateAssetImportsInSourceRoot,
+  assertShowcaseLooksOwnerApproved,
+  findShowcaseBodiesPendingOwnerApproval,
   findCandidateAssetImports
 }
