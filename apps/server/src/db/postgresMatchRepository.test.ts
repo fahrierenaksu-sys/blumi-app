@@ -7,6 +7,7 @@ interface QueryCall {
   values?: readonly unknown[]
 }
 
+// A complete, currently wearable look (plan X15: the 2.5D girl starter; the old pieces are retired).
 const completeAvatarRow = {
   avatar_preset_id: "avatar_v2_body_default",
   avatar_selection: {
@@ -16,11 +17,11 @@ const completeAvatarRow = {
     eyesId: "avatar_v2_eyes_mocha_doe",
     noseId: "avatar_v2_nose_soft_button",
     mouthId: "avatar_v2_mouth_peach_whisper_smile",
-    hairId: "avatar_v2_hair_mocha_ribbon_blowout",
-    topId: "avatar_v2_top_default",
-    bottomId: "avatar_v2_bottom_default",
-    shoesId: "avatar_v2_shoes_milk_tea_court_sneakers",
-    accessoryIds: ["avatar_v2_accessory_golden_heart_locket"]
+    hairId: "avatar_v2_hair_ink_pageboy_star",
+    topId: "avatar_v2_top_coral_wave_polo",
+    bottomId: "avatar_v2_bottom_coral_wave_pants",
+    shoesId: "avatar_v2_shoes_mint_ribbon_court_sneakers",
+    accessoryIds: []
   },
   avatar_revision: 3
 } as const

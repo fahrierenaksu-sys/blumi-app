@@ -11,7 +11,9 @@ import {
 import { createChatService } from "./chat/chatService"
 import { createInMemoryConnectionRepository } from "./connections/connectionRepository"
 import type { ConnectionService } from "./connections/connectionService"
+import { TEST_AVATAR_ITEM_RULES } from "@blumi/domain"
 import { createEconomyService } from "./economy/economyService"
+import { TEST_AVATAR_GIRL_BODY_ID, TEST_AVATAR_PAID_ITEM_ID, TEST_ECONOMY_CATALOG } from "./economy/testRoomCatalog"
 import { createNotificationService } from "./notifications/notificationService"
 import {
   createInMemoryMatchRepository,
@@ -1959,7 +1961,7 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     store: createBlumiBackendStore(),
     codeFactory: () => "482931"
   })
-  const economyService = createEconomyService()
+  const economyService = createEconomyService({ catalog: TEST_ECONOMY_CATALOG, avatarRules: TEST_AVATAR_ITEM_RULES })
   const app = createServer({ authService, economyService })
 
   const unauthenticated = await app.inject({
@@ -2024,7 +2026,7 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     },
     payload: {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
+      itemId: TEST_AVATAR_PAID_ITEM_ID,
       priceCoins: 1
     }
   })
@@ -2040,7 +2042,7 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     },
     payload: {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket"
+      itemId: TEST_AVATAR_PAID_ITEM_ID
     }
   })
   assert.equal(repeat.statusCode, 400)
@@ -2064,8 +2066,8 @@ test("economy endpoints require sessions and complete server-priced purchases", 
     },
     payload: {
       type: "avatar",
-      itemId: "avatar_v2_top_sage_ribbon_knit_jacket",
-      avatarBodyId: "avatar_v2_body_default"
+      itemId: TEST_AVATAR_PAID_ITEM_ID,
+      avatarBodyId: TEST_AVATAR_GIRL_BODY_ID
     }
   })
   assert.equal(incompatiblePurchase.statusCode, 400)

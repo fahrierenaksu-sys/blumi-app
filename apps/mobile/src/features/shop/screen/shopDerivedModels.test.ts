@@ -53,7 +53,9 @@ installRoomAvatarSeam({
 })
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
-const { DEFAULT_AVATAR_V2 } = require("../../avatarV2/avatarV2Catalog") as typeof import("../../avatarV2/avatarV2Catalog")
+const { AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2 } = require("../../avatarV2/avatarV2Catalog") as typeof import("../../avatarV2/avatarV2Catalog")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
+const realShopCatalog = require("../shopCatalog") as typeof import("../shopCatalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
 const { DEFAULT_ROOM_V2_SHELL_ID, ROOM_V2_SHELL_CATALOG, ROOM_V2_FURNITURE_CATALOG } = require("../../roomV2/roomV2Catalog") as typeof import("../../roomV2/roomV2Catalog")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
@@ -61,6 +63,22 @@ const avatarProductOrder = require("./shopAvatarProductOrder") as typeof import(
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
 const roomSelectors = require("../../roomV2/roomV2Selectors") as typeof import("../../roomV2/roomV2Selectors")
 
+// Plan X15 retired every old paid avatar item, so the live Shop sells no avatar piece either. The same tests run on
+// three paid avatar stand-ins (two hairs, one top) copied from old items under their own ids; each has a published
+// economy row, a Shop thumbnail verdict and a place on the shelf (see mountCatalog).
+const AVATAR_STAND_INS = [
+  ["stand_in_avatar_hair_a", "avatar_v2_hair_golden_waves"],
+  ["stand_in_avatar_hair_b", "avatar_v2_hair_honey_halfup_waves"],
+  ["stand_in_avatar_top_a", "avatar_v2_top_sage_ribbon_knit_jacket"]
+] as const
+const standInAvatarItems = AVATAR_STAND_INS.map(([id, realId]) => {
+  const item = AVATAR_V2_CATALOG.find((entry) => entry.id === realId)
+  assert.ok(item, realId)
+  return { ...item, id, hiddenFromShop: false, hiddenFromWardrobe: false }
+})
+const STAND_IN_AVATAR_ECONOMY_ITEMS = AVATAR_STAND_INS.map(([itemId]) => (
+  { itemId, type: "avatar" as const, title: itemId, priceCoins: 410 }
+))
 function loadRetainedShelves(runtime: ReturnType<typeof createFakeReactRuntime>) {
   return loadSourceWithFakeReact<typeof RetainedShelves>(
     "features/shop/screen/shopRetainedShelfModel.ts", runtime, {
@@ -253,17 +271,27 @@ function mountCatalog() {
         "@blumi/domain": {
           ...realDomain,
           resolveR1PublishedEconomyCatalog: (...args: Parameters<typeof realDomain.resolveR1PublishedEconomyCatalog>) => [
-            ...realDomain.resolveR1PublishedEconomyCatalog(...args), ...STAND_IN_ECONOMY_ITEMS
+            ...realDomain.resolveR1PublishedEconomyCatalog(...args), ...STAND_IN_ECONOMY_ITEMS, ...STAND_IN_AVATAR_ECONOMY_ITEMS
           ]
+        },
+        // Put the avatar stand-ins on the avatar shelf next to the live catalog.
+        "../shopCatalog": {
+          ...realShopCatalog,
+          buildAvatarShopItems: (input: Parameters<typeof realShopCatalog.buildAvatarShopItems>[0]) =>
+            realShopCatalog.buildAvatarShopItems({ ...input, avatarCatalog: [...AVATAR_V2_CATALOG, ...standInAvatarItems] })
         },
         // Supply the native locale, retaining the real sort and presentation rules.
         "./shopAvatarProductOrder": {
           ...avatarProductOrder,
+          // the stand-ins have no Shop thumbnail of their own
+          isDisplayableAvatarShopProduct: (product: Parameters<typeof avatarProductOrder.isDisplayableAvatarShopProduct>[0]) =>
+            AVATAR_STAND_INS.some(([id]) => id === product.sourceItemId) ||
+            avatarProductOrder.isDisplayableAvatarShopProduct(product),
           sortAvatarShopProducts: (products: Parameters<typeof avatarProductOrder.sortAvatarShopProducts>[0]) =>
             avatarProductOrder.sortAvatarShopProducts(products, "tr")
         }
       },
-      real: ["../shopCatalog", "./shopScreenModel"]
+      real: ["./shopScreenModel"]
     }
   ).useShopCatalogProducts
   const inventory: BlumiInventorySnapshot = {

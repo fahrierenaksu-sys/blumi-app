@@ -1,4 +1,5 @@
 import { coerceAvatarLoadout, type AvatarLoadoutCoercionHints } from "./avatarLoadoutCoercion";
+import type { AvatarItemRules } from "./avatarItemRules";
 import {
   AVATAR_STILL_MANIFEST,
   AVATAR_STILL_SLOT_KEYS,
@@ -73,8 +74,9 @@ export function resolveShowcaseLayers(
   crop: AvatarShowcaseCrop,
   manifest: AvatarStillManifest = AVATAR_STILL_MANIFEST,
   hints: AvatarLoadoutCoercionHints = {},
+  rules?: AvatarItemRules,
 ): AvatarShowcaseResolved {
-  const loadout = coerceAvatarLoadout(rawLoadout, hints);
+  const loadout = coerceAvatarLoadout(rawLoadout, hints, rules);
   const rig = avatarStillRigForBody(loadout.bodyId);
   const body = manifest.bodies[rig];
   const fallback = (reason: AvatarShowcaseFallback["reason"]): AvatarShowcaseFallback => ({

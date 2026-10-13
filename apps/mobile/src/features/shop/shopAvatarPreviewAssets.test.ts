@@ -12,6 +12,7 @@ const {
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixture setup must precede imports.
 } = require("./shopAvatarPreviewAssets") as typeof import("./shopAvatarPreviewAssets")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixture setup must precede imports.
+const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("../avatarV2/room/avatarRoomProjection") as typeof import("../avatarV2/room/avatarRoomProjection") // eslint-disable-line @typescript-eslint/no-require-imports
 const { getIdleAvatarLayerAssets } = require("../avatarV2/room/avatarIdleAssets") as typeof import("../avatarV2/room/avatarIdleAssets")
 
 test("current-scene warmup selects only equipped front/idle layers", () => {
@@ -23,11 +24,18 @@ test("current-scene warmup selects only equipped front/idle layers", () => {
 })
 
 test("shop warms only the new live outfit layer, not the whole avatar", () => {
-  const polo = AVATAR_V2_CATALOG.find((item) => item.name === "Coral Wave Polo")
-  assert.ok(polo)
-  const assets = getShopPreviewAddedAssets(DEFAULT_AVATAR_V2, polo)
+  // Plan X15 made the coral polo the girl's worn starter top and retired the old paid tops, so the product is a
+  // fixture copy of an old paid top (same art) under a fixture ID the room mapping knows.
+  const cream = AVATAR_V2_CATALOG.find((item) => item.id === "avatar_v2_top_sage_ribbon_knit_jacket")
+  assert.ok(cream)
+  const fixtureTop = { ...cream, id: "fixture_shop_top", hiddenFromShop: false, hiddenFromWardrobe: false }
+  const source = {
+    avatarCatalog: [...AVATAR_V2_CATALOG, fixtureTop],
+    projectionMap: { ...DEFAULT_AVATAR_ROOM_PROJECTION_MAP, [fixtureTop.id]: DEFAULT_AVATAR_ROOM_PROJECTION_MAP[cream.id] }
+  }
+  const assets = getShopPreviewAddedAssets(DEFAULT_AVATAR_V2, fixtureTop, source)
   assert.equal(assets.length, 1)
-  assert.match(assets[0].key, /coral_wave_polo/)
+  assert.match(assets[0].key, /sage_ribbon_knit_jacket/)
 })
 
 test("already equipped shop item requests no extra asset", () => {

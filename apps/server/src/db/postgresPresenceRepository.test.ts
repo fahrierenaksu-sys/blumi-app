@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { randomUUID } from "node:crypto"
 import test from "node:test"
 import type { CompleteAvatarSelection } from "@blumi/contracts"
+import { DEFAULT_MALE_AVATAR_LOADOUT, cloneAvatarLoadout } from "@blumi/domain"
 import pg from "pg"
 import { createPresenceService } from "../presence/presenceService"
 import type { PresenceRecord } from "../presence/presenceRepository"
@@ -13,6 +14,7 @@ interface QueryCall {
   values?: readonly unknown[]
 }
 
+// A complete, currently wearable look (plan X15: the 2.5D girl starter; the old pieces are retired).
 const avatar: CompleteAvatarSelection = {
   presetId: "avatar_v2_body_default",
   revision: 4,
@@ -23,21 +25,20 @@ const avatar: CompleteAvatarSelection = {
     eyesId: "avatar_v2_eyes_mocha_doe",
     noseId: "avatar_v2_nose_soft_button",
     mouthId: "avatar_v2_mouth_peach_whisper_smile",
-    hairId: "avatar_v2_hair_mocha_ribbon_blowout",
-    topId: "avatar_v2_top_default",
-    bottomId: "avatar_v2_bottom_default",
-    shoesId: "avatar_v2_shoes_milk_tea_court_sneakers",
-    accessoryIds: ["avatar_v2_accessory_golden_heart_locket"]
+    hairId: "avatar_v2_hair_ink_pageboy_star",
+    topId: "avatar_v2_top_coral_wave_polo",
+    bottomId: "avatar_v2_bottom_coral_wave_pants",
+    shoesId: "avatar_v2_shoes_mint_ribbon_court_sneakers",
+    accessoryIds: []
   }
 }
 
+// The account's real look differs in content from the cached copy (plan X15: no accessory is wearable any more,
+// so the boy's starter look stands in for the old "accessory removed" difference).
 const canonicalAccountAvatar: CompleteAvatarSelection = {
-  ...avatar,
+  presetId: DEFAULT_MALE_AVATAR_LOADOUT.bodyId,
   revision: 5,
-  loadout: {
-    ...avatar.loadout,
-    accessoryIds: []
-  }
+  loadout: cloneAvatarLoadout(DEFAULT_MALE_AVATAR_LOADOUT)
 }
 
 const presenceRow = {

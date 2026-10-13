@@ -20,6 +20,9 @@ const { getAvatarItemPreviewSource } =
   require("./shopAssets") as typeof import("./shopAssets");
 const {
   AVATAR_LOADOUT_CATALOG,
+  BLUMI_R1_RELEASE_CATALOG,
+  DEFAULT_FEMALE_AVATAR_LOADOUT,
+  DEFAULT_MALE_AVATAR_LOADOUT,
   ECONOMY_CATALOG,
   findEconomyCatalogItem,
   isReleaseCatalogItemHeld,
@@ -150,8 +153,31 @@ test("demo Shop lists Room products even when none are owned", () => {
   assert.ok(roomProducts.every((product) => product.roomItem))
 })
 
+// Plan X15 retired every old paid item and removed their receipts, so the R1 listing test runs on fixture items:
+// two paid tops copied from old items (same art), one published in a fixture release catalog and one not. The
+// fixture publication carries only the item ID; it is not a receipt and never leaves this test.
+const PUBLISHED_FIXTURE_TOP_ID = "fixture_shop_top_published";
+const HELD_BACK_FIXTURE_TOP_ID = "fixture_shop_top_not_published";
+const fixtureTops = [
+  [PUBLISHED_FIXTURE_TOP_ID, "avatar_v2_top_sage_ribbon_knit_jacket", 410],
+  [HELD_BACK_FIXTURE_TOP_ID, "avatar_v2_top_cherry_heart_milkmaid_blouse", 520],
+] as const;
+const fixtureShelf = fixtureTops.map(([id, realId]) => {
+  const item = AVATAR_V2_CATALOG.find((entry) => entry.id === realId);
+  assert.ok(item, realId);
+  return { ...item, id, hiddenFromShop: false, hiddenFromWardrobe: false };
+});
+const fixtureEconomy = [
+  ...ECONOMY_CATALOG,
+  ...fixtureTops.map(([itemId, , priceCoins]) => ({ itemId, type: "avatar" as const, title: itemId, priceCoins })),
+];
+const fixtureReleaseCatalog = {
+  ...BLUMI_R1_RELEASE_CATALOG,
+  publishedItems: [{ itemId: PUBLISHED_FIXTURE_TOP_ID, itemType: "avatar" }],
+} as unknown as typeof BLUMI_R1_RELEASE_CATALOG;
+
 test("R1 Shop lists starter and receipted paid items and hides held ones", () => {
-  const r1Catalog = resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG);
+  const r1Catalog = resolveR1PublishedEconomyCatalog(fixtureEconomy, fixtureReleaseCatalog);
   const publishedItemIds = new Set(r1Catalog.map((item) => item.itemId));
   const products = buildShopCatalogItems({
     avatar: resolveInitialAvatarV2("avatar_v2_body_default"),
@@ -168,19 +194,18 @@ test("R1 Shop lists starter and receipted paid items and hides held ones", () =>
     },
     economyCatalog: r1Catalog,
     publishedItemIds: [...publishedItemIds],
+    avatarCatalog: [...AVATAR_V2_CATALOG, ...fixtureShelf],
   });
 
-  const receiptedItemIds = new Set(resolvePublishedReleaseCatalogItemIds());
+  const receiptedItemIds = new Set(resolvePublishedReleaseCatalogItemIds(fixtureReleaseCatalog));
   assert.ok(r1Catalog.every((item) => item.ownedByDefault || receiptedItemIds.has(item.itemId)));
   assert.ok(products.length > 0);
   assert.ok(products.every((product) => publishedItemIds.has(product.sourceItemId)));
-  const receiptedTop = products.find(
-    (product) => product.sourceItemId === "avatar_v2_top_sage_ribbon_knit_jacket",
-  );
+  const receiptedTop = products.find((product) => product.sourceItemId === PUBLISHED_FIXTURE_TOP_ID);
   assert.ok(receiptedTop, "a receipted paid top is listed");
   assert.ok((receiptedTop.priceCoins ?? 0) > 0);
   assert.equal(
-    products.some((product) => product.sourceItemId === "avatar_v2_top_cherry_heart_milkmaid_blouse"),
+    products.some((product) => product.sourceItemId === HELD_BACK_FIXTURE_TOP_ID),
     false,
   );
 });
@@ -294,10 +319,11 @@ test("server loadout metadata exactly follows the runtime mobile avatar catalog"
 });
 
 test("male starter basics are browsable, owned, and have real shop previews", () => {
+  // the boy's visible starters after X15 (the old cocoa quiff and cream tee are retired)
   const visibleMaleBasics = [
-    "avatar_v2_hair_male_cocoa_textured_quiff",
-    "avatar_v2_top_male_cream_basic_tee",
-    "avatar_v2_shoes_male_milk_tea_court",
+    DEFAULT_MALE_AVATAR_LOADOUT.hairId,
+    DEFAULT_MALE_AVATAR_LOADOUT.topId,
+    DEFAULT_MALE_AVATAR_LOADOUT.shoesId,
   ];
 
   for (const itemId of visibleMaleBasics) {
@@ -365,7 +391,12 @@ test("a male avatar fixture never receives female-compatible shop products", () 
   assert.ok(
     avatarProducts.some(
       (product) =>
-        product.sourceItemId === "avatar_v2_top_male_cream_basic_tee",
+        product.sourceItemId === DEFAULT_MALE_AVATAR_LOADOUT.topId,
+    ),
+  );
+  assert.ok(
+    avatarProducts.every(
+      (product) => product.sourceItemId !== DEFAULT_FEMALE_AVATAR_LOADOUT.topId,
     ),
   );
   assert.ok(

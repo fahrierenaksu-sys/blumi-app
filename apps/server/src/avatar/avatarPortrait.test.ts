@@ -5,11 +5,13 @@ import { join } from "node:path"
 import test from "node:test"
 import sharp from "sharp"
 import {
+  AVATAR_ITEM_RULES,
   AVATAR_STILL_MANIFEST,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT,
   cloneAvatarLoadout,
   pickAvatarSwatch,
+  type AvatarItemRules,
   type AvatarStillManifest
 } from "@blumi/domain"
 import type { AvatarLoadout } from "@blumi/contracts"
@@ -183,7 +185,13 @@ test("a truncated art manifest never stops the server: no art, so the fixed bust
  * proof bakes a real second girl top (a stock catalog item) into a copy of it. That top owns no layers: it draws
  * the bare body, so the picture must differ from the polo and show no polo or sleeve pixel at all.
  */
-const OTHER_TOP = "avatar_v2_top_sage_ribbon_knit_jacket"
+// Plan X15: the live catalog has no second active girl top, so this test injects the live rules plus one test-only
+// girl top (drawn with the sage jacket's baked art); everything else is the live catalog.
+const OTHER_TOP = "fixture_avatar_top_portrait_other"
+const OTHER_TOP_RULES: AvatarItemRules = {
+  ...AVATAR_ITEM_RULES,
+  items: [...AVATAR_ITEM_RULES.items, { itemId: OTHER_TOP, slot: "top", supportedBodyIds: [female.bodyId] }]
+}
 const girlManifest = (options: { otherTop: boolean; starterTop: boolean }): AvatarStillManifest => {
   const bare = withoutFrontArt()
   const female = bare.bodies.female
@@ -205,7 +213,7 @@ const girlManifest = (options: { otherTop: boolean; starterTop: boolean }): Avat
 
 test("the saved outfit decides the picture: a bare top draws no top or sleeve pixel, the same outfit the same bytes", async () => {
   assert.ok(art)
-  const renderer = createAvatarPortraitRenderer({ art, manifest: girlManifest({ otherTop: true, starterTop: true }) })
+  const renderer = createAvatarPortraitRenderer({ art, manifest: girlManifest({ otherTop: true, starterTop: true }), avatarRules: OTHER_TOP_RULES })
   const background = "#FFD9E8"
   const starter = await renderer.render({ loadout: female, background })
   const bare = await renderer.render({ loadout: { ...female, topId: OTHER_TOP }, background })
@@ -213,13 +221,14 @@ test("the saved outfit decides the picture: a bare top draws no top or sleeve pi
   assert.equal(bare.level, "look")
   assert.ok(!bare.body.equals(starter.body), "a different worn top is a different picture")
   assert.ok(bare.body.equals(bareAgain.body))
-  // A girl with no top at all (no worn top, no starter top) is the same picture: only the body's own layers.
-  const noTopAnywhere = createAvatarPortraitRenderer({ art, manifest: girlManifest({ otherTop: false, starterTop: false }) })
-  const none = await noTopAnywhere.render({ loadout: female, background })
+  // A girl with no top at all (no worn top art, no starter top) is the same picture: only the body's own layers.
+  // Since X15 the starter top is the polo, which has art, so she wears the art-less top here instead of the starter.
+  const noTopAnywhere = createAvatarPortraitRenderer({ art, manifest: girlManifest({ otherTop: false, starterTop: false }), avatarRules: OTHER_TOP_RULES })
+  const none = await noTopAnywhere.render({ loadout: { ...female, topId: OTHER_TOP }, background })
   assert.ok(bare.body.equals(none.body), "no polo layer, and so no sleeve fragment, is drawn without its top")
   // The real manifest bakes no such top: the same loadout there is the starter picture.
-  const real = await createAvatarPortraitRenderer({ art, manifest: withoutFrontArt() }).render({ loadout: { ...female, topId: OTHER_TOP }, background })
-  const realStarter = await createAvatarPortraitRenderer({ art, manifest: withoutFrontArt() }).render({ loadout: female, background })
+  const real = await createAvatarPortraitRenderer({ art, manifest: withoutFrontArt(), avatarRules: OTHER_TOP_RULES }).render({ loadout: { ...female, topId: OTHER_TOP }, background })
+  const realStarter = await createAvatarPortraitRenderer({ art, manifest: withoutFrontArt(), avatarRules: OTHER_TOP_RULES }).render({ loadout: female, background })
   assert.ok(real.body.equals(realStarter.body))
 })
 

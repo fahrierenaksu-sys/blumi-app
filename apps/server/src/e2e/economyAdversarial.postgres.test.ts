@@ -2,8 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createHmac } from "node:crypto"
 import { Pool } from "pg"
-import { DEFAULT_FEMALE_AVATAR_LOADOUT } from "@blumi/domain"
+import { TEST_AVATAR_ITEM, TEST_AVATAR_ITEM_RULES } from "@blumi/domain"
 import { createAuthService } from "../auth/authService"
+import { createAvatarService } from "../avatar/avatarService"
 import { createDevelopmentSmsProvider } from "../auth/smsProvider"
 import { createCommerceService } from "../commerce/commerceService"
 import { createPostgresAuthRepository } from "../db/postgresAuthRepository"
@@ -11,7 +12,7 @@ import { createPostgresEconomyRepository } from "../db/postgresEconomyRepository
 import { createPostgresPersonalRoomDecorRepository } from "../db/postgresPersonalRoomDecorRepository"
 import { createPostgresReferralRepository } from "../db/postgresReferralRepository"
 import { createEconomyService } from "../economy/economyService"
-import { TEST_ROOM_ECONOMY_CATALOG, TEST_ROOM_STARTER_ITEM_ID } from "../economy/testRoomCatalog"
+import { TEST_ECONOMY_CATALOG, TEST_ROOM_STARTER_ITEM_ID } from "../economy/testRoomCatalog"
 import { createReferralService } from "../referrals/referralService"
 import { createPersonalRoomDecorService } from "../rooms/personalRoomDecorService"
 import { createServer } from "../server"
@@ -24,7 +25,11 @@ const databaseUrl = process.env.DATABASE_URL?.trim()
 const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
 const CODE = "482931"
 const WEBHOOK_SECRET = "adversarial-test-webhook-secret"
-const FEMALE_TOP = "avatar_v2_top_sage_ribbon_knit_jacket"
+// Plan X15: the live catalog sells no avatar item, so the avatar attacks run on the test-only fixture catalog
+// (`TEST_AVATAR_ITEM_RULES` + `TEST_ECONOMY_CATALOG`), exactly like the in-memory suite.
+const FEMALE_TOP = TEST_AVATAR_ITEM.girlTopPaid // 410 coins
+const CHEAP_TOP = TEST_AVATAR_ITEM.sharedTopPaid // 80 coins
+const DEFAULT_FEMALE_AVATAR_LOADOUT = TEST_AVATAR_ITEM_RULES.starters.female
 const ROOM_SHELL = "room_v2_shell_blumi_world_v1"
 const STARTER_COINS = 1250
 
@@ -50,7 +55,8 @@ function harness() {
   })
   const economyService = createEconomyService({
     repository: createPostgresEconomyRepository(pool),
-    catalog: TEST_ROOM_ECONOMY_CATALOG
+    catalog: TEST_ECONOMY_CATALOG,
+    avatarRules: TEST_AVATAR_ITEM_RULES
   })
   const personalRoomDecorService = createPersonalRoomDecorService({
     repository: createPostgresPersonalRoomDecorRepository(pool),
@@ -60,6 +66,7 @@ function harness() {
   const app = createServer({
     authService,
     economyService,
+    avatarService: createAvatarService({ authService, economyService, avatarRules: TEST_AVATAR_ITEM_RULES }),
     commerceService: createCommerceService({ economyService }),
     personalRoomDecorService,
     referralService: createReferralService({ repository: createPostgresReferralRepository(pool) }),
@@ -114,10 +121,10 @@ test("PG-A2 twenty concurrent identical purchases debit once", requirePostgres, 
 test("PG-A3 concurrent different purchases never overdraw the balance", requirePostgres, async () => {
   const { app, authService } = harness()
   const user = await onboardedAccount(authService)
-  const items = [FEMALE_TOP, "avatar_v2_top_azure_garden_halter", "avatar_v2_top_coral_wave_polo",
-    "avatar_v2_shoes_pearl_slingback_sandals", "avatar_v2_accessory_cherry_micro_bag", "avatar_v2_shoes_onyx_heart_mary_janes",
-    "avatar_v2_accessory_honey_blossom_square_glasses", "avatar_v2_accessory_rose_round_glasses",
-    "avatar_v2_accessory_mint_star_oval_glasses", "avatar_v2_accessory_sage_heart_glasses"]
+  const items = [FEMALE_TOP, TEST_AVATAR_ITEM.girlHairPaid, TEST_AVATAR_ITEM.sharedHairPaid,
+    TEST_AVATAR_ITEM.girlBottomPaid, TEST_AVATAR_ITEM.paidEarrings, TEST_AVATAR_ITEM.sharedShoesPaid,
+    TEST_AVATAR_ITEM.paidHeadwear, TEST_AVATAR_ITEM.paidEyewear,
+    CHEAP_TOP, TEST_AVATAR_ITEM.dressTop]
   const responses = await Promise.all(items.map((itemId) =>
     app.inject({ method: "POST", url: "/v1/economy/purchase", headers: user.headers, payload: { itemId, type: "avatar" } })
   ))
@@ -304,7 +311,7 @@ test("PG-A17 twenty concurrent rewards racing a refund repay the debt first and 
   assert.deepEqual(ledger.rows[0], { entries: 20, total: 500 }, "ledger rows keep the full reward amount")
   const purchase = await app.inject({
     method: "POST", url: "/v1/economy/purchase", headers: user.headers,
-    payload: { itemId: "avatar_v2_top_rosebud_picnic_peplum", type: "avatar" }
+    payload: { itemId: CHEAP_TOP, type: "avatar" }
   })
   assert.equal(purchase.statusCode, 201, purchase.body)
   assert.deepEqual(await coins(user.userId), { coins: 170, coinDebt: 0 })

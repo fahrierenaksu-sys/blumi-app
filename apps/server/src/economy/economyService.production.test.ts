@@ -10,6 +10,7 @@ const purchases = [
   ["female_top", { itemId: "avatar_v2_top_sage_ribbon_knit_jacket", type: "avatar", avatarBodyId: "avatar_v2_body_default" }],
   ["female_dress", { itemId: "avatar_v2_top_boho_patchwork_maxi_dress", type: "avatar", avatarBodyId: "avatar_v2_body_default" }],
   ["male_top", { itemId: "avatar_v2_top_male_tonal_geometric_camp_collar_shirt", type: "avatar", avatarBodyId: "avatar_v2_body_male_light" }],
+  ["starter", { itemId: "avatar_v2_hair_ink_pageboy_star", type: "avatar", avatarBodyId: "avatar_v2_body_default" }],
   ["room", { itemId: "room_v2_cute_bookshelf", type: "room" }],
   ["held", { itemId: "avatar_v2_top_cherry_heart_milkmaid_blouse", type: "avatar", avatarBodyId: "avatar_v2_body_default" }],
   ["retired", { itemId: "avatar_v2_top_male_acid_washed_boxy_sweatshirt", type: "avatar", avatarBodyId: "avatar_v2_body_male_light" }]
@@ -25,14 +26,15 @@ const purchases = [
         owned: input.type === "room" ? result.inventory.ownedRoomItemIds : result.inventory.ownedAvatarItemIds
       }
     } catch (error) {
-      results[userId] = { error: error.message }
+      const inventory = await service.getInventory(userId)
+      results[userId] = { error: error.message, coins: inventory.coins, owned: inventory.ownedAvatarItemIds }
     }
   }
   process.stdout.write(JSON.stringify(results))
 })()
 `
 
-test("production economy sells receipted women's and men's items and refuses held, retired and retired room ones", () => {
+test("production economy sells no old avatarV2 item after X15 and refuses held, retired, legacy room and owned starter ones", () => {
   const output = execFileSync(process.execPath, ["-e", PRODUCTION_PURCHASE_SCRIPT], {
     encoding: "utf8",
     env: {
@@ -41,14 +43,16 @@ test("production economy sells receipted women's and men's items and refuses hel
       ECONOMY_SERVICE_MODULE: require.resolve("./economyService")
     }
   })
-  const results = JSON.parse(output) as Record<string, { purchasedItemId?: string; owned?: string[]; error?: string }>
+  const results = JSON.parse(output) as Record<string, { purchasedItemId?: string; owned?: string[]; error?: string; coins?: number }>
 
-  assert.equal(results.female_top?.purchasedItemId, "avatar_v2_top_sage_ribbon_knit_jacket")
-  assert.equal(results.female_dress?.purchasedItemId, "avatar_v2_top_boho_patchwork_maxi_dress")
-  assert.ok(results.female_dress?.owned?.includes("avatar_v2_bottom_boho_patchwork_maxi_dress"))
-  assert.equal(results.male_top?.purchasedItemId, "avatar_v2_top_male_tonal_geometric_camp_collar_shirt")
-  // the old flat furniture is in the legacy registry: never sold again, even while its receipt still exists
-  assert.equal(results.room?.error, "That shop item is not available.")
-  assert.equal(results.held?.error, "That shop item is not available.")
-  assert.equal(results.retired?.error, "That shop item is not available.")
+  // the old avatarV2 items lost their receipts (plan X15): production never sells them again
+  for (const userId of ["female_top", "female_dress", "male_top", "held", "retired", "room"]) {
+    assert.equal(results[userId]?.purchasedItemId, undefined, userId)
+    assert.equal(results[userId]?.error, "That shop item is not available.", userId)
+  }
+  // the girl starter is free and already owned by every production account: no purchase, no charge
+  assert.equal(results.starter?.purchasedItemId, undefined)
+  assert.equal(results.starter?.error, "You already own this item.")
+  assert.ok(results.starter?.owned?.includes("avatar_v2_hair_ink_pageboy_star"))
+  assert.equal(results.starter?.coins, results.female_top?.coins)
 })

@@ -30,6 +30,12 @@ export interface ProjectAvatarV2ToRoomAvatarAppearanceInput {
   projectionMap?: AvatarRoomProjectionMap
 }
 
+/** Test seam: the catalog and room mapping a look is drawn from. The defaults are the live ones. */
+export type AvatarRoomProjectionSource = Pick<
+  ProjectAvatarV2ToRoomAvatarAppearanceInput,
+  "avatarCatalog" | "projectionMap"
+>
+
 export interface ProjectedRoomAvatarAppearance {
   appearance: RoomAvatarAppearance
   unmappedItemIds: string[]

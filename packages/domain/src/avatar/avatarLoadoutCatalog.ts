@@ -406,6 +406,7 @@ export const AVATAR_LOADOUT_CATALOG: readonly AvatarLoadoutCatalogItem[] =
     ),
   ]);
 
+/** The 2.5D girl starter (plan X15): the four pieces the rig and the stills draw, all free `ownedByDefault`. */
 export const DEFAULT_FEMALE_AVATAR_LOADOUT: ReadonlyAvatarLoadout<AvatarLoadoutV1> =
   freezeLoadout({
     schemaVersion: 1,
@@ -414,13 +415,17 @@ export const DEFAULT_FEMALE_AVATAR_LOADOUT: ReadonlyAvatarLoadout<AvatarLoadoutV
     eyesId: "avatar_v2_eyes_mocha_doe",
     noseId: "avatar_v2_nose_soft_button",
     mouthId: "avatar_v2_mouth_peach_whisper_smile",
-    hairId: "avatar_v2_hair_mocha_ribbon_blowout",
-    topId: "avatar_v2_top_default",
-    bottomId: "avatar_v2_bottom_default",
-    shoesId: "avatar_v2_shoes_milk_tea_court_sneakers",
+    hairId: "avatar_v2_hair_ink_pageboy_star",
+    topId: "avatar_v2_top_coral_wave_polo",
+    bottomId: "avatar_v2_bottom_coral_wave_pants",
+    shoesId: "avatar_v2_shoes_mint_ribbon_court_sneakers",
     accessoryIds: [],
   });
 
+/**
+ * The boy starter: his 2.5D hair plus the interim garments (`INTERIM_MALE_STARTER_ITEM_IDS`) until his
+ * outfit 2 lands.
+ */
 export const DEFAULT_MALE_AVATAR_LOADOUT: ReadonlyAvatarLoadout<AvatarLoadoutV1> = freezeLoadout(
   {
     schemaVersion: 1,
@@ -429,31 +434,13 @@ export const DEFAULT_MALE_AVATAR_LOADOUT: ReadonlyAvatarLoadout<AvatarLoadoutV1>
     eyesId: "avatar_v2_eyes_male_warm_brown",
     noseId: "avatar_v2_nose_male_gentle_bridge",
     mouthId: "avatar_v2_mouth_male_soft_smile",
-    hairId: "avatar_v2_hair_male_cocoa_textured_quiff",
+    hairId: "avatar_v2_hair_male_soft_black_side_part",
     topId: "avatar_v2_top_male_powder_blue_crew_tee",
     bottomId: "avatar_v2_bottom_male_navy_straight_pants",
     shoesId: "avatar_v2_shoes_male_milk_tea_court",
     accessoryIds: [],
   },
 );
-
-export function isAvatarLoadoutItemCompatibleWithBody(
-  itemId: string,
-  bodyId: string,
-): boolean {
-  const body = AVATAR_LOADOUT_CATALOG.find(
-    (item) =>
-      item.itemId === bodyId &&
-      item.slot === "body" &&
-      item.supportedBodyIds.includes(bodyId),
-  );
-  if (!body) return false;
-
-  const item = AVATAR_LOADOUT_CATALOG.find((entry) => entry.itemId === itemId);
-  if (!item) return false;
-  if (item.slot === "body") return item.itemId === bodyId;
-  return item.supportedBodyIds.includes(bodyId);
-}
 
 function freezeCatalog(
   catalog: AvatarLoadoutCatalogItem[],
