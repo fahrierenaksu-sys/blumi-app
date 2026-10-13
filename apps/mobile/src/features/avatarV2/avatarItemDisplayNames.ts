@@ -20,6 +20,8 @@ export const AVATAR_ITEM_NAMES_TR: Readonly<Record<string, string>> = {
   avatar_v2_top_coral_wave_polo: "Mercan Dalga Polo",
   avatar_v2_bottom_coral_wave_pants: "Mercan Dalga Pantolon",
   avatar_v2_shoes_mint_ribbon_court_sneakers: "Nane Sneaker",
+  avatar_v2_hair_mocha_ribbon_waves: "Kurdeleli Dalgalı Saç",
+  avatar_v2_shoes_white_clean_sneakers: "Beyaz Sneaker",
   // Boy: hair
   avatar_v2_hair_male_blue_black_curls: "Lacivert Bukleler",
   avatar_v2_hair_male_textured_twists: "Burgu Saç",
