@@ -14,6 +14,8 @@ import {
   VARIANT_SIT,
   VARIANT_STAND,
   VARIANT_WALK0,
+  avatar25StandEntries,
+  legPlan,
   walkFrameIndex,
   writeAvatarClipTransform,
   writeAvatarPalette,
@@ -386,4 +388,132 @@ test("every shipped rig's mirror cards line up with their mesh", () => {
       }
     }
   }
+})
+
+// leg composition: any bottom with any shoes. A boy-style fixture from the girl's data: items own role-keyed leg
+// drawings ('bottom' / 'shoes') and no pair drawing, with a second bottom and a second pair of shoes.
+const PANTS = "bottom_coral_wave_pants"
+const SNEAKERS = "shoes_mint_ribbon_court_sneakers"
+const LEGS = ["farLeg", "nearLeg"] as const
+
+function roleKeyedMix(): Rig25 {
+  const copy = structuredClone(rig)
+  for (const view of Object.values(copy.views)) {
+    const pants = view.items[PANTS]
+    pants.mesh.ranges = pants.mesh.ranges.filter((r) => r.legVariant !== "bottom+shoes")
+    view.items.bottom_b = structuredClone(pants)
+    view.items.shoes_b = structuredClone(view.items[SNEAKERS])
+  }
+  return copy
+}
+
+/** Global vertex ids drawn in one variant, and the global ids of a named range of a worn set (0 body, k+1 item k). */
+function drawnVertices(compiled: ReturnType<typeof compileAvatar>, variant: number): Set<number> {
+  const start = compiled.variants[variant * 2], count = compiled.variants[variant * 2 + 1]
+  return new Set(compiled.indexData.slice(start, start + count))
+}
+function rangeVertices(r: Rig25, worn: string[], set: number, name: string): Set<number> {
+  const v = r.views.front
+  const meshes = [v.mesh, ...worn.map((id) => v.items[id].mesh)]
+  const base = meshes.slice(0, set).reduce((n, m) => n + m.pos.length / 2, 0)
+  const range = meshes[set].ranges.find((x) => x.name === name)!
+  return new Set(meshes[set].index.slice(range.start, range.start + range.count).map((i) => i + base))
+}
+/** The mask bytes of vertex `i`: flag, page layer and uv (unorm16). */
+function maskAt(data: ArrayBuffer, i: number) {
+  const b = new Uint8Array(data), h = new Uint16Array(data)
+  return { on: b[i * VERTEX_STRIDE + 27], layer: b[i * VERTEX_STRIDE + 26], u: h[(i * VERTEX_STRIDE + 28) / 2] / 65535, v: h[(i * VERTEX_STRIDE + 30) / 2] / 65535 }
+}
+const every = (s: Set<number>, f: (i: number) => boolean) => [...s].every(f)
+
+test("legs: a bottom worn with shoes from another outfit draws its own leg drawing gated by the shoes' leg drawing", () => {
+  const mix = roleKeyedMix()
+  const worn = ["bottom_b", SNEAKERS]
+  const compiled = compileAvatar(mix, "front", worn)
+  const shown = drawnVertices(compiled, VARIANT_STAND)
+  const shoes = mix.views.front.items[SNEAKERS].mesh
+  const shoesLayer = compiled.pages.indexOf(mix.views.front.pages[mix.views.front.items[SNEAKERS].page])
+  const gated = new Set<number>()
+  for (const leg of LEGS) {
+    const own = rangeVertices(mix, worn, 1, `${leg}@bottom`)
+    assert.ok(every(own, (i) => shown.has(i)), `${leg}: the bottom's drawing is drawn`)
+    assert.ok(every(rangeVertices(mix, worn, 0, leg), (i) => !shown.has(i)), `${leg}: the bare leg is hidden`)
+    assert.ok(every(rangeVertices(mix, worn, 2, `${leg}@shoes`), (i) => !shown.has(i)), `${leg}: the shoes' drawing is only a gate`)
+    // the gate is the shoes' drawing at the same vertex of the shared body-leg mesh, on the shoes' page
+    const gate = shoes.ranges.find((r) => r.name === `${leg}@shoes`)!
+    const gateVerts = shoes.index.slice(gate.start, gate.start + gate.count)
+    const ownRange = mix.views.front.items.bottom_b.mesh.ranges.find((r) => r.name === `${leg}@bottom`)!
+    const ownVerts = mix.views.front.items.bottom_b.mesh.index.slice(ownRange.start, ownRange.start + ownRange.count)
+    const base = mix.views.front.mesh.pos.length / 2
+    ownVerts.forEach((local, t) => {
+      const m = maskAt(compiled.vertexData, local + base)
+      assert.equal(m.on, 1)
+      assert.equal(m.layer, shoesLayer)
+      assert.ok(Math.abs(m.u - shoes.uv[gateVerts[t] * 2]) < 1e-4 && Math.abs(m.v - shoes.uv[gateVerts[t] * 2 + 1]) < 1e-4, `${leg} uv`)
+      gated.add(local + base)
+    })
+  }
+  // nothing else is gated, and the still baker sees the same gate
+  for (let i = 0; i < compiled.vertexData.byteLength / VERTEX_STRIDE; i++) if (!gated.has(i)) assert.equal(maskAt(compiled.vertexData, i).on, 0)
+  const legs = avatar25StandEntries(mix, "front", worn).filter((e) => e.legVariant !== undefined)
+  assert.deepEqual(legs.map((e) => [e.owner, e.legVariant, e.legMask?.owner]), LEGS.map(() => ["bottom_b", "bottom", SNEAKERS]))
+})
+
+test("legs: one item alone draws its own leg drawing ungated, and any bottom mixes with any shoes", () => {
+  const mix = roleKeyedMix()
+  const view = mix.views.front
+  for (const [worn, key] of [[[PANTS], "bottom"], [["shoes_b"], "shoes"], [["hair_ink_pageboy_star"], null]] as const) {
+    const plan = legPlan(view, [...worn])
+    assert.equal(plan?.key ?? null, key, worn.join())
+    assert.equal(plan?.mask, undefined)
+    const compiled = compileAvatar(mix, "front", [...worn])
+    for (let i = 0; i < compiled.vertexData.byteLength / VERTEX_STRIDE; i++) assert.equal(maskAt(compiled.vertexData, i).on, 0)
+  }
+  for (const bottom of [PANTS, "bottom_b"]) {
+    for (const shoes of [SNEAKERS, "shoes_b"]) {
+      for (const worn of [[bottom, shoes], [shoes, bottom]]) {
+        const plan = legPlan(view, worn)
+        assert.deepEqual(plan, { set: worn.indexOf(bottom) + 1, key: "bottom", mask: worn.indexOf(shoes) + 1 }, worn.join())
+      }
+    }
+  }
+})
+
+test("legs: the girl's QA'd pair drawing is drawn as before, with no gate", () => {
+  for (const name of ["front", "back"] as const) {
+    const worn = [SNEAKERS, PANTS]
+    assert.deepEqual(legPlan(rig.views[name], worn), { set: 2, key: "bottom+shoes" })
+    const compiled = compileAvatar(rig, name, worn)
+    for (let i = 0; i < compiled.vertexData.byteLength / VERTEX_STRIDE; i++) assert.equal(maskAt(compiled.vertexData, i).on, 0)
+    if (name !== "front") continue
+    const shown = drawnVertices(compiled, VARIANT_STAND)
+    for (const leg of LEGS) {
+      assert.ok(every(rangeVertices(rig, worn, 2, `${leg}@bottom+shoes`), (i) => shown.has(i)), leg)
+      assert.ok(every(rangeVertices(rig, worn, 2, `${leg}@bottom`), (i) => !shown.has(i)), leg)
+      assert.ok(every(rangeVertices(rig, worn, 1, `${leg}@shoes`), (i) => !shown.has(i)), leg)
+    }
+    assert.ok(avatar25StandEntries(rig, name, worn).every((e) => e.legMask === undefined))
+  }
+})
+
+test("seated cards cut to their own box move exactly as the same rows of a full card", () => {
+  const band: [number, number] = [100, 200]
+  const card = (top: number, bottom: number): Rig25["views"]["front"]["mesh"] => ({
+    pos: [0, top, 10, top, 10, bottom, 0, bottom], uv: [0, 0, 1, 0, 1, 1, 0, 1], joints: [5, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0],
+    weights: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], index: [0, 1, 2, 0, 2, 3], page: [1, 1, 1, 1], arm: [0, 0, 0, 0],
+    ranges: [{ name: "sit", order: 1, start: 0, count: 6 }]
+  })
+  // [slot, weight] pairs per row (two vertices each): root 7, leg 9
+  const rows = (m: Rig25["views"]["front"]["mesh"] | null) =>
+    m ? Array.from({ length: m.pos.length / 4 }, (_, r) => [m.pos[r * 4 + 1], m.joints[r * 8], m.weights[r * 8], m.joints[r * 8 + 1], m.weights[r * 8 + 1]]) : null
+  // a full card: above the band on root, below it on the leg slot (as before)
+  assert.deepEqual(rows(seatedCardStrips(card(50, 300), band, 7, 9)), [[50, 7, 1, 0, 0], [100, 7, 1, 0, 0], [200, 9, 1, 0, 0], [300, 9, 1, 0, 0]])
+  // shoes cut below the band: all on the leg slot, drawn
+  const shoes = seatedCardStrips(card(250, 300), band, 7, 9)!
+  assert.ok(shoes.index.length > 0)
+  assert.ok(rows(shoes)!.every(([, slot, w]) => slot === 9 && w === 1))
+  // a card starting inside the band: its top row moves by its depth in the band
+  assert.deepEqual(rows(seatedCardStrips(card(150, 300), band, 7, 9))![0], [150, 7, 0.5, 9, 0.5])
+  // a card wholly above the band never moves
+  assert.equal(seatedCardStrips(card(10, 90), band, 7, 9), null)
 })

@@ -107,8 +107,13 @@ function skinMesh(mesh, palette, ground) {
   return out
 }
 
-/** Rasterises triangles into a sample buffer (straight rgb + coverage per sample), later ones overwrite. */
-function rasterise(buffer, canvas, mesh, skinned, index, pages) {
+/**
+ * Rasterises triangles into a sample buffer (straight rgb + coverage per sample), later ones overwrite. `mask` (a
+ * composed leg, avatar25Pose legPlan): { mesh, vertexOffset } of the shoes' leg drawing; a sample is drawn only where
+ * that drawing passes the same alpha test at the same vertex weights (the GPU shader's AND).
+ */
+function rasterise(buffer, canvas, mesh, skinned, index, pages, mask = null) {
+  const m = [0, 0, 0, 0]
   const W = canvas.width * SS, H = canvas.height * SS
   const c = [0, 0, 0, 0]
   for (let t = 0; t + 2 < index.length; t += 3) {
@@ -133,6 +138,13 @@ function rasterise(buffer, canvas, mesh, skinned, index, pages) {
         const v = w0 * mesh.uv[ia * 2 + 1] + w1 * mesh.uv[ib * 2 + 1] + w2 * mesh.uv[ic * 2 + 1]
         sample(page, u, v, c)
         if (c[3] < ALPHA_TEST) continue
+        if (mask) {
+          const ma = ia + mask.vertexOffset, mb = ib + mask.vertexOffset, mc = ic + mask.vertexOffset
+          const mu = w0 * mask.mesh.uv[ma * 2] + w1 * mask.mesh.uv[mb * 2] + w2 * mask.mesh.uv[mc * 2]
+          const mv = w0 * mask.mesh.uv[ma * 2 + 1] + w1 * mask.mesh.uv[mb * 2 + 1] + w2 * mask.mesh.uv[mc * 2 + 1]
+          sample(pages[mask.mesh.page[ma]], mu, mv, m)
+          if (m[3] < ALPHA_TEST) continue
+        }
         const o = (y * W + x) * 4
         buffer[o] = c[0] / c[3]
         buffer[o + 1] = c[1] / c[3]
@@ -142,6 +154,9 @@ function rasterise(buffer, canvas, mesh, skinned, index, pages) {
     }
   }
 }
+
+/** The rasteriser's mask for an entry's composed leg (avatar25StandEntries `legMask`), else null. */
+const maskOf = (legMask, meshOf) => (legMask ? { mesh: meshOf(legMask.owner), vertexOffset: legMask.vertexOffset } : null)
 
 /** Box-filters the samples to sheet pixels: straight RGBA8 + the tight pixel rect (null when empty). */
 function resolveSamples(buffer, canvas) {
@@ -226,7 +241,7 @@ function standLayers(rig, rigItemIds, canonicalOf) {
       const sig = `${entry.owner}:${entry.index[0]}:${entry.index.length}`
       if (!group.index.has(sig)) {
         group.index.add(sig)
-        group.triangles.push({ meshOwner: entry.owner, index: entry.index, seq: localSeq })
+        group.triangles.push({ meshOwner: entry.owner, index: entry.index, seq: localSeq, legMask: entry.legMask })
       }
       groups.set(key, group)
     }
@@ -300,7 +315,7 @@ async function bakeBody(rigId, files) {
   const full = [], bust = []
   for (const layer of layers) {
     const buffer = new Float32Array(canvas.width * SS * canvas.height * SS * 4)
-    for (const tri of layer.triangles.sort((a, b) => a.seq - b.seq)) rasterise(buffer, canvas, meshOf(tri.meshOwner), skinned.get(tri.meshOwner), tri.index, pages)
+    for (const tri of layer.triangles.sort((a, b) => a.seq - b.seq)) rasterise(buffer, canvas, meshOf(tri.meshOwner), skinned.get(tri.meshOwner), tri.index, pages, maskOf(tri.legMask, meshOf))
     const { rgba, rect } = resolveSamples(buffer, canvas)
     if (!rect) continue
     rendered.push({ layer, rgba, rect })
@@ -367,7 +382,7 @@ async function seamEvidence(rigId, rig, rigItemIds, canonicalOf, rendered, canva
   const starterIds = Object.values(art.AVATAR_RIG_STARTER[rigId]).map((id) => art.AVATAR_ITEM_ART[rigId][id])
   const worn = rigItemIds.filter((id) => starterIds.includes(id))
   const buffer = new Float32Array(canvas.width * SS * canvas.height * SS * 4)
-  for (const entry of pose.avatar25StandEntries(rig, "front", worn)) rasterise(buffer, canvas, meshOf(entry.owner), skinned.get(entry.owner), entry.index, pages)
+  for (const entry of pose.avatar25StandEntries(rig, "front", worn)) rasterise(buffer, canvas, meshOf(entry.owner), skinned.get(entry.owner), entry.index, pages, maskOf(entry.legMask, meshOf))
   const single = resolveSamples(buffer, canvas).rgba
   const legKey = pose.wornLegKey(worn.map((id) => rig.views.front.items[id].slot))
   const replaced = new Set(rendered.filter((r) => worn.includes(r.layer.rigItemId) && r.layer.legVariant === legKey).map((r) => r.layer.leg))

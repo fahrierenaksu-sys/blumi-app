@@ -11,8 +11,9 @@ export interface Rig25Range {
   /** The mesh has baked walk weights for this range (lab40 `walkWeights`): the retargeted walk skins it with those. */
   walk?: boolean
   /**
-   * A bare-leg drawing for what is worn (lab40 `legVariants`): 'bottom', 'shoes' or 'bottom+shoes'. It replaces the
-   * body leg named by `layer` while exactly that set is worn, and is drawn as that leg.
+   * A bare-leg drawing owned by this item (lab40 `legVariants`): 'bottom' (a bottom's), 'shoes' (shoes') or the legacy
+   * pair 'bottom+shoes' (one item per slot). It replaces the body leg named by `layer` and is drawn as that leg; a
+   * bottom worn with shoes draws its 'bottom' drawing gated by the shoes' 'shoes' drawing (avatar25Pose `legPlan`).
    */
   legVariant?: string
 }

@@ -61,6 +61,10 @@ struct VOut {
   @location(1) @interpolate(perspective, sample) billY: f32,
   @location(2) @interpolate(flat) page: u32,
   @location(3) @interpolate(flat) arm: u32,
+  // a composed leg (avatar25Pose legPlan): the shoes' leg drawing at the same vertex gates this fragment
+  @location(4) @interpolate(perspective, sample) maskUv: vec2f,
+  @location(5) @interpolate(flat) maskPage: u32,
+  @location(6) @interpolate(flat) masked: u32,
 };
 
 fn skin(i: u32, p: vec2f) -> vec2f {
@@ -70,7 +74,8 @@ fn skin(i: u32, p: vec2f) -> vec2f {
 }
 
 @vertex fn vs(
-  @location(0) pos: vec2f, @location(1) uv: vec2f, @location(2) j: vec4u, @location(3) w: vec4f, @location(4) extra: vec4u
+  @location(0) pos: vec2f, @location(1) uv: vec2f, @location(2) j: vec4u, @location(3) w: vec4f, @location(4) extra: vec4u,
+  @location(5) maskUv: vec2f
 ) -> VOut {
   let p = vec2f(pos.x - u.ground.x, -(pos.y - u.ground.y));
   let q = skin(j.x, p) * w.x + skin(j.y, p) * w.y + skin(j.z, p) * w.z + skin(j.w, p) * w.w;
@@ -80,6 +85,9 @@ fn skin(i: u32, p: vec2f) -> vec2f {
   o.billY = q.y;
   o.page = extra.x;
   o.arm = extra.y;
+  o.maskPage = extra.z;
+  o.masked = extra.w;
+  o.maskUv = maskUv;
   return o;
 }
 
@@ -87,6 +95,8 @@ fn skin(i: u32, p: vec2f) -> vec2f {
   // sampled before any branch: uniform control flow for the implicit derivatives
   let gx = dpdx(i.uv);
   let gy = dpdy(i.uv);
+  let mgx = dpdx(i.maskUv);
+  let mgy = dpdy(i.maskUv);
   var c = textureSample(tex, samp, i.uv, i.page);
   // blink: while a frame shows, the eye rect of the body page reads the frame packed elsewhere in that page, an
   // exact replace (alpha included). The uv's own gradients keep the mip level, so the jump never changes it.
@@ -105,6 +115,8 @@ fn skin(i: u32, p: vec2f) -> vec2f {
     c = textureSampleGrad(tex, samp, i.uv + off, i.page, gx, gy);
   }
   if ((i.arm == 1u && i.billY < u.ground.z) || (i.arm == 2u && i.billY < u.ground.w)) { discard; }
+  // composed leg: drawn only where the shoes' own leg drawing is drawn too (the same 0.5 test, so the AND of both)
+  if (i.masked == 1u && textureSampleGrad(tex, samp, i.maskUv, i.maskPage, mgx, mgy).a < 0.5) { discard; }
   // alpha test, as the lab draws every layer (three.js alphaTest 0.5): two pieces cut from one drawing meet
   // exactly on their 0.5 contour, so no background shows through their seam (blending their soft edges let it
   // through as a light dotted line); the edge smoothing comes from the per-sample test instead
@@ -166,7 +178,8 @@ export function createAvatar25Shared(device: GPUDevice, format: GPUTextureFormat
           { shaderLocation: 1, offset: 8, format: "float32x2" },
           { shaderLocation: 2, offset: 16, format: "uint8x4" },
           { shaderLocation: 3, offset: 20, format: "unorm8x4" },
-          { shaderLocation: 4, offset: 24, format: "uint8x4" }
+          { shaderLocation: 4, offset: 24, format: "uint8x4" },
+          { shaderLocation: 5, offset: 28, format: "unorm16x2" }
         ]
       }]
     },

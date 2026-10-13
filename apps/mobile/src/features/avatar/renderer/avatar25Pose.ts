@@ -6,7 +6,7 @@
  * The palette holds one 2×3 affine per slot (bones, then ROOT, then WAVE, then SEATED LEGS), 8 floats each:
  *   [a, c, tx, 0, b, d, ty, 0]  so  x' = a·x + c·y + tx,  y' = b·x + d·y + ty   (x, y in bill px)
  */
-import type { Avatar25Pose, Avatar25ViewName, Rig25, Rig25Item, Rig25Mesh, Rig25View } from "./rigTypes"
+import type { Avatar25Pose, Avatar25ViewName, Rig25, Rig25Item, Rig25Mesh, Rig25Range, Rig25View } from "./rigTypes"
 import {
   addMotionBreath,
   addMotionIdle,
@@ -21,7 +21,10 @@ import {
   type CompiledMotion
 } from "./avatar25Motion"
 import { seatedCardStrips, seatedShinBandRows } from "./avatar25SeatedLegs"
+import { legMaskRange, legMaskVertices, legPlan, UNORM16, type LegMaskVertex } from "./avatar25Legs"
 import { breathCurve, compileBlink, compileBreath, type CompiledBlink, type CompiledBreath } from "./avatar25Life"
+
+export { legPlan } from "./avatar25Legs"
 
 export const POSE_BITS: Record<Avatar25Pose, number> = { stand: 1, walk: 2, sit: 4, wave: 8 }
 export const PALETTE_STRIDE = 8
@@ -80,7 +83,10 @@ export const VARIANT_WALK0 = 3
 export interface CompiledAvatar {
   view: CompiledView
   itemIds: string[]
-  /** Interleaved vertices, 32 bytes each: pos f32×2, uv f32×2, joints u8×4, weights unorm8×4, page/arm u8×4. */
+  /**
+   * Interleaved vertices, 32 bytes each: pos f32×2, uv f32×2, joints u8×4, weights unorm8×4, page/arm/mask page/mask
+   * on u8×4, mask uv unorm16×2 (a composed leg: the shoes' leg drawing whose coverage gates this one, see `legPlan`).
+   */
   vertexData: ArrayBuffer
   indexData: Uint32Array
   /** [start, count] per variant (VARIANT_*): one indexed draw shows the whole avatar in that pose. */
@@ -227,11 +233,12 @@ function itemPoseMask(range: Rig25Mesh["ranges"][number], v: Rig25View, motion: 
   return { mask, frame: -1 }
 }
 
-function packVertices(meshes: Rig25Mesh[], layerOfPage: Map<number, number>): ArrayBuffer {
+function packVertices(meshes: Rig25Mesh[], layerOfPage: Map<number, number>, masks: Map<number, LegMaskVertex> = new Map()): ArrayBuffer {
   const total = meshes.reduce((n, m) => n + m.pos.length / 2, 0)
   const buffer = new ArrayBuffer(total * AVATAR25_VERTEX_STRIDE)
   const f = new Float32Array(buffer)
   const b = new Uint8Array(buffer)
+  const h = new Uint16Array(buffer)
   let v = 0
   for (const mesh of meshes) {
     const count = mesh.pos.length / 2
@@ -250,6 +257,13 @@ function packVertices(meshes: Rig25Mesh[], layerOfPage: Map<number, number>): Ar
       }
       b[bo + 24] = layerOfPage.get(mesh.page[i]) ?? 0
       b[bo + 25] = mesh.arm[i]
+      const mask = masks.get(v)
+      if (mask) {
+        b[bo + 26] = layerOfPage.get(mask.page) ?? 0
+        b[bo + 27] = 1
+        h[(bo + 28) / 2] = Math.round(Math.min(1, Math.max(0, mask.u)) * UNORM16)
+        h[(bo + 30) / 2] = Math.round(Math.min(1, Math.max(0, mask.v)) * UNORM16)
+      }
     }
   }
   return buffer
@@ -391,7 +405,7 @@ export function compileAvatar(
   return {
     view: { ...view, soleLift: Math.max(0, ...worn.map((id) => v.items[id].lift ?? 0)) },
     itemIds: worn,
-    vertexData: packVertices([...meshes, ...(extra ? [extra.mesh] : []), ...stripMeshes], layerOfPage),
+    vertexData: packVertices([...meshes, ...(extra ? [extra.mesh] : []), ...stripMeshes], layerOfPage, legMaskVertices(entries, meshes, base)),
     indexData: Uint32Array.from(indices),
     variants,
     pages: usedPages.map((page) => v.pages[page])
@@ -403,12 +417,13 @@ export function compileAvatar(
  * the one source of draw order for the live renderer and the still baker (tools/avatar25d/bake-stills.mjs).
  */
 function buildDrawEntries(v: Rig25View, worn: string[], motion: boolean, has: Set<string>): DrawEntry[] {
-  // the bare legs drawn for what is worn (lab40 wear(): key from the worn trousers and shoes)
-  const legKey = wornLegKey(worn.map((id) => v.items[id].slot))
+  // the bare legs drawn for what is worn
+  const plan = legPlan(v, worn)
+  const drawnLeg = (k: number, r: Rig25Range) => plan !== null && plan.set === k + 1 && r.legVariant === plan.key && Boolean(r.layer)
   const replacedLegs = new Set<string>()
-  for (const id of worn) {
-    for (const r of v.items[id].mesh.ranges) if (r.legVariant === legKey && r.layer) replacedLegs.add(r.layer)
-  }
+  worn.forEach((id, k) => {
+    for (const r of v.items[id].mesh.ranges) if (drawnLeg(k, r)) replacedLegs.add(r.layer as string)
+  })
   const entries: DrawEntry[] = []
   let seq = 0
   for (const r of v.mesh.ranges) {
@@ -429,13 +444,15 @@ function buildDrawEntries(v: Rig25View, worn: string[], motion: boolean, has: Se
       const leg = r.layer === "farLeg" || r.layer === "nearLeg" ? r.layer : null
       // a leg drawing for what is worn is drawn exactly as the body leg it replaces; the others are not drawn
       const pm = r.legVariant !== undefined
-        ? r.legVariant === legKey && leg ? bodyPoseMask(leg, has, v, motion) : { mask: 0, frame: -1 }
+        ? drawnLeg(k, r) && leg ? bodyPoseMask(leg, has, v, motion) : { mask: 0, frame: -1 }
         : itemPoseMask(r, v, motion)
+      const maskRange = drawnLeg(k, r) && plan?.mask ? legMaskRange(item.mesh, v.items[worn[plan.mask - 1]].mesh, plan.mask, r) : null
       entries.push({
         set: k + 1, start: r.start, count: r.count, mask: pm.mask, frame: pm.frame, order: r.order, seq: seq++, leg,
         walkBaked: Boolean(r.walk) && r.legVariant === undefined,
         seat: item.slot === "bottom" && r.layer === "torso",
-        seated: r.name === "sit"
+        seated: r.name === "sit",
+        ...(maskRange ? { legMask: maskRange } : {})
       })
     }
   })
@@ -450,6 +467,11 @@ export interface Avatar25StandEntry {
   seq: number
   /** The worn-items key this range is drawn for (a leg drawing owned by an item), else undefined. */
   legVariant?: string
+  /**
+   * A composed leg: the worn shoes whose own leg drawing gates this one's coverage (drawn where both are), and the
+   * offset from this range's vertices to the same vertices of that drawing (mesh-local, the shoes' mesh).
+   */
+  legMask?: { owner: string; vertexOffset: number }
   /** The leg layer this range is drawn on (a body leg, or an item piece on it), else null. */
   leg: "farLeg" | "nearLeg" | null
   /** Mesh-local triangle indices of this range. */
@@ -478,6 +500,7 @@ export function avatar25StandEntries(rig: Rig25, viewName: Avatar25ViewName, ite
       order: e.order,
       seq: e.seq,
       legVariant: rangeAt.get(`${e.set}:${e.start}`)?.legVariant,
+      ...(e.legMask ? { legMask: { owner: worn[e.legMask.set - 1]!, vertexOffset: e.legMask.vertexOffset } } : {}),
       leg: e.leg,
       index: meshes[e.set].index.slice(e.start, e.start + e.count)
     }))
@@ -499,6 +522,8 @@ interface DrawEntry {
   seat: boolean
   /** The seated card (range "sit"): drawn from its strips when it has them. */
   seated: boolean
+  /** A composed leg (see `legPlan`): the mesh set of the gating drawing and the vertex offset into it. */
+  legMask?: { set: number; vertexOffset: number }
 }
 
 interface DrawKey {

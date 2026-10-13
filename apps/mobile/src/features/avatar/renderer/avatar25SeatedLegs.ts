@@ -71,24 +71,35 @@ export function seatedCardStrips(mesh: Rig25Mesh, bandRows: [number, number], ro
   const tl = corner(left, top), tr = corner(right, top), bl = corner(left, bottom), br = corner(right, bottom)
   // only an axis-aligned rectangle with an axis-aligned texture rectangle is cut (that is how the rig bakes them)
   if (!tl || !tr || !bl || !br || tl.v !== tr.v || bl.v !== br.v || tl.u !== bl.u || tr.u !== br.u) return null
+  // a card cut to its own box (export_rig.py item_cards) may start inside or below the band, or end inside it: rows
+  // are clamped to the card and a row inside the band blends the two slots by its depth in it, so every card's
+  // pixels move exactly as the same rows of a card spanning the whole band. Cards wholly above it never move.
+  if (!(bandRows[1] > bandRows[0]) || bottom <= bandRows[0]) return null
   const b0 = Math.max(top, Math.min(bottom, bandRows[0]))
   const b1 = Math.max(b0, Math.min(bottom, bandRows[1]))
-  if (!(b0 > top && b1 < bottom && b1 > b0)) return null
   const page = mesh.page[corners[0]!]!
   const out: Rig25Mesh = { pos: [], uv: [], joints: [], weights: [], index: [], page: [], arm: [], ranges: [] }
-  const rows: [number, number][] = [[top, rootSlot], [b0, rootSlot], [b1, legSlot], [bottom, legSlot]]
-  for (const [y, slot] of rows) {
+  const depth = (y: number) => Math.min(1, Math.max(0, (y - bandRows[0]) / (bandRows[1] - bandRows[0])))
+  for (const y of [top, b0, b1, bottom]) {
     const v = tl.v + ((y - top) / (bottom - top)) * (bl.v - tl.v)
+    const t = depth(y)
     for (const [x, u] of [[left, tl.u], [right, tr.u]] as const) {
       out.pos.push(x, y)
       out.uv.push(u, v)
-      out.joints.push(slot, 0, 0, 0)
-      out.weights.push(1, 0, 0, 0)
+      if (t === 0 || t === 1) {
+        out.joints.push(t === 0 ? rootSlot : legSlot, 0, 0, 0)
+        out.weights.push(1, 0, 0, 0)
+      } else {
+        out.joints.push(rootSlot, legSlot, 0, 0)
+        out.weights.push(1 - t, t, 0, 0)
+      }
       out.page.push(page)
       out.arm.push(0)
     }
   }
+  const rows = [top, b0, b1, bottom]
   for (let strip = 0; strip < 3; strip++) {
+    if (!(rows[strip + 1]! > rows[strip]!)) continue   // a strip the card does not reach
     const a = strip * 2, b = a + 1, c = a + 3, d = a + 2
     out.index.push(a, b, c, a, c, d)
   }
