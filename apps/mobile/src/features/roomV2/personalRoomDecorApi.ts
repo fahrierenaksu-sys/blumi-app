@@ -3,6 +3,10 @@ import {
   requestJson
 } from "../network/apiClient"
 import type { UserRoomDecor } from "./roomV2.types"
+import {
+  isRoomDecorUnownedItemRefusal,
+  RoomDecorItemNotOwnedError
+} from "./personalRoomDecorErrors"
 import { readStoredRoomV2Decor } from "./roomV2Persistence"
 
 export interface PersonalRoomDecorSnapshot {
@@ -74,7 +78,11 @@ export async function savePersonalRoomDecor(
     return { kind: "conflict", current }
   }
   if (!response.ok) {
-    throw new Error(readApiError(payload, "We could not save your room yet."))
+    const message = readApiError(payload, "We could not save your room yet.")
+    if (isRoomDecorUnownedItemRefusal(response.status, message)) {
+      throw new RoomDecorItemNotOwnedError(message)
+    }
+    throw new Error(message)
   }
   const snapshot = normalizeSnapshot(
     isRecord(payload) ? payload.roomDecor : null
