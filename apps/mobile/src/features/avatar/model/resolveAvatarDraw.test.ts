@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
-import { DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT } from "@blumi/domain"
+import { BOY_WARDROBE_PREVIEW_ALL_IDS, DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT } from "@blumi/domain"
 import type { Rig25 } from "../renderer/rigTypes"
 import { AVATAR_ITEM_ART, AVATAR_RIG_STARTER, listAvatarItemArt } from "./avatarItemArt"
 import { resolveAvatarDraw } from "./resolveAvatarDraw"
@@ -11,6 +11,7 @@ const girlRig = JSON.parse(readFileSync(resolve(import.meta.dirname, "../rigs/gi
 const boyRig = JSON.parse(readFileSync(resolve(import.meta.dirname, "../rigs/boy/rig25.json"), "utf8")) as Rig25
 const RIGS = { female: girlRig, male: boyRig }
 
+const BOY_STARTER_ITEMS = ["shoes_male_basic_a", "bottom_male_basic_a", "top_male_basic_a", "hair_male_curls"]
 const GIRL_STARTER_ITEMS = ["shoes_mint_ribbon_court_sneakers", "bottom_coral_wave_pants", "top_coral_wave_polo", "hair_ink_pageboy_star"]
 const GIRL_RIG_OUTFIT = {
   ...DEFAULT_FEMALE_AVATAR_LOADOUT,
@@ -74,7 +75,38 @@ test("the boy is drawn by his own rig; an item without his art, a girl's include
     for (const state of ["idle", "walking", "sitting", "waving"] as const) {
       const spec = resolveAvatarDraw(RIGS, { loadout, state, direction: "right" })
       assert.equal(spec.rig, "male", state)
-      assert.deepEqual(spec.itemIds, [], state)
+      // an item without his art is drawn as his rig starter piece (preview: curls + basic_a), never a girl's piece
+      assert.deepEqual(spec.itemIds, BOY_STARTER_ITEMS, state)
+    }
+  }
+})
+
+test("the boy wearing his wardrobe pieces is drawn in them, in both views and every pose", () => {
+  const look = {
+    ...DEFAULT_MALE_AVATAR_LOADOUT,
+    hairId: "avatar_v2_hair_male_textured_twists",
+    topId: "avatar_v2_top_male_check_flannel_white_tee",
+    bottomId: "avatar_v2_bottom_male_grey_wide_jeans",
+    shoesId: "avatar_v2_shoes_male_tan_loafers"
+  }
+  for (const direction of ["left", "right", "back"] as const) {
+    for (const state of ["idle", "walking", "sitting", "waving"] as const) {
+      const spec = resolveAvatarDraw(RIGS, { loadout: look, state, direction })
+      assert.equal(spec.rig, "male")
+      assert.deepEqual(spec.itemIds, ["shoes_male_c2", "bottom_male_c14w", "top_male_c14w", "hair_male_twists"], `${direction} ${state}`)
+    }
+  }
+})
+
+test("every boy wardrobe ID maps to an item of his rig in both views, in its own slot", () => {
+  const ids = Object.entries(AVATAR_ITEM_ART.male)
+  assert.equal(ids.length, BOY_WARDROBE_PREVIEW_ALL_IDS.length)
+  for (const [canonical, rigItem] of ids) {
+    assert.ok(BOY_WARDROBE_PREVIEW_ALL_IDS.includes(canonical), canonical)
+    for (const view of ["front", "back"] as const) {
+      const art = boyRig.views[view].items[rigItem]
+      assert.ok(art, `${rigItem} ${view}`)
+      assert.ok(canonical.startsWith(`avatar_v2_${art.slot}_male_`), `${canonical} is a ${art.slot}`)
     }
   }
 })

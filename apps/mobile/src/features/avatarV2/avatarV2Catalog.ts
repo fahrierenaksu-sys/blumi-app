@@ -1,7 +1,7 @@
 import { avatarV2LayerAssets } from "./avatarV2Assets"
 import { FEMALE_SWEET_CAPSULE_LAYERS } from "./femaleSweetCapsuleDefinitions"
 import { MALE_PREMIUM_CAPSULE_RUNTIME } from "./malePremiumCapsulePilotDefinitions"
-import { isRetiredAvatarItemId } from "@blumi/domain"
+import { BOY_WARDROBE_PREVIEW_ITEM_IDS, isRetiredAvatarItemId } from "@blumi/domain"
 import type {
   AvatarCatalogItem,
   AvatarCategory,
@@ -76,6 +76,25 @@ const MALE_CAPSULE_AVATAR_ITEMS: AvatarCatalogItem[] = ([
   ownedByDefault: true,
   compatibleBodyIds: ["avatar_v2_body_male_light"]
 }))
+
+const titleOf = (id: string): string =>
+  id.replace(/^avatar_v2_[a-z]+_male_/, "").split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+
+/**
+ * The boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts): never sold (no economy entry, no receipt), never
+ * owned by default; listed only when the development QA unlock grants it (qa/avatarQaInventory.ts).
+ */
+const BOY_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top", "bottom", "shoes"] as const).flatMap((type) =>
+  BOY_WARDROBE_PREVIEW_ITEM_IDS[type].map((id, index) => ({
+    id,
+    type,
+    name: titleOf(id),
+    sortOrder: 5 + index,
+    layerOrder: AVATAR_V2_LAYER_ORDER[type],
+    assets: {},
+    hiddenFromShop: true,
+    compatibleBodyIds: ["avatar_v2_body_male_light"]
+  })))
 
 const MALE_PREMIUM_CAPSULE_AVATAR_ITEMS: AvatarCatalogItem[] = MALE_PREMIUM_CAPSULE_RUNTIME.map((item, index) => {
   const type = item.type === "hairFront" ? "hair" : item.type
@@ -254,6 +273,7 @@ const AVATAR_V2_CATALOG_SOURCE: AvatarCatalogItem[] = [
   },
   ...MALE_CAPSULE_AVATAR_ITEMS,
   ...MALE_PREMIUM_CAPSULE_AVATAR_ITEMS,
+  ...BOY_WARDROBE_PREVIEW_AVATAR_ITEMS,
   ...FEMALE_SWEET_CAPSULE_AVATAR_ITEMS,
   {
     id: DEFAULT_AVATAR_V2.faceId,

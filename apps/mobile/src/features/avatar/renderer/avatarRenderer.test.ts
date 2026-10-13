@@ -221,7 +221,11 @@ test("both rigs' seated cards can be cut at their shin band, so the seated soles
       const band = seatedShinBandRows(view)
       const meshes = [view.mesh, ...Object.values(view.items).map((item) => item.mesh)]
       for (const mesh of meshes) {
-        if (!mesh.ranges.some((range) => range.name === "sit")) continue
+        const sit = mesh.ranges.find((range) => range.name === "sit")
+        if (!sit) continue
+        // a card cut to its own box that ends above the shin band (a top) has no leg rows: it is drawn as it is
+        const rows = mesh.index.slice(sit.start, sit.start + sit.count).map((i) => mesh.pos[i * 2 + 1]!)
+        if (Math.max(...rows) <= band[0]) continue
         assert.ok(seatedCardStrips(mesh, band, 0, 1), `${name} ${viewName}`)
       }
       assert.ok(view.sit.feet[1] > view.sit.seat[1], `${name} ${viewName}: soles below the hip`)

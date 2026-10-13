@@ -36,7 +36,9 @@ test("every layer and thumbnail in the manifest is a bundled file in the still r
   const bundled = new Set([...table.matchAll(/^ {2}"([^"]+)": require\("\.\/layers\/\1\.webp"\),$/gm)].map((m) => m[1]!))
   const expected = BODIES.flatMap((rig) => {
     const body = AVATAR_STILL_MANIFEST.bodies[rig]
-    return [...body.layers.full.map((l) => `${rig}/full/${l.key}`), ...body.layers.bust.map((l) => `${rig}/bust/${l.key}`),
+    // a composed leg is drawn from a shared sheet (`source.key`), one file per bottom and leg
+    const file = (l: { key: string; source?: { key: string } }) => l.source?.key ?? l.key
+    return [...new Set([...body.layers.full.map((l) => `${rig}/full/${file(l)}`), ...body.layers.bust.map((l) => `${rig}/bust/${file(l)}`)]),
       ...Object.values(body.items).map((item) => `${rig}/thumb/${item.thumb}`),
       // front (showcase) art: the base, each item's front layer and the part drawn behind the body (hair back)
       ...(body.showcaseBase ? [`${rig}/showcase/${body.showcaseBase.key}`] : []),
@@ -83,7 +85,8 @@ test("a still stacks its layers in exactly the order the live renderer draws fra
     assert.equal(still.rig, live.rig)
     const body = AVATAR_STILL_MANIFEST.bodies[still.rig]
     const groups = still.layers.map((layer) => {
-      const entry = body.layers.full.find((l) => `${still.rig}/full/${l.key}` === layer.asset)!
+      const entry = body.layers.full.find((l) => `${still.rig}/full/${l.source?.key ?? l.key}` === layer.asset &&
+        (l.source === undefined || JSON.stringify(l.source.rect) === JSON.stringify(layer.source?.rect)))!
       return `${entry.owner}|${entry.order}|${entry.legVariant ?? ""}`
     })
     assert.deepEqual(groups, live.groups, JSON.stringify(loadout))

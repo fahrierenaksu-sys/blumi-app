@@ -7,6 +7,7 @@ import {
   type AvatarLoadoutV2
 } from "@blumi/contracts"
 import { ECONOMY_CATALOG } from "../economy/economyCatalog"
+import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "./boyWardrobePreview"
 import {
   AVATAR_LOADOUT_CATALOG,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
@@ -371,5 +372,11 @@ test("every economy avatar entitlement and grant has loadout metadata", () => {
   for (const itemId of economyAvatarIds) {
     assert.equal(manifestIds.has(itemId), true, itemId)
   }
-  assert.equal(manifestIds.size, new Set(economyAvatarIds).size)
+  // Exception (2026-10-13): the boy's wardrobe PREVIEW ids (boyWardrobePreview.ts) are loadout-valid but deliberately
+  // have no economy entry, so they can never be sold or granted; they are shown only by the dev QA unlock.
+  for (const itemId of BOY_WARDROBE_PREVIEW_ALL_IDS) {
+    assert.equal(economyAvatarIds.includes(itemId), false, `${itemId} must not be sold`)
+  }
+  const previewIds = new Set(BOY_WARDROBE_PREVIEW_ALL_IDS)
+  assert.equal([...manifestIds].filter((itemId) => !previewIds.has(itemId)).length, new Set(economyAvatarIds).size)
 })

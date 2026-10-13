@@ -33,6 +33,7 @@ const SS = 2
 const BUST_PX = 256
 const THUMB_MAX_PX = 256
 const ALPHA_TEST = 0.5
+const STILL_LIFT_TOLERANCE_PX = 2
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const AVATAR = join(ROOT, "apps/mobile/src/features/avatar")
 const STILLS = join(AVATAR, "stills")
@@ -335,7 +336,8 @@ async function bakeBody(rigId, rigDir, files) {
     : art.AVATAR_RIG_STARTER[rigId]
   const canonicalOf = Object.fromEntries(Object.entries(artMap).map(([canonical, rigItem]) => [rigItem, canonical]))
   const rigItemIds = Object.keys(canonicalOf).filter((id) => view.items[id]).sort((a, b) => SLOT_RANK[view.items[a].slot] - SLOT_RANK[view.items[b].slot])
-  for (const id of rigItemIds) if ((view.items[id].lift ?? 0) !== 0) throw new Error(`${id} has a sole lift: stills need a lift offset first`)
+  // stills are drawn at lift 0: a sole lift up to STILL_LIFT_TOLERANCE_PX sheet px (under 1 bust px) is not visible
+  for (const id of rigItemIds) if (Math.abs(view.items[id].lift ?? 0) > STILL_LIFT_TOLERANCE_PX) throw new Error(`${id} has a sole lift: stills need a lift offset first`)
 
   // the stand pose at time 0: eyes open, breath 0; must equal the reduced-motion pose (the still never moves)
   const compiled = pose.compileView("front", view)

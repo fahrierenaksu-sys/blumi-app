@@ -1,0 +1,42 @@
+/**
+ * The boy's 2.5D wardrobe, PREVIEW ONLY (2026-10-13, branch wip/boy-wardrobe-preview): 8 outfits × top/bottom/shoes
+ * + 2 hairs, with the canonical IDs proposed in docs/release/AVATAR_25D_INTEGRATION_PLAN.md §5.1. The two basic_b
+ * bottom/shoes IDs are minted here (§5.1 lists five basic IDs for six pieces). All are NEW IDs (no old ID is renamed or
+ * reused), have no economy entry and no receipt, so they are never sold or owned on the server; the app shows them
+ * only through the development QA unlock (EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS=1), which never persists a look.
+ */
+export const BOY_WARDROBE_PREVIEW_ITEM_IDS = {
+  hair: ["avatar_v2_hair_male_blue_black_curls", "avatar_v2_hair_male_textured_twists"],
+  top: [
+    "avatar_v2_top_male_navy_knit_polo",
+    "avatar_v2_top_male_olive_overshirt",
+    "avatar_v2_top_male_forest_collar_sweater",
+    "avatar_v2_top_male_black_embroidered_sweatshirt",
+    "avatar_v2_top_male_taupe_waffle_blouson",
+    "avatar_v2_top_male_check_flannel_white_tee",
+    "avatar_v2_top_male_white_basic_tee",
+    "avatar_v2_top_male_black_basic_tee",
+  ],
+  bottom: [
+    "avatar_v2_bottom_male_cream_pleated_trousers",
+    "avatar_v2_bottom_male_dark_straight_jeans",
+    "avatar_v2_bottom_male_charcoal_trousers",
+    "avatar_v2_bottom_male_cream_drawstring_trousers",
+    "avatar_v2_bottom_male_ecru_wide_trousers",
+    "avatar_v2_bottom_male_grey_wide_jeans",
+    "avatar_v2_bottom_male_black_straight_trousers",
+    "avatar_v2_bottom_male_black_pocket_trousers",
+  ],
+  shoes: [
+    "avatar_v2_shoes_male_tan_loafers",
+    "avatar_v2_shoes_male_sand_desert_boots",
+    "avatar_v2_shoes_male_brown_loafers",
+    "avatar_v2_shoes_male_cream_chunky_sneakers",
+    "avatar_v2_shoes_male_dark_leather_sneakers",
+    "avatar_v2_shoes_male_green_skate_shoes",
+    "avatar_v2_shoes_male_black_clean_sneakers",
+    "avatar_v2_shoes_male_black_everyday_sneakers",
+  ],
+} as const;
+
+export const BOY_WARDROBE_PREVIEW_ALL_IDS: readonly string[] = Object.values(BOY_WARDROBE_PREVIEW_ITEM_IDS).flat();

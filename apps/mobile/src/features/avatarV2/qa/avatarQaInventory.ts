@@ -3,6 +3,7 @@ import type {
   AvatarInventory,
   UserAvatar
 } from "../avatarV2.types"
+import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "@blumi/domain"
 import { MALE_PREMIUM_CAPSULE_RUNTIME } from "../malePremiumCapsulePilotDefinitions"
 
 /**
@@ -23,7 +24,9 @@ const PREMIUM_MALE_QA_AVATAR_ITEM_IDS = MALE_PREMIUM_CAPSULE_RUNTIME.map(
 
 export const BLUMI_QA_AVATAR_ITEM_IDS: readonly string[] = [
   ...DEFAULT_QA_AVATAR_ITEM_IDS,
-  ...PREMIUM_MALE_QA_AVATAR_ITEM_IDS
+  ...PREMIUM_MALE_QA_AVATAR_ITEM_IDS,
+  // the boy's 2.5D wardrobe preview: shown only through this disposable QA unlock
+  ...BOY_WARDROBE_PREVIEW_ALL_IDS
 ]
 
 export function isAvatarQaUnlockEnabled(

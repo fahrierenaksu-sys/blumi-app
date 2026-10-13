@@ -3,6 +3,7 @@ import { isAvatarV2ItemCompatibleWithBody } from "../avatarBodyCompatibility"
 import type { AvatarCatalogItem, UserAvatar } from "../avatarV2.types"
 import { isAvatarV2ItemEquipped } from "../avatarV2Selectors"
 import { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } from "../room/avatarRoomProjection"
+import { hasAvatarItemRigArt } from "../../avatar/model/avatarItemArt"
 import {
   getWardrobeCategoryItems,
   type WardrobeCategoryId
@@ -43,7 +44,7 @@ export function reuseWardrobeCards(
 }
 
 export function isAvatarItemRoomPreviewSupported(item: AvatarCatalogItem): boolean {
-  return item.id in DEFAULT_AVATAR_ROOM_PROJECTION_MAP
+  return item.id in DEFAULT_AVATAR_ROOM_PROJECTION_MAP || hasAvatarItemRigArt(item.id)
 }
 
 /**

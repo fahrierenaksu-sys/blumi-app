@@ -50,7 +50,9 @@ test("the boy is drawn from his own body and never wears a girl's item", () => {
   for (const raw of [DEFAULT_MALE_AVATAR_LOADOUT, { ...GIRL_RIG_OUTFIT, bodyId: DEFAULT_MALE_AVATAR_LOADOUT.bodyId }]) {
     const still = resolveAvatarStillLayers(raw, "full");
     assert.equal(still.rig, "male");
-    assert.ok(still.layers.length > 0 && owners(still.layers).every((owner) => owner === "body"));
+    const maleItems = AVATAR_STILL_MANIFEST.bodies.male.items;
+    assert.ok(still.layers.length > 0 && owners(still.layers).every((owner) => owner === "body" || maleItems[owner] !== undefined));
+    assert.ok(owners(still.layers).every((owner) => AVATAR_STILL_MANIFEST.bodies.female.items[owner] === undefined), "no girl item");
   }
   assert.equal(resolveAvatarStillLayers({}, "bust", { hints: { gender: "man" } }).rig, "male");
 });

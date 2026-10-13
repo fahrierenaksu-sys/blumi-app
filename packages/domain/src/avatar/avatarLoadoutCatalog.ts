@@ -1,3 +1,4 @@
+import { BOY_WARDROBE_PREVIEW_ITEM_IDS } from "./boyWardrobePreview";
 import type {
   AvatarLoadout,
   AvatarLoadoutV1,
@@ -340,6 +341,10 @@ export const AVATAR_LOADOUT_CATALOG: readonly AvatarLoadoutCatalogItem[] =
         "avatar_v2_shoes_male_lightweight_trail_sneakers",
       ],
       ["avatar_v2_body_male_light"],
+    ),
+    // the boy's 2.5D wardrobe preview (boyWardrobePreview.ts): loadout-valid for the male body only
+    ...(["hair", "top", "bottom", "shoes"] as const).flatMap((slot) =>
+      slotItems(slot, BOY_WARDROBE_PREVIEW_ITEM_IDS[slot], ["avatar_v2_body_male_light"]),
     ),
     accessoryItem("avatar_v2_accessory_ivory_ribbon_beret", "headwear"),
     accessoryItem("avatar_v2_accessory_cherry_bow_headband", "headwear"),

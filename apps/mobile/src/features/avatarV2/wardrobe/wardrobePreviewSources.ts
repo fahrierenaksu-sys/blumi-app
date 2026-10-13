@@ -8,6 +8,7 @@ import {
 import { PREMIUM_FACE_PREVIEW_SOURCES } from "../avatarV2PreviewAssets"
 import type { AvatarCatalogItem } from "../avatarV2.types"
 import { getGarmentThumbnailOverride } from "../garmentThumbnailOverrides"
+import { AVATAR_STILL_ASSETS } from "../../avatar/stills/stillAssets"
 
 const AVATAR_ITEM_PREVIEW_SOURCES: Partial<Record<string, ImageSourcePropType>> = {
   ...MALE_CAPSULE_PREVIEW_SOURCES,
@@ -174,4 +175,5 @@ export function getAvatarItemPreviewSource(
   return getGarmentThumbnailOverride(item.id)?.source
     ?? WARDROBE_SQUARE_THUMBNAIL_SOURCES[item.id]
     ?? AVATAR_ITEM_PREVIEW_SOURCES[item.id]
+    ?? AVATAR_STILL_ASSETS[`male/thumb/${item.id}`]
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
+import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "./boyWardrobePreview";
 
 /**
  * Ratchet: every item with baked rig art needs a front (showcase) layer, so the figure outside the room is never the
@@ -12,6 +13,9 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * ankles, white slivers in hair, ragged cuffs, shoulder notches) and the owner has not approved the look, so it was
  * taken out of the bake (tools/avatar25d/showcase-allowlist.json). Remove these four when a QA-passed, owner-approved
  * still is baked.
+ *
+ * Reason for the boy entries (2026-10-13, branch wip/boy-wardrobe-preview): his 26-piece wardrobe preview has room
+ * stills but no owner-approved front layer yet (bake-showcase.mjs needs `ownerApproved`). Remove them as fronts land.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
   female: [
@@ -20,7 +24,7 @@ const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = 
     "avatar_v2_top_coral_wave_polo",
     "avatar_v2_hair_ink_pageboy_star",
   ],
-  male: [],
+  male: [...BOY_WARDROBE_PREVIEW_ALL_IDS],
 };
 
 const rigs = Object.keys(AVATAR_STILL_MANIFEST.bodies) as AvatarStillRigId[];

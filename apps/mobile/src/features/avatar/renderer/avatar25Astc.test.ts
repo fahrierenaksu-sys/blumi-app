@@ -58,7 +58,7 @@ test("flag on without the GPU feature falls back to the PNG path", () => {
 
 test("flag on with the feature but no matching blob falls back to the PNG path", () => {
   assert.deepEqual(chooseAvatar25PageSource({ requested: true, featureAvailable: true, source: undefined, pages: ["front_page0.png"] }), { kind: "png" })
-  assert.deepEqual(chooseAvatar25PageSource({ requested: true, featureAvailable: true, source: sourceOf("../rigs/boy"), pages: ["front_page2.png"] }), { kind: "png" })
+  assert.deepEqual(chooseAvatar25PageSource({ requested: true, featureAvailable: true, source: sourceOf("../rigs/boy"), pages: ["front_page99.png"] }), { kind: "png" })
   assert.deepEqual(chooseAvatar25PageSource({ requested: true, featureAvailable: true, source: sourceOf("../rigs/girl"), pages: [] }), { kind: "png" })
   const wrongFormat = { ...readManifest("../rigs/girl"), format: "astc-6x6-unorm" }
   assert.equal(findAvatar25AstcSet(wrongFormat, ["front_page0.png"]), null)
@@ -85,7 +85,8 @@ for (const dir of RIG_DIRS) {
     assert.equal(manifest.format, AVATAR25_ASTC_FORMAT)
     assert.deepEqual(Object.keys(manifest.sets).sort(), ["back", "front"])
     for (const set of Object.values(manifest.sets)) {
-      assert.deepEqual(Object.keys(set.sourceSha256), set.pages)
+      // JSON key order is not meaningful (the manifest is written with sorted keys: page10 sorts before page2)
+      assert.deepEqual(Object.keys(set.sourceSha256).sort(), [...set.pages].sort())
       for (const page of set.pages) {
         assert.equal(sha256(readFileSync(resolve(here, dir, page))), set.sourceSha256[page], `${dir}/${page} changed since the blob was derived: re-run compress_pages.py`)
       }
