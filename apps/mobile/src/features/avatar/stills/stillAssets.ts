@@ -3,6 +3,8 @@
 export const AVATAR_STILL_ASSETS: Readonly<Record<string, number>> = {
   "female/bust/avatar_v2_bottom_black_highwaist_trousers__o0__body-farArm": require("./layers/female/bust/avatar_v2_bottom_black_highwaist_trousers__o0__body-farArm.webp"),
   "female/bust/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso": require("./layers/female/bust/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso.webp"),
+  "female/bust/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top": require("./layers/female/bust/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top.webp"),
+  "female/bust/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top": require("./layers/female/bust/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top.webp"),
   "female/bust/avatar_v2_bottom_black_highwaist_trousers__o5__body-nearArm": require("./layers/female/bust/avatar_v2_bottom_black_highwaist_trousers__o5__body-nearArm.webp"),
   "female/bust/avatar_v2_hair_ink_pageboy_star__o4p6": require("./layers/female/bust/avatar_v2_hair_ink_pageboy_star__o4p6.webp"),
   "female/bust/avatar_v2_top_black_cute_crop_top__o0p45": require("./layers/female/bust/avatar_v2_top_black_cute_crop_top__o0p45.webp"),
@@ -28,6 +30,8 @@ export const AVATAR_STILL_ASSETS: Readonly<Record<string, number>> = {
   "female/full/avatar_v2_bottom_black_highwaist_trousers__o2__bottom-cut": require("./layers/female/full/avatar_v2_bottom_black_highwaist_trousers__o2__bottom-cut.webp"),
   "female/full/avatar_v2_bottom_black_highwaist_trousers__o2p3": require("./layers/female/full/avatar_v2_bottom_black_highwaist_trousers__o2p3.webp"),
   "female/full/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso": require("./layers/female/full/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso.webp"),
+  "female/full/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top": require("./layers/female/full/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top.webp"),
+  "female/full/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top": require("./layers/female/full/avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top.webp"),
   "female/full/avatar_v2_bottom_black_highwaist_trousers__o3p3": require("./layers/female/full/avatar_v2_bottom_black_highwaist_trousers__o3p3.webp"),
   "female/full/avatar_v2_bottom_black_highwaist_trousers__o5__body-nearArm": require("./layers/female/full/avatar_v2_bottom_black_highwaist_trousers__o5__body-nearArm.webp"),
   "female/full/avatar_v2_bottom_coral_wave_pants__o1__bottom": require("./layers/female/full/avatar_v2_bottom_coral_wave_pants__o1__bottom.webp"),

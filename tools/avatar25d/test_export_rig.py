@@ -331,6 +331,29 @@ class BlinkGateTest(unittest.TestCase):
                 self.assertTrue(any(c[key] for c in cases if c['outfit'].startswith('dressed')), broken)
 
 
+@unittest.skipUnless((APP_RIG / 'girl/rig25.json').exists(), 'app rig not exported')
+class SharedBodyDrawingTest(unittest.TestCase):
+    """An item's identical body drawings (the trousers' torso fitted to each crop top) are packed once and shared."""
+
+    def test_identical_pair_drawings_of_one_item_share_their_page_rect(self):
+        rig = json.loads((APP_RIG / 'girl/rig25.json').read_text())
+        shared = 0
+        for view in rig['views'].values():
+            for item in view['items'].values():
+                m = item['mesh']
+                uvs = {}
+                for r in m['ranges']:
+                    if 'bodyWith' not in r:
+                        continue
+                    verts = list(dict.fromkeys(m['index'][r['start']:r['start'] + r['count']]))
+                    uvs.setdefault(r['bodyPart'], []).append(tuple(m['uv'][i * 2 + k] for i in verts for k in (0, 1)))
+                for part, sets in uvs.items():
+                    if len(sets) > 1:
+                        self.assertEqual(len(set(sets)), 1, part)
+                        shared += 1
+        self.assertGreater(shared, 0, 'the girl rig has pair drawings shared by two partners')
+
+
 def data_uri(image):
     import io, base64
     buf = io.BytesIO()

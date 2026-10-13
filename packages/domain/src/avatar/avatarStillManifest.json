@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "c156a4abc599cd99f6d409e2a45115b3a456f77b78318ba70d5c4da5a8c50d0c",
+      "rigSha256": "e7a46fc121a361e78b72d675c16b01396f6fda4fbf4944594d3ccdb07286df9a",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -66,13 +66,39 @@
               "part": "torsoNoArms"
             },
             {
-              "part": "torsoSit"
-            },
-            {
-              "part": "torsoUpper"
-            },
-            {
               "part": "torsoWalk"
+            },
+            {
+              "part": "torsoCardArms",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torso",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torsoNoArms",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torsoWalk",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torsoCardArms",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "torso",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "torsoNoArms",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "torsoWalk",
+              "with": "avatar_v2_top_white_cute_crop_top"
             },
             {
               "part": "farArm"
@@ -155,7 +181,7 @@
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
             "order": 0,
-            "seq": 2011,
+            "seq": 2017,
             "rect": [
               126,
               274,
@@ -522,6 +548,36 @@
             "bodyPart": "torso"
           },
           {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2010,
+            "rect": [
+              220,
+              250,
+              185,
+              344
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_black_cute_crop_top"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2014,
+            "rect": [
+              220,
+              250,
+              185,
+              344
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_white_cute_crop_top"
+          },
+          {
             "key": "avatar_v2_top_white_cute_crop_top__o3__body-torso",
             "owner": "avatar_v2_top_white_cute_crop_top",
             "slot": "top",
@@ -659,7 +715,7 @@
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
             "order": 5,
-            "seq": 2012,
+            "seq": 2018,
             "rect": [
               365,
               277,
@@ -728,7 +784,7 @@
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
             "order": 0,
-            "seq": 2011,
+            "seq": 2017,
             "rect": [
               49,
               164,
@@ -803,6 +859,36 @@
               107
             ],
             "bodyPart": "torso"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2010,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_black_cute_crop_top"
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2014,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_white_cute_crop_top"
           },
           {
             "key": "avatar_v2_top_white_cute_crop_top__o3__body-torso",
@@ -916,7 +1002,7 @@
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
             "order": 5,
-            "seq": 2012,
+            "seq": 2018,
             "rect": [
               161,
               166,

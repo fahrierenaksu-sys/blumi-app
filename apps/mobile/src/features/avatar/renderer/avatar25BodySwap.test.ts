@@ -132,6 +132,12 @@ test("seated, bottoms' and shoes' cards go above the torso only under a bared wa
     for (const id of [BOTTOM, SHOES]) assert.ok(sit.findIndex((k) => k.startsWith(`${id}:sit@`)) > torso, `${view} ${id}`)
     const top = sit.findIndex((k) => k.startsWith(`${TOP}:sit@`))
     if (top >= 0) assert.ok(top < torso, `${view} top`)
+    // a bottom's pair drawing made with the crop top (her belly fitted to that bottom) bares the waist just the same
+    const fitted = withBodyDrawings(crop, BOTTOM, MIDRIFF_PARTS, TOP)
+    const fittedSit = drawn(fitted, view, OUTFIT, "sit")
+    const fittedTorso = fittedSit.findIndex((k) => k.startsWith(`${BOTTOM}:torsoCardArms@with:${TOP}`))
+    assert.ok(fittedTorso >= 0, `${view} pair`)
+    for (const id of [BOTTOM, SHOES]) assert.ok(fittedSit.findIndex((k) => k.startsWith(`${id}:sit@`)) > fittedTorso, `${view} pair ${id}`)
     // no bared waist: every card keeps its exported order (the QA'd seated outfits)
     for (const rig of [girl, tankTorso]) {
       const plain = avatar25PoseRanges(rig, view, OUTFIT, "sit")
@@ -180,8 +186,11 @@ test("the shipped girl's crop tops bare her waist and her black trousers bring t
     assert.equal(torsoNow.length, 1, `${view} ${pose}: one torso drawing`)
     for (const crop of crops) for (const bottom of [undefined, BOTTOM, TROUSERS]) {
       const worn = [crop, ...(bottom ? [bottom] : []), SHOES, HAIR]
-      // exactly one torso is drawn and it is the top's bare belly; the arms and seated card are the trousers' or the body's
-      assert.equal(bodyDrawn(worn, view, pose, torsoNow[0]!), crop, `${view} ${pose} ${crop} ${bottom}`)
+      // exactly one torso is drawn and it is the top's bare belly (with the trousers: their drawing of it, shorts trimmed);
+      // the arms and seated card are the trousers' or the body's
+      const torso = avatar25PoseRanges(girl, view, worn, pose).filter((e) => e.name.startsWith("torso"))
+      assert.equal(torso.length, 1, `${view} ${pose} ${crop} ${bottom}`)
+      assert.deepEqual([torso[0]!.owner, torso[0]!.name], bottom === TROUSERS ? [TROUSERS, `${torsoNow[0]}@with:${crop}`] : [crop, `${torsoNow[0]}@body`])
       for (const part of ["farArm", "nearArm", "sit"]) {
         const now = bodyDrawn([], view, pose, part)
         assert.equal(bodyDrawn(worn, view, pose, part), now === "body" && bottom === TROUSERS ? TROUSERS : now, `${view} ${pose} ${part}`)
@@ -192,9 +201,10 @@ test("the shipped girl's crop tops bare her waist and her black trousers bring t
     for (const part of [torsoNow[0]!, "farArm", "nearArm", "sit"]) assert.ok([null, "body"].includes(bodyDrawn(OUTFIT, view, pose, part)), `${view} ${pose} ${part}`)
   }
   // seated under a crop top, the bottom's and shoes' cards are above the belly; with the starter top they keep their order
-  for (const view of VIEWS) for (const bottom of [BOTTOM, TROUSERS]) {
-    const sit = drawn(girl, view, [crops[0]!, bottom, SHOES, HAIR], "sit")
-    const belly = sit.findIndex((k) => k.startsWith(`${crops[0]}:torsoCardArms@`))
+  for (const view of VIEWS) for (const crop of crops) for (const bottom of [BOTTOM, TROUSERS]) {
+    const sit = drawn(girl, view, [crop, bottom, SHOES, HAIR], "sit")
+    const belly = sit.findIndex((k) => k.includes(":torsoCardArms@"))
+    assert.ok(belly >= 0, `${view} ${crop} ${bottom}`)
     // (the item's own seated card, not the trousers' replacement of the body's card, `sit@body`)
     for (const id of [bottom, SHOES]) assert.ok(sit.findIndex((k) => k.startsWith(`${id}:sit@`) && !k.startsWith(`${id}:sit@body`)) > belly, `${view} ${bottom} ${id}`)
   }

@@ -71,10 +71,15 @@ export function bodySwapPlan(v: Rig25View, worn: readonly string[]): Map<string,
 
 const LOWER_SLOTS: ReadonlySet<string> = new Set(["bottom", "shoes"])
 
-/** True when the torso drawn now bares her waist: the torso family is won by an item marked `torso: "midriff"`. */
+/**
+ * True when the torso drawn now bares her waist: the torso family is won by an item marked `torso: "midriff"`, or by a
+ * pair drawing made with one (a crop top's belly fitted to one bottom, e.g. the black trousers with their shorts trimmed).
+ */
 export function waistBared(v: Rig25View, worn: readonly string[], plan: Map<string, BodySwap>): boolean {
   for (const swap of plan.values()) {
-    if (TORSO_RANGES.has(swap.range.bodyPart as string)) return v.items[worn[swap.set - 1]!]?.torso === "midriff"
+    if (!TORSO_RANGES.has(swap.range.bodyPart as string)) continue
+    const partner = swap.range.bodyWith
+    return v.items[worn[swap.set - 1]!]?.torso === "midriff" || (partner !== undefined && v.items[partner]?.torso === "midriff")
   }
   return false
 }
