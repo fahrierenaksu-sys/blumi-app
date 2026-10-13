@@ -292,8 +292,12 @@ class BlinkGateTest(unittest.TestCase):
 
     def test_the_app_rigs_blink_only_in_the_eyes(self):
         cases = self.assert_gate(APP_RIG / 'girl')
+        # a wardrobe rig (several items per slot) is checked with each item worn alone: every item, both frames, mirrored
+        items = json.loads((APP_RIG / 'girl/rig25.json').read_text())['views']['front']['items']
+        outfits = ('bare', 'dressed') if len({it['slot'] for it in items.values()}) == len(items) else \
+            ('bare', *(f'dressed:{iid}' for iid in items))
         self.assertEqual({(c['outfit'], c['frame'], c['mirror']) for c in cases},
-                         {(o, f, m) for o in ('bare', 'dressed') for f in ('half', 'closed') for m in (False, True)})
+                         {(o, f, m) for o in outfits for f in ('half', 'closed') for m in (False, True)})
         self.assert_gate(APP_RIG / 'boy')
 
     def test_the_gate_fails_when_a_patch_erases_hair_or_leaves_a_speck(self):
@@ -301,7 +305,8 @@ class BlinkGateTest(unittest.TestCase):
         import numpy as np
         from PIL import Image
         rig = json.loads((APP_RIG / 'girl/rig25.json').read_text())
-        v = rig['views']['front']; it = v['blink']['items'][0]
+        v = rig['views']['front']
+        it = next((i for i in v['blink']['items'] if i['item'] == 'hair_ink_pageboy_star'), v['blink']['items'][0])
         with Image.open(APP_RIG / 'girl' / v['pages'][it['page']]) as im:
             sc = im.width / v['pageSize'][0]
         (x, y, w, h), (dx, dy) = it['rect'], it['offset']
@@ -324,7 +329,7 @@ class BlinkGateTest(unittest.TestCase):
                 Image.fromarray(a).save(page)
                 cases = load_gate().check(tmp, scales=(1.0,))
                 key = 'outsideEye' if broken == 'hair' else 'specks'
-                self.assertTrue(any(c[key] for c in cases if c['outfit'] == 'dressed'), broken)
+                self.assertTrue(any(c[key] for c in cases if c['outfit'].startswith('dressed')), broken)
 
 
 def data_uri(image):
@@ -473,6 +478,15 @@ class LegVariantOwnersTest(unittest.TestCase):
         owners = self.ex.leg_variant_owners(dict.fromkeys(['bottom', 'bottom+shoes', 'shoes'], {}), items)
         self.assertEqual(owners, {'pants': [('bottom', 'bottom'), ('bottom+shoes', 'bottom+shoes')],
                                   'sneakers': [('shoes', 'shoes')]})
+
+    def test_slot_keys_belong_to_the_one_item_of_that_slot_without_its_own_key_as_in_the_lab(self):
+        # the girl's wardrobe: her QA'd slot drawings stay with her first shoes when a second pair brings its own key
+        items = {'pants': {'slot': 'bottom'}, 'mint': {'slot': 'shoes'}, 'white': {'slot': 'shoes'}}
+        owners = self.ex.leg_variant_owners(dict.fromkeys(['bottom', 'bottom+shoes', 'shoes', 'white'], {}), items)
+        self.assertEqual(owners, {'pants': [('bottom', 'bottom'), ('bottom+shoes', 'bottom+shoes')],
+                                  'mint': [('shoes', 'shoes')], 'white': [('white', 'shoes')]})
+        with self.assertRaises(SystemExit):   # two shoes without their own key: the slot key names nobody
+            self.ex.leg_variant_owners(dict.fromkeys(['shoes'], {}), items)
 
     def test_bad_keys_stop_the_export(self):
         for key in ('top_a', 'nobody', 'bottom_a+bottom_b', 'bottom_a+shoes_a+shoes_b', 'bottom'):

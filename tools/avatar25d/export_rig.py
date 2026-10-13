@@ -333,11 +333,14 @@ def _flood(seed, through):
         out = grown
 
 
-def blink_item_cut(head_open, frames, item):
+def blink_item_cut(head_open, frames, item, light_edge=False):
     """Item pixels (same size crops of the eye rect, RGBA uint8) that copy the open eye: True = cleared in the patch.
     Only the eye copy goes: item pixels at the head's eye drawing (iris, sclera, lashes, its rim and loose dots) that
     are not hair. Hair keeps every pixel: strands that enter the rect from its sides or top (runs from the edge) and
-    item pixels joined by a thick path to the item outside the eye (bang tips, side locks hanging into it)."""
+    item pixels joined by a thick path to the item outside the eye (bang tips, side locks hanging into it).
+    `light_edge` (a part's `blinkLightEdge`, set by the factory for a LIGHT side lock lying over an eye corner, whose
+    soft inner edge matches the lid colour): the one-pixel rim of the cut next to kept hair that differs from the head
+    is kept too, unless it is the copy's vivid dark lash line."""
     import numpy as np
     O = head_open.astype(float); P = item.astype(float); F = [f.astype(float) for f in frames]
     h, w = O.shape[:2]
@@ -387,6 +390,9 @@ def blink_item_cut(head_open, frames, item):
     hair |= path & zone & _dilate(hair, 1) | protect    # the strand's own edge px (the thickness test rounds them off)
     cut = zone & drawn & opaque & ~hair
     cut &= _dilate(~_dilate(~cut, 1), 1)              # no 1-2 px slivers cut into a strand (they blur into its edge)
+    if light_edge:
+        lashlike = ((mx - rgb.min(-1)) > BLINK_LASH_SAT * np.maximum(mx, 1)) & (mx < BLINK_LASH_VALUE)
+        cut &= ~(_dilate(drawn & ~cut & mismatch, 1) & ~lashlike)
     kept = drawn & ~cut
     loose = kept & ~_flood(outside, kept) & opaque    # bits left with no tie to the item outside: specks
     return cut | loose
@@ -422,7 +428,7 @@ def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pag
             if ox + rw <= 0 or oy + rh <= 0 or ox >= img.width or oy >= img.height:
                 continue
             crop = np.asarray(img.crop((ox, oy, ox + rw, oy + rh)))   # transparent where the part is not
-            cut = blink_item_cut(head_open, frames, crop)
+            cut = blink_item_cut(head_open, frames, crop, bool(part.get('blinkLightEdge')))
             if not cut.any():
                 continue
             if len(out) >= BLINK_ITEMS_MAX:
@@ -476,7 +482,7 @@ def card_carries_eye_copy(card, part, eye):
     if ox + rw <= 0 or oy + rh <= 0 or ox >= card.width or oy >= card.height:
         return False
     crop = np.asarray(card.crop((ox, oy, ox + rw, oy + rh)))   # transparent where the card is not
-    return bool(blink_item_cut(eye['head_open'], eye['frames'], crop).any())
+    return bool(blink_item_cut(eye['head_open'], eye['frames'], crop, bool(part.get('blinkLightEdge'))).any())
 
 
 def pack_mirror_cards(iid, it, ir, mesh, page, pages, page_taken, eye=None):
@@ -586,13 +592,15 @@ def export_motion(M, bone_names):
 LEG_ROLES = ('bottom', 'shoes')
 
 
-def _leg_part(part, items, slot_item):
-    """One part of a legVariants key -> (owner item id, role). A part is a slot name (one item per slot, the girl's
-    rig) or a rig item id (the factory's keys, one per worn item)."""
+def _leg_part(part, items, slot_item, keyed=frozenset()):
+    """One part of a legVariants key -> (owner item id, role). A part is a slot name (the girl's rig) or a rig item id
+    (the factory's keys, one per worn item). A slot name is the lab's fallback (doll25.js: the item-id key first, then
+    the slot key), so it belongs to the one item of that slot without a drawing keyed by its own id (`keyed`)."""
     if part in LEG_ROLES:
-        owners = slot_item.get(part, [])
+        owners = [o for o in slot_item.get(part, []) if o not in keyed]
         if len(owners) != 1:
-            raise SystemExit(f'leg variant {part}: {len(owners)} items in that slot (a slot key needs exactly one)')
+            raise SystemExit(f'leg variant {part}: {len(owners)} items in that slot without their own key '
+                             '(a slot key needs exactly one)')
         return owners[0], part
     if part not in items:
         raise SystemExit(f'leg variant {part}: not a slot and not an item of this view')
@@ -615,11 +623,12 @@ def leg_variant_owners(leg_variants, items):
     for iid, it in sorted(items.items()):
         slot_item.setdefault(it['slot'], []).append(iid)
     owners, seen = {}, set()
+    keyed = frozenset(p for key in leg_variants for p in key.split('+') if p not in LEG_ROLES)
     for key in leg_variants:
         parts = key.split('+')
         if len(parts) > 2:
             raise SystemExit(f'leg variant {key}: more than two parts')
-        resolved = [_leg_part(p, items, slot_item) for p in parts]
+        resolved = [_leg_part(p, items, slot_item, keyed) for p in parts]
         if len(parts) == 2 and sorted(r for _, r in resolved) != ['bottom', 'shoes']:
             raise SystemExit(f'leg variant {key}: a pair is one bottom and one pair of shoes')
         if len(parts) == 2 and not all(p in LEG_ROLES for p in parts):
