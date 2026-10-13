@@ -7,6 +7,7 @@ import {
   avatarStillThumbAsset,
   resolveAvatarStillLayers,
   type AvatarStillBody,
+  type AvatarStillBodyClaim,
   type AvatarStillLayer,
   type AvatarStillLayerEntry,
   type AvatarStillSlot,
@@ -132,4 +133,66 @@ test("the girl keeps her QA'd pair drawing and no layer of hers is a sheet part"
   const layers = resolveAvatarStillLayers(GIRL_RIG_OUTFIT, "full").layers;
   assert.ok(layers.every((l) => l.source === undefined));
   assert.deepEqual(legAssets(layers).map((l) => l.asset.split("__").pop()), ["bottom-shoes", "bottom-shoes"]);
+});
+
+/**
+ * A girl-like body whose items draw body ranges instead of the body's (bake-stills: body layers that can be replaced
+ * carry `part`, an item's drawing of one `bodyPart`): black trousers (torso, arms, seated card), a crop top (bare-belly
+ * torso), a top whose torso drawing is made for one bottom only (a pair) and a hair that claims only an unseen torso.
+ */
+function swapBody(): AvatarStillBody {
+  const entry = (key: string, owner: string, slot: string, order: number, seq: number, extra: Partial<AvatarStillLayerEntry> = {}): AvatarStillLayerEntry =>
+    ({ key, owner, slot, order, seq, rect: [0, 0, 10, 10], ...extra });
+  const swap = (owner: string, slot: string, part: string, order: number, seq: number, bodyWith?: string) =>
+    entry(`${owner}__o${order}__body-${part}${bodyWith ? `-with-${bodyWith}` : ""}`, owner, slot, order, seq, { bodyPart: part, ...(bodyWith ? { bodyWith } : {}) });
+  const full = [
+    entry("body__o0", "body", "body", 0, 0, { part: "farArm" }), entry("body__o1", "body", "body", 1, 1, { leg: "farLeg" }),
+    entry("body__o3", "body", "body", 3, 3, { part: "torso" }), entry("body__o4", "body", "body", 4, 4), entry("body__o5", "body", "body", 5, 5, { part: "nearArm" }),
+    entry("trousers__o3p3", "trousers", "bottom", 3.3, 2000), swap("trousers", "bottom", "farArm", 0, 2010), swap("trousers", "bottom", "torso", 3, 2011),
+    swap("trousers", "bottom", "nearArm", 5, 2012),
+    entry("crop__o3p45", "crop", "top", 3.45, 3000), swap("crop", "top", "torso", 3, 3010),
+    entry("polo__o3p45", "polo", "top", 3.45, 3000), swap("polo", "top", "torso", 3, 3010, "skirt"),
+    entry("skirt__o3p3", "skirt", "bottom", 3.3, 2000),
+    entry("bob__o4p6", "bob", "hair", 4.6, 4000),
+  ];
+  const item = (id: string, slot: string, replaces?: AvatarStillBodyClaim[]) => [id, { slot, rigItemId: id, thumb: id, ...(replaces ? { replaces } : {}) }] as const;
+  const items = Object.fromEntries([
+    item("trousers", "bottom", ["torso", "torsoCardArms", "torsoWalk", "farArm", "nearArm", "sit"].map((part) => ({ part }))),
+    item("crop", "top", ["torso", "torsoNoArms", "torsoCardArms", "torsoWalk"].map((part) => ({ part }))),
+    item("polo", "top", [{ part: "torso", with: "skirt" }]),
+    item("skirt", "bottom"),
+    // claims only a torso drawing the stand pose never shows; it still wins the torso family over the trousers' (live rule)
+    item("bob", "hair", [{ part: "torsoSit", with: "trousers" }]),
+  ]);
+  return { ...AVATAR_STILL_MANIFEST.bodies.female, items, layers: { full, bust: [] } };
+}
+const keysOf = (drawn: [AvatarStillSlot, string][]) =>
+  avatarStillLayersFor("female", swapBody(), new Map(drawn), "full").map((l) => l.asset.replace("female/full/", ""));
+
+test("an item that draws body ranges is drawn instead of exactly those body layers, at the body's place in the stack", () => {
+  assert.deepEqual(keysOf([["bottom", "trousers"]]),
+    ["trousers__o0__body-farArm", "body__o1", "trousers__o3__body-torso", "trousers__o3p3", "body__o4", "trousers__o5__body-nearArm"]);
+  // nothing drawn replaces the body: its own layers, and no item's body drawing
+  assert.deepEqual(keysOf([["bottom", "skirt"]]), ["body__o0", "body__o1", "body__o3", "skirt__o3p3", "body__o4", "body__o5"]);
+});
+
+test("each body part is drawn by one item: the top's bare belly wins the torso, the trousers keep the arms", () => {
+  const both = keysOf([["top", "crop"], ["bottom", "trousers"]]);
+  assert.deepEqual(both, ["trousers__o0__body-farArm", "body__o1", "crop__o3__body-torso", "trousers__o3p3", "crop__o3p45", "body__o4", "trousers__o5__body-nearArm"]);
+  // the same look whatever the slot order of the map
+  assert.deepEqual(keysOf([["bottom", "trousers"], ["top", "crop"]]), both);
+});
+
+test("a drawing made for a pair is drawn only while both items are, and then wins over a single item's", () => {
+  assert.ok(keysOf([["top", "polo"], ["bottom", "skirt"]]).includes("polo__o3__body-torso-with-skirt"));
+  assert.ok(keysOf([["top", "polo"]]).includes("body__o3"));
+  assert.ok(!keysOf([["top", "polo"], ["bottom", "trousers"]]).some((k) => k.startsWith("polo__o3__body")));
+  assert.ok(keysOf([["top", "polo"], ["bottom", "trousers"]]).includes("trousers__o3__body-torso"));
+});
+
+test("the winner of a body part is chosen from every claim, even one the still never shows (as the room renderer does)", () => {
+  // the hair's pair claim on the seated torso wins the torso family, so the trousers' standing torso is not drawn
+  const layers = keysOf([["bottom", "trousers"], ["hair", "bob"]]);
+  assert.ok(layers.includes("body__o3") && !layers.includes("trousers__o3__body-torso"), layers.join());
+  assert.ok(layers.includes("trousers__o0__body-farArm"), "the arms family is the trousers' still");
 });

@@ -505,6 +505,12 @@ export interface Avatar25StandEntry {
   legMask?: { owner: string; vertexOffset: number }
   /** The leg layer this range is drawn on (a body leg, or an item piece on it), else null. */
   leg: "farLeg" | "nearLeg" | null
+  /** The range's name ('torso', 'part0', 'nearLeg@bottom', 'torso@body', ...). */
+  name: string
+  /** An item's drawing of this body range, drawn instead of the body's (avatar25BodySwap), else undefined. */
+  bodyPart?: string
+  /** Such a drawing made for a pair: only while this other worn item is worn too. */
+  bodyWith?: string
   /** Mesh-local triangle indices of this range. */
   index: number[]
 }
@@ -526,15 +532,21 @@ export function avatar25StandEntries(rig: Rig25, viewName: Avatar25ViewName, ite
   return entries
     .filter((e) => (e.mask & POSE_BITS.stand) !== 0 && e.frame < 0)
     .sort((a, b) => a.order - b.order || a.seq - b.seq)
-    .map((e) => ({
-      owner: e.set === 0 ? "body" : worn[e.set - 1]!,
-      order: e.order,
-      seq: e.seq,
-      legVariant: rangeAt.get(`${e.set}:${e.start}`)?.legVariant,
-      ...(e.legMask ? { legMask: { owner: worn[e.legMask.set - 1]!, vertexOffset: e.legMask.vertexOffset } } : {}),
-      leg: e.leg,
-      index: meshes[e.set].index.slice(e.start, e.start + e.count)
-    }))
+    .map((e) => {
+      const range = rangeAt.get(`${e.set}:${e.start}`)!
+      return {
+        owner: e.set === 0 ? "body" : worn[e.set - 1]!,
+        order: e.order,
+        seq: e.seq,
+        legVariant: range.legVariant,
+        ...(e.legMask ? { legMask: { owner: worn[e.legMask.set - 1]!, vertexOffset: e.legMask.vertexOffset } } : {}),
+        leg: e.leg,
+        name: range.name,
+        ...(range.bodyPart !== undefined ? { bodyPart: range.bodyPart } : {}),
+        ...(range.bodyWith !== undefined ? { bodyWith: range.bodyWith } : {}),
+        index: meshes[e.set].index.slice(e.start, e.start + e.count)
+      }
+    })
 }
 
 /** One drawn range of a pose: whose it is, the range's name and its painter's order. */

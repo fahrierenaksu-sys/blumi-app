@@ -30,6 +30,18 @@ export interface AvatarStillLayerEntry {
   readonly gatedBy?: string;
   /** Drawn from `rect` of a shared sheet `<rig>/<product>/<key>` (composed legs of one bottom), not from its own file. */
   readonly source?: { readonly key: string; readonly rect: AvatarStillRect; readonly sheet: readonly [number, number] };
+  /** A body layer that a worn item can draw instead (only on a body with such items): the body range it is. */
+  readonly part?: string;
+  /** An item's own drawing of the body range `bodyPart`, drawn instead of the body's while it wins (avatarStillBodySwaps). */
+  readonly bodyPart?: string;
+  /** Such a drawing made for a pair: drawn only while this other item is drawn too. */
+  readonly bodyWith?: string;
+}
+
+/** A body range an item draws instead of the body's (its `part`), optionally only together with another item. */
+export interface AvatarStillBodyClaim {
+  readonly part: string;
+  readonly with?: string;
 }
 
 /** The crops of the one front (showcase) still: Discover card front, chat head, push picture. */
@@ -63,6 +75,11 @@ export interface AvatarStillItem {
   readonly thumb: string;
   /** Optional until the item's front art has passed its gates; missing = the 3/4 fallback. */
   readonly showcase?: AvatarShowcaseItemLayer;
+  /**
+   * Every body range this item draws instead of the body's, in any pose (black trousers: torso, arms, seated card; a
+   * crop top: the bare-belly torso). It decides which item wins a body part, like the room renderer does.
+   */
+  readonly replaces?: readonly AvatarStillBodyClaim[];
 }
 
 export interface AvatarStillBody {
@@ -161,6 +178,47 @@ export function avatarStillLegLayers(
   return alone.length > 0 ? alone : own(shoes, "shoes");
 }
 
+const TORSO_PARTS: ReadonlySet<string> = new Set(["torso", "torsoUpper", "torsoNoArms", "torsoSit", "torsoCardArms", "torsoWalk"]);
+const SWAP_SLOT_RANK: Readonly<Record<string, number>> = { top: 0, bottom: 1, shoes: 2, hair: 3 };
+
+/** The family a body range is replaced in: one item wins all torso drawings, one both arms, one the seated card. */
+function bodySwapFamily(part: string): string {
+  if (TORSO_PARTS.has(part)) return "torso";
+  return part === "farArm" || part === "nearArm" ? "arms" : part;
+}
+
+/**
+ * Which drawn item draws each body range instead of the body, exactly as the room renderer picks it (mobile
+ * avatar25BodySwap): per family the best claim of the drawn items wins, a pair (whose other item is drawn) over a
+ * single item, then top, bottom, shoes, hair, then item ID; the winner replaces exactly the ranges it claims.
+ */
+export function avatarStillBodySwaps(
+  body: AvatarStillBody,
+  drawn: ReadonlyMap<AvatarStillSlot, string>,
+): ReadonlyMap<string, AvatarStillBodyClaim & { readonly owner: string }> {
+  const ids = new Set(drawn.values());
+  const winners = new Map<string, { owner: string; with: string | undefined; rank: readonly [number, number, string] }>();
+  for (const owner of ids) {
+    const item = body.items[owner];
+    for (const claim of item?.replaces ?? []) {
+      if (claim.with !== undefined && !ids.has(claim.with)) continue;
+      const rank = [claim.with !== undefined ? 0 : 1, SWAP_SLOT_RANK[item!.slot] ?? 9, owner] as const;
+      const family = bodySwapFamily(claim.part);
+      const best = winners.get(family);
+      const better = !best || rank[0] < best.rank[0] || (rank[0] === best.rank[0] && (rank[1] < best.rank[1] || (rank[1] === best.rank[1] && rank[2] < best.rank[2])));
+      if (better) winners.set(family, { owner, with: claim.with, rank });
+    }
+  }
+  const swaps = new Map<string, AvatarStillBodyClaim & { readonly owner: string }>();
+  for (const [family, winner] of winners) {
+    for (const claim of body.items[winner.owner]!.replaces!) {
+      if (bodySwapFamily(claim.part) !== family || claim.with !== winner.with) continue;
+      swaps.set(claim.part, { part: claim.part, owner: winner.owner, ...(claim.with !== undefined ? { with: claim.with } : {}) });
+    }
+  }
+  return swaps;
+}
+
 /** The layers that draw these items on a body, in painter's order (body, item parts, the chosen leg drawings). */
 export function avatarStillLayersFor(
   rig: AvatarStillRigId,
@@ -172,9 +230,14 @@ export function avatarStillLayersFor(
   const owners = new Set(drawn.values());
   const legs = avatarStillLegLayers(all, drawn);
   const replaced = new Set(legs.flatMap((entry) => (entry.leg ? [entry.leg] : [])));
+  const swaps = avatarStillBodySwaps(body, drawn);
   const visible = [
     ...all.filter((entry) => {
-      if (entry.owner === "body") return !(entry.leg && replaced.has(entry.leg));
+      if (entry.owner === "body") return !(entry.leg && replaced.has(entry.leg)) && !(entry.part !== undefined && swaps.has(entry.part));
+      if (entry.bodyPart !== undefined) {
+        const swap = swaps.get(entry.bodyPart);
+        return swap !== undefined && swap.owner === entry.owner && swap.with === entry.bodyWith;
+      }
       return owners.has(entry.owner) && entry.legVariant === undefined;
     }),
     ...legs,
