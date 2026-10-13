@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import Module, { createRequire } from "node:module"
 import { resolve } from "node:path"
 import test from "node:test"
+import { describePhoneCodeFailure } from "./phoneCodeFailure"
 
 type PhoneAppCheck = typeof import("./firebasePhoneAppCheck")
 async function withAppCheck(
@@ -86,5 +87,22 @@ test("an attestation outage can recover but never selects a weaker provider", as
     await phone.requireFirebasePhoneAppCheck()
     assert.equal(calls, 2)
     assert.equal(initializations, 1)
+  })
+})
+
+test("App Check failures say whether setup or the token step failed, without native text", async () => {
+  const codeOf = (error: unknown) => {
+    assert.doesNotMatch(String(error), /native credential material|private provider error/)
+    return describePhoneCodeFailure("APPCHECK", error)
+  }
+  await withAppCheck(new Error("native credential material"), async phone => {
+    await assert.rejects(phone.requireFirebasePhoneAppCheck(), error => codeOf(error) === "E-APPCHECK-INIT")
+  })
+  await withAppCheck({
+    ReactNativeFirebaseAppCheckProvider: class { configure() {} },
+    initializeAppCheck: async () => ({}),
+    getToken: async () => { throw new Error("private provider error") }
+  }, async phone => {
+    await assert.rejects(phone.requireFirebasePhoneAppCheck(), error => codeOf(error) === "E-APPCHECK-TOKEN")
   })
 })

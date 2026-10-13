@@ -2,6 +2,7 @@ import type { ConfirmationResult } from "@react-native-firebase/auth"
 import { requireFirebasePhoneAppCheck } from "./firebasePhoneAppCheck"
 import { requireFirebaseSmsDevicePermission } from "./firebaseSmsDevicePermission"
 import { normalizeInternationalSmsPhone } from "./phoneNumberInput"
+import { describePhoneCodeFailure, type PhoneCodeStage } from "./phoneCodeFailure"
 
 export type FirebasePhoneConfirmation = ConfirmationResult
 
@@ -68,12 +69,6 @@ function configureFictionalNumberTesting(auth: FirebaseAuth): Promise<void> {
   return appVerificationConfiguration
 }
 
-function getFirebaseAuthErrorCode(error: unknown): string | null {
-  if (!error || typeof error !== "object" || !("code" in error)) return null
-  const code = (error as { code?: unknown }).code
-  return typeof code === "string" && code.length > 0 ? code : null
-}
-
 export function getFirebaseCurrentPhoneNumber(): string | null {
   return loadFirebaseAuth()?.auth.currentUser?.phoneNumber ?? null
 }
@@ -95,21 +90,25 @@ export async function requestFirebasePhoneCode(
   const { module, auth } = requireFirebaseAuth()
   if (smsRequestInFlight) throw new Error("A verification request is already in progress. Try again later.")
   smsRequestInFlight = true
+  let stage: PhoneCodeStage = "APPCHECK"
   try {
     // Fictional-number testing is explicitly development-only; production
     // requests cannot skip attestation or select Firebase's debug provider.
     if (!disableAppVerificationForTesting) {
       await requireFirebasePhoneAppCheck()
+      stage = "PERMIT"
       await requireFirebaseSmsDevicePermission(phoneNumber)
     }
+    stage = "FIREBASE"
     await configureFictionalNumberTesting(auth)
     return await module.signInWithPhoneNumber(auth, phoneNumber)
   } catch (error) {
-    const code = getFirebaseAuthErrorCode(error)
+    // The short code names the failed step in release builds too, so a phone
+    // screenshot is enough to tell App Check, the device permit and Firebase
+    // apart. It never includes tokens, numbers or native error text.
     throw new Error(
-      `We could not send a verification code right now. Check the number and try again.${
-        __DEV__ && code ? ` (${code})` : ""
-      }`
+      "We could not send a verification code right now. Check the number and try again. " +
+        `(${describePhoneCodeFailure(stage, error)})`
     )
   } finally { smsRequestInFlight = false }
 }
