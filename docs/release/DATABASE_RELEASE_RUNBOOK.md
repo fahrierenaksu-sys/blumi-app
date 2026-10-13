@@ -121,6 +121,30 @@ classified environment. A missing migration is expected until an authorized
 staging/production rollout. Do not run `npm run db:migrate` against a URL whose
 project and environment have not been independently confirmed.
 
+## Full beta reset (owner option "c", pre-approved 2026-10-10)
+
+`apps/server/scripts/betaReset.ts` is the only way to run it; never ad-hoc SQL.
+It sets coins to 1,250, every loadout to its body's starter look, every finished
+room to the starter room with the bed, and deletes all chats, messages, matches,
+discovery decisions, mini rooms, invites, reactions, pending pushes about them,
+room presence, realtime payloads and old room renders. It never writes profile
+columns, sessions, push devices, settings, blocks, reports, bans, money ledgers,
+owned items or `blumi_migrations`. Output is counts only. Run it last, after the
+new server is live. From the repository root, after `npm run build:packages`:
+
+1. Dump first (PostgreSQL 17 client on PATH, e.g.
+   `PATH=/opt/homebrew/opt/postgresql@17/bin:$PATH node --env-file-if-exists=.env.local scripts/automation/local-backup.mjs`),
+   then, if time allows, prove it with `restore-upgrade-gate.mjs` (below; on macOS also set `LC_ALL=en_US.UTF-8`).
+2. Dry run (default, READ ONLY): `node --env-file-if-exists=.env.local --import tsx apps/server/scripts/betaReset.ts --project-ref <ref>`.
+   It prints the counts, `fingerprint=<fp>` and `expect=<sha256>`.
+3. Apply: the same command with `--apply --expect <sha256> --fingerprint <fp>` and
+   `BLUMI_BETA_RESET_CONFIRM=reset-beta-<ref>` set for that one command. It locks the written tables, refuses if
+   the counts or the database changed since the dry run, and rolls back unless the post-check finds nothing left to
+   reset and every kept table at its old row count.
+4. Re-run the dry run: every delete and reset count must be 0. The schema has no generic audit table, so record
+   the printed counts (never IDs) in `LAUNCH_CONTROL.md`. After a commit the only undo is restoring the dump into a
+   new database.
+
 ## Environments and migration order
 
 Under the 2026-09-30 classification there is one database, the release target
