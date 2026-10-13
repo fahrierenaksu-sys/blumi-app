@@ -6,6 +6,8 @@ import { getShopProductThumbnailSource } from "../../shop/shopAssets"
 import { isAvatarItemSoldInShop } from "../../shop/shopListingModel"
 import type { AvatarCatalogItem, UserAvatar } from "../avatarV2.types"
 import { equipAvatarV2Item } from "../avatarV2Selectors"
+import { getAvatarItemDisplayName } from "../avatarItemDisplayNames"
+import { getAppLocale } from "../../session/authLocale"
 import { buildWardrobeShopLink } from "./wardrobeCatalogModel"
 import type { WardrobeStudioCopy } from "./wardrobeCopy"
 
@@ -45,7 +47,7 @@ export function useWardrobeLockedPreview(input: {
   const previewLockedItem = useCallback((item: AvatarCatalogItem): void => {
     hapticSelection()
     setLockedItem((current) => (current?.id === item.id ? null : item))
-    AccessibilityInfo.announceForAccessibility(copy.lockedPreviewTitle(item.name))
+    AccessibilityInfo.announceForAccessibility(copy.lockedPreviewTitle(getAvatarItemDisplayName(item, getAppLocale())))
   }, [copy])
   const clearLockedPreview = useCallback((): void => setLockedItem(null), [])
   const openLockedItemInShop = useCallback((): void => {

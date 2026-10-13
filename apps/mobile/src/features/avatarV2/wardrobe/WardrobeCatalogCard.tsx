@@ -13,11 +13,16 @@ import { getAvatarAutomationSlug } from "../qa/avatarQaInventory"
 import { getAvatarItemPreviewImageStyle, getStarterLayerThumbnail } from "./wardrobeCatalogModel"
 import { WARDROBE_ART_ASPECT, WARDROBE_THUMB_BOX } from "./wardrobeStageLayout"
 import { CATEGORY_ICONS } from "./wardrobeCopy"
-import { WARDROBE_SQUARE_THUMBNAIL_SOURCES } from "./wardrobePreviewSources"
+import { WARDROBE_SQUARE_THUMBNAIL_SOURCES, isAvatarItemCutoutPreview } from "./wardrobePreviewSources"
 import { wardrobeTheme, wardrobeV2Styles as styles } from "./wardrobeV2Styles"
+
+/** Air between a whole-garment cutout and the card edge. */
+const CUTOUT_INSET = 8
 
 export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   item: AvatarCatalogItem
+  /** The name shown on the card, in the app's language. */
+  name: string
   equipped: boolean
   itemStateLabel: string
   wearingLabel: string
@@ -32,7 +37,7 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
   previewSource?: ImageSourcePropType
 }) {
   const {
-    item, equipped, itemStateLabel, wearingLabel, locked, previewing, lockedHint, width,
+    item, name, equipped, itemStateLabel, wearingLabel, locked, previewing, lockedHint, width,
     onEquip, onPreviewLocked, previewSource
   } = props
   const rigLayerPresentation = item.id in MALE_CAPSULE_PREVIEW_SOURCES
@@ -44,29 +49,38 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
     isSquareAsset:
       item.id in WARDROBE_SQUARE_THUMBNAIL_SOURCES ||
       Boolean(getGarmentThumbnailOverride(item.id)) ||
-      ["face", "eyes", "nose", "mouth"].includes(item.type)
+      ["face", "eyes", "nose", "mouth"].includes(item.type),
+    isCutoutAsset: isAvatarItemCutoutPreview(item)
   })
+  const isCutout = thumbnailPresentation.frame === "cutout"
+  const artHeight = Math.round(width * WARDROBE_ART_ASPECT)
   const starterThumbnail = thumbnailPresentation.frame === "legacy"
     ? getStarterLayerThumbnail(item.id)
     : undefined
   // Shop bounds describe these exact preview sources, including male room
   // layers. Fit their visible pixels rather than offsetting a scaled canvas.
-  const thumbnailBounds = thumbnailPresentation.frame !== "legacy" ||
+  const usesShopBounds = thumbnailPresentation.frame !== "legacy" ||
     item.type === "hair" || item.type === "accessory"
-    ? getShopProductThumbnailBounds(item.id)
-    : starterThumbnail?.bounds
+  const thumbnailBounds = isCutout
+    ? undefined
+    : usesShopBounds ? getShopProductThumbnailBounds(item.id) : starterThumbnail?.bounds
   const preferredBox = thumbnailPresentation.frame === "portrait" || item.type === "hair"
-    ? { width, height: Math.round(width * WARDROBE_ART_ASPECT) }
+    ? { width, height: artHeight }
     : starterThumbnail?.box ?? WARDROBE_THUMB_BOX
   // The artwork viewport includes a 1.5px border on each side.
   const thumbnailBox = {
     width: Math.min(preferredBox.width, width - 3),
-    height: Math.min(preferredBox.height, Math.round(width * WARDROBE_ART_ASPECT) - 3)
+    height: Math.min(preferredBox.height, artHeight - 3)
   }
   const thumbnailLayout = thumbnailBounds
     ? getShopThumbnailLayout(thumbnailBounds, thumbnailBox.width, thumbnailBox.height)
     : undefined
-  const isBoxed = Boolean(thumbnailLayout)
+  // A cutout is already cropped to the garment: contain it whole in an inset box.
+  const cutoutBox = {
+    width: Math.max(0, width - 3 - CUTOUT_INSET * 2),
+    height: Math.max(0, artHeight - 3 - CUTOUT_INSET * 2)
+  }
+  const isBoxed = Boolean(thumbnailLayout) || isCutout
 
   const image = previewSource ? (
     <ExpoImage
@@ -80,7 +94,7 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
           ? styles.itemPreviewRigLayer
           : thumbnailPresentation.frame === "portrait"
             ? styles.itemPreviewFeaturePortrait
-            : thumbnailPresentation.frame === "square" || thumbnailLayout
+            : thumbnailPresentation.frame === "square" || isCutout || thumbnailLayout
               ? styles.itemPreviewSquare
               : styles.itemPreviewImage,
         thumbnailLayout ? { position: "absolute", ...thumbnailLayout } : null,
@@ -100,7 +114,7 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
     <Pressable
       testID={`wardrobe-item-${getAvatarAutomationSlug(item.id)}`}
       accessibilityRole="button"
-      accessibilityLabel={`${item.name}, ${equipped ? wearingLabel : itemStateLabel}`}
+      accessibilityLabel={`${name}, ${equipped ? wearingLabel : itemStateLabel}`}
       accessibilityHint={locked ? lockedHint : undefined}
       accessibilityState={{ selected: equipped || previewing }}
       onPress={() => (locked ? onPreviewLocked(item) : onEquip(item))}
@@ -113,7 +127,7 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
       <View
         style={[
           styles.itemArt,
-          { height: Math.round(width * WARDROBE_ART_ASPECT) },
+          { height: artHeight },
           equipped ? styles.itemArtSelected : null,
           locked ? styles.itemArtLocked : null,
           previewing ? styles.itemArtPreviewing : null
@@ -122,7 +136,7 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
         {previewSource ? (
           isBoxed
             ? (
-              <View style={[styles.itemThumbBox, thumbnailBox]}>{image}</View>
+              <View style={[styles.itemThumbBox, isCutout ? cutoutBox : thumbnailBox]}>{image}</View>
             )
             : image
         ) : (
@@ -150,12 +164,13 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
         numberOfLines={2}
         style={styles.itemName}
       >
-        {item.name}
+        {name}
       </Text>
     </Pressable>
   )
 }, (previous, next) =>
   previous.item === next.item &&
+  previous.name === next.name &&
   previous.equipped === next.equipped &&
   previous.itemStateLabel === next.itemStateLabel &&
   previous.wearingLabel === next.wearingLabel &&

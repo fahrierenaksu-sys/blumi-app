@@ -69,11 +69,11 @@ test("batched category and section bursts keep the last requested selection", ()
 
 test("category data is reused only when every visible card state and action item stays current", () => {
   const item = { id: "item", type: "hair", name: "current" } as any
-  const previous = [{ item, equipped: false, itemStateLabel: "choose", locked: false, previewing: false, previewSource: 1 }]
+  const previous = [{ item, name: "current", equipped: false, itemStateLabel: "choose", locked: false, previewing: false, previewSource: 1 }]
   assert.equal(reuseWardrobeCards(previous, [{ ...previous[0] }]), previous)
   for (const update of [
     { locked: true }, { equipped: true }, { previewing: true }, { itemStateLabel: "owned" },
-    { previewSource: 2 }, { item: { ...item, name: "refreshed" } }
+    { previewSource: 2 }, { item: { ...item, name: "refreshed" } }, { name: "Yeni ad" }
   ]) {
     const next = [{ ...previous[0], ...update }]
     assert.equal(reuseWardrobeCards(previous, next), next)
