@@ -3,32 +3,32 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "c08d66b17b96eeaca3fc9b14abeb0e3757e6b674128842e080977b5597ce71e4",
+      "rigSha256": "b3285aca17eae89464e072449325292be57ea49478efff35d205bcb45a4443b9",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
-        "height": 1039
+        "height": 1046
       },
       "ground": [
         319.5,
-        1008
+        1015
       ],
       "windows": {
         "bust": [
           98,
-          2,
+          9,
           419,
           419
         ],
         "half": [
           95,
-          2,
+          9,
           423,
           564
         ],
         "full": [
           2,
-          2,
+          9,
           636,
           1025
         ]
@@ -46,6 +46,11 @@
           "rigItemId": "shoes_mint_ribbon_court_sneakers",
           "thumb": "avatar_v2_shoes_mint_ribbon_court_sneakers"
         },
+        "avatar_v2_shoes_white_clean_sneakers": {
+          "slot": "shoes",
+          "rigItemId": "shoes_white_sneakers",
+          "thumb": "avatar_v2_shoes_white_clean_sneakers"
+        },
         "avatar_v2_bottom_coral_wave_pants": {
           "slot": "bottom",
           "rigItemId": "bottom_coral_wave_pants",
@@ -60,6 +65,11 @@
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
           "thumb": "avatar_v2_hair_ink_pageboy_star"
+        },
+        "avatar_v2_hair_mocha_ribbon_waves": {
+          "slot": "hair",
+          "rigItemId": "hair_girl_waves",
+          "thumb": "avatar_v2_hair_mocha_ribbon_waves"
         }
       },
       "layers": {
@@ -72,7 +82,7 @@
             "seq": 0,
             "rect": [
               126,
-              274,
+              281,
               156,
               340
             ]
@@ -85,9 +95,22 @@
             "seq": 3002,
             "rect": [
               200,
-              305,
+              312,
               25,
               53
+            ]
+          },
+          {
+            "key": "avatar_v2_hair_mocha_ribbon_waves__o0p6",
+            "owner": "avatar_v2_hair_mocha_ribbon_waves",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              219,
+              89,
+              220,
+              344
             ]
           },
           {
@@ -98,7 +121,7 @@
             "seq": 1,
             "rect": [
               189,
-              520,
+              527,
               121,
               466
             ],
@@ -112,9 +135,24 @@
             "seq": 1002,
             "rect": [
               189,
-              520,
+              527,
               121,
               455
+            ],
+            "leg": "farLeg",
+            "legVariant": "shoes"
+          },
+          {
+            "key": "avatar_v2_shoes_white_clean_sneakers__o1__shoes",
+            "owner": "avatar_v2_shoes_white_clean_sneakers",
+            "slot": "shoes",
+            "order": 1,
+            "seq": 1002,
+            "rect": [
+              210,
+              527,
+              100,
+              409
             ],
             "leg": "farLeg",
             "legVariant": "shoes"
@@ -127,7 +165,7 @@
             "seq": 2003,
             "rect": [
               189,
-              875,
+              882,
               112,
               111
             ],
@@ -142,7 +180,7 @@
             "seq": 2005,
             "rect": [
               189,
-              875,
+              882,
               112,
               100
             ],
@@ -157,9 +195,23 @@
             "seq": 1001,
             "rect": [
               177,
-              863,
+              870,
               132,
               112
+            ],
+            "leg": "farLeg"
+          },
+          {
+            "key": "avatar_v2_shoes_white_clean_sneakers__o1p15",
+            "owner": "avatar_v2_shoes_white_clean_sneakers",
+            "slot": "shoes",
+            "order": 1.15,
+            "seq": 1001,
+            "rect": [
+              180,
+              904,
+              127,
+              83
             ],
             "leg": "farLeg"
           },
@@ -171,7 +223,7 @@
             "seq": 2002,
             "rect": [
               212,
-              519,
+              526,
               109,
               368
             ],
@@ -185,7 +237,7 @@
             "seq": 2,
             "rect": [
               288,
-              520,
+              527,
               124,
               495
             ],
@@ -199,9 +251,24 @@
             "seq": 1003,
             "rect": [
               288,
-              520,
+              527,
               124,
               492
+            ],
+            "leg": "nearLeg",
+            "legVariant": "shoes"
+          },
+          {
+            "key": "avatar_v2_shoes_white_clean_sneakers__o2__shoes",
+            "owner": "avatar_v2_shoes_white_clean_sneakers",
+            "slot": "shoes",
+            "order": 2,
+            "seq": 1003,
+            "rect": [
+              301,
+              527,
+              111,
+              439
             ],
             "leg": "nearLeg",
             "legVariant": "shoes"
@@ -214,7 +281,7 @@
             "seq": 2004,
             "rect": [
               288,
-              899,
+              906,
               120,
               116
             ],
@@ -229,7 +296,7 @@
             "seq": 2006,
             "rect": [
               288,
-              899,
+              906,
               120,
               113
             ],
@@ -244,9 +311,23 @@
             "seq": 1000,
             "rect": [
               283,
-              892,
+              899,
               132,
               119
+            ],
+            "leg": "nearLeg"
+          },
+          {
+            "key": "avatar_v2_shoes_white_clean_sneakers__o2p15",
+            "owner": "avatar_v2_shoes_white_clean_sneakers",
+            "slot": "shoes",
+            "order": 2.15,
+            "seq": 1000,
+            "rect": [
+              285,
+              932,
+              131,
+              89
             ],
             "leg": "nearLeg"
           },
@@ -258,7 +339,7 @@
             "seq": 2001,
             "rect": [
               292,
-              519,
+              526,
               142,
               392
             ],
@@ -272,7 +353,7 @@
             "seq": 3,
             "rect": [
               209,
-              250,
+              257,
               199,
               344
             ]
@@ -285,7 +366,7 @@
             "seq": 2000,
             "rect": [
               212,
-              450,
+              457,
               194,
               147
             ]
@@ -298,8 +379,8 @@
             "seq": 3001,
             "rect": [
               214,
-              248,
-              176,
+              255,
+              169,
               233
             ]
           },
@@ -311,7 +392,7 @@
             "seq": 9,
             "rect": [
               221,
-              40,
+              47,
               192,
               215
             ]
@@ -324,9 +405,22 @@
             "seq": 4000,
             "rect": [
               198,
-              26,
+              33,
               246,
               230
+            ]
+          },
+          {
+            "key": "avatar_v2_hair_mocha_ribbon_waves__o4p6",
+            "owner": "avatar_v2_hair_mocha_ribbon_waves",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              189,
+              2,
+              310,
+              418
             ]
           },
           {
@@ -337,7 +431,7 @@
             "seq": 10,
             "rect": [
               365,
-              277,
+              284,
               114,
               369
             ]
@@ -350,7 +444,7 @@
             "seq": 3000,
             "rect": [
               365,
-              274,
+              281,
               62,
               110
             ]
@@ -384,6 +478,19 @@
             ]
           },
           {
+            "key": "avatar_v2_hair_mocha_ribbon_waves__o0p6",
+            "owner": "avatar_v2_hair_mocha_ribbon_waves",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              71,
+              46,
+              139,
+              210
+            ]
+          },
+          {
             "key": "body__o3",
             "owner": "body",
             "slot": "body",
@@ -405,7 +512,7 @@
             "rect": [
               68,
               148,
-              113,
+              107,
               108
             ]
           },
@@ -433,6 +540,19 @@
               12,
               155,
               146
+            ]
+          },
+          {
+            "key": "avatar_v2_hair_mocha_ribbon_waves__o4p6",
+            "owner": "avatar_v2_hair_mocha_ribbon_waves",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              53,
+              0,
+              194,
+              254
             ]
           },
           {

@@ -5,6 +5,7 @@ import {
   STARTER_ROOM_BED_TITLE
 } from "./roomFurnitureIds"
 import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "../avatar/boyWardrobePreview"
+import { GIRL_WARDROBE_PREVIEW_ALL_IDS } from "../avatar/girlWardrobePreview"
 import { isRetiredAvatarItemId } from "../avatar/retiredAvatarItems"
 
 export type EconomyItemType = "avatar" | "room"
@@ -48,10 +49,10 @@ const roomItem = (
   ...(ownedByDefault ? { ownedByDefault: true } : {})
 })
 
-/** "avatar_v2_top_male_navy_knit_polo" -> "Navy Knit Polo" */
-const titleFromMaleItemId = (itemId: string): string =>
+/** "avatar_v2_top_male_navy_knit_polo" -> "Navy Knit Polo", "avatar_v2_shoes_white_clean_sneakers" -> "White Clean Sneakers" */
+const titleFromItemId = (itemId: string): string =>
   itemId
-    .replace(/^avatar_v2_[a-z]+_male_/, "")
+    .replace(/^avatar_v2_[a-z]+_(male_)?/, "")
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ")
@@ -401,7 +402,10 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
 
   // the boy's 2.5D wardrobe (boyWardrobePreview.ts), free and owned by every account during testing (owner yes,
   // 2026-10-13): the inventory self-heal grants them, so no row write is needed up front; never sold, no receipt
-  ...BOY_WARDROBE_PREVIEW_ALL_IDS.map((itemId) => avatarItem(itemId, titleFromMaleItemId(itemId), 0, true)),
+  ...BOY_WARDROBE_PREVIEW_ALL_IDS.map((itemId) => avatarItem(itemId, titleFromItemId(itemId), 0, true)),
+  // the girl's 2.5D wardrobe additions (girlWardrobePreview.ts), on the same testing terms as the boy's (owner yes for
+  // free test wardrobes, 2026-10-13): free, owned by every account, never sold, no receipt; wearable by the girl only
+  ...GIRL_WARDROBE_PREVIEW_ALL_IDS.map((itemId) => avatarItem(itemId, titleFromItemId(itemId), 0, true)),
 
   // the old flat pieces are retired (legacy registry); the chair keeps its id with layered art, held until §12
   roomItem("room_v2_chair_blush", "Blush Lounge Chair", 0),

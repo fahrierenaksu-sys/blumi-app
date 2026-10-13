@@ -314,8 +314,16 @@ test("mirror cards: a mirrored direction samples them for the marked parts only,
   assert.equal(avatar25HasMirrorCards(rig, "front", worn), false)
 })
 
+/** An item page that the card hair does not use (the cards then sit on a page of their own for that avatar). */
+const otherItemPage = (): number => {
+  const pages = Object.values(rig.views.front.items).map((item) => item.page)
+  const page = pages.find((p) => p !== rig.views.front.items[CARD_HAIR].page)
+  assert.ok(page !== undefined, "the rig has an item page the card hair does not use")
+  return page
+}
+
 test("mirror cards on their own page: only the marked vertices use it, and that page is loaded only when mirrored", () => {
-  const cardPage = rig.views.front.items.shoes_mint_ribbon_court_sneakers.page
+  const cardPage = otherItemPage()
   assert.notEqual(cardPage, rig.views.front.items[CARD_HAIR].page)
   const cards = withMirrorCards(cardPage)
   const plain = compileAvatar(cards, "front", [CARD_HAIR], false)
@@ -333,7 +341,7 @@ test("mirror cards on their own page: only the marked vertices use it, and that 
 })
 
 test("mirror cards on their own page: the plain view of that avatar holds the same page set, so one texture array serves both", () => {
-  const cardPage = rig.views.front.items.shoes_mint_ribbon_court_sneakers.page
+  const cardPage = otherItemPage()
   const cards = withMirrorCards(cardPage)
   const worn = [CARD_HAIR]
   const mirrored = compileAvatar(cards, "front", worn, true)

@@ -13,10 +13,10 @@
  "sets": {
   "back": {
    "file": "back.astc.zip",
-   "fileBytes": 2426544,
-   "gpuBytes": 2426544,
+   "fileBytes": 3235392,
+   "gpuBytes": 3235392,
    "height": 592,
-   "layers": 3,
+   "layers": 4,
    "levels": [
     {
      "bh": 148,
@@ -88,22 +88,24 @@
    "pages": [
     "back_page0.png",
     "back_page1.png",
-    "back_page2.png"
+    "back_page2.png",
+    "back_page3.png"
    ],
-   "sha256": "bbf94f92a5caf5cc599581ec85ca1fa216aae22201c7f23e873c62fdfa680028",
+   "sha256": "70434a8ee70fd7ca07d4f75cbb8b9b22578448c3d0133afd0f735b9e9075c501",
    "sourceSha256": {
     "back_page0.png": "c17cfa6aa06062f92fb5744b17261ba1f8efd6518e754296f1eff03b0b4fd211",
-    "back_page1.png": "975b8677d0ed1b556bd424d9c2a4e488b702e86f7fd6b2a671f1c7367973c7e1",
-    "back_page2.png": "1e104eb23da6b8bd63a95c066e83c74448a6f326431820c9f80bc72a3b92797b"
+    "back_page1.png": "d95dfa05f8bcd6d9d970f8b22d1917b0b66b79fc26fb652529edcb5fe4619aac",
+    "back_page2.png": "87f73526780d1ae9b480cfb0f913bf07246d1bf8fe3146d4ba85b9a04e71c2cc",
+    "back_page3.png": "a45cbd6bbc40c708fa3fa2669ee07513b80c8bb80ae17fe6732ed9248eb2eaf6"
    },
    "width": 1024
   },
   "front": {
    "file": "front.astc.zip",
-   "fileBytes": 2526384,
-   "gpuBytes": 2526384,
+   "fileBytes": 3368512,
+   "gpuBytes": 3368512,
    "height": 616,
-   "layers": 3,
+   "layers": 4,
    "levels": [
     {
      "bh": 154,
@@ -175,13 +177,15 @@
    "pages": [
     "front_page0.png",
     "front_page1.png",
-    "front_page2.png"
+    "front_page2.png",
+    "front_page3.png"
    ],
-   "sha256": "a1d831140a2f9a59e13ccc278ac3d9ac3605f13269a1578a515a99712443c475",
+   "sha256": "f113b09d4bbbc8fc48cadfa162218e425e95e1fa32bf2455d3e282f086924cb0",
    "sourceSha256": {
     "front_page0.png": "aed6b1439a5d0109d3bcf8b0e9d6db8505ba4a3b70883bbdb99b17de5ec4a18c",
-    "front_page1.png": "0b34130e5f4f83f8edac3c22741e3fd636f161190f9e8a66963dda2ee91f9f0c",
-    "front_page2.png": "984184d418043a3ccf3c5247f505c0d3021eab0f0199518fa922093067fe2186"
+    "front_page1.png": "6831f17d44ecbe240a1baf19c272b33458819daff4e23f58590bb3ab6b7d4b0b",
+    "front_page2.png": "b3551fc336e4ba61d54f6551b5ed5907996b579548f712d53556e43ca12883c8",
+    "front_page3.png": "4547164135bebf6f48bce3a5d9692bc476aebfd2f0065ce8daa9ab1ec54e9585"
    },
    "width": 1024
   }

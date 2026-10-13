@@ -176,4 +176,5 @@ export function getAvatarItemPreviewSource(
     ?? WARDROBE_SQUARE_THUMBNAIL_SOURCES[item.id]
     ?? AVATAR_ITEM_PREVIEW_SOURCES[item.id]
     ?? AVATAR_STILL_ASSETS[`male/thumb/${item.id}`]
+    ?? AVATAR_STILL_ASSETS[`female/thumb/${item.id}`]
 }
