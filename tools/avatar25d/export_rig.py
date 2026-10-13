@@ -531,7 +531,14 @@ def restore_blink_item_hair(stored, scale, keeps):
         foot = np.zeros((sh, sw), bool)
         ys, xs = np.nonzero(cut)
         foot[(ys * scale).astype(int), (xs * scale).astype(int)] = True
-        a[Y0:Y0 + sh, X0:X0 + sw][~foot] = a[y0:y0 + sh, x0:x0 + sw][~foot]
+        # a patch whose margin reaches past the page edge (a part packed at the edge): copy only the texels on the page
+        H, W = a.shape[:2]
+        lx, ly = max(0, -x0, -X0), max(0, -y0, -Y0)
+        hx, hy = min(sw, W - x0, W - X0), min(sh, H - y0, H - Y0)
+        if hx <= lx or hy <= ly:
+            continue
+        keep = ~foot[ly:hy, lx:hx]
+        a[Y0 + ly:Y0 + hy, X0 + lx:X0 + hx][keep] = a[y0 + ly:y0 + hy, x0 + lx:x0 + hx][keep]
     return Image.fromarray(a, stored.mode)
 
 

@@ -196,7 +196,12 @@ def check(rigdir, scales=(1.0, 2.0)):
     v, pages = load(rigdir)
     if not v.get('blink'):
         return []
-    outfits = {'bare': (), 'dressed': tuple(sorted(v.get('items', {})))}
+    items = v.get('items', {})
+    slots = [it['slot'] for it in items.values()]
+    if len(slots) == len(set(slots)):
+        outfits = {'bare': (), 'dressed': tuple(sorted(items))}
+    else:   # a wardrobe rig (several items per slot): each item is worn alone, never two hairs at once
+        outfits = {'bare': (), **{f'dressed:{iid}': (iid,) for iid in sorted(items)}}
     texel_scale = pages[0].shape[1] / v['pageSize'][0]     # stored texels per sheet px (0.5: half-size pages)
     cases = []
     for scale in scales:

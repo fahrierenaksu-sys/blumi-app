@@ -13,10 +13,10 @@
  "sets": {
   "back": {
    "file": "back.astc.zip",
-   "fileBytes": 732624,
-   "gpuBytes": 732624,
+   "fileBytes": 10256736,
+   "gpuBytes": 10256736,
    "height": 536,
-   "layers": 1,
+   "layers": 14,
    "levels": [
     {
      "bh": 134,
@@ -86,20 +86,46 @@
     }
    ],
    "pages": [
-    "back_page0.png"
+    "back_page0.png",
+    "back_page1.png",
+    "back_page2.png",
+    "back_page3.png",
+    "back_page4.png",
+    "back_page5.png",
+    "back_page6.png",
+    "back_page7.png",
+    "back_page8.png",
+    "back_page9.png",
+    "back_page10.png",
+    "back_page11.png",
+    "back_page12.png",
+    "back_page13.png"
    ],
-   "sha256": "57c545eededda6d9be0f2659271d836a3d5c3537c37139d21d5424b91f541bbb",
+   "sha256": "01a99f283cae610092b015100c0ac4f3a63d668e739650ada6db1bda0811bb97",
    "sourceSha256": {
-    "back_page0.png": "a0e89dbfc704bb6408a17d95fcc3db0524972ff1bd882659284e8ba1dd1f13d3"
+    "back_page0.png": "a0e89dbfc704bb6408a17d95fcc3db0524972ff1bd882659284e8ba1dd1f13d3",
+    "back_page1.png": "50aaf79910a0d4e2c2dbc310f0752c06181eddf8aeaa1ca9863ed9820c257ea4",
+    "back_page10.png": "0d7bf68efb4c636e0ca8115bd73ee1e6c40df13e901c652a7d60171e401d9341",
+    "back_page11.png": "2c77893ba41d2946b619c0308746247cefbc3b1428a170e3d5fbffb85ec34f72",
+    "back_page12.png": "5d9264ddf22c07dc6c895efd30b87c1687e526f6863c93b53cdadd38f394da5b",
+    "back_page13.png": "b7f2d9da394b57fafac10b4bfc926dd5f1db7f732e7274257c78bb72b6ac71f6",
+    "back_page2.png": "eee4f0c9ca0987ad4ee43480f8bc7c9d3af5589be5ff30aac62b0ea678f8ca6c",
+    "back_page3.png": "9aa104bf891a404603b923370f68f09828ff2ee282fa5a3a3f0177abb574b573",
+    "back_page4.png": "ba40d5f1e563fa98116ed5ca403d72a9c1bfe4f6dda28338ca8b207bcb57230b",
+    "back_page5.png": "d2ca591f68ca45a1f0bbf37b986ad8ca43f560138fb73bf6c129f5fe4cdf389a",
+    "back_page6.png": "80303b4b6e813fc399ec0db87a31743410e3dd3e44c461de78535b14165c45f8",
+    "back_page7.png": "3dae58761593114d4b9d5ec1ba6562f4a1b9576b55230eb381a9e1bfd9b2522a",
+    "back_page8.png": "8f15fe7898bc38b14a00d3e42b5e1e57057d654127b9fe90e7cfb3818876b9b2",
+    "back_page9.png": "cb218efb1bedf831fcb6a79b81cc051f2b07b16647a9c97d8076ac375d4ca26f"
    },
    "width": 1024
   },
   "front": {
    "file": "front.astc.zip",
-   "fileBytes": 742992,
-   "gpuBytes": 742992,
+   "fileBytes": 10401888,
+   "gpuBytes": 10401888,
    "height": 544,
-   "layers": 1,
+   "layers": 14,
    "levels": [
     {
      "bh": 136,
@@ -169,11 +195,37 @@
     }
    ],
    "pages": [
-    "front_page0.png"
+    "front_page0.png",
+    "front_page1.png",
+    "front_page2.png",
+    "front_page3.png",
+    "front_page4.png",
+    "front_page5.png",
+    "front_page6.png",
+    "front_page7.png",
+    "front_page8.png",
+    "front_page9.png",
+    "front_page10.png",
+    "front_page11.png",
+    "front_page12.png",
+    "front_page13.png"
    ],
-   "sha256": "ab97d847778dec246309ef5bbaef0b831a8a187bc2fcf4b565aa1e2dbeb1224b",
+   "sha256": "296370a2d4b1e3c28ac0f235e9147459e7cc4085998cac26d817e7932f4103ea",
    "sourceSha256": {
-    "front_page0.png": "af714ab32df860a1ea29c916ddf97865a21bf6e54768cfdf460c617e4348be68"
+    "front_page0.png": "af714ab32df860a1ea29c916ddf97865a21bf6e54768cfdf460c617e4348be68",
+    "front_page1.png": "a6a13413f638c67243b7216782bf1de89ca8b6e6efb282fcdf6c2a23ca6f2ae3",
+    "front_page10.png": "64db9619a7315faff80ad54252f3ff2a6ba35e69bed069813564958415ffc943",
+    "front_page11.png": "21a978386a7ba0295710163888f3a7b871c13238d316cc1522f43f6211c27cfc",
+    "front_page12.png": "82dc4648c4306037253dd43785fef41da4fe5416187bfa753e0a9535dc64e90b",
+    "front_page13.png": "6cab2546fafa70bbfd8073cb3a31df06287b1cd0bc03da6de7c63504994dcc79",
+    "front_page2.png": "71ef53c00bf642a7c99b4eee5f0b5125d52b905d51da6e2fd1754732e4c58d15",
+    "front_page3.png": "9cdbf8ff534294cad2bff44b7b67c8658dc3001797a1cf68d190d081d6c37549",
+    "front_page4.png": "2d07f5f2778c932e1f5c0a1e6b20d4b4ffcc256472318d601fa32d594cf90f01",
+    "front_page5.png": "e19df62038128173673424853bc0d6df85425f4c1b4ce3869f015b28d29672ab",
+    "front_page6.png": "2c455b974bf85ea934410c0827fa79d48977d5ae251711967dc9b69148f40586",
+    "front_page7.png": "0e87da251771cbda685a84cc44dc48a1f13092a6c9d35bdf9cb9904db4f12bda",
+    "front_page8.png": "3890bca020b261f8c1ea70b50ac5da1a0c0bf424c8e125691198cb6576f438ca",
+    "front_page9.png": "838cb6d40ef8f29bf198c4d52c0420e0cb1f0e3d5ab4158c04f1207e2bdf04f0"
    },
    "width": 1024
   }
