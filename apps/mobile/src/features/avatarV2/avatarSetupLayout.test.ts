@@ -60,7 +60,8 @@ test("sizes the avatar to preserve an outer arrow clearance on narrow viewports"
   const tiny = getAvatarStudioStageMetrics(true, 280)
   const measuredStage = getAvatarStudioStageMetrics(false, 393, 320)
 
-  assert.ok(proMax.avatarSize >= 292)
+  // Character-led: the figure stays large on Pro Max even after it yields headroom to the gender switch.
+  assert.ok(proMax.avatarSize >= 260)
   assert.ok(narrow.avatarSize <= 260)
   assert.ok(tiny.orbitPodWidth >= 96)
   assert.ok(proMax.orbitPodWidth <= Math.floor(proMax.stageWidth * 0.31))
@@ -68,6 +69,26 @@ test("sizes the avatar to preserve an outer arrow clearance on narrow viewports"
   assert.equal(measuredStage.stageWidth, 320)
   assert.ok(measuredStage.orbitPodWidth + 16 <= measuredStage.stageWidth)
   assert.ok(tiny.orbitPod.shoes.top + tiny.orbitPodHeight <= tiny.stageHeight)
+})
+
+test("keeps the avatar head below the gender switch on every phone size (beta-2 smoke)", () => {
+  // Measured share of the figure box above the boy's hair on the front still.
+  const measuredHeadTop = 0.12
+  const phones = [
+    [667, 375], [812, 375], [852, 393], [874, 402], [932, 430], [956, 440]
+  ] as const
+  for (const [height, width] of phones) {
+    for (const fontScale of [1, 1.4]) {
+      const layout = getAvatarSetupLayoutMetrics(height, width, fontScale)
+      const stage = getAvatarStudioStageMetrics(layout.compact, width, undefined, height, layout.veryCompact)
+      const figureHeight = stage.avatarSize * 1.5
+      const figureTop = stage.stageHeight - stage.avatarBottomInset - figureHeight
+      const headTop = figureTop + figureHeight * measuredHeadTop
+      const railBottom = stage.genderRailTop + stage.genderRailHeight
+      assert.ok(headTop >= railBottom, `${width}x${height}@${fontScale}: head ${headTop} under switch ${railBottom}`)
+      assert.ok(stage.orbitPod.hair.top >= railBottom, `${width}x${height}@${fontScale}: hair pod under switch`)
+    }
+  }
 })
 
 test("wraps previous and next style selection without dead ends", () => {
