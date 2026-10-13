@@ -479,6 +479,34 @@ test("legs: one item alone draws its own leg drawing ungated, and any bottom mix
   }
 })
 
+test("legs: shoes missing the drawing for one leg degrade that one avatar to the bottom's leg uncut, never a failed draw", () => {
+  const mix = roleKeyedMix()
+  const shoes = mix.views.front.items.shoes_b.mesh
+  shoes.ranges = shoes.ranges.filter((r) => r.name !== "nearLeg@shoes")
+  const worn = ["bottom_b", "shoes_b"]
+  const warn = console.warn
+  const warnings: string[] = []
+  console.warn = (message: string) => warnings.push(message)
+  try {
+    const compiled = compileAvatar(mix, "front", worn)
+    const again = compileAvatar(mix, "front", worn)
+    assert.ok(again.vertexData.byteLength > 0)
+    const shown = drawnVertices(compiled, VARIANT_STAND)
+    for (const leg of LEGS) {
+      assert.ok(every(rangeVertices(mix, worn, 1, `${leg}@bottom`), (i) => shown.has(i)), `${leg}: the bottom's drawing is drawn`)
+      assert.ok(every(rangeVertices(mix, worn, 0, leg), (i) => !shown.has(i)), `${leg}: the bare leg is hidden`)
+    }
+    const near = rangeVertices(mix, worn, 1, "nearLeg@bottom")
+    const far = rangeVertices(mix, worn, 1, "farLeg@bottom")
+    assert.ok(every(near, (i) => maskAt(compiled.vertexData, i).on === 0), "near leg: drawn uncut")
+    assert.ok(every(far, (i) => maskAt(compiled.vertexData, i).on === 1), "far leg: still gated")
+  } finally {
+    console.warn = warn
+  }
+  assert.ok(warnings.length <= 1, "logged at most once")
+  assert.ok(warnings.every((m) => !m.includes("bottom_b") && !m.includes("shoes_b")), "no item IDs in the log")
+})
+
 test("legs: the girl's QA'd pair drawing is drawn as before, with no gate", () => {
   for (const name of ["front", "back"] as const) {
     const worn = [SNEAKERS, PANTS]
