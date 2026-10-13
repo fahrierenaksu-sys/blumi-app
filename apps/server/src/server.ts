@@ -97,6 +97,7 @@ import {
   createNotificationPortraitService,
   type NotificationPortraitService
 } from "./notifications/notificationPortraitService"
+import { readDeployedCommit } from "./operations/deployedCommit"
 import {
   createOpenApiDocument,
   OPENAPI_DOCUMENT_PATH,
@@ -110,6 +111,8 @@ interface CreateServerOptions {
   readinessTimeoutMs?: number
   /** Overrides how /ready reads the avatar art-pack hash (tests); default hashes the built art pack manifest. */
   avatarArtPackHash?: () => string | null
+  /** Overrides the build commit /health reports (tests); default reads it from the deploy environment. */
+  deployedCommit?: string | null
   authService?: AuthService
   firebaseAuthVerifier?: FirebaseAuthVerifier
   /**
@@ -301,13 +304,16 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       // Never echo an attacker-controlled URL (which may contain private IDs).
       return reply.code(404).send({ error: "Not found.", statusCode: 404 })
     })
+    const deployedCommit = options.deployedCommit === undefined ? readDeployedCommit() : options.deployedCommit
     app.get("/health", async () => ({
       ok: true,
       service: "blumi-server",
       // the room showcase art self-check (start-up); "failed" means Discover room pictures cannot be drawn
       roomShowcaseArt: getRoomSnapshotSelfCheckState(),
       // the push portrait art self-check (start-up); "failed" means pushes go out without a sender picture
-      pushPortraitArt: getAvatarPortraitSelfCheckState()
+      pushPortraitArt: getAvatarPortraitSelfCheckState(),
+      // the short git SHA this server was built from, or null when the deploy does not say
+      commit: deployedCommit
     }))
     app.get("/live", async () => ({ ok: true, service: "blumi-server" }))
     const probe = createReadinessProbe({
