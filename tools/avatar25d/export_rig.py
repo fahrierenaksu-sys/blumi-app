@@ -27,6 +27,13 @@ Leg drawings (`hybrid.legVariants`) are exported per item: each bottom owns a 'b
 (leg_variant_owners). Item sit / wave cards may carry their own sheet box (`sitBox` / `waveBox`, item_cards).
 An item part with `poseOnly` (e.g. ['wave']) exports its range with that list; the runtime draws it in those poses only.
 
+Body replacement drawings (factory/lab `hybrid.torsoVariants` / `armVariants` / `sitVariants`, keyed by a rig item id or
+an `<item>+<item>` pair; and the shared `hybrid.torsoMidriff` set, carried by every item with `torso: "midriff"`) are
+exported per owning item (body_replacements): a range `<body range>@body` (`@with:<id>` for a pair) with the body
+range's own mesh, weights and order, `bodyPart` = that body range and, for a pair, `bodyWith` = the other item. The
+runtime draws it instead of the body range while the item (and the pair partner) is worn (avatar25BodySwap). A rig
+without them exports byte-identically.
+
 --motion (or a `motion` already inside a rig view): the retargeted 3D walk (lab40, rig25d/walk3d/v3/a4). Each view
 with one carries it as `motion` (per key pose: hips offset, near-leg-in-front flag, turn + stretch per bone in the
 view's bone order) and drops its painted walk cards (body and items): the standing drawing walks instead.
@@ -584,6 +591,72 @@ def export_motion(M, bone_names):
 
 
 LEG_ROLES = ('bottom', 'shoes')
+# factory / lab body-variant map names -> the body range each one replaces (lab doll25 `torsoMaps`)
+TORSO_VARIANT_RANGES = {'full': 'torso', 'walk': 'torsoWalk', 'upper': 'torsoUpper', 'noArms': 'torsoNoArms',
+                        'sit': 'torsoSit', 'cardArms': 'torsoCardArms'}
+ARM_LAYERS = ('farArm', 'nearArm')
+MIDRIFF = 'midriff'
+
+
+def _replacement_key(key, items, family):
+    """A body-variant key -> (owner item id, partner item id or None). Keys name rig item ids: `<id>` or `<id>+<id>`
+    (the lab's `<bottom>+<top>` pair, drawn only while both are worn; stored with the first)."""
+    parts = key.split('+')
+    if len(parts) > 2 or len(set(parts)) != len(parts):
+        raise SystemExit(f'{family} {key}: a key is one item id or a pair of two')
+    unknown = [p for p in parts if p not in items]
+    if unknown:
+        raise SystemExit(f'{family} {key}: {unknown} not items of this view')
+    return parts[0], (parts[1] if len(parts) == 2 else None)
+
+
+def body_replacements(hy, items, body_sizes):
+    """{owner item id: [(body range, png data uri, partner id or None), ...]} for the view's body variants.
+
+    `body_sizes` = {body range: (w, h)} of the ranges this view exports; a replacement must have the same size (it is
+    drawn with that range's mesh and uvs, exactly where and as the body drawing is)."""
+    out = {}
+
+    def add(owner, partner, body, png, family):
+        if body not in body_sizes:
+            raise SystemExit(f'{family} of {owner}: the body has no {body} drawing to replace')
+        size = decode(png).size
+        if size != body_sizes[body]:
+            raise SystemExit(f'{family} of {owner}: {body} is {size}, the body drawing {body_sizes[body]}')
+        if any(b == body and w == partner for b, _, w in out.get(owner, [])):
+            raise SystemExit(f'{family} of {owner}: two drawings replace {body}' + (f' with {partner}' if partner else ''))
+        out.setdefault(owner, []).append((body, png, partner))
+
+    midriff_items = sorted(iid for iid, it in items.items() if it.get('torso') is not None)
+    for iid in midriff_items:
+        if items[iid]['torso'] != MIDRIFF:
+            raise SystemExit(f"{iid}: torso {items[iid]['torso']!r} is not supported ({MIDRIFF!r} only)")
+        if not hy.get('torsoMidriff'):
+            raise SystemExit(f'{iid}: torso {MIDRIFF!r} but the view has no hybrid.torsoMidriff')
+        if iid in (hy.get('torsoVariants') or {}):
+            raise SystemExit(f'{iid}: both torso {MIDRIFF!r} and its own torsoVariants')
+    torso_sets = [(k, m) for k, m in sorted((hy.get('torsoVariants') or {}).items())]
+    torso_sets += [(iid, hy['torsoMidriff']) for iid in midriff_items]
+    for key, maps in torso_sets:
+        owner, partner = _replacement_key(key, items, 'torsoVariants')
+        for name, png in sorted(maps.items()):
+            if name not in TORSO_VARIANT_RANGES:
+                raise SystemExit(f'torsoVariants {key}: unknown map {name!r}')
+            add(owner, partner, TORSO_VARIANT_RANGES[name], png, 'torsoVariants')
+    for key, maps in sorted((hy.get('armVariants') or {}).items()):
+        owner, partner = _replacement_key(key, items, 'armVariants')
+        for name, png in sorted(maps.items()):
+            if name not in ARM_LAYERS:
+                raise SystemExit(f'armVariants {key}: unknown arm {name!r}')
+            add(owner, partner, name, png, 'armVariants')
+    for key, png in sorted((hy.get('sitVariants') or {}).items()):
+        owner, partner = _replacement_key(key, items, 'sitVariants')
+        add(owner, partner, 'sit', png, 'sitVariants')
+    return out
+
+
+def replacement_range(body, partner):
+    return f'{body}@with:{partner}' if partner else f'{body}@body'
 
 
 def _leg_part(part, items, slot_item):
@@ -695,6 +768,9 @@ def export_view(name, v, motion=None):
     atlas.add('sit', sit_img)
     atlas.add('wave', wave_img)
     img, rects = atlas.pack(PAGE_W)
+    # body drawings an item may replace while worn (body_replacements), by the body range they are drawn as
+    body_sizes = {k: (r[2], r[3]) for k, r in rects.items() if k in TORSO_VARIANTS or k in ARM_LAYERS or k == 'sit'}
+    replacements = body_replacements(hy, v.get('items', {}), body_sizes)
     # every item atlas is packed first so the page height (shared by all layers of the array) is known
     item_atlases = {}
     for iid, it in sorted(v.get('items', {}).items()):
@@ -710,6 +786,8 @@ def export_view(name, v, motion=None):
         for key, out_key in variant_owner.get(iid, []):
             for ln, png in sorted(leg_variants[key].items()):
                 ia.add(f'{ln}@{out_key}', decode(png))
+        for body, png, partner in replacements.get(iid, []):
+            ia.add(replacement_range(body, partner), decode(png))
         item_atlases[iid] = (*ia.pack(PAGE_W // 2), walk_card is not None, cards)
     page_h = max([img.height] + [a[0].height for a in item_atlases.values()])
     page_h = (page_h + 15) // 16 * 16
@@ -774,6 +852,19 @@ def export_view(name, v, motion=None):
                 im.add_range(f'{ln}@{out_key}', layer_order[ln],
                              lambda ln=ln, k=out_key: im.skinned({**body_layers[ln], 'walkWeights': None}, ir[f'{ln}@{k}'], PAGE, bone_idx, page, 0),
                              layer=ln, legVariant=out_key)
+        # body drawings this item replaces while worn: the body range's own mesh (or seated card quad) and order
+        for body, _, partner in replacements.get(iid, []):
+            rname = replacement_range(body, partner)
+            tag = {'bodyPart': body, **({'bodyWith': partner} if partner else {})}
+            if body == 'sit':
+                im.add_range(rname, 4.5 if S.get('front') else LOWER_Z,
+                             lambda rname=rname: im.quad(S['box'][0], S['box'][1], sit_img.width, sit_img.height, ir[rname], PAGE, ROOT, None, page),
+                             **tag)
+                continue
+            src = body_layers['torso' if body in TORSO_VARIANTS else body]
+            im.add_range(rname, layer_order[src['name']],
+                         lambda src=src, rname=rname: im.skinned(src, ir[rname], PAGE, bone_idx, page, ARM_CODE.get(src['name'], 0)),
+                         **tag)
         # each card at its own sheet box (the body's box unless the item carries `sitBox` / `waveBox`)
         if 'sit' in cards:
             card, (bx, by) = cards['sit']
@@ -790,6 +881,8 @@ def export_view(name, v, motion=None):
                 im.add_range(f'walk{i}', LOWER_Z + f, lambda fr=fr, uvr=uvr: im.quad(fr['x'], fr['y'], fr['w'], fr['h'], None, PAGE, ROOT, uvr, page))
         items[iid] = {'slot': it['slot'], 'lift': it.get('lift', 0), 'page': page,
                       'hasWalk': has_walk, 'mesh': im.dump()}
+        if it.get('torso') == MIDRIFF:   # it bares the waist: the runtime draws seated bottoms over its belly
+            items[iid]['torso'] = MIDRIFF
 
     blink_keeps = {}   # stored page -> the item patches whose untouched texels are copied back after resizing
     if blink is not None:

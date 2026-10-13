@@ -22,14 +22,13 @@ import {
 } from "./avatar25Motion"
 import { seatedCardStrips, seatedShinBandRows } from "./avatar25SeatedLegs"
 import { legMaskRange, legMaskVertices, legPlan, UNORM16, type LegMaskVertex } from "./avatar25Legs"
+import { bodySwapPlan, seatedCardOrder, TORSO_RANGES, waistBared } from "./avatar25BodySwap"
 import { breathCurve, compileBlink, compileBreath, type CompiledBlink, type CompiledBreath } from "./avatar25Life"
 
 export { legPlan } from "./avatar25Legs"
 
 export const POSE_BITS: Record<Avatar25Pose, number> = { stand: 1, walk: 2, sit: 4, wave: 8 }
 export const PALETTE_STRIDE = 8
-/** The torso layer's drawings (one mesh, one range each). */
-const TORSO_RANGES = new Set(["torso", "torsoUpper", "torsoNoArms", "torsoSit", "torsoCardArms", "torsoWalk"])
 const ARM_SWING = 0.14
 const WAVE_TIME = 1.7
 const LUT_BINS = 512
@@ -350,7 +349,10 @@ export function compileAvatar(
   // the seated cards are drawn as strips whose shins stretch, so her soles reach the floor at any height
   // (avatar25SeatedLegs); packed after every other vertex
   const band = seatedShinBandRows(v)
-  const strips = meshes.map((mesh) => seatedCardStrips(mesh, band, v.bones.length, v.bones.length + 2))
+  // (the item seated cards and an item's replacement of the body's seated card, keyed `set:range start`)
+  const strips = meshes.flatMap((mesh, set) => mesh.ranges
+    .filter((r) => r.name === "sit" || r.bodyPart === "sit")
+    .map((r) => ({ key: `${set}:${r.start}`, mesh: seatedCardStrips(mesh, band, v.bones.length, v.bones.length + 2, r.name) })))
   // only the pages this avatar draws are loaded: rig page → texture-array layer
   const cardPages = withCardPages
     ? worn.map((id) => v.items[id]).flatMap((item) => (hasMirrorCards(item) && item.mirrorPage !== undefined ? [item.mirrorPage] : []))
@@ -375,11 +377,11 @@ export function compileAvatar(
   // the walk variants index the duplicates
   const extra = motion ? walkWeightedCopies(v, meshes, base, entries) : null
   const stripMeshes: Rig25Mesh[] = []
-  const stripIndices = new Map<number, number[]>()
+  const stripIndices = new Map<string, number[]>()
   let stripBase = vertexTotal + (extra ? extra.mesh.pos.length / 2 : 0)
-  strips.forEach((mesh, set) => {
+  strips.forEach(({ key, mesh }) => {
     if (!mesh) return
-    stripIndices.set(set, mesh.index.map((i) => i + stripBase))
+    stripIndices.set(key, mesh.index.map((i) => i + stripBase))
     stripMeshes.push(mesh)
     stripBase += mesh.pos.length / 2
   })
@@ -392,7 +394,7 @@ export function compileAvatar(
       .filter((e) => (e.mask & key.bit) !== 0 && (e.frame < 0 || e.frame === key.frame))
       .sort((a, b) => order(a) - order(b) || a.seq - b.seq)
     for (const e of visible) {
-      const seated = e.seated ? stripIndices.get(e.set) : undefined
+      const seated = e.seated ? stripIndices.get(`${e.set}:${e.start}`) : undefined
       if (seated) {
         indices.push(...seated)
         continue
@@ -428,13 +430,16 @@ function buildDrawEntries(v: Rig25View, worn: string[], motion: boolean, has: Se
   worn.forEach((id, k) => {
     for (const r of v.items[id].mesh.ranges) if (drawnLeg(k, r)) replacedLegs.add(r.layer as string)
   })
+  // body drawings a worn item brings instead of the body's own (avatar25BodySwap)
+  const swaps = bodySwapPlan(v, worn)
+  const bared = waistBared(v, worn, swaps)
   const entries: DrawEntry[] = []
   let seq = 0
   for (const r of v.mesh.ranges) {
     const pm = bodyPoseMask(r.name, has, v, motion)
     const leg = r.name === "farLeg" || r.name === "nearLeg" ? r.name : null
     entries.push({
-      set: 0, start: r.start, count: r.count, mask: leg && replacedLegs.has(leg) ? 0 : pm.mask, frame: pm.frame,
+      set: 0, start: r.start, count: r.count, mask: (leg && replacedLegs.has(leg)) || swaps.has(r.name) ? 0 : pm.mask, frame: pm.frame,
       order: r.order, seq: seq++, leg,
       // lab40 setWalkWeights: the torso layer and every item piece take their baked walk weights while walking
       walkBaked: Boolean(r.walk) && TORSO_RANGES.has(r.name),
@@ -445,6 +450,10 @@ function buildDrawEntries(v: Rig25View, worn: string[], motion: boolean, has: Se
   worn.forEach((id, k) => {
     const item = v.items[id]
     for (const r of item.mesh.ranges) {
+      if (r.bodyPart !== undefined) {
+        entries.push(bodySwapEntry(v, k + 1, r, swaps, motion, has, seq++))
+        continue
+      }
       const leg = r.layer === "farLeg" || r.layer === "nearLeg" ? r.layer : null
       // a leg drawing for what is worn is drawn exactly as the body leg it replaces; the others are not drawn
       const pm = r.legVariant !== undefined
@@ -452,7 +461,7 @@ function buildDrawEntries(v: Rig25View, worn: string[], motion: boolean, has: Se
         : itemPoseMask(r, v, motion)
       const maskRange = drawnLeg(k, r) && plan?.mask ? legMaskRange(item.mesh, v.items[worn[plan.mask - 1]].mesh, plan.mask, r) : null
       entries.push({
-        set: k + 1, start: r.start, count: r.count, mask: pm.mask, frame: pm.frame, order: r.order, seq: seq++, leg,
+        set: k + 1, start: r.start, count: r.count, mask: pm.mask, frame: pm.frame, order: seatedCardOrder(v, item, r, bared), seq: seq++, leg,
         walkBaked: Boolean(r.walk) && r.legVariant === undefined,
         seat: item.slot === "bottom" && r.layer === "torso",
         seated: r.name === "sit",
@@ -461,6 +470,24 @@ function buildDrawEntries(v: Rig25View, worn: string[], motion: boolean, has: Se
     }
   })
   return entries
+}
+
+/**
+ * An item's body drawing: when it wins (bodySwapPlan) it is drawn exactly as the body range it replaces (that range's
+ * poses, order, walk weights and seated strips); otherwise never.
+ */
+function bodySwapEntry(v: Rig25View, set: number, r: Rig25Range, swaps: Map<string, { set: number; range: Rig25Range }>, motion: boolean, has: Set<string>, seq: number): DrawEntry {
+  const part = r.bodyPart as string
+  const won = swaps.get(part)
+  const pm = won && won.set === set && won.range === r ? bodyPoseMask(part, has, v, motion) : { mask: 0, frame: -1 }
+  const torso = TORSO_RANGES.has(part)
+  return {
+    set, start: r.start, count: r.count, mask: pm.mask, frame: pm.frame, order: r.order, seq,
+    leg: part === "farLeg" || part === "nearLeg" ? part : null,
+    walkBaked: Boolean(r.walk) && torso,
+    seat: torso,
+    seated: part === "sit"
+  }
 }
 
 /** One drawn range of the stand pose, in painter's order: whose it is, its order and its triangles (mesh-local). */
@@ -507,6 +534,35 @@ export function avatar25StandEntries(rig: Rig25, viewName: Avatar25ViewName, ite
       ...(e.legMask ? { legMask: { owner: worn[e.legMask.set - 1]!, vertexOffset: e.legMask.vertexOffset } } : {}),
       leg: e.leg,
       index: meshes[e.set].index.slice(e.start, e.start + e.count)
+    }))
+}
+
+/** One drawn range of a pose: whose it is, the range's name and its painter's order. */
+export interface Avatar25PoseRange {
+  /** "body", or the worn rig item id. */
+  owner: string
+  name: string
+  order: number
+}
+
+/**
+ * The ranges a pose draws for this worn set, in painter's order, exactly as `compileAvatar` lists them (walk: the
+ * first walk frame, or the retargeted walk in the drawing's own leg order). Pure: what a worn set looks like.
+ */
+export function avatar25PoseRanges(rig: Rig25, viewName: Avatar25ViewName, itemIds: string[], pose: Avatar25Pose): Avatar25PoseRange[] {
+  const v = rig.views[viewName]
+  const motion = compileView(viewName, v).motion !== null
+  const has = new Set(v.mesh.ranges.map((r) => r.name))
+  const worn = itemIds.filter((id) => v.items[id])
+  const ranges = [v.mesh.ranges, ...worn.map((id) => v.items[id].mesh.ranges)]
+  const frame = pose === "walk" && !motion && v.walk.frames.length > 0 ? 0 : -1
+  return buildDrawEntries(v, worn, motion, has)
+    .filter((e) => (e.mask & POSE_BITS[pose]) !== 0 && (e.frame < 0 || e.frame === frame))
+    .sort((a, b) => a.order - b.order || a.seq - b.seq)
+    .map((e) => ({
+      owner: e.set === 0 ? "body" : worn[e.set - 1]!,
+      name: ranges[e.set]!.find((r) => r.start === e.start && r.count === e.count)!.name,
+      order: e.order
     }))
 }
 

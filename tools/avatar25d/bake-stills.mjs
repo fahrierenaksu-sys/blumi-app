@@ -243,6 +243,10 @@ function entryKey(entry, canonicalOf) {
  */
 function standLayers(rig, rigItemIds, canonicalOf) {
   const view = rig.views.front
+  // an item that draws a body range instead of the body's (avatar25BodySwap) needs the still compositor to hide that
+  // body layer; until it does, baking would ship stills with both drawn, so stop instead
+  const replacing = rigItemIds.filter((id) => view.items[id].mesh.ranges.some((r) => r.bodyPart !== undefined))
+  if (replacing.length > 0) throw new Error(`stills: ${replacing.length} item(s) replace body drawings (bodyPart); the still layers do not support that yet`)
   const ofSlot = (slot) => rigItemIds.filter((id) => view.items[id].slot === slot)
   const groups = new Map()
   const add = (worn, keep) => {
