@@ -51,17 +51,25 @@ export function legPlan(v: Rig25View, worn: string[]): LegPlan | null {
   return null
 }
 
+let warnedUngated = false
+
 /**
  * The gating range of a composed leg: the shoes' 'shoes' drawing on the same leg. Both are the body leg's own mesh
  * (export_rig.py), so their triangles list the same vertices in the same order; the offset maps one onto the other.
+ * Null when the shoes have no drawing for that leg or it is not the same mesh: that one avatar then draws the bottom's
+ * leg uncut (never the bare leg, never a failed room), and it is logged once, without IDs.
  */
-export function legMaskRange(own: Rig25Mesh, mesh: Rig25Mesh, maskSet: number, r: Rig25Range): { set: number; vertexOffset: number } {
+export function legMaskRange(own: Rig25Mesh, mesh: Rig25Mesh, maskSet: number, r: Rig25Range): { set: number; vertexOffset: number } | null {
   const gate = mesh.ranges.find((m) => m.legVariant === "shoes" && m.layer === r.layer)
   const a = own.index.slice(r.start, r.start + r.count)
   const b = gate ? mesh.index.slice(gate.start, gate.start + gate.count) : []
   const offset = (b[0] ?? 0) - (a[0] ?? 0)
   if (!gate || a.length !== b.length || a.some((x, i) => b[i] - x !== offset)) {
-    throw new Error(`avatar25: the ${r.layer} leg drawings of a worn bottom and shoes do not share the body leg mesh`)
+    if (!warnedUngated) {
+      warnedUngated = true
+      console.warn(`[avatar25] a ${r.layer} leg of a worn bottom has no matching shoes leg drawing; drawn uncut`)
+    }
+    return null
   }
   return { set: maskSet, vertexOffset: offset }
 }

@@ -59,6 +59,7 @@ function mountShowcase(manifest: AvatarStillManifest = withoutFrontArt()) {
             realShowcaseModel.planAvatarShowcase(loadout, crop, box, { ...(options as object), manifest } as never)
         },
         "./AvatarStill": { AvatarStill },
+        "./StillLayerImage": { StillLayerImage: "Image" },
         "./useStillDisplayReceipts": { useStillDisplayReceipts }
       },
       real: ["@blumi/domain"]

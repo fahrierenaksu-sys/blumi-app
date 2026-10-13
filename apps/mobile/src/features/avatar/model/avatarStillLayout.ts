@@ -1,4 +1,4 @@
-import type { AvatarStillRect, AvatarStillResolved } from "@blumi/domain"
+import type { AvatarStillLayer, AvatarStillRect, AvatarStillResolved } from "@blumi/domain"
 
 /** The crop a still shows: the whole figure, down to the hips, or the head and shoulders. */
 export type AvatarStillCrop = "full" | "half" | "bust"
@@ -9,6 +9,11 @@ export interface AvatarStillFrame {
   readonly top: number
   readonly width: number
   readonly height: number
+  /**
+   * Set when the layer is a part of a shared sheet: where the whole sheet is drawn, in points relative to the frame,
+   * so the frame (clipped) shows exactly that part.
+   */
+  readonly sheet?: { readonly left: number; readonly top: number; readonly width: number; readonly height: number }
 }
 
 export interface AvatarStillLayout {
@@ -43,7 +48,7 @@ export function layoutAvatarStill(
 
 /** Fits a window inside a box (contain), centred, and places each layer at its baked rect in the window's space. */
 export function placeStillLayers(
-  layers: readonly { readonly asset: string; readonly rect: AvatarStillRect }[],
+  layers: readonly AvatarStillLayer[],
   [wx, wy, ww, wh]: AvatarStillRect,
   box: { readonly width: number; readonly height: number }
 ): { readonly scale: number; readonly offsetX: number; readonly offsetY: number; readonly frames: readonly AvatarStillFrame[] } {
@@ -54,14 +59,21 @@ export function placeStillLayers(
     scale,
     offsetX,
     offsetY,
-    frames: layers.map(({ asset, rect: [x, y, w, h] }) => ({
+    frames: layers.map(({ asset, rect: [x, y, w, h], source }) => ({
       asset,
       left: offsetX + x * scale,
       top: offsetY + y * scale,
       width: w * scale,
-      height: h * scale
+      height: h * scale,
+      ...(source ? { sheet: sheetPlacement(source, scale) } : {})
     }))
   }
+}
+
+/** Where a whole sheet is drawn, relative to the clipped frame, so the frame shows exactly the layer's part of it. */
+function sheetPlacement(source: NonNullable<AvatarStillLayer["source"]>, scale: number): NonNullable<AvatarStillFrame["sheet"]> {
+  const [sx, sy] = source.rect
+  return { left: -sx * scale, top: -sy * scale, width: source.sheet[0] * scale, height: source.sheet[1] * scale }
 }
 
 /** The window of a crop: full and half use the full layers, the bust its own 256 px layers. */

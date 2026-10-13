@@ -25,6 +25,10 @@ export interface AvatarStillLayerEntry {
   readonly leg?: "farLeg" | "nearLeg";
   /** A leg drawing owned by an item: drawn only for this worn-items key ("bottom", "shoes", "bottom+shoes"). */
   readonly legVariant?: string;
+  /** A composed leg (legVariant "bottom"): the worn shoes whose own leg drawing gates it (the room renderer's AND). */
+  readonly gatedBy?: string;
+  /** Drawn from `rect` of a shared sheet `<rig>/<product>/<key>` (composed legs of one bottom), not from its own file. */
+  readonly source?: { readonly key: string; readonly rect: AvatarStillRect; readonly sheet: readonly [number, number] };
 }
 
 /** The crops of the one front (showcase) still: Discover card front, chat head, push picture. */
@@ -82,11 +86,19 @@ export interface AvatarStillManifest {
 
 export const AVATAR_STILL_MANIFEST = manifestJson as unknown as AvatarStillManifest;
 
+/** A drawn layer: its asset `<rig>/<product>/<key>`, where it lands, and the part of the asset drawn (whole if absent). */
+export interface AvatarStillLayer {
+  readonly asset: string;
+  readonly rect: AvatarStillRect;
+  /** A part of a shared sheet: its rect in the sheet (same size as `rect`) and the sheet's size, px. */
+  readonly source?: { readonly rect: AvatarStillRect; readonly sheet: readonly [number, number] };
+}
+
 export interface AvatarStillResolved {
   readonly rig: AvatarStillRigId;
   readonly product: AvatarStillProduct;
   /** Layer asset keys `<rig>/<product>/<key>`, bottom first. */
-  readonly layers: readonly { readonly asset: string; readonly rect: AvatarStillRect }[];
+  readonly layers: readonly AvatarStillLayer[];
   /** The space the rects are in: the body canvas (full) or the bust window (bust). */
   readonly space: { readonly width: number; readonly height: number };
   /** Crop windows in that space (full: bust, half, full; bust: the whole window). */
@@ -125,6 +137,57 @@ export function avatarStillDrawnItems(body: AvatarStillBody, loadout: AvatarLoad
 }
 
 /**
+ * The item leg drawings drawn for the drawn items, as the room renderer picks them (avatar25Legs.legPlan): a legacy
+ * pair drawing when either worn piece owns one (the girl); else the bottom's own drawing gated by the worn shoes (a
+ * composed cell); a pair with no baked cell yet draws the bottom's drawing uncut (never the bare legs); one piece
+ * alone draws its own drawing.
+ */
+export function avatarStillLegLayers(
+  all: readonly AvatarStillLayerEntry[],
+  drawn: ReadonlyMap<AvatarStillSlot, string>,
+): readonly AvatarStillLayerEntry[] {
+  const bottom = drawn.get("bottom");
+  const shoes = drawn.get("shoes");
+  const own = (owner: string | undefined, variant: string) =>
+    all.filter((entry) => owner !== undefined && entry.owner === owner && entry.legVariant === variant && entry.gatedBy === undefined);
+  if (bottom && shoes) {
+    const pair = all.filter((entry) => (entry.owner === bottom || entry.owner === shoes) && entry.legVariant === "bottom+shoes");
+    if (pair.length > 0) return pair;
+    const composed = all.filter((entry) => entry.owner === bottom && entry.legVariant === "bottom" && entry.gatedBy === shoes);
+    if (composed.length > 0) return composed;
+  }
+  const alone = own(bottom, "bottom");
+  return alone.length > 0 ? alone : own(shoes, "shoes");
+}
+
+/** The layers that draw these items on a body, in painter's order (body, item parts, the chosen leg drawings). */
+export function avatarStillLayersFor(
+  rig: AvatarStillRigId,
+  body: AvatarStillBody,
+  drawn: ReadonlyMap<AvatarStillSlot, string>,
+  product: AvatarStillProduct,
+): readonly AvatarStillLayer[] {
+  const all = body.layers[product];
+  const owners = new Set(drawn.values());
+  const legs = avatarStillLegLayers(all, drawn);
+  const replaced = new Set(legs.flatMap((entry) => (entry.leg ? [entry.leg] : [])));
+  const visible = [
+    ...all.filter((entry) => {
+      if (entry.owner === "body") return !(entry.leg && replaced.has(entry.leg));
+      return owners.has(entry.owner) && entry.legVariant === undefined;
+    }),
+    ...legs,
+  ];
+  return visible
+    .sort((a, b) => a.order - b.order || a.seq - b.seq)
+    .map((entry) =>
+      entry.source
+        ? { asset: `${rig}/${product}/${entry.source.key}`, rect: entry.rect, source: { rect: entry.source.rect, sheet: entry.source.sheet } }
+        : { asset: `${rig}/${product}/${entry.key}`, rect: entry.rect },
+    );
+}
+
+/**
  * The still layers for anyone's loadout. Total: the loadout is coerced first (never throws), then a slot whose item
  * has no baked art for that body is drawn as the body's rig starter piece (draw-only, review R3).
  */
@@ -138,17 +201,6 @@ export function resolveAvatarStillLayers(
   const rig = avatarStillRigForBody(loadout.bodyId);
   const body = manifest.bodies[rig];
   const drawn = avatarStillDrawnItems(body, loadout);
-  const owners = new Set(drawn.values());
-  const legKey = (["bottom", "shoes"] as const).filter((slot) => drawn.has(slot)).join("+");
-  const all = body.layers[product];
-  const replaced = new Set(
-    all.filter((entry) => owners.has(entry.owner) && entry.legVariant === legKey && entry.leg).map((entry) => entry.leg),
-  );
-  const visible = all.filter((entry) => {
-    if (entry.owner === "body") return !(entry.leg && replaced.has(entry.leg));
-    if (!owners.has(entry.owner)) return false;
-    return entry.legVariant === undefined || entry.legVariant === legKey;
-  });
   const mirror = options.mirror === true;
   const space = product === "full" ? body.canvas : { width: body.bustPx, height: body.bustPx };
   const windows =
@@ -158,9 +210,7 @@ export function resolveAvatarStillLayers(
   return {
     rig,
     product,
-    layers: [...visible]
-      .sort((a, b) => a.order - b.order || a.seq - b.seq)
-      .map((entry) => ({ asset: `${rig}/${product}/${entry.key}`, rect: entry.rect })),
+    layers: avatarStillLayersFor(rig, body, drawn, product),
     space,
     windows,
     mirror,

@@ -41,6 +41,11 @@ const SHOWCASE_BAKED = join(ROOT, "tools/avatar25d/showcase-baked.json")
 const RIG_DIRS = { female: "girl", male: "boy" }
 const SLOT_RANK = { shoes: 0, bottom: 1, top: 2, hair: 3 }
 const CHECK = process.argv.includes("--check")
+const option = (flag) => { const k = process.argv.indexOf(flag); return k >= 0 ? process.argv[k + 1] : undefined }
+/** --rig <rigId>=<dir> --out <dir>: bake one rig from outside the repo (a factory wardrobe) for QA, nothing committed. */
+const EXTERNAL = option("--rig")?.split("=")
+const OUT_DIR = option("--out")
+if (EXTERNAL && (!OUT_DIR || !RIG_DIRS[EXTERNAL[0]] || !EXTERNAL[1])) throw new Error("usage: --rig <female|male>=<rig dir> --out <dir>")
 
 const pose = await tsImport(join(AVATAR, "renderer/avatar25Pose.ts"), import.meta.url)
 const art = await tsImport(join(AVATAR, "model/avatarItemArt.ts"), import.meta.url)
@@ -217,23 +222,39 @@ function composite(layers, canvas) {
 
 const webp = (raw, w, h) => sharp(raw, { raw: { width: w, height: h, channels: 4 } }).webp({ lossless: true, effort: 6 }).toBuffer()
 const orderTag = (order) => `o${String(order).replace(".", "p")}`
-const layerKey = (owner, order, legVariant) => `${owner}__${orderTag(order)}${legVariant ? `__${legVariant.replace("+", "-")}` : ""}`
+const layerKey = (owner, order, legVariant, gatedBy) =>
+  `${owner}__${orderTag(order)}${legVariant ? `__${legVariant.replace("+", "-")}` : ""}${gatedBy ? `__cut-by__${gatedBy}` : ""}`
+/** The shared sheet of a bottom's composed legs on one leg layer (every shoes' cell, stacked). */
+const sheetKey = (owner, order) => `${owner}__${orderTag(order)}__bottom-cut`
+const SHEET_GAP = 2
 
-/** Every stand layer a body can show: body bands, item parts, and each item's leg drawing per worn-items key. */
+/** The layer key of a stand entry: body bands, item parts, item leg drawings and composed (cut) legs. */
+function entryKey(entry, canonicalOf) {
+  const owner = entry.owner === "body" ? "body" : canonicalOf[entry.owner]
+  return layerKey(owner, entry.order, entry.legVariant, entry.legMask ? canonicalOf[entry.legMask.owner] : undefined)
+}
+
+/**
+ * Every stand layer a body can show, enumerated per item so any wardrobe bakes: the body with nothing worn, every
+ * item part with everything worn (neither depends on what else is worn), each bottom's and each shoes' own leg drawing
+ * worn alone, and for each (bottom, shoes) pair what the live renderer draws (avatar25Legs.legPlan): the legacy pair
+ * drawing, or the bottom's drawing cut by exactly those shoes.
+ */
 function standLayers(rig, rigItemIds, canonicalOf) {
-  const slots = (ids) => ids.map((id) => rig.views.front.items[id].slot)
-  const subsets = [rigItemIds, rigItemIds.filter((id) => slots([id])[0] !== "shoes"), rigItemIds.filter((id) => slots([id])[0] !== "bottom"),
-    rigItemIds.filter((id) => !["bottom", "shoes"].includes(slots([id])[0]))]
+  const view = rig.views.front
+  const ofSlot = (slot) => rigItemIds.filter((id) => view.items[id].slot === slot)
   const groups = new Map()
-  for (const subset of subsets) {
-    for (const entry of pose.avatar25StandEntries(rig, "front", subset)) {
+  const add = (worn, keep) => {
+    for (const entry of pose.avatar25StandEntries(rig, "front", worn)) {
+      if (!keep(entry)) continue
       const owner = entry.owner === "body" ? "body" : canonicalOf[entry.owner]
-      const key = layerKey(owner, entry.order, entry.legVariant)
-      const rank = entry.owner === "body" ? 0 : (SLOT_RANK[rig.views.front.items[entry.owner].slot] + 1) * 1000
+      const key = entryKey(entry, canonicalOf)
+      const rank = entry.owner === "body" ? 0 : (SLOT_RANK[view.items[entry.owner].slot] + 1) * 1000
       const group = groups.get(key) ?? {
         key, owner, rigItemId: entry.owner === "body" ? null : entry.owner,
-        slot: entry.owner === "body" ? "body" : rig.views.front.items[entry.owner].slot,
-        order: entry.order, seq: Infinity, legVariant: entry.legVariant, leg: entry.leg, index: new Set(), triangles: []
+        slot: entry.owner === "body" ? "body" : view.items[entry.owner].slot,
+        order: entry.order, seq: Infinity, legVariant: entry.legVariant, leg: entry.leg, index: new Set(), triangles: [],
+        gatedBy: entry.legMask ? canonicalOf[entry.legMask.owner] : undefined
       }
       // seq: the live tie-break is monotone in (worn slot, range); a stable rank keeps it for any worn subset
       const localSeq = rank + entryRangeIndex(rig, entry)
@@ -246,7 +267,38 @@ function standLayers(rig, rigItemIds, canonicalOf) {
       groups.set(key, group)
     }
   }
+  add([], () => true)
+  add(rigItemIds, (entry) => entry.owner !== "body" && entry.legVariant === undefined)
+  const bottoms = ofSlot("bottom"), shoes = ofSlot("shoes")
+  for (const id of [...bottoms, ...shoes]) add([id], (entry) => entry.legVariant !== undefined)
+  for (const bottom of bottoms) for (const pair of shoes) add([pair, bottom], (entry) => entry.legVariant !== undefined)
   return [...groups.values()].sort((a, b) => a.order - b.order || a.seq - b.seq)
+}
+
+/**
+ * Packs a bottom's composed legs into one sheet per leg layer (cells stacked, a transparent gap between them), so
+ * the file count grows with bottoms, not with bottoms x shoes. Writes the sheets; returns each cell's source by key.
+ */
+async function packCutSheets(cut, rigId, files) {
+  const sheets = new Map(), sources = new Map()
+  for (const cell of cut) {
+    const key = sheetKey(cell.entry.owner, cell.entry.order)
+    sheets.set(key, [...(sheets.get(key) ?? []), cell])
+  }
+  for (const [key, cells] of sheets) {
+    const width = Math.max(...cells.map((c) => c.entry.rect[2]))
+    const height = cells.reduce((h, c) => h + c.entry.rect[3], 0) + SHEET_GAP * (cells.length - 1)
+    const sheet = Buffer.alloc(width * height * 4)
+    let y = 0
+    for (const cell of cells) {
+      const [, , w, h] = cell.entry.rect
+      for (let row = 0; row < h; row++) cell.pixels.copy(sheet, ((y + row) * width) * 4, row * w * 4, (row + 1) * w * 4)
+      sources.set(cell.entry.key, { key, rect: [0, y, w, h], sheet: [width, height] })
+      y += h + SHEET_GAP
+    }
+    files.set(`layers/${rigId}/full/${key}.webp`, await webp(sheet, width, height))
+  }
+  return sources
 }
 
 function entryRangeIndex(rig, entry) {
@@ -272,11 +324,15 @@ function windowsFor(view) {
   }
 }
 
-async function bakeBody(rigId, files) {
-  const rigDir = join(AVATAR, "rigs", RIG_DIRS[rigId])
+async function bakeBody(rigId, rigDir, files) {
   const rig = JSON.parse(readFileSync(join(rigDir, "rig25.json"), "utf8"))
   const view = rig.views.front
-  const artMap = art.AVATAR_ITEM_ART[rigId]
+  // a rig outside the repo (--rig, factory QA) names its items by their rig ids
+  const artMap = EXTERNAL ? Object.fromEntries(Object.keys(view.items).map((id) => [id, id])) : art.AVATAR_ITEM_ART[rigId]
+  // --worn a,b,c (with --rig): the look the one-pass evidence draws, else nothing worn
+  const starter = EXTERNAL
+    ? Object.fromEntries((option("--worn")?.split(",") ?? []).map((id) => [view.items[id].slot, id]))
+    : art.AVATAR_RIG_STARTER[rigId]
   const canonicalOf = Object.fromEntries(Object.entries(artMap).map(([canonical, rigItem]) => [rigItem, canonical]))
   const rigItemIds = Object.keys(canonicalOf).filter((id) => view.items[id]).sort((a, b) => SLOT_RANK[view.items[a].slot] - SLOT_RANK[view.items[b].slot])
   for (const id of rigItemIds) if ((view.items[id].lift ?? 0) !== 0) throw new Error(`${id} has a sole lift: stills need a lift offset first`)
@@ -312,7 +368,7 @@ async function bakeBody(rigId, files) {
   const toCanvas = (r) => [r[0] - canvas.x, r[1] - canvas.y, r[2], r[3]]
   const bustWin = toCanvas(windows.bust)
   const rendered = []
-  const full = [], bust = []
+  const drawn = [], bust = [], cut = []
   for (const layer of layers) {
     const buffer = new Float32Array(canvas.width * SS * canvas.height * SS * 4)
     for (const tri of layer.triangles.sort((a, b) => a.seq - b.seq)) rasterise(buffer, canvas, meshOf(tri.meshOwner), skinned.get(tri.meshOwner), tri.index, pages, maskOf(tri.legMask, meshOf))
@@ -320,8 +376,15 @@ async function bakeBody(rigId, files) {
     if (!rect) continue
     rendered.push({ layer, rgba, rect })
     const entry = { key: layer.key, owner: layer.owner, slot: layer.slot, order: layer.order, seq: layer.seq, rect,
-      ...(layer.leg ? { leg: layer.leg } : {}), ...(layer.legVariant !== undefined ? { legVariant: layer.legVariant } : {}) }
-    full.push(entry)
+      ...(layer.leg ? { leg: layer.leg } : {}), ...(layer.legVariant !== undefined ? { legVariant: layer.legVariant } : {}),
+      ...(layer.gatedBy ? { gatedBy: layer.gatedBy } : {}) }
+    drawn.push(entry)
+    if (layer.gatedBy) {
+      // a composed leg is a cell of its bottom's sheet; legs never reach the bust window
+      cut.push({ entry, pixels: crop(rgba, canvas, rect) })
+      if (rect[1] < bustWin[1] + bustWin[3]) throw new Error(`${rigId}: a composed leg reaches the bust window`)
+      continue
+    }
     files.set(`layers/${rigId}/full/${layer.key}.webp`, await webp(crop(rgba, canvas, rect), rect[2], rect[3]))
     // bust: the layer inside the bust window, scaled to 256 px; kept only when something of it is in the window
     const bust256 = await sharp(rgba, { raw: { width: canvas.width, height: canvas.height, channels: 4 } })
@@ -331,6 +394,8 @@ async function bakeBody(rigId, files) {
     bust.push({ ...entry, rect: bustRect })
     files.set(`layers/${rigId}/bust/${layer.key}.webp`, await webp(crop(bust256, { width: BUST_PX }, bustRect), bustRect[2], bustRect[3]))
   }
+  const sources = await packCutSheets(cut, rigId, files)
+  const full = drawn.map((entry) => (sources.has(entry.key) ? { ...entry, source: sources.get(entry.key) } : entry))
   // thumbs: each item alone (its own parts, never the bare legs it draws for a worn set), cropped, max 256 px
   const items = {}
   for (const rigItemId of rigItemIds) {
@@ -345,7 +410,7 @@ async function bakeBody(rigId, files) {
     files.set(`layers/${rigId}/thumb/${canonical}.webp`, thumb)
     items[canonical] = { slot: view.items[rigItemId].slot, rigItemId, thumb: canonical }
   }
-  const evidence = await seamEvidence(rigId, rig, rigItemIds, canonicalOf, rendered, canvas, meshOf, skinned, pages)
+  const evidence = await seamEvidence(rigId, rig, starter, artMap, rigItemIds, canonicalOf, rendered, canvas, meshOf, skinned, pages)
   return {
     manifest: {
       rigSha256: rigSha256(rigDir, rig),
@@ -354,7 +419,7 @@ async function bakeBody(rigId, files) {
       ground: [view.ground[0] - canvas.x, view.ground[1] - canvas.y],
       windows: { bust: bustWin, half: toCanvas(windows.half), full: toCanvas(windows.full) },
       bustPx: BUST_PX,
-      starter: art.AVATAR_RIG_STARTER[rigId],
+      starter,
       items,
       layers: { full, bust }
     },
@@ -378,19 +443,16 @@ function alphaRect(rgba, w, h) {
  * The starter outfit drawn in one pass (every sample overwritten in painter's order, as the GPU does) against the
  * stacked layers: the difference is only where two layers' soft edges meet (a still composites coverage).
  */
-async function seamEvidence(rigId, rig, rigItemIds, canonicalOf, rendered, canvas, meshOf, skinned, pages) {
-  const starterIds = Object.values(art.AVATAR_RIG_STARTER[rigId]).map((id) => art.AVATAR_ITEM_ART[rigId][id])
+async function seamEvidence(rigId, rig, starter, artMap, rigItemIds, canonicalOf, rendered, canvas, meshOf, skinned, pages) {
+  const starterIds = Object.values(starter).map((id) => artMap[id])
   const worn = rigItemIds.filter((id) => starterIds.includes(id))
   const buffer = new Float32Array(canvas.width * SS * canvas.height * SS * 4)
-  for (const entry of pose.avatar25StandEntries(rig, "front", worn)) rasterise(buffer, canvas, meshOf(entry.owner), skinned.get(entry.owner), entry.index, pages, maskOf(entry.legMask, meshOf))
+  const entries = pose.avatar25StandEntries(rig, "front", worn)
+  for (const entry of entries) rasterise(buffer, canvas, meshOf(entry.owner), skinned.get(entry.owner), entry.index, pages, maskOf(entry.legMask, meshOf))
   const single = resolveSamples(buffer, canvas).rgba
-  const legKey = pose.wornLegKey(worn.map((id) => rig.views.front.items[id].slot))
-  const replaced = new Set(rendered.filter((r) => worn.includes(r.layer.rigItemId) && r.layer.legVariant === legKey).map((r) => r.layer.leg))
-  const stack = rendered.filter(({ layer }) => {
-    if (layer.owner === "body") return !(layer.leg && replaced.has(layer.leg))
-    if (!worn.includes(layer.rigItemId)) return false
-    return layer.legVariant === undefined || layer.legVariant === legKey
-  })
+  // the layers of exactly the ranges the live renderer draws for this worn set
+  const drawnKeys = new Set(entries.map((entry) => entryKey(entry, canonicalOf)))
+  const stack = rendered.filter(({ layer }) => drawnKeys.has(layer.key))
   const stacked = composite(stack, canvas)
   let maxDiff = 0, sum = 0, over8 = 0
   for (let i = 0; i < single.length; i++) {
@@ -432,32 +494,47 @@ function mergeShowcase(rigId, body, files) {
 const files = new Map()
 const manifest = { bakerVersion: BAKER_VERSION, supersample: SS, bodies: {} }
 const evidence = []
-for (const rigId of Object.keys(RIG_DIRS)) {
-  const baked = await bakeBody(rigId, files)
-  manifest.bodies[rigId] = mergeShowcase(rigId, baked.manifest, files)
+const rigSources = EXTERNAL ? [[EXTERNAL[0], resolve(EXTERNAL[1])]] : Object.entries(RIG_DIRS).map(([rigId, dir]) => [rigId, join(AVATAR, "rigs", dir)])
+for (const [rigId, rigDir] of rigSources) {
+  const baked = await bakeBody(rigId, rigDir, files)
+  manifest.bodies[rigId] = EXTERNAL ? baked.manifest : mergeShowcase(rigId, baked.manifest, files)
   evidence.push(baked.evidence)
 }
-const keys = [...files.keys()].map((path) => path.replace(/^layers\//, "").replace(/\.webp$/, "")).sort()
-const outputs = new Map([...files.entries()].map(([path, bytes]) => [join(STILLS, path), bytes]))
-outputs.set(join(STILLS, "stillAssets.ts"), Buffer.from(stillAssetsSource(keys)))
-outputs.set(MANIFEST, Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`))
-
-if (CHECK) {
-  const stale = [...outputs.entries()].filter(([path, bytes]) => !existsSync(path) || sha256(readFileSync(path)) !== sha256(bytes)).map(([path]) => path)
-  const onDisk = existsSync(join(STILLS, "layers")) ? listFiles(join(STILLS, "layers")) : []
-  const extra = onDisk.filter((path) => !outputs.has(path))
-  if (stale.length || extra.length) {
-    console.error(`stills are stale: ${stale.length} differ, ${extra.length} extra\n${[...stale, ...extra].join("\n")}`)
-    process.exit(1)
+if (EXTERNAL) {
+  for (const [path, bytes] of files) {
+    mkdirSync(dirname(join(OUT_DIR, path)), { recursive: true })
+    writeFileSync(join(OUT_DIR, path), bytes)
   }
-  console.log(`stills up to date (${outputs.size} files)`)
+  writeFileSync(join(OUT_DIR, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`)
+  console.log(`wrote ${files.size} layers to ${OUT_DIR}`)
 } else {
-  rmSync(join(STILLS, "layers"), { recursive: true, force: true })
-  for (const [path, bytes] of outputs) {
-    mkdirSync(dirname(path), { recursive: true })
-    writeFileSync(path, bytes)
+  writeRepoOutputs()
+}
+
+/** The committed outputs: written, or (--check) compared byte for byte. */
+function writeRepoOutputs() {
+  const keys = [...files.keys()].map((path) => path.replace(/^layers\//, "").replace(/\.webp$/, "")).sort()
+  const outputs = new Map([...files.entries()].map(([path, bytes]) => [join(STILLS, path), bytes]))
+  outputs.set(join(STILLS, "stillAssets.ts"), Buffer.from(stillAssetsSource(keys)))
+  outputs.set(MANIFEST, Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`))
+
+  if (CHECK) {
+    const stale = [...outputs.entries()].filter(([path, bytes]) => !existsSync(path) || sha256(readFileSync(path)) !== sha256(bytes)).map(([path]) => path)
+    const onDisk = existsSync(join(STILLS, "layers")) ? listFiles(join(STILLS, "layers")) : []
+    const extra = onDisk.filter((path) => !outputs.has(path))
+    if (stale.length || extra.length) {
+      console.error(`stills are stale: ${stale.length} differ, ${extra.length} extra\n${[...stale, ...extra].join("\n")}`)
+      process.exit(1)
+    }
+    console.log(`stills up to date (${outputs.size} files)`)
+  } else {
+    rmSync(join(STILLS, "layers"), { recursive: true, force: true })
+    for (const [path, bytes] of outputs) {
+      mkdirSync(dirname(path), { recursive: true })
+      writeFileSync(path, bytes)
+    }
+    console.log(`wrote ${outputs.size} files (${files.size} layers)`)
   }
-  console.log(`wrote ${outputs.size} files (${files.size} layers)`)
 }
 const evidenceDir = process.env.BAKE_STILLS_EVIDENCE
 for (const e of evidence) {
