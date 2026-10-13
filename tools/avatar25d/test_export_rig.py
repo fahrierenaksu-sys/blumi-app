@@ -509,6 +509,16 @@ class ItemCardBoxTest(unittest.TestCase):
             self.ex.item_cards('shoes_a', {'sit': data_uri(Image.new('RGBA', (41, 30)))}, {'sit': (self.body, [0, 0])})
 
 
+class PoseOnlyTest(unittest.TestCase):
+    def test_a_part_drawn_in_some_poses_only_keeps_that_list_and_a_bad_list_stops_the_export(self):
+        ex = load_exporter()
+        self.assertEqual(ex.pose_only('top_a', 5, {'poseOnly': 'wave'}), ['wave'])
+        self.assertEqual(ex.pose_only('top_a', 3, {'poseOnly': ['walk', 'stand', 'walk']}), ['stand', 'walk'])
+        for bad in ([], ['run'], 'jump', 3):
+            with self.assertRaises(SystemExit):
+                ex.pose_only('top_a', 1, {'poseOnly': bad})
+
+
 MIXED_BOY = pathlib.Path.home() / 'BlumiArtWorkbench/avatar25-v2/factory/work/boy_pipeline_v8/smoke/basic_a/post/rig.json'
 
 

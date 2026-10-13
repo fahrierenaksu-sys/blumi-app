@@ -549,3 +549,34 @@ test("seated cards cut to their own box move exactly as the same rows of a full 
   // a card wholly above the band never moves
   assert.equal(seatedCardStrips(card(10, 90), band, 7, 9), null)
 })
+
+test("a part drawn in some poses only (poseOnly, e.g. the boy's wave-only hip patch) is drawn in exactly those poses", () => {
+  // Arrange: a top and a bottom whose factory parts carry poseOnly lists
+  const worn = ["top_male_c3", "bottom_male_c3"]
+  const v = maleRig.views.front
+  const compiled = compileAvatar(maleRig, "front", worn)
+  const drawnIn = (pose: "stand" | "sit" | "wave") => {
+    const k = poseVariant(pose, -1)
+    return new Set(compiled.indexData.subarray(compiled.variants[k * 2], compiled.variants[k * 2] + compiled.variants[k * 2 + 1]))
+  }
+  const drawn = { stand: drawnIn("stand"), sit: drawnIn("sit"), wave: drawnIn("wave") }
+  let offset = v.mesh.pos.length / 2
+  let checked = 0
+  for (const id of worn) {
+    const mesh = v.items[id].mesh
+    for (const r of mesh.ranges) {
+      if (!r.poseOnly) continue
+      const vertices = Array.from(mesh.index.slice(r.start, r.start + r.count), (i) => i + offset)
+      for (const pose of ["stand", "wave"] as const) {
+        // Act + Assert: in its poses every vertex is drawn, in the others none is
+        const shown = vertices.filter((i) => drawn[pose].has(i)).length
+        assert.equal(shown, r.poseOnly.includes(pose) ? vertices.length : 0, `${id} ${r.name} ${pose}`)
+      }
+      if (!r.poseOnly.includes("sit")) assert.ok(vertices.every((i) => !drawn.sit.has(i)), `${id} ${r.name} sit`)
+      checked++
+    }
+    offset += mesh.pos.length / 2
+  }
+  assert.ok(checked > 0, "the boy rig carries poseOnly parts")
+  assert.ok(v.items.bottom_male_c3.mesh.ranges.some((r) => r.poseOnly?.join() === "wave"), "the bottom's wave-only hip patch is exported")
+})

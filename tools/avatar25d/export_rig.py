@@ -25,6 +25,7 @@ item without `pngMirror` exports exactly as before.
 Leg drawings (`hybrid.legVariants`) are exported per item: each bottom owns a 'bottom' range and each pair of shoes a
 'shoes' range per leg (keys may name slots or rig item ids); the runtime composes any worn pair as the AND of the two
 (leg_variant_owners). Item sit / wave cards may carry their own sheet box (`sitBox` / `waveBox`, item_cards).
+An item part with `poseOnly` (e.g. ['wave']) exports its range with that list; the runtime draws it in those poses only.
 
 --motion (or a `motion` already inside a rig view): the retargeted 3D walk (lab40, rig25d/walk3d/v3/a4). Each view
 with one carries it as `motion` (per key pose: hips offset, near-leg-in-front flag, turn + stretch per bone in the
@@ -632,6 +633,18 @@ def leg_variant_owners(leg_variants, items):
     return owners
 
 
+POSES = ('stand', 'walk', 'sit', 'wave')
+
+
+def pose_only(iid, k, part):
+    """A part's `poseOnly` as a list, checked: one known pose or a non-empty list of them (the lab, doll25.js, takes
+    both: `[].concat(poseOnly)`); the runtime draws the part in those poses only."""
+    poses = [part['poseOnly']] if isinstance(part['poseOnly'], str) else part['poseOnly']
+    if not isinstance(poses, list) or not poses or any(p not in POSES for p in poses):
+        raise SystemExit(f'{iid} part {k}: bad poseOnly {poses!r} (a non-empty list of {POSES})')
+    return sorted(set(poses), key=POSES.index)
+
+
 def item_cards(iid, it, body_cards):
     """{pose: (card image, sheet box [x, y])} of an item's seated / waving cards. Without `sitBox` / `waveBox` a card
     is the body card's size and sits at the body's box (one fit: every card shares the union box). With one, the
@@ -748,9 +761,12 @@ def export_view(name, v, motion=None):
         lower = it['slot'] in LOWER_SLOTS
         for k, p in enumerate(it.get('parts', [])):
             stand_only = lower and p['layer'] in ('torso', 'farLeg', 'nearLeg')
+            # a part drawn in some poses only (factory `poseOnly`, e.g. a bottom's wave-only hip patch over the waving
+            # torso's briefs) carries that list; parts without one export exactly as before
+            only = {'poseOnly': pose_only(iid, k, p)} if p.get('poseOnly') else {}
             im.add_range(f'part{k}', layer_order.get(p['layer'], 3) + f,
                          lambda p=p, k=k: im.skinned(p, ir[f'part{k}'], PAGE, bone_idx, page, ARM_CODE.get(p['layer'], 0)),
-                         layer=p['layer'], standOnly=stand_only)
+                         layer=p['layer'], standOnly=stand_only, **only)
         body_layers = {L['name']: L for L in v['layers']}
         for key, out_key in variant_owner.get(iid, []):
             for ln in sorted(leg_variants[key]):

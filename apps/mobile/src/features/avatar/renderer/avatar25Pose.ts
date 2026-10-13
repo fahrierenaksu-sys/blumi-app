@@ -226,6 +226,8 @@ function itemPoseMask(range: Rig25Mesh["ranges"][number], v: Rig25View, motion: 
   if (range.name === "sit") return { mask: sit, frame: -1 }
   if (range.name === "wave") return { mask: wave, frame: -1 }
   let mask = SLOT_ORDER_ALL
+  // a part drawn in some poses only (lab40 doll25 `poseOnly`), on top of every other rule
+  if (range.poseOnly) mask &= range.poseOnly.reduce((m, pose) => m | (POSE_BITS[pose] ?? 0), 0)
   if (range.standOnly) mask &= ~(sit | (skinnedWalk ? 0 : walk))
   if (range.layer === "nearArm") mask &= ~wave
   if ((range.layer === "nearArm" && (cardArms.includes("near") || v.sit.hideArms)) ||
