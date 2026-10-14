@@ -449,7 +449,7 @@ function clonePreferences(preferences: NotificationPreferences): NotificationPre
   }
 }
 
-function isEnabled(preferences: NotificationPreferences, type: NotificationValueType): boolean {
+export function isEnabled(preferences: NotificationPreferences, type: NotificationValueType): boolean {
   switch (type) {
     case "like": return preferences.likesEnabled
     case "message": return preferences.messagesEnabled
@@ -458,7 +458,7 @@ function isEnabled(preferences: NotificationPreferences, type: NotificationValue
   }
 }
 
-function isWithinQuietHours(now: Date, preferences: NotificationPreferences): boolean {
+export function isWithinQuietHours(now: Date, preferences: NotificationPreferences): boolean {
   const quietHours = preferences.quietHours
   if (!quietHours) return false
   const local = new Date(now.getTime() + preferences.quietHoursUtcOffsetMinutes * 60_000)
