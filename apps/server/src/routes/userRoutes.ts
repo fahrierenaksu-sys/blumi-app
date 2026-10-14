@@ -16,7 +16,7 @@ import {
 import type { AvatarService } from "../avatar/avatarService"
 import type { CapabilityService } from "../capabilities/capabilityService"
 import {
-  projectAvatarSelectionForRead,
+  projectOwnAvatarSelectionForRead,
   resolveRequestCapabilities
 } from "../avatar/avatarReadProjection"
 import {
@@ -245,9 +245,9 @@ export async function registerUserRoutes(
         ...resolved.account.profile,
         avatar: resolved.account.profile.avatar.loadout &&
             typeof resolved.account.profile.avatar.revision === "number"
-          ? projectAvatarSelectionForRead(
+          ? projectOwnAvatarSelectionForRead(
               resolved.account.profile.avatar as CompleteAvatarSelection,
-              requestCapabilities.capabilities.avatar_loadout_v2_read
+              requestCapabilities.capabilities
             )
           : { ...resolved.account.profile.avatar }
       },
@@ -358,8 +358,6 @@ export async function registerUserRoutes(
         error: "Update Blumi before saving this avatar."
       })
     }
-    const allowAvatarLoadoutV2 =
-      requestCapabilities.capabilities.avatar_loadout_v2_read
     const result = await avatarService.saveAvatar(sessionToken, {
       loadout: body.loadout,
       revision: body.revision,
@@ -375,17 +373,17 @@ export async function registerUserRoutes(
       return reply.code(409).send({
         code: "AVATAR_REVISION_CONFLICT",
         error: "Your avatar changed on another device. Refresh and try again.",
-        current: projectAvatarSelectionForRead(
+        current: projectOwnAvatarSelectionForRead(
           result.current,
-          allowAvatarLoadoutV2
+          requestCapabilities.capabilities
         )
       })
     }
     announceChatIdentity(resolvedSession.account.userId)
     return {
-      avatar: projectAvatarSelectionForRead(
+      avatar: projectOwnAvatarSelectionForRead(
         result.selection,
-        allowAvatarLoadoutV2
+        requestCapabilities.capabilities
       )
     }
   })
