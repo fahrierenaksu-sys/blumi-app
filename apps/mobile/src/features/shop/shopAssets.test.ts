@@ -44,11 +44,17 @@ test("visible thumbnail metadata stays bound to the resolved source geometry", a
   }
 
   // Garment-only overrides replace square thumbnails that show the whole
-  // character; their bounds must match the garment layer they point at.
+  // character; their bounds must match the garment layer they point at. A
+  // piece the 2.5D rig draws resolves to its tight baked still instead, which
+  // must carry no pre-2.5D bounds at all.
   for (const { id } of AVATAR_V2_CATALOG) {
     if (!getGarmentThumbnailOverride(id)) continue
     const source = getShopProductThumbnailSource(id) as string
     const bounds = getShopProductThumbnailBounds(id)
+    if (source.endsWith(`/thumb/${id}.webp`)) {
+      assert.equal(bounds, undefined, `${id}: a baked still must not be cropped with pre-2.5D bounds`)
+      continue
+    }
     assert.ok(bounds, `${id}: missing visible bounds`)
     assert.deepEqual(bounds, await measureVisibleBounds(source), `${id}: regenerate the garment override bounds`)
   }
