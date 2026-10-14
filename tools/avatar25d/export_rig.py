@@ -78,6 +78,10 @@ SLOT_ORDER = {'shoes': 0.15, 'bottom': 0.3, 'top': 0.45, 'dress': 0.45, 'glasses
 LOWER_Z = 2.5
 LOWER_SLOTS = {'shoes', 'bottom'}
 NEW_KIND_SLOTS = ('dress', 'glasses', 'accessory')
+# An accessory may name its catalog group (`group`, the domain `accessoryGroup`); a group listed here takes its own offset
+# instead of .70: earrings 4.55 sit under the fringe 4.6 (review slots_1330 LOW-1). Eyewear is the `glasses` slot.
+ACCESSORY_GROUPS = ('headwear', 'earrings', 'neck', 'bag', 'hairClip')
+ACCESSORY_GROUP_ORDER = {'earrings': 0.55}
 GLASSES_LAYERS = ('head',)
 LEG_LAYERS = ('farLeg', 'nearLeg')
 
@@ -600,11 +604,14 @@ LEG_ROLES = ('bottom', 'shoes')
 LEG_ROLE_OF_SLOT = {'bottom': 'bottom', 'dress': 'bottom', 'shoes': 'shoes'}
 
 
-def slot_order(iid, slot):
-    """The draw-order offset of an item's slot; an unknown slot stops the export (it used to become 0.5 silently)."""
+def slot_order(iid, slot, group=None):
+    """The draw-order offset of an item's slot (or its accessory group); an unknown slot or group stops the export."""
     if slot not in SLOT_ORDER:
         raise SystemExit(f'{iid}: unknown slot {slot!r} (one of {sorted(SLOT_ORDER)})')
-    return SLOT_ORDER[slot]
+    if group is not None and (slot != 'accessory' or group not in ACCESSORY_GROUPS):
+        raise SystemExit(f'{iid}: group {group!r} is for accessories only, one of {list(ACCESSORY_GROUPS)} '
+                         '(glasses use the glasses slot)')
+    return ACCESSORY_GROUP_ORDER.get(group, SLOT_ORDER[slot])
 
 
 def part_stand_only(slot, layer):
@@ -616,13 +623,17 @@ def part_stand_only(slot, layer):
 
 
 def check_item_slots(rig):
-    """Export gates for the item kinds (DESIGN slots_2140 §10): every item's slot is known; glasses draw only on the head;
-    a dress, glasses or accessory exists in both views (the back may have no parts). Stops the export on the first
-    problem. Pure."""
+    """Export gates for the item kinds (DESIGN slots_2140 §10): every item's slot (and accessory group) is known; glasses
+    draw only on the head; a dress, glasses or accessory exists in both views (glasses and accessories may have no parts
+    in the back); a dress has torso fabric in every view and walk cards in both views or neither (review slots_1330
+    MEDIUM-1: a drawn dress hides the top and bottom, so a bare view would show the body). Stops on the first problem.
+    Pure."""
     views = {n: v for n, v in rig.items() if n in ('front', 'back')}
     for name, v in sorted(views.items()):
         for iid, it in sorted(v.get('items', {}).items()):
-            slot_order(iid, it.get('slot'))
+            slot_order(iid, it.get('slot'), it.get('group'))
+            if it['slot'] == 'dress' and 'torso' not in {p['layer'] for p in it.get('parts', [])}:
+                raise SystemExit(f'{iid} ({name}): a dress needs torso parts in every view')
             if it['slot'] == 'glasses':
                 bad = sorted({p['layer'] for p in it.get('parts', [])} - set(GLASSES_LAYERS))
                 if bad:
@@ -631,6 +642,8 @@ def check_item_slots(rig):
                 other = next(n for n in views if n != name)
                 if iid not in views[other].get('items', {}):
                     raise SystemExit(f'{iid}: a {it["slot"]} needs the {other} view too (it may have no parts)')
+                if it['slot'] == 'dress' and bool(it.get('walk')) != bool(views[other]['items'][iid].get('walk')):
+                    raise SystemExit(f'{iid}: a dress has walk cards in both views or in neither')
 
 
 def _leg_part(part, items, slot_item, keyed=frozenset()):
@@ -807,7 +820,7 @@ def export_view(name, v, motion=None):
         page_taken.setdefault(page, []).extend(ir.values())
         items_src.append((iid, it, page))
         im = Mesh()
-        f = slot_order(iid, it['slot'])
+        f = slot_order(iid, it['slot'], it.get('group'))
         for k, p in enumerate(it.get('parts', [])):
             stand_only = part_stand_only(it['slot'], p['layer'])
             # a part drawn in some poses only (factory `poseOnly`, e.g. a bottom's wave-only hip patch over the waving
@@ -837,8 +850,8 @@ def export_view(name, v, motion=None):
             for i, fr in enumerate(wl['frames']):
                 uvr = (iw[0] + fr['cell'][0], iw[1] + fr['cell'][1], cw, ch)
                 im.add_range(f'walk{i}', LOWER_Z + f, lambda fr=fr, uvr=uvr: im.quad(fr['x'], fr['y'], fr['w'], fr['h'], None, PAGE, ROOT, uvr, page))
-        items[iid] = {'slot': it['slot'], 'lift': it.get('lift', 0), 'page': page,
-                      'hasWalk': has_walk, 'mesh': im.dump()}
+        items[iid] = {'slot': it['slot'], **({'group': it['group']} if it.get('group') else {}),
+                      'lift': it.get('lift', 0), 'page': page, 'hasWalk': has_walk, 'mesh': im.dump()}
 
     blink_keeps = {}   # stored page -> the item patches whose untouched texels are copied back after resizing
     if blink is not None:

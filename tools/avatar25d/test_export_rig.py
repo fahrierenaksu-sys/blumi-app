@@ -600,6 +600,31 @@ class ItemKindGateTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.er.leg_variant_owners({'hair_a': {}}, items)
 
+    def test_a_dress_needs_torso_fabric_in_both_views_and_walk_cards_in_both_or_neither(self):
+        # review slots_1330 MEDIUM-1: an empty back would skip the top and bottom and draw a bare body from behind
+        check = self.er.check_item_slots
+        dress = {'slot': 'dress', 'parts': [{'layer': 'torso'}, {'layer': 'nearLeg'}]}
+        check(self.rig({'d': dress}))
+        check(self.rig({'d': {**dress, 'walk': 'card'}}, {'d': {**dress, 'walk': 'card'}}))
+        for back in ({'slot': 'dress', 'parts': []}, {'slot': 'dress', 'parts': [{'layer': 'nearLeg'}]}):
+            with self.assertRaises(SystemExit):
+                check(self.rig({'d': dress}, {'d': back}))
+        with self.assertRaises(SystemExit):
+            check(self.rig({'d': {**dress, 'walk': 'card'}}, {'d': dress}))
+
+    def test_earrings_draw_under_the_fringe_and_an_accessory_group_is_checked(self):
+        # review slots_1330 LOW-1: earrings sit under hair that falls over the ears; other accessories keep .70
+        order = self.er.slot_order
+        self.assertLess(4 + order('g', 'glasses'), 4 + order('e', 'accessory', 'earrings'))
+        self.assertLess(4 + order('e', 'accessory', 'earrings'), 4 + order('h', 'hair'))
+        self.assertEqual(order('a', 'accessory', 'hairClip'), order('a', 'accessory'))
+        check = self.er.check_item_slots
+        check(self.rig({'e': {'slot': 'accessory', 'group': 'earrings', 'parts': [{'layer': 'head'}]}}))
+        for bad in ({'slot': 'accessory', 'group': 'eyewear', 'parts': []}, {'slot': 'accessory', 'group': 'cape', 'parts': []},
+                    {'slot': 'top', 'group': 'earrings', 'parts': []}):
+            with self.assertRaises(SystemExit):
+                check(self.rig({'x': bad}))
+
 
 @unittest.skipUnless(SRC.exists(), 'lab39 rig not on this machine')
 class ExportItemKindsTest(unittest.TestCase):
