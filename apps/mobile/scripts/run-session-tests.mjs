@@ -161,6 +161,7 @@ try {
       "src/features/session/onboardingWelcomeHomeModel.test.ts",
       "src/features/session/onboardingWorldClockModel.test.ts",
       "src/features/session/profileSetupValidation.test.ts",
+      "src/features/session/profilePreferencesRoundTrip.test.ts",
       "src/features/session/onboardingWorldCompositionModel.test.ts",
       "src/features/session/profileCharacterReactionModel.test.ts",
       "src/features/session/ProfileInterestsField.test.ts",

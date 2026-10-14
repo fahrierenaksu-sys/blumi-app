@@ -1,5 +1,6 @@
 import { ACCOUNT_RECOVERY_REQUIRED_MESSAGE } from "./accountRecoveryCopy"
 import {
+  normalizeDiscoveryPreferences,
   normalizeOnboardingStatus,
   normalizeSessionActor,
   type OnboardingStatus,
@@ -8,6 +9,7 @@ import {
 } from "./sessionModel"
 import {
   type CapabilityMap,
+  isProfileGender,
   normalizeUserProfilePrompts,
   type DiscoveryPreferences,
   type ProfileGender,
@@ -518,10 +520,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object"
 }
 
+const UNREADABLE_PROFILE_MESSAGE = "Blumi could not read your saved profile."
+
+/**
+ * Older accounts may have no identity or discovery preferences yet; those stay
+ * undefined. A value the server did send but that fails validation is an
+ * error, so an unreadable preference never silently turns into the defaults
+ * that a later save would write back over the account.
+ */
+function normalizeProfilePreferenceFields(
+  record: Record<string, unknown>
+): Pick<UserProfile, "identityGender" | "discoveryPreferences"> {
+  const rawIdentity = record.identityGender
+  if (rawIdentity != null && !isProfileGender(rawIdentity)) {
+    throw new Error(UNREADABLE_PROFILE_MESSAGE)
+  }
+  const rawPreferences = record.discoveryPreferences
+  const discoveryPreferences = normalizeDiscoveryPreferences(rawPreferences)
+  if (rawPreferences != null && !discoveryPreferences) {
+    throw new Error(UNREADABLE_PROFILE_MESSAGE)
+  }
+  return {
+    identityGender: isProfileGender(rawIdentity) ? rawIdentity : undefined,
+    discoveryPreferences
+  }
+}
+
 function normalizeUserProfilePayload(payload: unknown): UserProfile {
   const profile = (payload as { profile?: unknown } | null)?.profile
   if (!profile || typeof profile !== "object") {
-    throw new Error("Blumi could not read your saved profile.")
+    throw new Error(UNREADABLE_PROFILE_MESSAGE)
   }
   const record = profile as Partial<UserProfile>
   const avatar = record.avatar
@@ -532,14 +560,18 @@ function normalizeUserProfilePayload(payload: unknown): UserProfile {
     (record.age !== undefined && typeof record.age !== "number") ||
     !normalizedAvatar
   ) {
-    throw new Error("Blumi could not read your saved profile.")
+    throw new Error(UNREADABLE_PROFILE_MESSAGE)
   }
+  const preferenceFields = normalizeProfilePreferenceFields(
+    profile as Record<string, unknown>
+  )
   return {
     userId: record.userId,
     displayName: record.displayName,
     age: record.age,
     bio: typeof record.bio === "string" ? record.bio : undefined,
     gender: typeof record.gender === "string" ? record.gender : undefined,
+    ...preferenceFields,
     interests: Array.isArray(record.interests)
       ? record.interests.filter((item): item is string => typeof item === "string")
       : undefined,

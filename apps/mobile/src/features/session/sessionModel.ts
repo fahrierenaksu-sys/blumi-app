@@ -339,7 +339,7 @@ function normalizeOptionalStringArray(value: unknown): string[] | undefined {
   return strings.length > 0 ? [...strings] : undefined
 }
 
-function normalizeDiscoveryPreferences(
+export function normalizeDiscoveryPreferences(
   value: unknown
 ): UserProfile["discoveryPreferences"] {
   if (!value || typeof value !== "object") return undefined
