@@ -3,6 +3,7 @@ import test from "node:test"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../testing/hookHarness"
 import * as apiRequestError from "../network/apiRequestError"
 import * as sensitiveReauthGate from "../session/sensitiveReauthGate"
+import { createPendingPhoneChangeStore } from "./pendingPhoneChangeStore"
 
 // Drives the real usePhoneChange hook through its own API. Only the Firebase
 // and Blumi API boundaries are fakes. Phone numbers are obviously fake.
@@ -21,7 +22,28 @@ const timeoutError = () => Object.assign(new Error("timed out"), { name: "Timeou
 
 const mountedHolders: Array<{ release: (() => void) | null }> = []
 
-function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
+/**
+ * What outlives one mount of the hook: Firebase's signed-in phone, the
+ * server's account phone and session, and the device's secure storage. A new
+ * mount over the same world is an app restart.
+ */
+interface FakeWorld {
+  firebasePhone: string
+  accountPhone: string
+  sessionValid: boolean
+  storage: Map<string, string>
+  proofTtlMs: number
+  revokes: number
+}
+
+function createWorld(): FakeWorld {
+  return { firebasePhone: OLD_PHONE, accountPhone: OLD_PHONE, sessionValid: true, storage: new Map(), proofTtlMs: 600_000, revokes: 0 }
+}
+
+/** The change reached the server, but the client sees `error` instead of the answer. */
+type ConfirmOutcome = Error | "ok" | { landedThen: Error }
+
+function mountPhoneChange(confirmOutcomes: ConfirmOutcome[], world: FakeWorld = createWorld()) {
   // Each test starts with no re-auth hold left open by an earlier test.
   for (const holder of mountedHolders.splice(0)) holder.release?.()
   const runtime = createFakeReactRuntime()
@@ -35,7 +57,6 @@ function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
     proofsSent: [] as string[],
     events: [] as string[]
   }
-  let firebasePhone = OLD_PHONE
   const reauthHolder: { release: (() => void) | null } = { release: null }
   mountedHolders.push(reauthHolder)
   let verifyCount = 0
@@ -60,27 +81,50 @@ function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
         "../session/firebasePhoneAuth": {
           confirmFirebasePhoneCode: async (confirmation: { phone: string }) => {
             calls.firebaseConfirms += 1
-            firebasePhone = confirmation.phone // Firebase signs in as the confirmed phone.
+            world.firebasePhone = confirmation.phone // Firebase signs in as the confirmed phone.
             return "fake-id-token"
           },
-          getFirebaseCurrentPhoneNumber: () => firebasePhone,
+          getFirebaseCurrentPhoneNumber: () => world.firebasePhone,
+          getFirebaseCurrentIdToken: async () => "fake-current-id-token",
           requestFirebasePhoneCode: async (phone: string) => {
             calls.codeRequests.push(phone)
             return { phone }
           }
         },
+        "./pendingPhoneChange": {
+          pendingPhoneChange: createPendingPhoneChangeStore({
+            getItem: async (key) => world.storage.get(key) ?? null,
+            setItem: async (key, value) => { world.storage.set(key, value) },
+            removeItem: async (key) => { world.storage.delete(key) }
+          })
+        },
         "../session/sessionApi": {
+          fetchProductionAccountSnapshot: async () => {
+            if (!world.sessionValid) throw serverError(401, "session_invalid")
+            return {}
+          },
+          // Sign-in only: the server finds the account that owns Firebase's phone.
+          completeFirebaseAccount: async (_url: string, input: { authIntent: string }) => {
+            assert.equal(input.authIntent, "sign-in", "the probe must never create an account")
+            if (world.firebasePhone !== world.accountPhone) throw new Error("fake no account")
+            return { session: { userId: actor.session.userId, sessionToken: "fake-probe-token" } }
+          },
+          revokeProductionSession: async () => { world.revokes += 1 },
           requestFirebaseAccountActionChallenge: async () => ({ challengeId: "fake-challenge" }),
           verifyFirebaseAccountAction: async () => {
             verifyCount += 1
-            return { confirmationToken: `fake-proof-${verifyCount}`, expiresAt: new Date(Date.now() + 600_000).toISOString() }
+            return { confirmationToken: `fake-proof-${verifyCount}`, expiresAt: new Date(Date.now() + world.proofTtlMs).toISOString() }
           },
           confirmPhoneChange: async (_url: string, _token: string, _current: string, next: string) => {
             calls.confirm += 1
             calls.events.push("confirm")
             calls.proofsSent.push(next)
             const outcome = confirmOutcomes.shift() ?? "ok"
-            if (outcome !== "ok") throw outcome
+            if (outcome instanceof Error) throw outcome
+            // Landed: the account takes the new phone and every session ends.
+            world.accountPhone = world.firebasePhone
+            world.sessionValid = false
+            if (outcome !== "ok") throw outcome.landedThen
           }
         },
         "../session/settingsActionErrorCopy": {
@@ -116,7 +160,7 @@ function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
     alertButtons[1].onPress?.()
     await tick()
   }
-  return { calls, hook, startFlow, restartFlow, firebasePhone: () => firebasePhone }
+  return { calls, hook, startFlow, restartFlow, world, firebasePhone: () => world.firebasePhone }
 }
 
 test("a transient failure while finishing keeps the new-phone proof and the retry reaches the API", async () => {
@@ -134,7 +178,7 @@ test("a transient failure while finishing keeps the new-phone proof and the retr
 })
 
 test("a lost success response is recovered when the retry finds the old session already ended", async () => {
-  const f = mountPhoneChange([timeoutError(), serverError(401, "session_invalid")])
+  const f = mountPhoneChange([{ landedThen: timeoutError() }, serverError(401, "session_invalid")])
   await f.startFlow()
 
   await f.hook().verifyNewPhoneChangeCode()
@@ -186,4 +230,78 @@ test("token refresh is held from the first SMS challenge until the new phone is 
   assert.equal(openWhileCodePending, true)
   assert.equal(openAfterVerified, false, "the proof is no longer bound to the token")
   assert.equal(sensitiveReauthGate.isSensitiveReauthOpen(), false)
+})
+
+test("a restart after the app was closed mid-change texts the account's original phone, not Firebase's", async () => {
+  const world = createWorld()
+  const firstLaunch = mountPhoneChange([serverError(503, "server_unavailable")], world)
+  await firstLaunch.startFlow()
+  await firstLaunch.hook().verifyNewPhoneChangeCode()
+  assert.notEqual(world.firebasePhone, OLD_PHONE, "Firebase is on the new phone while Blumi kept the old one")
+
+  const nextLaunch = mountPhoneChange([], world)
+  await nextLaunch.restartFlow()
+
+  assert.deepEqual(nextLaunch.calls.codeRequests, [OLD_PHONE])
+})
+
+test("a finished change forgets the pending original phone", async () => {
+  const world = createWorld()
+  const f = mountPhoneChange(["ok"], world)
+  await f.startFlow()
+
+  await f.hook().verifyNewPhoneChangeCode()
+
+  assert.equal(f.calls.resets, 1)
+  assert.equal(world.storage.size, 0)
+})
+
+test("a 401 from a session revoked for another reason is not reported as a phone change", async () => {
+  const world = createWorld()
+  const f = mountPhoneChange([serverError(503, "server_unavailable"), serverError(401, "session_invalid")], world)
+  await f.startFlow()
+  await f.hook().verifyNewPhoneChangeCode()
+  world.sessionValid = false // signed out elsewhere; the change never landed
+
+  await f.hook().verifyNewPhoneChangeCode()
+
+  assert.equal(world.accountPhone, OLD_PHONE)
+  assert.equal(f.calls.toasts.some((toast) => toast.startsWith("success:")), false)
+  assert.equal(f.calls.toasts.at(-1), "warning:phoneChangeUnconfirmed")
+  assert.equal(f.calls.resets, 1, "the ended session still signs out")
+})
+
+test("an expired proof with an open outcome restarts the flow instead of dead-ending", async () => {
+  const world = createWorld()
+  world.proofTtlMs = 1
+  const f = mountPhoneChange([serverError(503, "server_unavailable")], world)
+  await f.startFlow()
+  await f.hook().verifyNewPhoneChangeCode()
+  await tick()
+
+  await f.hook().verifyNewPhoneChangeCode()
+
+  assert.equal(f.calls.confirm, 1, "an expired proof is never sent")
+  assert.equal(f.calls.toasts.at(-1), "warning:phoneChangeExpired")
+  assert.equal(f.hook().phoneChangeVisible, false)
+  assert.equal(f.calls.resets, 0)
+  await f.restartFlow()
+  assert.equal(f.calls.codeRequests.at(-1), OLD_PHONE)
+})
+
+test("an expired proof whose lost request had landed finishes as a success", async () => {
+  const world = createWorld()
+  world.proofTtlMs = 1
+  const f = mountPhoneChange([{ landedThen: timeoutError() }], world)
+  await f.startFlow()
+  await f.hook().verifyNewPhoneChangeCode()
+  await tick()
+
+  await f.hook().verifyNewPhoneChangeCode()
+
+  assert.equal(f.calls.confirm, 1)
+  assert.equal(f.calls.resets, 1)
+  assert.ok(f.calls.toasts.at(-1)?.startsWith("success:"))
+  assert.equal(world.revokes, 1, "the probe's sign-in session is revoked")
+  assert.equal(world.storage.size, 0)
 })

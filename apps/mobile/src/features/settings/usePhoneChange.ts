@@ -10,6 +10,7 @@ import {
 import type { AppLocale } from "../session/appLocale"
 import {
   confirmFirebasePhoneCode,
+  getFirebaseCurrentIdToken,
   getFirebaseCurrentPhoneNumber,
   requestFirebasePhoneCode,
   type FirebasePhoneConfirmation
@@ -20,8 +21,11 @@ import {
   type PhoneCountryCode
 } from "../session/registerFlowModel"
 import {
+  completeFirebaseAccount,
   confirmPhoneChange,
+  fetchProductionAccountSnapshot,
   requestFirebaseAccountActionChallenge,
+  revokeProductionSession,
   verifyFirebaseAccountAction
 } from "../session/sessionApi"
 import type { SessionActor } from "../session/sessionModel"
@@ -29,6 +33,7 @@ import {
   getSettingsActionErrorMessageForDisplay,
   getSettingsVerificationErrorToastForDisplay
 } from "../session/settingsActionErrorCopy"
+import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import {
   INITIAL_PHONE_CHANGE_FORM_STATE,
@@ -45,23 +50,53 @@ interface NewPhoneProof {
 function isProofUsable(proof: NewPhoneProof | null, nowMs = Date.now()): proof is NewPhoneProof {
   if (!proof) return false
   const expiresAtMs = new Date(proof.expiresAt).getTime()
-  return !Number.isFinite(expiresAtMs) || expiresAtMs > nowMs
+  return Number.isFinite(expiresAtMs) && expiresAtMs > nowMs
 }
 
-type FinalisingFailure = "retry" | "completed" | "new_number" | "restart"
+type FinalisingFailure = "retry" | "check_outcome" | "new_number" | "restart"
+
+/**
+ * What the server says about an attempt whose answer was lost.
+ * - landed: the account now has the new phone.
+ * - not_landed: the session is still valid, which a landed change never leaves.
+ * - session_ended: the session ended, but no account owns the new phone.
+ * - unknown: the server could not be asked (network, outage).
+ */
+type PhoneChangeOutcome = "landed" | "not_landed" | "session_ended" | "unknown"
+
+async function probePhoneChangeOutcome(sessionActor: SessionActor): Promise<PhoneChangeOutcome> {
+  try {
+    await fetchProductionAccountSnapshot(MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken)
+    return "not_landed"
+  } catch (error) {
+    if (!isSessionInvalidError(error)) return "unknown"
+  }
+  // The session ended. Firebase holds the verified new phone: a sign-in-only
+  // request (never a registration) shows which account owns it now.
+  try {
+    const idToken = await getFirebaseCurrentIdToken()
+    if (!idToken) return "session_ended"
+    const probe = await completeFirebaseAccount(MOBILE_HTTP_BASE_URL, { idToken, authIntent: "sign-in" })
+    // The probe's session is not used; the flow signs out either way.
+    void revokeProductionSession(MOBILE_HTTP_BASE_URL, probe.session.sessionToken).catch(() => undefined)
+    return probe.session.userId === sessionActor.session.userId ? "landed" : "session_ended"
+  } catch {
+    return "session_ended"
+  }
+}
 
 /**
  * How a failed final confirmation is resolved. The new-phone proof is kept
  * while the outcome is still open. A transient failure may have reached the
- * server (lost response); the change deletes every session of the account, so
- * a later verified invalid session means it landed.
+ * server (lost response); a later verified invalid session may mean it landed
+ * or that the session was revoked for another reason, so the server is asked.
  */
 function classifyFinalisingFailure(
   error: unknown,
   outcomeUnknown: boolean
 ): FinalisingFailure {
   if (isRetryableRequestFailure(error)) return "retry"
-  if (isSessionInvalidError(error) && outcomeUnknown) return "completed"
+  if (isSessionInvalidError(error) && outcomeUnknown) return "check_outcome"
   if (error instanceof ApiRequestError && error.code === "conflict") return "new_number"
   return "restart"
 }
@@ -125,8 +160,12 @@ export function usePhoneChange(input: {
     }
     setIsChangingPhone(true)
     try {
+      // After an interrupted change Firebase may hold the new phone; the
+      // account's original phone is kept in secure storage until it ends.
       const currentPhoneNumber =
-        verifiedCurrentPhoneRef.current ?? getFirebaseCurrentPhoneNumber()
+        verifiedCurrentPhoneRef.current ??
+        (await pendingPhoneChange.readOrigin(sessionActor.session.userId)) ??
+        getFirebaseCurrentPhoneNumber()
       if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
       verifiedCurrentPhoneRef.current = currentPhoneNumber
       reauthHold.hold()
@@ -204,7 +243,7 @@ export function usePhoneChange(input: {
   }, [copy, currentPhoneConfirmationToken, isChangingPhone, locale, newPhoneAnalysis.normalizedPhoneNumber, reauthHold, sessionActor])
 
   const applyFinalisingFailure = (
-    resolution: Exclude<FinalisingFailure, "completed">,
+    resolution: Exclude<FinalisingFailure, "check_outcome">,
     error: unknown
   ) => {
     if (resolution === "retry") {
@@ -235,9 +274,40 @@ export function usePhoneChange(input: {
     }
     setIsChangingPhone(true)
     const resetChangedSession = bindSessionReset()
+    const finishLanded = async () => {
+      resetPhoneChangeFlow()
+      verifiedCurrentPhoneRef.current = null
+      await pendingPhoneChange.clear()
+      await resetChangedSession()
+      showToast({ title: copy.changePhone, body: copy.signOutBody, type: "success" })
+    }
+    /** Resolves an attempt whose answer was lost; true when the flow ended. */
+    const settleOpenOutcome = async (): Promise<boolean> => {
+      const outcome = await probePhoneChangeOutcome(sessionActor)
+      if (outcome === "landed") {
+        await finishLanded()
+      } else if (outcome === "session_ended") {
+        resetPhoneChangeFlow()
+        await resetChangedSession()
+        showToast({ title: copy.changePhone, body: copy.phoneChangeUnconfirmed, type: "warning" })
+      } else if (outcome === "not_landed") {
+        // Every proof has expired: start again from the original phone.
+        resetPhoneChangeFlow()
+        showToast({ title: copy.changePhone, body: copy.phoneChangeExpired, type: "warning" })
+      } else {
+        return false
+      }
+      return true
+    }
     try {
       // Verified: reuse a still-valid proof from an attempt whose outcome is open.
       let proof = newPhoneProofRef.current
+      if (!isProofUsable(proof) && finalOutcomeUnknownRef.current) {
+        if (!(await settleOpenOutcome())) {
+          showToast({ title: copy.changePhone, body: copy.phoneChangeUnconfirmed, type: "warning" })
+        }
+        return
+      }
       if (!isProofUsable(proof)) {
         newPhoneProofRef.current = null
         finalOutcomeUnknownRef.current = false
@@ -245,6 +315,9 @@ export function usePhoneChange(input: {
           const firebaseConfirmation = newPhoneFirebaseConfirmationRef.current
           const challengeId = newPhoneChallengeRef.current
           if (!firebaseConfirmation || !challengeId) throw new Error("Request a verification code first.")
+          const originPhone = verifiedCurrentPhoneRef.current
+          // Firebase switches to the new phone on confirm: keep the original first.
+          if (originPhone) await pendingPhoneChange.remember(sessionActor.session.userId, originPhone)
           const idToken = await confirmFirebasePhoneCode(firebaseConfirmation, newPhoneCode)
           proof = await verifyFirebaseAccountAction(
             MOBILE_HTTP_BASE_URL,
@@ -279,20 +352,15 @@ export function usePhoneChange(input: {
         )
       } catch (error) {
         const resolution = classifyFinalisingFailure(error, finalOutcomeUnknownRef.current)
-        if (resolution !== "completed") {
-          applyFinalisingFailure(resolution, error)
+        if (resolution === "check_outcome") {
+          if (!(await settleOpenOutcome())) applyFinalisingFailure("retry", error)
           return
         }
+        applyFinalisingFailure(resolution, error)
+        return
       }
 
-      resetPhoneChangeFlow()
-      verifiedCurrentPhoneRef.current = null
-      await resetChangedSession()
-      showToast({
-        title: copy.changePhone,
-        body: copy.signOutBody,
-        type: "success"
-      })
+      await finishLanded()
     } finally {
       setIsChangingPhone(false)
     }

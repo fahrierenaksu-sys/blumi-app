@@ -110,6 +110,7 @@ import {
   resolvePendingReferralClaim,
   shouldClaimCapturedReferral
 } from "../referrals/referralModel"
+import { pendingPhoneChange } from "../settings/pendingPhoneChange"
 
 export interface UseSessionStateResult {
   sessionActor: SessionActor | null
@@ -813,6 +814,7 @@ export function useSessionState(): UseSessionStateResult {
         clear: () => clearing
       })
       await signOutFirebasePhoneAuth()
+      await pendingPhoneChange.clear()
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
       throw error
