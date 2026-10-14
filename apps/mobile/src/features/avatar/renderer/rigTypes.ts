@@ -51,6 +51,8 @@ export function isRig25LowerBodySlot(slot: Rig25ItemSlot): boolean {
 
 export interface Rig25Item {
   slot: Rig25ItemSlot
+  /** An accessory's catalog group when its draw order depends on it (earrings under the fringe); export_rig.py. */
+  group?: string
   lift: number
   page: number
   /** Painted walk cards for this item (only meaningful when the body has painted walk frames). */
