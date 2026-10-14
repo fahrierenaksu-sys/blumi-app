@@ -170,6 +170,7 @@ try {
       "src/features/profile/profileViewModel.test.ts",
       "src/features/avatar/model/avatarInput.test.ts",
       "src/screens/youScreenFirstFrame.test.ts",
+      "src/screens/profileEditDiscoveryControls.test.ts",
       "src/features/settings/settingsCopy.test.ts",
       "src/features/settings/settingsPresentationModel.test.ts",
       "src/features/settings/settingsPhoneChangeModel.test.ts",

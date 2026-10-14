@@ -18,7 +18,7 @@ const COPY = {
     answer: (question: string) => `Answer: ${question}`, answerPlaceholder: "Write a short, real answer",
     promptEmpty: "Answer each selected prompt or remove it", promptLimit: "Choose up to two different prompts with short answers",
     saved: "Saved", saving: "Saving...", save: "Save profile", savedStatus: "Profile saved", savingAccessibility: "Saving profile",
-    audience: "Who I’d like to meet", everyone: "Everyone", radius: "Search area", character: "Character frame",
+    audience: "Who I’d like to meet", everyone: "Everyone", character: "Character frame",
     characterHelp: "Separate from your identity. Change your look in Avatar Studio.", editCharacter: "Edit in Avatar Studio",
     genderAccessibility: (gender: string) => `${gender} gender`, defaultBody: "Default"
   },
@@ -39,7 +39,7 @@ const COPY = {
     answer: (question: string) => `Yanıt: ${question}`, answerPlaceholder: "Kısa ve içten bir yanıt yaz",
     promptEmpty: "Seçtiğin soruları yanıtla veya kaldır", promptLimit: "En fazla iki farklı soru seçip kısaca yanıtla",
     saved: "Kaydedildi", saving: "Kaydediliyor...", save: "Profili kaydet", savedStatus: "Profil kaydedildi", savingAccessibility: "Profil kaydediliyor",
-    audience: "Kiminle tanışmak istiyorum", everyone: "Herkes", radius: "Arama alanı", character: "Karakter gövdesi",
+    audience: "Kiminle tanışmak istiyorum", everyone: "Herkes", character: "Karakter gövdesi",
     characterHelp: "Kimliğinden bağımsızdır. Görünüşünü Avatar Stüdyosu’nda değiştirebilirsin.", editCharacter: "Avatar Stüdyosu’nda düzenle",
     genderAccessibility: (gender: string) => `${gender} seçeneği`, defaultBody: "Varsayılan"
   }
