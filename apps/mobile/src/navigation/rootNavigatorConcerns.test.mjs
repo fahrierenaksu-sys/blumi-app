@@ -553,7 +553,7 @@ function findFunction(path, name) {
   return matches[0]
 }
 
-function linkingWith({ initialUrl = null } = {}) {
+function linkingWith({ initialUrl = null, realParsers = false } = {}) {
   const captured = []
   const events = []
   const routed = []
@@ -581,9 +581,12 @@ function linkingWith({ initialUrl = null } = {}) {
       }
     },
     ROOT_LINK_SCREENS,
-    // The query/param policy is covered by rootLinkConfig.test.ts.
-    getStateFromPath: () => undefined,
-    createSafeGetStateFromPath: (parse) => parse,
+    // The query/param policy is covered by rootLinkConfig.test.ts; the
+    // wiring test below runs the real parsers through this linking object.
+    getStateFromPath: realParsers ? require("@react-navigation/core").getStateFromPath : () => undefined,
+    createSafeGetStateFromPath: realParsers
+      ? loadModule("./rootLinkConfig.ts").createSafeGetStateFromPath
+      : (parse) => parse,
     pendingDeepLinks,
     parseReferralCodeFromUrl,
     capturePendingReferral: async (referral) => { captured.push(referral) },
@@ -633,6 +636,24 @@ function linkingWith({ initialUrl = null } = {}) {
     get removed() { return removed }
   }
 }
+
+test("the root linking object parses links with the safe parser, so query keys never become params", () => {
+  const { linking } = linkingWith({ realParsers: true })
+  assert.equal(typeof linking.getStateFromPath, "function", "linking must set the safe getStateFromPath")
+  const routeFor = (path) => {
+    const state = linking.getStateFromPath(path, linking.config)
+    assert.ok(state, `no state for ${path}`)
+    return plain(state.routes[state.routes.length - 1])
+  }
+
+  const room = routeFor("room?roomInviteAccept=fake-invite&pendingLikeUserId=fake-user")
+  const chat = routeFor("chat/fake-thread?roomInviteRequest=1#context")
+
+  assert.equal(room.name, "MyRoom")
+  assert.equal(room.params, undefined)
+  assert.equal(chat.name, "ChatThread")
+  assert.deepEqual(chat.params, { threadId: "fake-thread" })
+})
 
 test("linking keeps the blumi scheme and route paths", () => {
   const { linking } = linkingWith()
