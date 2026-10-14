@@ -178,7 +178,10 @@ command; stop at the first STOP.
    each user gets, what is kept. The reset is pre-approved; this is a notice.
 6. Apply: the same command plus `--apply --expect <sha256> --fingerprint <fp>
    --deployed-commit <step 1 commit>`, with `BLUMI_BETA_RESET_CONFIRM=reset-beta-<ref>`
-   set for that one command. It locks the tables it writes, refuses on a hash,
+   set for that one command. It refuses before connecting when the checkout has
+   uncommitted changes to tracked files or when the typed commit (12 characters
+   or more, every one compared) is not the checkout's HEAD. It locks the tables
+   it writes, refuses on a hash,
    fingerprint or commit mismatch or when a live connection or room presence
    exists, and rolls back unless the post-check finds nothing left to reset, the
    accounts, inventories and persona likes at their old counts. `hash mismatch`
