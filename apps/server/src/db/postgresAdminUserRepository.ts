@@ -77,6 +77,9 @@ async function updateQuota(
   action: AdminQuotaAuditEvent["action"]
 ): Promise<{ quota: AdminQuotaSnapshot; event: AdminQuotaAuditEvent }> {
   const client = await pool.connect()
+  // A connection whose ROLLBACK failed may still hold the transaction and its
+  // locks: release(error) makes node-postgres destroy it instead of reusing it.
+  let broken: Error | undefined
   try {
     await client.query("BEGIN")
     const day = input.now.toISOString().slice(0, 10)
@@ -143,10 +146,12 @@ async function updateQuota(
     await client.query("COMMIT")
     return { quota: currentQuota, event }
   } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined)
+    await client.query("ROLLBACK").catch((rollbackError: unknown) => {
+      broken = rollbackError instanceof Error ? rollbackError : new Error("ROLLBACK failed.")
+    })
     throw error
   } finally {
-    client.release()
+    client.release(broken)
   }
 }
 
