@@ -13,13 +13,16 @@
  * Output
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/full/<key>.webp   one layer per (owner, order[, leg variant])
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/bust/<key>.webp   the same layers in the 256 px bust window
- *   apps/mobile/src/features/avatar/stills/layers/<rig>/thumb/<item>.webp the item alone, cropped, at most 256 px
+ *   apps/mobile/src/features/avatar/stills/layers/<rig>/thumb/<item>.webp the item alone, cropped, at most 256 px,
+ *                                                                          without the body art its pages carry (see
+ *                                                                          withoutBodyArt: face, ears, neck, hands)
  *   apps/mobile/src/features/avatar/stills/stillAssets.ts                 literal require table (Metro, asset scan)
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/showcase/<key>.webp front (showcase) layers, carried over from
  *                                                                          bake-showcase.mjs (verified by sha256)
  *   packages/domain/src/avatar/avatarStillManifest.json                   layers, rects, windows, rigSha256, and the
  *                                                                          showcaseBase / item showcase layers
  * --check: bake into memory and fail if anything on disk differs (nothing is written).
+ * BAKE_STILLS_EVIDENCE=<dir>: also write the seam evidence and, per item thumb, before/after/body/stages PNGs.
  */
 import { createHash } from "node:crypto"
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from "node:fs"
@@ -400,10 +403,16 @@ async function bakeBody(rigId, rigDir, files) {
   const full = drawn.map((entry) => (sources.has(entry.key) ? { ...entry, source: sources.get(entry.key) } : entry))
   // thumbs: each item alone (its own parts, never the bare legs it draws for a worn set), cropped, max 256 px
   const items = {}
+  // the body as drawn with nothing worn: the rig's own skin, face and ears at the stand pose, the reference an item
+  // thumb is cleaned against (an item's art may carry the body it was cut from: hands in cuffs, neck, face under hair)
+  const bodySkin = bodySkinOf(rendered, canvas)
+  const debugThumbs = process.env.BAKE_STILLS_EVIDENCE ? [] : null
   for (const rigItemId of rigItemIds) {
     const canonical = canonicalOf[rigItemId]
     const own = rendered.filter((r) => r.layer.rigItemId === rigItemId && r.layer.legVariant === undefined)
-    const alone = composite(own, canvas)
+    const withBody = composite(own, canvas)
+    const { rgba: alone, removed } = withoutBodyArt(withBody, bodySkin, canvas)
+    if (debugThumbs) debugThumbs.push({ canonical, withBody, alone, removed })
     const rect = alphaRect(alone, canvas.width, canvas.height)
     const scale = Math.min(1, THUMB_MAX_PX / Math.max(rect[2], rect[3]))
     const thumb = await sharp(crop(alone, canvas, rect), { raw: { width: rect[2], height: rect[3], channels: 4 } })
@@ -413,6 +422,7 @@ async function bakeBody(rigId, rigDir, files) {
     items[canonical] = { slot: view.items[rigItemId].slot, rigItemId, thumb: canonical }
   }
   const evidence = await seamEvidence(rigId, rig, starter, artMap, rigItemIds, canonicalOf, rendered, canvas, meshOf, skinned, pages)
+  if (debugThumbs) await writeThumbEvidence(rigId, debugThumbs, bodySkin, canvas)
   return {
     manifest: {
       rigSha256: rigSha256(rigDir, rig),
@@ -427,6 +437,235 @@ async function bakeBody(rigId, rigDir, files) {
     },
     evidence
   }
+}
+
+/** Body layers that are skin and face only: far arm, far leg, near leg, head, near arm (stand orders 0, 1, 2, 4, 5). */
+const BODY_SKIN_ORDERS = new Set([0, 1, 2, 4, 5])
+/** The head layer (stand order 4): the only body art with eyes, brows and ears. */
+const BODY_HEAD_ORDER = 4
+/** How far (sheet px) an item's carried body art may sit from the body's own drawing. */
+const BODY_MATCH_RADIUS = 4
+/** CIELAB tolerances at which an item pixel still is the body's own colour (a*: redness, tight, so cream, white and
+ *  grey fabric over skin never match it). */
+const BODY_MATCH_TOLERANCE = [14, 5, 9]
+/** The body's skin colour model: these percentiles of its skin layers' CIELAB lightness, hue angle and chroma. */
+const SKIN_MODEL_PERCENTILES = { lightness: [0.02, 1], hue: [0.01, 0.99], chroma: [0.01, 0.99] }
+/** How deep inside the item's outline (px) a removal may start, and how many px of dark rim go with it. */
+const SEED_DEPTH = 3
+const RIM_STEPS = 3
+/** A removed pixel comes back when its colour (CIELAB bin of GARMENT_BIN) is more common in the garment's core (the
+ *  kept item deeper than GARMENT_CORE_DEPTH px, at least GARMENT_BIN_MIN_SHARE of it) than in the body's skin. */
+const GARMENT_CORE_DEPTH = 4
+const GARMENT_BIN = 4
+const GARMENT_BIN_MIN_SHARE = 0.0005
+/** A piece left after removal smaller than this share of the item's largest piece is a body fragment (a pair of
+ *  shoes is two large pieces). */
+const ISLAND_MAX_SHARE = 0.05
+
+/** sRGB (0..255) to CIELAB (D65). */
+function lab(r, g, b) {
+  const lin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }
+  const [R, G, B] = [lin(r), lin(g), lin(b)]
+  const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116)
+  const x = f((0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047), y = f(0.2126 * R + 0.7152 * G + 0.0722 * B)
+  const z = f((0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883)
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)]
+}
+
+/** CIELAB per pixel of a straight RGBA buffer. */
+function labOf(rgba, n) {
+  const out = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) out.set(lab(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]), i * 3)
+  return out
+}
+
+/**
+ * The body drawn with nothing worn, in CIELAB, its skin colour model (percentiles of its skin layers) and where it
+ * shows skin (face, ears, neck, shoulders, arms, hands, legs, feet): the skin layers, plus the torso layer's pixels in
+ * the skin model (never the white vest or the grey shorts).
+ */
+function bodySkinOf(rendered, canvas) {
+  const bodyLayers = rendered.filter((r) => r.layer.owner === "body" && r.layer.legVariant === undefined && !r.layer.gatedBy)
+  const n = canvas.width * canvas.height
+  const body = composite(bodyLayers, canvas)
+  const skinLayers = composite(bodyLayers.filter((r) => BODY_SKIN_ORDERS.has(r.layer.order)), canvas)
+  // the order of the body layer seen at each pixel (layers are drawn in order: legs and far arm go under the torso)
+  const seenOrder = new Float32Array(n).fill(-1)
+  for (const { layer, rgba } of [...bodyLayers].sort((a, b) => a.layer.order - b.layer.order)) {
+    for (let i = 0; i < n; i++) if (rgba[i * 4 + 3] >= 128) seenOrder[i] = layer.order
+  }
+  const bodyLab = labOf(body, n)
+  const skinLab = labOf(skinLayers, n)
+  const samples = { lightness: [], hue: [], chroma: [] }
+  const skinBins = { bins: new Map(), count: 0 }
+  for (let i = 0; i < n; i++) {
+    if (skinLayers[i * 4 + 3] !== 255) continue
+    const key = labBin(skinLayers, i)
+    skinBins.bins.set(key, (skinBins.bins.get(key) ?? 0) + 1)
+    skinBins.count++
+    const [L, A, B] = skinLab.subarray(i * 3, i * 3 + 3)
+    samples.lightness.push(L)
+    samples.hue.push(hueOf(A, B))
+    samples.chroma.push(Math.hypot(A, B))
+  }
+  const range = (values, [lo, hi]) => {
+    const sorted = values.sort((a, b) => a - b)
+    const at = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]
+    return [at(lo), at(hi)]
+  }
+  const model = Object.fromEntries(Object.entries(samples).map(([k, v]) => [k, range(v, SKIN_MODEL_PERCENTILES[k])]))
+  if (process.env.BAKE_STILLS_EVIDENCE) console.log(`skin model ${JSON.stringify(model, (_, x) => (typeof x === "number" ? Math.round(x * 10) / 10 : x))}`)
+  // skin: 1 = skin, 2 = the head (face features may be matched there by the body's own colour)
+  const skin = new Uint8Array(n)
+  for (let i = 0; i < n; i++) {
+    if (seenOrder[i] === BODY_HEAD_ORDER) skin[i] = 2
+    else if (BODY_SKIN_ORDERS.has(seenOrder[i])) skin[i] = 1
+    else if (seenOrder[i] >= 0 && isSkinColour(bodyLab.subarray(i * 3, i * 3 + 3), model)) skin[i] = 1
+  }
+  return { body, bodyLab, skin, model, skinBins }
+}
+
+const isSkinColour = ([L, A, B], model) =>
+  within(L, model.lightness) && within(hueOf(A, B), model.hue) && within(Math.hypot(A, B), model.chroma)
+const hueOf = (a, b) => (Math.atan2(b, a) * 180) / Math.PI
+const within = (x, [lo, hi]) => x >= lo && x <= hi
+
+/**
+ * An item thumb without the body art its own pages carry. Each item was cut from a dressed render, so its art can
+ * hold the face under a fringe, an ear, a neck in a collar or hands in cuffs, always at the item's outline. A pixel is
+ * the body's when it lies on (or within BODY_MATCH_RADIUS of) the body's skin and either has the body's skin colour
+ * (its colour model) or, on the head, shows the colour the body itself draws nearby (eyes, brows, ears). The removal
+ * starts within SEED_DEPTH px of the outline (a patch of skin is ringed by its own dark line) or at an outline pixel
+ * of skin colour off the body (matting fringe), and grows through such pixels only, so garment shading inside the
+ * outline stays; then the dark rim of each removed patch goes (RIM_STEPS px of skin hue, at any lightness and
+ * saturation). Removed pixels in the garment's own colours come back, and fragments the removal cut off go.
+ */
+function withoutBodyArt(item, bodySkin, canvas) {
+  const { width: W, height: H } = canvas
+  const n = W * H
+  const { isBody, isRim, isSkinColour } = bodyArtTest(item, bodySkin, canvas)
+  const depth = outlineDepth(item, canvas, SEED_DEPTH)
+  const removed = new Uint8Array(n)
+  const queue = []
+  // seeds: body art near the outline, and the outline's own skin-coloured matting fringe (skin the art was cut from)
+  for (let p = 0; p < n; p++) {
+    if ((depth[p] <= SEED_DEPTH && isBody(p)) || (depth[p] === 1 && isSkinColour(p))) { removed[p] = 1; queue.push(p) }
+  }
+  for (let k = 0; k < queue.length; k++) {
+    eachNeighbour(queue[k], W, H, (q) => { if (!removed[q] && item[q * 4 + 3] > 0 && isBody(q)) { removed[q] = 1; queue.push(q) } })
+  }
+  let rim = queue
+  for (let step = 0; step < RIM_STEPS; step++) {
+    const next = []
+    for (const p of rim) eachNeighbour(p, W, H, (q) => { if (!removed[q] && item[q * 4 + 3] > 0 && isRim(q)) { removed[q] = 2; next.push(q) } })
+    rim = next
+  }
+  const out = Buffer.from(item)
+  for (let p = 0; p < n; p++) if (removed[p]) out.fill(0, p * 4, p * 4 + 4)
+  return { rgba: withoutIslands(restoreGarmentColours(item, out, removed, bodySkin.skinBins, canvas), canvas), removed }
+}
+
+const labBin = (rgba, p) => {
+  const [L, A, B] = lab(rgba[p * 4], rgba[p * 4 + 1], rgba[p * 4 + 2])
+  return `${Math.round(L / GARMENT_BIN)},${Math.round(A / GARMENT_BIN)},${Math.round(B / GARMENT_BIN)}`
+}
+
+/**
+ * Gives back each removed pixel whose colour is more the garment's than the body's: its CIELAB bin is more common in
+ * the garment's core (the kept item deeper than GARMENT_CORE_DEPTH px) than in the body's skin layers, and holds at
+ * least GARMENT_BIN_MIN_SHARE of that core. A tan suede shoe, a taupe knit, a salmon sleeve or a light brown strand
+ * where it touches skin comes back; skin carried by the art (face, ears, necks, hands) stays out.
+ */
+function restoreGarmentColours(item, kept, removed, skinBins, canvas) {
+  const n = canvas.width * canvas.height
+  const depth = outlineDepth(kept, canvas, GARMENT_CORE_DEPTH)
+  const core = new Map()
+  let coreCount = 0
+  for (let p = 0; p < n; p++) {
+    if (depth[p] <= GARMENT_CORE_DEPTH) continue
+    const key = labBin(kept, p)
+    core.set(key, (core.get(key) ?? 0) + 1)
+    coreCount++
+  }
+  const out = Buffer.from(kept)
+  for (let p = 0; p < n; p++) {
+    if (!removed[p]) continue
+    const key = labBin(item, p)
+    const garment = (core.get(key) ?? 0) / Math.max(1, coreCount)
+    if (garment >= GARMENT_BIN_MIN_SHARE && garment > (skinBins.bins.get(key) ?? 0) / skinBins.count) item.copy(out, p * 4, p * 4, p * 4 + 4)
+  }
+  return out
+}
+
+function eachNeighbour(p, W, H, visit) {
+  const x = p % W, y = (p - x) / W
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const u = x + dx, v = y + dy
+    if ((dx || dy) && u >= 0 && v >= 0 && u < W && v < H) visit(v * W + u)
+  }
+}
+
+/** Steps (8-connected) from each opaque pixel to the nearest transparent one, counted up to `max` (else max + 1). */
+function outlineDepth(rgba, { width: W, height: H }, max) {
+  const depth = new Uint8Array(W * H).fill(max + 1)
+  let front = []
+  for (let p = 0; p < W * H; p++) if (rgba[p * 4 + 3] === 0) { depth[p] = 0; front.push(p) }
+  for (let d = 1; d <= max; d++) {
+    const next = []
+    for (const p of front) eachNeighbour(p, W, H, (q) => { if (depth[q] > d) { depth[q] = d; next.push(q) } })
+    front = next
+  }
+  return depth
+}
+
+const BODY = 1, RIM = 2, SKIN_COLOUR = 4
+/** Per-pixel tests (memoised): `isBody` (see withoutBodyArt), `isRim` (on skin, skin hue and chroma) and
+ *  `isSkinColour` (the skin model, anywhere). */
+function bodyArtTest(item, { bodyLab, skin, model }, { width: W, height: H }) {
+  const R = BODY_MATCH_RADIUS
+  const [tL, tA, tB] = BODY_MATCH_TOLERANCE
+  const memo = new Int8Array(W * H).fill(-1)
+  const classify = (p) => {
+    const colour = lab(item[p * 4], item[p * 4 + 1], item[p * 4 + 2])
+    const [L, A, B] = colour
+    const x = p % W, y = (p - x) / W
+    let onSkin = false, matched = false
+    for (let dy = -R; dy <= R && !matched; dy++) for (let dx = -R; dx <= R && !matched; dx++) {
+      const u = x + dx, v = y + dy
+      if (u < 0 || v < 0 || u >= W || v >= H || !skin[v * W + u]) continue
+      onSkin = true
+      if (skin[v * W + u] !== 2) continue
+      const q = (v * W + u) * 3
+      matched = Math.abs(L - bodyLab[q]) <= tL && Math.abs(A - bodyLab[q + 1]) <= tA && Math.abs(B - bodyLab[q + 2]) <= tB
+    }
+    const hue = within(hueOf(A, B), model.hue), chroma = Math.hypot(A, B)
+    const skinColour = hue && within(chroma, model.chroma) && within(L, model.lightness)
+    // a patch's rim: skin hue at any lightness, and as saturated as skin in deep shadow gets
+    const rim = hue && chroma >= model.chroma[0]
+    return (skinColour ? SKIN_COLOUR : 0) | (onSkin && (skinColour || matched) ? BODY : 0) | (onSkin && rim ? RIM : 0)
+  }
+  const get = (p) => (memo[p] >= 0 ? memo[p] : (memo[p] = classify(p)))
+  return { isBody: (p) => (get(p) & BODY) !== 0, isRim: (p) => (get(p) & RIM) !== 0, isSkinColour: (p) => (get(p) & SKIN_COLOUR) !== 0 }
+}
+
+/** Clears 8-connected opaque pieces smaller than ISLAND_MAX_SHARE of the largest piece. */
+function withoutIslands(rgba, { width: W, height: H }) {
+  const n = W * H
+  const seen = new Uint8Array(n)
+  const pieces = []
+  for (let i = 0; i < n; i++) {
+    if (seen[i] || rgba[i * 4 + 3] === 0) continue
+    const piece = [i]
+    seen[i] = 1
+    for (let k = 0; k < piece.length; k++) {
+      eachNeighbour(piece[k], W, H, (q) => { if (!seen[q] && rgba[q * 4 + 3] > 0) { seen[q] = 1; piece.push(q) } })
+    }
+    pieces.push(piece)
+  }
+  const out = Buffer.from(rgba)
+  const largest = Math.max(0, ...pieces.map((piece) => piece.length))
+  for (const piece of pieces) if (piece.length < largest * ISLAND_MAX_SHARE) for (const p of piece) out.fill(0, p * 4, p * 4 + 4)
+  return out
 }
 
 function alphaRect(rgba, w, h) {
@@ -539,6 +778,29 @@ function writeRepoOutputs() {
   }
 }
 const evidenceDir = process.env.BAKE_STILLS_EVIDENCE
+/** Evidence (BAKE_STILLS_EVIDENCE): each thumb before and after body removal, on the body, cropped to the item. */
+async function writeThumbEvidence(rigId, thumbs, { body, skin }, canvas) {
+  const skinView = Buffer.from(body)
+  for (let i = 0; i < skin.length; i++) if (!skin[i] && skinView[i * 4 + 3]) skinView.fill(255, i * 4, i * 4 + 3)
+  const dir = join(process.env.BAKE_STILLS_EVIDENCE, "thumbs", rigId)
+  mkdirSync(dir, { recursive: true })
+  const png = (raw, rect) => sharp(crop(raw, canvas, rect), { raw: { width: rect[2], height: rect[3], channels: 4 } }).png().toBuffer()
+  for (const { canonical, withBody, alone, removed } of thumbs) {
+    const rect = alphaRect(withBody, canvas.width, canvas.height)
+    // stages: removed by the flood (red), by the rim (blue), given back (green), dropped as a fragment (yellow)
+    const stages = Buffer.from(withBody)
+    for (let p = 0; p < removed.length; p++) {
+      if (withBody[p * 4 + 3] === 0) continue
+      const kept = alone[p * 4 + 3] > 0
+      const colour = removed[p] ? (kept ? [0, 200, 0] : removed[p] === 1 ? [230, 0, 0] : [0, 0, 255]) : kept ? null : [255, 220, 0]
+      if (colour) stages.set(colour, p * 4)
+    }
+    writeFileSync(join(dir, `${canonical}__stages.png`), await png(stages, rect))
+    writeFileSync(join(dir, `${canonical}__before.png`), await png(withBody, rect))
+    writeFileSync(join(dir, `${canonical}__after.png`), await png(alone, rect))
+    writeFileSync(join(dir, `${canonical}__body.png`), await png(skinView, rect))
+  }
+}
 for (const e of evidence) {
   console.log(`${e.rigId}: starter ${e.worn.join(", ")}; ${e.layers} layers stacked vs one pass: max ${e.maxDiff}, mean ${e.meanDiff.toFixed(4)}, channels > 8: ${e.channelsOver8}`)
   if (evidenceDir) {
