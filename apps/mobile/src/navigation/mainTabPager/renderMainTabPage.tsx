@@ -69,7 +69,7 @@ export function renderMainTabPage(
   if (routeName === "MyRoom") {
     return (
       <MyRoomScreen
-        {...pageProps}
+        {...(pageProps as Pick<MyRoomProps, "navigation" | "route">)}
         sessionActor={actor}
         resolvedCapabilities={dependencies.resolvedCapabilities}
       />
@@ -77,7 +77,7 @@ export function renderMainTabPage(
   }
   return (
     <CosmeticShopScreen
-      {...pageProps}
+      {...(pageProps as NativeStackScreenProps<RootStackParamList, "CosmeticShop">)}
       sessionActor={actor}
       roomFurnitureCatalog={undefined}
       qaOnlyOwnedRoomItemIds={NO_QA_OWNED_ROOM_ITEM_IDS}
