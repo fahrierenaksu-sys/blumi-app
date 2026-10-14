@@ -97,6 +97,7 @@ import {
 } from "./preAuthOnboardingDraft"
 import { getSecureSessionStorageRecoveryMessage } from "./sessionPersistence"
 import { getSessionErrorMessageForDisplay } from "./sessionErrorCopy"
+import { isSessionInvalidError } from "../network/apiRequestError"
 import { claimReferralInvite } from "../referrals/referralApi"
 import {
   clearPendingReferralCode,
@@ -164,12 +165,8 @@ function warmDiscoveryBeforeMain(actor: SessionActor | null): void {
   void warmDiscoveryFirstFrameAssets()
 }
 
-function isAuthSessionError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    error.message.toLowerCase().includes("sign in again")
-  )
-}
+/** Only a server-verified invalid session may sign the user out. */
+const isAuthSessionError = isSessionInvalidError
 
 // Dev-only Simulator QA against the local in-memory API (see localQaEnvironment).
 const IS_LOCAL_QA_PHONE_AUTH = IS_LOCAL_QA_ENVIRONMENT

@@ -34,6 +34,7 @@ function mount() {
           saveHasSeenIntro: async () => undefined,
           saveSessionActor: async () => undefined
         },
+        "../network/apiRequestError": { isSessionInvalidError: () => false },
         "./sessionRefresh": {
           createSessionRefreshCoordinator: () => {
             calls.push("createRefreshCoordinator")

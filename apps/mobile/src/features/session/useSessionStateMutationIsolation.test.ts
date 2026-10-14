@@ -10,6 +10,7 @@ import * as sessionModel from "./sessionModel"
 import { createDemoSessionActor, type SessionActor } from "./sessionModel"
 import * as sessionMutationCoordinator from "./sessionMutationCoordinator"
 import * as sessionRefresh from "./sessionRefresh"
+import * as apiRequestError from "../network/apiRequestError"
 import * as preAuthOnboardingDraft from "./preAuthOnboardingDraft"
 import type { UseSessionStateResult } from "./useSessionState"
 
@@ -41,6 +42,12 @@ function productionActor(userId: string, token: string): SessionActor {
 }
 
 const AUTH_EXPIRED = "Sign in again to continue."
+/** What the API adapters throw for a server-verified invalid session (401). */
+const authExpired = () => new apiRequestError.ApiRequestError({
+  status: 401,
+  code: "session_invalid",
+  message: AUTH_EXPIRED
+})
 
 interface MountOptions {
   rejectOtp?: boolean
@@ -139,7 +146,7 @@ function mount(options: MountOptions = {}) {
           fetchProductionAccountSnapshot: async (_url: string, _token: string, _fetch: unknown, signal: AbortSignal) => {
             profileSignal = signal
             profileCalls += 1
-            if (options.recover && profileCalls === 1) throw new Error(AUTH_EXPIRED)
+            if (options.recover && profileCalls === 1) throw authExpired()
             profileStarted.resolve()
             return profile.promise // Deliberately ignores abort to exercise late completions.
           },
@@ -193,6 +200,7 @@ function mount(options: MountOptions = {}) {
         "./onboardingFlowModel": onboardingFlowModel,
         "./onboardingCompletion": onboardingCompletion,
         "./sessionModel": sessionModel,
+        "../network/apiRequestError": apiRequestError,
         "./sessionRefresh": {
           ...sessionRefresh,
           refreshAndPersistSession: async (_url: string, _actor: SessionActor, input: { signal: AbortSignal }) => {
@@ -388,7 +396,7 @@ test("startup profile late rejection after unmount cannot start auth recovery", 
   const f = mount()
   await f.profileStarted.promise
   f.runtime.unmount()
-  f.profile.reject(new Error(AUTH_EXPIRED))
+  f.profile.reject(authExpired())
   await settle()
   assert.equal(f.refreshCalls(), 0)
   assert.equal(f.saves.length, 0)
@@ -430,7 +438,7 @@ test("foreground refresh late failure after unmount cannot publish errors or cle
   f.foreground()
   await f.refreshStarted.promise
   f.runtime.unmount()
-  f.refresh.reject(new Error(AUTH_EXPIRED))
+  f.refresh.reject(authExpired())
   f.profile.resolve(f.snapshot)
   await settle()
   assert.equal(f.saves.length, 0)
@@ -442,7 +450,7 @@ test("foreground refresh late failure after unmount cannot publish errors or cle
 test("startup auth clear already in progress cannot publish after unmount", async () => {
   const f = mount({ recover: true, pauseClear: true })
   await f.refreshStarted.promise
-  f.refresh.reject(new Error(AUTH_EXPIRED))
+  f.refresh.reject(authExpired())
   await f.clearStarted.promise
   f.runtime.unmount()
   f.clearing.resolve()
@@ -512,3 +520,53 @@ for (const [name, run] of Object.entries(lateActions)) for (const relogin of rel
     f.runtime.unmount()
   })
 }
+
+// A refresh failure signs the user out only when the server verified the
+// session is invalid. Gateway, rate-limit, timeout and transport failures keep
+// the session; the real refreshSession produces each error from a response.
+const refreshFailure = async (response: () => Response | Promise<Response>): Promise<Error> => {
+  try {
+    await sessionRefresh.refreshSession("https://fixture.invalid", "fixture-token", (async () => response()) as typeof fetch)
+  } catch (error) {
+    return error as Error
+  }
+  throw new Error("expected the refresh to fail")
+}
+const jsonFailure = (status: number, body: unknown) => () =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
+
+const SESSION_KEEPING_FAILURES: Array<[string, () => Response | Promise<Response>]> = [
+  ["503 edge JSON without an error field", jsonFailure(503, { status: "error", code: 503, message: "unavailable" })],
+  ["429 JSON without an error field", jsonFailure(429, { message: "rate limited", retryAfter: 30 })],
+  ["502 gateway JSON", jsonFailure(502, { status: "error", code: 502, message: "Application failed to respond" })],
+  ["503 server error body", jsonFailure(503, { error: "Service temporarily unavailable." })],
+  ["502 HTML body", () => new Response("<html>bad gateway</html>", { status: 502 })],
+  ["empty 500 body", () => new Response("", { status: 500 })],
+  ["network failure", () => { throw new TypeError("Network request failed") }]
+]
+
+for (const [name, response] of SESSION_KEEPING_FAILURES) {
+  test(`foreground refresh ${name} keeps the session`, async () => {
+    const f = mount()
+    await f.profileStarted.promise
+    f.foreground()
+    await f.refreshStarted.promise
+    f.refresh.reject(await refreshFailure(response))
+    await settle()
+    assert.deepEqual(f.clears, [])
+    assert.equal(f.current()?.session.userId, f.actor.session.userId)
+    f.runtime.unmount()
+  })
+}
+
+test("foreground refresh with a verified invalid session signs out", async () => {
+  const f = mount()
+  await f.profileStarted.promise
+  f.foreground()
+  await f.refreshStarted.promise
+  f.refresh.reject(await refreshFailure(jsonFailure(401, { error: "Sign in again to continue." })))
+  await settle()
+  assert.deepEqual(f.clears, ["production"])
+  assert.equal(f.current(), null)
+  f.runtime.unmount()
+})

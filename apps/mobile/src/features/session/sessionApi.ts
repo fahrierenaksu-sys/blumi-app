@@ -25,6 +25,7 @@ import {
   type AccountModerationState
 } from "./accountModeration"
 import { requestJson } from "../network/apiClient"
+import { createApiRequestError } from "../network/apiRequestError"
 
 export class AccountAccessError extends Error {
   readonly moderation: AccountModerationState
@@ -319,6 +320,7 @@ export async function acknowledgeAccountModeration(
   )
   if (!response.ok || !moderation) {
     throw createSessionApiError(
+      response.status,
       payload,
       "We could not save that acknowledgement."
     )
@@ -455,7 +457,7 @@ export async function fetchProductionAccountSnapshot(
   }, fetcher)
 
   if (!response.ok) {
-    throw createSessionApiError(payload, "We could not refresh your profile yet.")
+    throw createSessionApiError(response.status, payload, "We could not refresh your profile yet.")
   }
   const onboarding = normalizeOnboardingStatus(
     (payload as { onboarding?: unknown } | null)?.onboarding
@@ -472,7 +474,11 @@ export async function fetchProductionAccountSnapshot(
   }
 }
 
-function createSessionApiError(payload: unknown, fallback: string): Error {
+function createSessionApiError(
+  httpStatus: number,
+  payload: unknown,
+  fallback: string
+): Error {
   const record = isRecord(payload) ? payload : null
   const code = record?.code
   const status = record?.status
@@ -492,7 +498,7 @@ function createSessionApiError(payload: unknown, fallback: string): Error {
       return new AccountAccessError(getApiErrorMessage(payload, fallback), moderation)
     }
   }
-  return new Error(getApiErrorMessage(payload, fallback))
+  return createApiRequestError(httpStatus, payload, getApiErrorMessage(payload, fallback))
 }
 
 function getApiErrorMessage(
