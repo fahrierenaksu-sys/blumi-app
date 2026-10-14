@@ -125,12 +125,13 @@ project and environment have not been independently confirmed.
 
 `apps/server/scripts/betaReset.ts` is the only way to run it; never ad-hoc SQL.
 It sets coins to 1,250, every loadout to its body's starter look, every finished
-room to the starter room with the bed, and deletes all chats, messages, matches,
+room to the starter room with the bed (all three skip the test personas, which
+keep their seeded coins, looks and rooms), and deletes all chats, messages, matches,
 discovery decisions (except the likes the test personas hand out), mini rooms,
 invites, reactions, pending pushes about them, room presence, realtime payloads
 and old room renders. It never writes profile columns, sessions, push devices,
-settings, blocks, reports, bans, money ledgers, owned items, test personas or
-`blumi_migrations`. Deleting a mini room queues a LiveKit media revocation per
+settings, blocks, reports, bans, money ledgers, owned items, test personas (their
+rows, coins, looks or rooms) or `blumi_migrations`. Deleting a mini room queues a LiveKit media revocation per
 participant (database trigger, as when the app ends a room; voice is off).
 Output is counts, catalog item IDs and commit SHAs only.
 
