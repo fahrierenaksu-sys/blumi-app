@@ -16,7 +16,7 @@ import {
   writeAvatar25BlinkUniform,
   type CompiledBlink
 } from "./avatar25Life"
-import { compileView, PALETTE_STRIDE, writeAvatarPalette, type CompiledView, type PoseInput } from "./avatar25Pose"
+import { compileAvatar, compileView, PALETTE_STRIDE, writeAvatarPalette, type CompiledView, type PoseInput } from "./avatar25Pose"
 import type { Avatar25Pose, Avatar25ViewName, Rig25, Rig25Mesh, Rig25View } from "./rigTypes"
 
 const RIGS = {
@@ -304,8 +304,7 @@ for (const [who, rig] of Object.entries(RIGS)) {
 
   test(`${who}: a worn hair's own eye copy is swapped for its cleared patch during a blink, on its page only`, () => {
     const source = rig.views.front
-    const view = compileView("front", source)
-    const blink = view.blink
+    const blink = compileView("front", source).blink
     assert.ok(blink)
     const patches = source.blink?.items ?? []
     // the girl's pageboy hair holds a copy of her far eye (the closed blink read as a wink without its patch)
@@ -330,14 +329,19 @@ for (const [who, rig] of Object.entries(RIGS)) {
         if (other.page !== patch.page) continue
         for (const range of other.mesh.ranges) assert.equal(overlaps(target, rangeUvBox(other.mesh, range)), false, `patch over ${range.name}`)
       }
+      // an avatar wearing the hair applies its patch on the texture layer the hair's page loads into
+      const worn = compileAvatar(rig, "front", [patch.item])
+      const wornBlink = worn.view.blink
+      assert.ok(wornBlink)
+      const layer = worn.pages.indexOf(source.pages[patch.page])
       const mid: [number, number] = [(rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2]
       for (const frame of [BLINK_HALF, BLINK_CLOSED]) {
-        writeAvatar25BlinkUniform(blink, frame, block, 0)
-        const [ru, rv] = redirectAvatar25BlinkUv(block, 0, mid[0], mid[1], patch.page)
+        writeAvatar25BlinkUniform(wornBlink, frame, block, 0)
+        const [ru, rv] = redirectAvatar25BlinkUv(block, 0, mid[0], mid[1], layer)
         assert.ok(Math.abs(ru - (mid[0] + patch.offset[0] / pw)) < 1e-6 && Math.abs(rv - (mid[1] + patch.offset[1] / ph)) < 1e-6, `patch ${k} frame ${frame}`)
-        // the same uv on another page, or just outside the rect, stays where it is
-        assert.deepEqual(redirectAvatar25BlinkUv(block, 0, mid[0], mid[1], patch.page + 1), [mid[0], mid[1]])
-        assert.deepEqual(redirectAvatar25BlinkUv(block, 0, rect[0] - 1e-5, mid[1], patch.page), [rect[0] - 1e-5, mid[1]])
+        // the same uv on another layer, or just outside the rect, stays where it is
+        assert.deepEqual(redirectAvatar25BlinkUv(block, 0, mid[0], mid[1], layer + 1), [mid[0], mid[1]])
+        assert.deepEqual(redirectAvatar25BlinkUv(block, 0, rect[0] - 1e-5, mid[1], layer), [rect[0] - 1e-5, mid[1]])
       }
     }
   })

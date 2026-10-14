@@ -300,7 +300,9 @@ def pack_blink(blink, layers, rects, page):
 # head's eye rect shows a closed frame. So each such item gets ONE patch, used by every blink frame: the item around
 # the eye rect with its eye pixels made transparent (the head's frame shows through them), packed into free space of
 # the item's page; the runtime redirects the item's rect there while a frame shows. Open eyes read nothing new.
-BLINK_ITEMS_MAX = 2          # the shader's item redirects (avatar25Life.ts AVATAR25_BLINK_ITEMS)
+# The rig may hold patches for any number of items; the runtime loads only the worn items' patches
+# (avatar25Pose.ts compileAvatar), and one outfit wears one item per slot.
+BLINK_ITEMS_MAX = 2          # the shader's item redirects per worn outfit (avatar25Life.ts AVATAR25_BLINK_ITEMS)
 BLINK_EYE_SKIN_DIST = 60     # an open-head pixel at least this far (RGB) from the face's skin is the eye drawing
 BLINK_EYE_CHANGE = 10        # ... and a frame changes it by more than this (any RGBA channel)
 BLINK_ITEM_SKIN_DIST = 60    # an item pixel this close to the skin colour is face showing between strands, not hair
@@ -407,6 +409,18 @@ def part_uv_box(mesh, name, page_size):
     return [float(uv[:, 0].min()), float(uv[:, 1].min()), float(uv[:, 0].max()), float(uv[:, 1].max())]
 
 
+def blink_patches_one_outfit(patches, items_src):
+    """The most eye patches one outfit can wear at once: per slot, the item with the most patches (one item per slot)."""
+    slot_of = {iid: it['slot'] for iid, it, _ in items_src}
+    per_item = {}
+    for pt in patches:
+        per_item[pt['item']] = per_item.get(pt['item'], 0) + 1
+    per_slot = {}
+    for iid, n in per_item.items():
+        per_slot[slot_of[iid]] = max(per_slot.get(slot_of[iid], 0), n)
+    return sum(per_slot.values())
+
+
 def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pages, page_taken, meshes=None):
     """The item patches (see above) for the view's `blink.items`; pastes each into free space of its item's page.
     `meshes` ({item id: mesh}) clips each redirect rect to the drawn area of its part: a hair that ends above the
@@ -431,8 +445,9 @@ def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pag
             cut = blink_item_cut(head_open, frames, crop, bool(part.get('blinkLightEdge')))
             if not cut.any():
                 continue
-            if len(out) >= BLINK_ITEMS_MAX:
-                raise SystemExit(f'blink: more than {BLINK_ITEMS_MAX} items hold an eye copy ({iid})')
+            worn_most = blink_patches_one_outfit([*out, {'item': iid}], items_src)
+            if worn_most > BLINK_ITEMS_MAX:
+                raise SystemExit(f'blink: one outfit could wear {worn_most} > {BLINK_ITEMS_MAX} eye patches ({iid})')
             tile = np.asarray(img.crop((ox - M, oy - M, ox + rw + M, oy + rh + M))).copy()
             tile[M:M + rh, M:M + rw][cut] = 0
             tile = Image.fromarray(tile, 'RGBA')

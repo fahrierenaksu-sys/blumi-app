@@ -553,5 +553,19 @@ class ExportItemKeyedBoyTest(unittest.TestCase):
                     self.assertEqual(r['count'], body[r['layer']]['count'])   # the body leg's own triangles
 
 
+class BlinkPatchesOneOutfitTest(unittest.TestCase):
+    """The shader applies BLINK_ITEMS_MAX item patches; the runtime loads only the worn items', one item per slot."""
+    ITEMS = [('hair_a', {'slot': 'hair'}, 1), ('hair_b', {'slot': 'hair'}, 1), ('hair_c', {'slot': 'hair'}, 2),
+             ('hat', {'slot': 'headwear'}, 2)]
+
+    def test_hairs_never_worn_together_count_once(self):
+        patches = [{'item': 'hair_a'}, {'item': 'hair_b'}, {'item': 'hair_c'}]
+        self.assertEqual(load_exporter().blink_patches_one_outfit(patches, self.ITEMS), 1)
+
+    def test_items_of_other_slots_add_up_and_an_item_counts_each_of_its_patches(self):
+        patches = [{'item': 'hair_a'}, {'item': 'hair_b'}, {'item': 'hair_b'}, {'item': 'hat'}]
+        self.assertEqual(load_exporter().blink_patches_one_outfit(patches, self.ITEMS), 3)
+
+
 if __name__ == '__main__':
     unittest.main()
