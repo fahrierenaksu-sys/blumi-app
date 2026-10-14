@@ -178,3 +178,50 @@ test("each piece erases the body only where its own mask says, whichever other p
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+// Review slots_1330 HIGH-1: a one-piece dress's erase mask applies only when that dress is worn. It must never change
+// the front base or the top and bottom under layers that every top+bottom look is drawn with.
+async function topBottomDressFixture(dressErase: readonly [number, number, number, number]) {
+  const { dir, body } = await fixture()
+  const art = {
+    bottom: await still([120, 400, 160, 200], { r: 60, g: 60, b: 200 }),
+    dress: await still([110, 250, 180, 350], { r: 200, g: 120, b: 200 }),
+    eraseTop: await mask([140, 260, 120, 130]),
+    eraseBottom: await mask([140, 390, 120, 200]),
+    eraseDress: await mask(dressErase)
+  }
+  for (const [name, bytes] of Object.entries(art)) writeFileSync(join(dir, "g", `${name}.png`), bytes)
+  const withErase = (file: string) => ({ eraseFile: `g/${file}.png`, eraseSha256: sha(art[file as keyof typeof art]) })
+  const separates = {
+    ...body.items,
+    item_top: { ...body.items.item_top, ...withErase("eraseTop") },
+    item_bottom: { slot: "bottom", order: 2, file: "g/bottom.png", sha256: sha(art.bottom), ...withErase("eraseBottom") }
+  }
+  const dress = { slot: "dress", order: 3, file: "g/dress.png", sha256: sha(art.dress), ...withErase("eraseDress") }
+  return { dir, body, separates, dress }
+}
+
+test("adding a dress with an erase mask leaves the front base and every top and bottom layer byte-identical", async () => {
+  const { bakeBody } = await loadBaker()
+  const { dir, body, separates, dress } = await topBottomDressFixture([140, 260, 120, 330])
+  try {
+    const before = await bakeBody("female", { ...body, items: separates }, 0.5, 20, dir)
+    const after = await bakeBody("female", { ...body, items: { ...separates, item_dress: dress } }, 0.5, 20, dir)
+    assert.deepEqual(after.showcaseBase, before.showcaseBase, "base canvas, windows and erased slots are unchanged")
+    for (const [key, bytes] of before.files) assert.ok(after.files.get(key)?.equals(bytes), `${key} changed`)
+    for (const id of ["item_top", "item_bottom"]) assert.deepEqual(after.items[id], before.items[id], id)
+    assert.ok(after.items.item_dress?.under, "the dress refills the top and bottom regions with its own under layer")
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test("a dress whose mask would erase body outside the top and bottom regions stops the bake instead of changing the base", async () => {
+  const { bakeBody } = await loadBaker()
+  const { dir, body, separates, dress } = await topBottomDressFixture([140, 260, 120, 420])
+  try {
+    await assert.rejects(bakeBody("female", { ...body, items: { ...separates, item_dress: dress } }, 0.5, 20, dir), /outside the top and bottom/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

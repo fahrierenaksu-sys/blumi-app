@@ -34,11 +34,14 @@ const WEBP = { quality: 90, alphaQuality: 100, effort: 6, smartSubsample: false 
 const CROPS = ["card", "head", "push"]
 const RIGS = ["female", "male"]
 const ERASED_SLOTS = ["shoes", "bottom", "top"]
+/** The erase region an item's mask joins (cut out of the shared front base): its own slot. */
+const ERASE_REGIONS_OF = { shoes: ["shoes"], bottom: ["bottom"], top: ["top"] }
 /**
- * The erase regions an item's mask joins and its `under` refills: its own slot, and for a one-piece dress (drawn
- * instead of the top and the bottom) both of theirs (slots_2140 DESIGN §7).
+ * The regions an item's `under` refills. A one-piece dress is drawn instead of the top and the bottom, so its under
+ * refills both of theirs, with its own mask applied there only: its mask never joins the shared regions, so adding a
+ * dress cannot change the base or any top or bottom layer (review slots_1330 HIGH-1).
  */
-const ERASE_REGIONS_OF = { shoes: ["shoes"], bottom: ["bottom"], top: ["top"], dress: ["bottom", "top"] }
+const REFILL_REGIONS_OF = { ...ERASE_REGIONS_OF, dress: ["bottom", "top"] }
 /** Output pixels each slot region reaches past its erase masks (body only, identical in base and under: no seam). */
 const UNDER_OVERLAP_PX = 2
 /** The slots a front layer can be worn as (the rig item's slot; slots_2140 DESIGN §7). */
@@ -66,7 +69,7 @@ export function validateAllowlist(list, { allowPendingOwnerApproval = false } = 
       if (!SHOWCASE_SLOTS.includes(item.slot)) throw new Error(`${rig}.${id}: unknown slot ${item.slot}`)
       if (item.backFile && !item.backSha256) throw new Error(`${rig}.${id}: backFile needs backSha256`)
       if (item.eraseFile && !item.eraseSha256) throw new Error(`${rig}.${id}: eraseFile needs eraseSha256`)
-      if (item.eraseFile && !ERASE_REGIONS_OF[item.slot]) throw new Error(`${rig}.${id}: only shoes, bottoms, tops and dresses erase the body`)
+      if (item.eraseFile && !REFILL_REGIONS_OF[item.slot]) throw new Error(`${rig}.${id}: only shoes, bottoms, tops and dresses erase the body`)
       if ([item.file, item.backFile, item.eraseFile].some((path) => /candidate/i.test(path ?? ""))) throw new Error(`${rig}.${id}: a candidate path cannot enter the app`)
     }
     if (/candidate/i.test(body.base)) throw new Error(`${rig}: a candidate path cannot enter the app`)
@@ -194,6 +197,18 @@ function unionOf(masks) {
   return masks[0].map((_, i) => (masks.some((mask) => mask[i]) ? 1 : 0))
 }
 
+/**
+ * A dress erases only inside the top and bottom regions its under refills. Body it would erase elsewhere would stay
+ * on the shared base, so the bake stops: the factory must widen the top or bottom erase masks instead.
+ */
+function assertErasesInside(id, scaledErase, baseRaw, region) {
+  for (let i = 0; i < baseRaw.length / 4; i++) {
+    if (scaledErase[i * 4] > 0 && baseRaw[i * 4 + 3] > 0 && !region?.[i]) {
+      throw new Error(`${id}: its erase mask reaches body outside the top and bottom erase regions (widen their masks)`)
+    }
+  }
+}
+
 /** Keeps the pixels of `raw` inside `mask` (the rest become transparent). */
 function keepOnly(raw, mask, invert = false) {
   const out = Buffer.from(raw)
@@ -226,7 +241,7 @@ export async function bakeBody(rig, body, scale, pad, srcRoot) {
   const scaledMasks = {}
   for (const entry of items.filter((e) => e.erase)) {
     entry.scaledErase = (await scaledLayer(entry.erase, canvas, scale)).raw
-    for (const slot of ERASE_REGIONS_OF[entry.item.slot]) scaledMasks[slot] = [...(scaledMasks[slot] ?? []), entry.scaledErase]
+    for (const slot of ERASE_REGIONS_OF[entry.item.slot] ?? []) scaledMasks[slot] = [...(scaledMasks[slot] ?? []), entry.scaledErase]
   }
   const { claimed, regions } = slotRegions(scaledMasks, outWidth, outHeight)
   const anyClaimed = new Uint8Array(outWidth * outHeight)
@@ -235,7 +250,7 @@ export async function bakeBody(rig, body, scale, pad, srcRoot) {
   const baseLayer = await encodeRaw("base__front", { ...scaledBase, raw: keepOnly(scaledBase.raw, anyClaimed, true) }, true)
   files.set(baseLayer.key, baseLayer.bytes)
   const baked = {}
-  for (const { id, item, front, back, erase } of items) {
+  for (const { id, item, front, back, erase, scaledErase } of items) {
     const frontLayer = await encodeLayer(`${id}__front`, front, canvas, scale, false)
     files.set(frontLayer.key, frontLayer.bytes)
     const entry = { key: frontLayer.key, rect: frontLayer.rect, order: item.order, slot: item.slot, ...(item.tucked === true ? { tucked: true } : {}) }
@@ -244,7 +259,8 @@ export async function bakeBody(rig, body, scale, pad, srcRoot) {
       files.set(backLayer.key, backLayer.bytes)
       entry.back = { key: backLayer.key, rect: backLayer.rect }
     }
-    const region = unionOf((ERASE_REGIONS_OF[item.slot] ?? []).map((slot) => regions[slot]).filter(Boolean))
+    const region = unionOf((REFILL_REGIONS_OF[item.slot] ?? []).map((slot) => regions[slot]).filter(Boolean))
+    if (scaledErase && !ERASE_REGIONS_OF[item.slot]) assertErasesInside(id, scaledErase, scaledBase.raw, region)
     if (region) {
       const body = erase ? erased(base, erase) : base
       const scaledBody = await scaledLayer(body, canvas, scale)
