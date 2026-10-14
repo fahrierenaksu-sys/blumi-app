@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "b3285aca17eae89464e072449325292be57ea49478efff35d205bcb45a4443b9",
+      "rigSha256": "6586ef9fcc9399efc92b3cd1cf13d67ba768a9edc69527afcba22db624ff328e",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -146,6 +146,16 @@
           "slot": "hair",
           "rigItemId": "hair_girl_waves",
           "thumb": "avatar_v2_hair_mocha_ribbon_waves"
+        },
+        "hair_girl_bob": {
+          "slot": "hair",
+          "rigItemId": "hair_girl_bob",
+          "thumb": "hair_girl_bob"
+        },
+        "hair_girl_pigtails": {
+          "slot": "hair",
+          "rigItemId": "hair_girl_pigtails",
+          "thumb": "hair_girl_pigtails"
         }
       },
       "layers": {
@@ -187,6 +197,32 @@
               89,
               220,
               344
+            ]
+          },
+          {
+            "key": "hair_girl_bob__o0p6",
+            "owner": "hair_girl_bob",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              221,
+              106,
+              183,
+              166
+            ]
+          },
+          {
+            "key": "hair_girl_pigtails__o0p6",
+            "owner": "hair_girl_pigtails",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              205,
+              69,
+              211,
+              302
             ]
           },
           {
@@ -500,6 +536,32 @@
             ]
           },
           {
+            "key": "hair_girl_bob__o4p6",
+            "owner": "hair_girl_bob",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              187,
+              31,
+              276,
+              233
+            ]
+          },
+          {
+            "key": "hair_girl_pigtails__o4p6",
+            "owner": "hair_girl_pigtails",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              187,
+              35,
+              246,
+              330
+            ]
+          },
+          {
             "key": "body__o5",
             "owner": "body",
             "slot": "body",
@@ -567,6 +629,32 @@
             ]
           },
           {
+            "key": "hair_girl_bob__o0p6",
+            "owner": "hair_girl_bob",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              73,
+              57,
+              116,
+              106
+            ]
+          },
+          {
+            "key": "hair_girl_pigtails__o0p6",
+            "owner": "hair_girl_pigtails",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              63,
+              34,
+              134,
+              190
+            ]
+          },
+          {
             "key": "body__o3",
             "owner": "body",
             "slot": "body",
@@ -629,6 +717,32 @@
               0,
               194,
               254
+            ]
+          },
+          {
+            "key": "hair_girl_bob__o4p6",
+            "owner": "hair_girl_bob",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              52,
+              11,
+              174,
+              147
+            ]
+          },
+          {
+            "key": "hair_girl_pigtails__o4p6",
+            "owner": "hair_girl_pigtails",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              52,
+              13,
+              155,
+              207
             ]
           },
           {

@@ -15,6 +15,8 @@ import { GIRL_WARDROBE_PREVIEW_ALL_IDS } from "./girlWardrobePreview";
  *
  * Reason for the girl wardrobe entries (2026-10-13, release/2.5d-beta-3): the ribbon waves and white sneakers ship
  * their QA'd room art; their factory front layers exist but are not owner-approved and allowlisted yet (same rule).
+ * 2026-10-14 (wip/girl-hairs): the bob and pigtails hairs join for the same reason; their front layers (factory
+ * girl_bob_2130 and girl_pigtails_2130 sc/final_r2) passed QA and wait for the owner's yes on the front look.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
   female: [...GIRL_WARDROBE_PREVIEW_ALL_IDS],

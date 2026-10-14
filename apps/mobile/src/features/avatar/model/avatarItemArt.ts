@@ -26,7 +26,9 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     avatar_v2_shoes_mint_ribbon_court_sneakers: "shoes_mint_ribbon_court_sneakers",
     // the girl's 2.5D wardrobe additions (domain girlWardrobePreview.ts)
     avatar_v2_hair_mocha_ribbon_waves: "hair_girl_waves",
-    avatar_v2_shoes_white_clean_sneakers: "shoes_white_sneakers"
+    avatar_v2_shoes_white_clean_sneakers: "shoes_white_sneakers",
+    hair_girl_bob: "hair_girl_bob",
+    hair_girl_pigtails: "hair_girl_pigtails"
   },
   // the boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts; QA unlock only, no receipts)
   male: {

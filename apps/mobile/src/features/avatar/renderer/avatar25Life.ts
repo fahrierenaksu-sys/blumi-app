@@ -4,7 +4,7 @@
  *
  * Both are optional per rig view (`blink`, `breath` in rig25.json): a view without them poses and draws as before.
  */
-import type { Rig25View } from "./rigTypes"
+import type { Rig25BlinkItem, Rig25View } from "./rigTypes"
 
 /** The blink frame shown: indexes `CompiledBlink.offsets` pairs. */
 export const BLINK_OPEN = 0
@@ -40,7 +40,24 @@ export interface CompiledBlink {
 export const AVATAR25_BLINK_ITEMS = 2
 const BLINK_ITEM_STRIDE = 7
 
-export function compileBlink(v: Rig25View): CompiledBlink | null {
+/**
+ * The item patches one avatar uses: only its worn items' (the rig holds every item's patch, at most
+ * AVATAR25_BLINK_ITEMS per outfit), each with its rig page swapped for the texture-array layer that page loads into,
+ * since the shader compares the patch page with the layer a vertex samples.
+ */
+export function wornAvatar25BlinkItems(
+  items: readonly Rig25BlinkItem[] | undefined,
+  wornItemIds: readonly string[],
+  layerOfPage: ReadonlyMap<number, number>
+): Rig25BlinkItem[] {
+  return (items ?? []).flatMap((it) => {
+    const layer = layerOfPage.get(it.page)
+    return wornItemIds.includes(it.item) && layer !== undefined ? [{ ...it, page: layer }] : []
+  })
+}
+
+/** `patches`: the item patches to apply (default: every patch of the view, rig pages; see wornAvatar25BlinkItems). */
+export function compileBlink(v: Rig25View, patches: readonly Rig25BlinkItem[] | undefined = v.blink?.items): CompiledBlink | null {
   const b = v.blink
   if (!b || b.page !== 0 || b.seq.length === 0) return null
   const [pw, ph] = v.pageSize
@@ -65,7 +82,7 @@ export function compileBlink(v: Rig25View): CompiledBlink | null {
   const doubleFits = gapMin > end + doubleGapS
   const items: number[] = []
   for (let k = 0; k < AVATAR25_BLINK_ITEMS; k++) {
-    const it = b.items?.[k]
+    const it = patches?.[k]
     if (!it) {
       items.push(-1, 0, 0, 0, 0, 0, 0)
       continue

@@ -22,7 +22,7 @@ import {
 } from "./avatar25Motion"
 import { seatedCardStrips, seatedShinBandRows } from "./avatar25SeatedLegs"
 import { legMaskRange, legMaskVertices, legPlan, UNORM16, type LegMaskVertex } from "./avatar25Legs"
-import { breathCurve, compileBlink, compileBreath, type CompiledBlink, type CompiledBreath } from "./avatar25Life"
+import { breathCurve, compileBlink, compileBreath, wornAvatar25BlinkItems, type CompiledBlink, type CompiledBreath } from "./avatar25Life"
 
 export { legPlan } from "./avatar25Legs"
 
@@ -407,7 +407,12 @@ export function compileAvatar(
     variants.push(start, indices.length - start)
   }
   return {
-    view: { ...view, soleLift: Math.max(0, ...worn.map((id) => v.items[id].lift ?? 0)) },
+    view: {
+      ...view,
+      soleLift: Math.max(0, ...worn.map((id) => v.items[id].lift ?? 0)),
+      // only the worn items' eye patches, on this avatar's texture layers
+      blink: view.blink === null ? null : compileBlink(v, wornAvatar25BlinkItems(v.blink?.items, worn, layerOfPage))
+    },
     itemIds: worn,
     vertexData: packVertices([...meshes, ...(extra ? [extra.mesh] : []), ...stripMeshes], layerOfPage, legMaskVertices(entries, meshes, base)),
     indexData: Uint32Array.from(indices),

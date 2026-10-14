@@ -87,7 +87,7 @@ const MALE_CAPSULE_AVATAR_ITEMS: AvatarCatalogItem[] = ([
 }))
 
 const titleOf = (id: string): string =>
-  id.replace(/^avatar_v2_[a-z]+_(male_)?/, "").split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+  id.replace(/^(avatar_v2_[a-z]+_(male_)?|[a-z]+_girl_)/, "").split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
 
 /**
  * The boy's 2.5D wardrobe (domain boyWardrobePreview.ts): free and owned by every account during testing (economy

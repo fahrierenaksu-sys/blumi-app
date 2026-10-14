@@ -136,10 +136,11 @@ test("one indexed draw per pose shows the body and every worn item, each walk fr
     const [start, count] = [compiled.variants[variant * 2], compiled.variants[variant * 2 + 1]]
     return new Set(Array.from(compiled.indexData.subarray(start, start + count), pageOf))
   }
-  const itemPages = new Set(items.map((id) => v.items[id].page))
+  // vertices carry the texture-array layer their rig page loads into
+  const itemLayers = new Set(items.map((id) => compiled.pages.indexOf(v.pages[v.items[id].page])))
   for (const variant of [VARIANT_STAND, VARIANT_SIT, VARIANT_WALK0]) {
     assert.ok(compiled.variants[variant * 2 + 1] > 0)
-    for (const page of [0, ...itemPages]) assert.ok(pagesIn(variant).has(page), `variant ${variant} page ${page}`)
+    for (const layer of [0, ...itemLayers]) assert.ok(layer >= 0 && pagesIn(variant).has(layer), `variant ${variant} layer ${layer}`)
   }
   const range = (k: number) => Array.from(compiled.indexData.subarray(compiled.variants[k * 2], compiled.variants[k * 2] + compiled.variants[k * 2 + 1]))
   if (v.walk.frames.length > 1) {
@@ -164,7 +165,7 @@ test("one indexed draw per pose shows the body and every worn item, each walk fr
     for (const walk of [VARIANT_WALK0, VARIANT_WALK0 + 1]) {
       const drawn = new Set(range(walk))
       assert.ok(standLegs.every((i) => drawn.has(i)), `walk ${walk}`)
-      for (const page of itemPages) assert.ok(pagesIn(walk).has(page), `walk ${walk} page ${page}`)
+      for (const layer of itemLayers) assert.ok(pagesIn(walk).has(layer), `walk ${walk} layer ${layer}`)
     }
   } else {
     // no painted walk: the skinned standing legs (and the worn trousers and shoes on them) walk
@@ -601,4 +602,24 @@ test("a part drawn in some poses only (poseOnly, e.g. the boy's wave-only hip pa
   }
   assert.ok(checked > 0, "the boy rig carries poseOnly parts")
   assert.ok(v.items.bottom_male_c3.mesh.ranges.some((r) => r.poseOnly?.join() === "wave"), "the bottom's wave-only hip patch is exported")
+})
+
+test("blinking, an avatar applies the eye patches of its worn items only, on the texture layer their page loads into", () => {
+  const BLINK_ITEM_STRIDE = 7
+  for (const [rigName, r] of Object.entries(RIGS)) {
+    const v = r.views.front
+    const patches = v.blink?.items ?? []
+    for (const itemId of [...new Set(patches.map((it) => it.item))]) {
+      const compiled = compileAvatar(r, "front", [itemId])
+      const own = patches.filter((it) => it.item === itemId)
+      const applied: number[] = []
+      const slots = compiled.view.blink?.items ?? []
+      for (let k = 0; k < slots.length; k += BLINK_ITEM_STRIDE) if (slots[k] >= 0) applied.push(slots[k])
+      const layers = own.map((it) => compiled.pages.indexOf(v.pages[it.page]))
+      assert.ok(layers.every((layer) => layer > 0), `${rigName} ${itemId}: its patch page is loaded`)
+      assert.deepEqual(applied, layers, `${rigName} ${itemId}: exactly its own patches, on their texture layers`)
+    }
+    const bare = compileAvatar(r, "front", [])
+    assert.ok((bare.view.blink?.items ?? []).every((value, k) => k % BLINK_ITEM_STRIDE !== 0 || value === -1), `${rigName}: no item, no patch`)
+  }
 })
