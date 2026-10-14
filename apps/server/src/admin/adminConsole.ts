@@ -173,6 +173,16 @@ const ADMIN_CONSOLE_JS = `(() => {
   const overviewTab = $("#overview-tab"), analysisTab = $("#analysis-tab");
   let token = "", scopes = new Set(), selectedUserId = "", selectedReportId = "", currentArea = "";
   let analyticsRequestId = 0;
+  // Account actions target the immutable record that is drawn on screen. A
+  // newer selection or a new operator session makes older responses and drawn
+  // actions stale, so they are dropped instead of acting on another account.
+  let userRequestId = 0, sessionEpoch = 0, drawnUser = null, userActionControls = [];
+  function resetUserSelection() {
+    selectedUserId = ""; sessionEpoch++; userRequestId++; drawnUser = null; userActionControls = [];
+  }
+  function setUserActionsEnabled(enabled) {
+    for (const control of userActionControls) control.disabled = !enabled;
+  }
 
   async function request(path, options = {}, authToken = token) {
     const headers = new Headers(options.headers || {});
@@ -183,7 +193,7 @@ const ADMIN_CONSOLE_JS = `(() => {
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
       if (response.status === 401 && authToken && authToken === token && !workspace.hidden) {
-        token = ""; scopes = new Set(); selectedUserId = "";
+        token = ""; scopes = new Set(); resetUserSelection();
         workspace.hidden = true; $("#session").hidden = true; login.hidden = false;
         results.replaceChildren(); detail.replaceChildren(); reportResults.replaceChildren();
         reportDetail.replaceChildren(); tokenField.focus();
@@ -206,6 +216,7 @@ const ADMIN_CONSOLE_JS = `(() => {
     const candidate = tokenField.value.trim();
     try {
       const session = await request("/v1/admin/session", {}, candidate);
+      resetUserSelection(); detail.replaceChildren();
       token = candidate; scopes = new Set(session.scopes);
       tokenField.value = "";
       $("#operator").textContent = session.operatorId + " · " + new Date(session.expiresAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
@@ -224,7 +235,7 @@ const ADMIN_CONSOLE_JS = `(() => {
   });
 
   $("#logout").addEventListener("click", () => {
-    token = ""; scopes = new Set(); selectedUserId = ""; analyticsRequestId++;
+    token = ""; scopes = new Set(); resetUserSelection(); analyticsRequestId++;
     workspace.hidden = true; $("#session").hidden = true; login.hidden = false;
     results.replaceChildren(); detail.replaceChildren(); reportResults.replaceChildren();
     reportDetail.replaceChildren(); tokenField.focus(); message("");
@@ -271,18 +282,24 @@ const ADMIN_CONSOLE_JS = `(() => {
 
   async function loadUser(userId) {
     message(""); selectedUserId = userId;
+    const requestId = ++userRequestId, epoch = sessionEpoch;
+    drawnUser = null; setUserActionsEnabled(false);
+    const isCurrent = () => requestId === userRequestId && epoch === sessionEpoch;
     try {
       const [data, audit] = await Promise.all([
         request("/v1/admin/users/" + encodeURIComponent(userId)),
         request("/v1/admin/users/" + encodeURIComponent(userId) + "/quota-audit")
       ]);
-      renderUser(data.user, audit.events);
+      if (!isCurrent()) return false;
+      renderUser(data.user, audit.events, epoch);
       return true;
-    } catch (error) { message(error.message); return false; }
+    } catch (error) { if (isCurrent()) message(error.message); return false; }
   }
 
-  function renderUser(user, events) {
+  function renderUser(user, events, epoch) {
     detail.replaceChildren();
+    const record = Object.freeze({ userId: user.userId, epoch });
+    drawnUser = record; userActionControls = [];
     const head = element("div", "user-head"), identity = element("div");
     identity.append(element("div", "eyebrow", "HESAP"), element("h2", "", user.displayName || "İsimsiz kullanıcı"));
     identity.append(element("p", "", user.userId), element("p", "", user.maskedPhone + " · Katıldı " + new Date(user.createdAt).toLocaleDateString("tr-TR")));
@@ -305,8 +322,9 @@ const ADMIN_CONSOLE_JS = `(() => {
       const amount = element("input"); amount.type = "number"; amount.min = "1"; amount.max = "50"; amount.step = "1"; amount.value = "5"; amount.required = true; amount.id = "grant-amount"; grantLabel.htmlFor = amount.id; grantWrap.append(grantLabel, amount);
       const grant = element("button", "button button-primary", "Ek hak tanımla"); grant.type = "button";
       const reset = element("button", "button button-danger", "Bugünkü hakkı sıfırla"); reset.type = "button";
-      grant.addEventListener("click", () => performAction("grant", { reason: reason.value, amount: Number(amount.value) }));
-      reset.addEventListener("click", () => { if (window.confirm("Bu kullanıcının bugünkü keşfet kullanımı sıfırlansın mı? İşlem denetim kaydına yazılır.")) performAction("reset", { reason: reason.value }); });
+      grant.addEventListener("click", () => performAction(record, "grant", { reason: reason.value, amount: Number(amount.value) }));
+      reset.addEventListener("click", () => { if (window.confirm("Bu kullanıcının bugünkü keşfet kullanımı sıfırlansın mı? İşlem denetim kaydına yazılır.")) performAction(record, "reset", { reason: reason.value }); });
+      userActionControls = [reason, amount, grant, reset];
       form.append(reasonWrap, grantWrap, grant, reset); detail.append(form);
     }
 
@@ -322,14 +340,17 @@ const ADMIN_CONSOLE_JS = `(() => {
   }
 
   let actionPending = false;
-  async function performAction(action, payload) {
+  async function performAction(target, action, payload) {
     if (actionPending) return;
+    if (target !== drawnUser || target.epoch !== sessionEpoch) { message("Hesap değişti. İşlemi gösterilen hesap için yeniden seç."); return; }
     if (!payload.reason || payload.reason.trim().length < 12) { message("Lütfen en az 12 karakterlik bir işlem gerekçesi yaz."); return; }
     const suffix = action === "reset" ? "reset" : "grant";
     actionPending = true;
     try {
-      await request("/v1/admin/users/" + encodeURIComponent(selectedUserId) + "/discovery-quota/" + suffix, { method: "POST", body: JSON.stringify(payload) });
-      if (await loadUser(selectedUserId)) message("İşlem tamamlandı ve denetim kaydına eklendi.");
+      await request("/v1/admin/users/" + encodeURIComponent(target.userId) + "/discovery-quota/" + suffix, { method: "POST", body: JSON.stringify(payload) });
+      if (target.epoch !== sessionEpoch) return;
+      if (selectedUserId !== target.userId) { message("İşlem tamamlandı ve denetim kaydına eklendi."); return; }
+      if (await loadUser(target.userId)) message("İşlem tamamlandı ve denetim kaydına eklendi.");
     } catch (error) { message(error.message); }
     finally { actionPending = false; }
   }
