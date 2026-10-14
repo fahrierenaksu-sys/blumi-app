@@ -2,18 +2,12 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image as ExpoImage } from "expo-image"
 import { memo } from "react"
 import { type ImageSourcePropType, Pressable, Text, View } from "react-native"
-import { getShopProductThumbnailBounds } from "../../shop/shopAssets"
 import { getShopThumbnailLayout } from "../../shop/shopThumbnailLayout"
-import { getGarmentThumbnailOverride } from "../garmentThumbnailOverrides"
 import type { AvatarCatalogItem } from "../avatarV2.types"
-import { getMaleRigLayerThumbnailPresentation } from "../maleRigThumbnailPresentation"
-import { MALE_CAPSULE_PREVIEW_SOURCES } from "../maleCapsulePreviewSources"
-import { getWardrobeThumbnailPresentation } from "../wardrobeThumbnailPresentation"
 import { getAvatarAutomationSlug } from "../qa/avatarQaInventory"
-import { getAvatarItemPreviewImageStyle, getStarterLayerThumbnail } from "./wardrobeCatalogModel"
-import { WARDROBE_ART_ASPECT, WARDROBE_THUMB_BOX } from "./wardrobeStageLayout"
+import { WARDROBE_ART_ASPECT } from "./wardrobeStageLayout"
 import { CATEGORY_ICONS } from "./wardrobeCopy"
-import { WARDROBE_SQUARE_THUMBNAIL_SOURCES, isAvatarItemCutoutPreview } from "./wardrobePreviewSources"
+import { getAvatarItemPreviewBounds, isAvatarItemCutoutPreview } from "./wardrobePreviewSources"
 import { wardrobeTheme, wardrobeV2Styles as styles } from "./wardrobeV2Styles"
 
 /** Air between a whole-garment cutout and the card edge. */
@@ -40,47 +34,19 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
     item, name, equipped, itemStateLabel, wearingLabel, locked, previewing, lockedHint, width,
     onEquip, onPreviewLocked, previewSource
   } = props
-  const rigLayerPresentation = item.id in MALE_CAPSULE_PREVIEW_SOURCES
-    ? getMaleRigLayerThumbnailPresentation(item.type, "wardrobe")
-    : undefined
-  const thumbnailPresentation = getWardrobeThumbnailPresentation({
-    type: item.type,
-    isRigLayer: Boolean(rigLayerPresentation),
-    isSquareAsset:
-      item.id in WARDROBE_SQUARE_THUMBNAIL_SOURCES ||
-      Boolean(getGarmentThumbnailOverride(item.id)) ||
-      ["face", "eyes", "nose", "mouth"].includes(item.type),
-    isCutoutAsset: isAvatarItemCutoutPreview(item)
-  })
-  const isCutout = thumbnailPresentation.frame === "cutout"
   const artHeight = Math.round(width * WARDROBE_ART_ASPECT)
-  const starterThumbnail = thumbnailPresentation.frame === "legacy"
-    ? getStarterLayerThumbnail(item.id)
-    : undefined
-  // Shop bounds describe these exact preview sources, including male room
-  // layers. Fit their visible pixels rather than offsetting a scaled canvas.
-  const usesShopBounds = thumbnailPresentation.frame !== "legacy" ||
-    item.type === "hair" || item.type === "accessory"
-  const thumbnailBounds = isCutout
-    ? undefined
-    : usesShopBounds ? getShopProductThumbnailBounds(item.id) : starterThumbnail?.bounds
-  const preferredBox = thumbnailPresentation.frame === "portrait" || item.type === "hair"
-    ? { width, height: artHeight }
-    : starterThumbnail?.box ?? WARDROBE_THUMB_BOX
-  // The artwork viewport includes a 1.5px border on each side.
-  const thumbnailBox = {
-    width: Math.min(preferredBox.width, width - 3),
-    height: Math.min(preferredBox.height, artHeight - 3)
-  }
-  const thumbnailLayout = thumbnailBounds
-    ? getShopThumbnailLayout(thumbnailBounds, thumbnailBox.width, thumbnailBox.height)
-    : undefined
-  // A cutout is already cropped to the garment: contain it whole in an inset box.
+  // A cutout (2.5D thumbnail) is already cropped to the garment: contain it whole in an inset box.
+  const isCutout = isAvatarItemCutoutPreview(item)
   const cutoutBox = {
     width: Math.max(0, width - 3 - CUTOUT_INSET * 2),
     height: Math.max(0, artHeight - 3 - CUTOUT_INSET * 2)
   }
-  const isBoxed = Boolean(thumbnailLayout) || isCutout
+  // The default feature portrait fits its visible pixels to the card art (1.5px border on each side).
+  const portraitBounds = isCutout ? undefined : getAvatarItemPreviewBounds(item)
+  const portraitLayout = portraitBounds
+    ? getShopThumbnailLayout(portraitBounds, width - 3, artHeight - 3)
+    : undefined
+  const isBoxed = isCutout || Boolean(portraitLayout)
 
   const image = previewSource ? (
     <ExpoImage
@@ -90,22 +56,8 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
       // WRD-2: static thumbnails never fade in after decoding (as in the Shop).
       transition={0}
       style={[
-        thumbnailPresentation.frame === "rig"
-          ? styles.itemPreviewRigLayer
-          : thumbnailPresentation.frame === "portrait"
-            ? styles.itemPreviewFeaturePortrait
-            : thumbnailPresentation.frame === "square" || isCutout || thumbnailLayout
-              ? styles.itemPreviewSquare
-              : styles.itemPreviewImage,
-        thumbnailLayout ? { position: "absolute", ...thumbnailLayout } : null,
-        rigLayerPresentation && !thumbnailLayout
-          ? {
-              top: rigLayerPresentation.top,
-              transform: [{ scale: rigLayerPresentation.scale }]
-            }
-          : thumbnailPresentation.frame === "legacy" && !thumbnailLayout
-            ? getAvatarItemPreviewImageStyle(item)
-            : null
+        portraitBounds ? styles.itemPreviewFeaturePortrait : styles.itemPreviewSquare,
+        portraitLayout ? { position: "absolute", ...portraitLayout } : null
       ]}
     />
   ) : null
@@ -136,7 +88,9 @@ export const WardrobeCatalogCard = memo(function WardrobeCatalogCard(props: {
         {previewSource ? (
           isBoxed
             ? (
-              <View style={[styles.itemThumbBox, isCutout ? cutoutBox : thumbnailBox]}>{image}</View>
+              <View style={[styles.itemThumbBox, isCutout ? cutoutBox : { width: width - 3, height: artHeight - 3 }]}>
+                {image}
+              </View>
             )
             : image
         ) : (

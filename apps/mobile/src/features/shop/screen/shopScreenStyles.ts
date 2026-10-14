@@ -312,11 +312,6 @@ export const shopScreenStyles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  productWearableRigLayer: {
-    ...StyleSheet.absoluteFill,
-    width: "100%",
-    height: "100%",
-  },
   // The card X: a 44 pt corner touch target around a small dot.
   productRemoveHitArea: {
     position: "absolute",

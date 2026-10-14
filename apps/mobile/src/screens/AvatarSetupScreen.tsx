@@ -231,7 +231,6 @@ export function AvatarSetupScreen({
       stage={(
         <AvatarSetupStudioStage
           avatar={starterAvatar}
-          catalog={catalog}
           categories={studioCategories}
           copy={copy.studio}
           compact={compact}

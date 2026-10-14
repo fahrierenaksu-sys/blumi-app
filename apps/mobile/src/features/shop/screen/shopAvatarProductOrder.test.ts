@@ -9,7 +9,7 @@ require.extensions[".webp"] = require.extensions[".png"]
 
 const {
   PRODUCT_REFERENCE_AVATAR_ITEM_IDS,
-  SHOP_THUMBNAIL_SOURCES
+  getShopProductThumbnailSource
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("../shopAssets") as typeof import("../shopAssets")
 const {
@@ -20,7 +20,7 @@ const {
 } = require("./shopAvatarProductOrder") as typeof import("./shopAvatarProductOrder")
 
 const referenceId = [...PRODUCT_REFERENCE_AVATAR_ITEM_IDS][0]
-const thumbnailId = Object.keys(SHOP_THUMBNAIL_SOURCES)[0]
+const thumbnailId = [...PRODUCT_REFERENCE_AVATAR_ITEM_IDS].find((id) => getShopProductThumbnailSource(id) !== undefined)!
 
 function product(sourceItemId: string, title: string, priceCoins: number | null, avatar = true): ShopCatalogItem {
   return {

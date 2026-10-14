@@ -1,3 +1,4 @@
+import { RETIRED_AVATAR_ART } from "../retiredAvatarArt"
 import type {
   RoomV2AssetRef,
   RoomV2AvatarAssetSequence
@@ -36,63 +37,63 @@ const motion = (
 export const roomAvatarMaleCapsuleLayerAssets = {
   hairFrontMaleCocoaTexturedQuiffV1: asset(
     "avatar_room_hair_front_male_cocoa_textured_quiff_v1",
-    require("../assets/room/avatar_room_hair_front_male_cocoa_textured_quiff_v2.png")
+    RETIRED_AVATAR_ART
   ),
   hairFrontMaleSoftBlackSidePartV1: asset(
     "avatar_room_hair_front_male_soft_black_side_part_v1",
-    require("../assets/room/avatar_room_hair_front_male_soft_black_side_part_v2.png")
+    RETIRED_AVATAR_ART
   ),
   hairFrontMaleChestnutShortWavesV1: asset(
     "avatar_room_hair_front_male_chestnut_short_waves_v1",
-    require("../assets/room/avatar_room_hair_front_male_chestnut_short_waves_v2.png")
+    RETIRED_AVATAR_ART
   ),
   topMaleDustyNavyTeeV1: asset(
     "avatar_room_top_male_dusty_navy_tee_v1",
-    require("../assets/room/avatar_room_top_male_dusty_navy_tee_v1.png")
+    RETIRED_AVATAR_ART
   ),
   topMaleSageBasicTeeV1: asset(
     "avatar_room_top_male_sage_basic_tee_v1",
-    require("../assets/room/avatar_room_top_male_sage_basic_tee_v1.png")
+    RETIRED_AVATAR_ART
   ),
   topMaleMistBlueOxfordShirtV1: asset(
     "avatar_room_top_male_mist_blue_oxford_shirt_v1",
-    require("../assets/room/avatar_room_top_male_mist_blue_oxford_shirt_v1.png")
+    RETIRED_AVATAR_ART
   ),
   topMaleSoftSageLinenShirtV1: asset(
     "avatar_room_top_male_soft_sage_linen_shirt_v1",
-    require("../assets/room/avatar_room_top_male_soft_sage_linen_shirt_v1.png")
+    RETIRED_AVATAR_ART
   ),
   topMaleCocoaVarsityJacketV1: asset(
     "avatar_room_top_male_cocoa_varsity_jacket_v1",
-    require("../assets/room/avatar_room_top_male_cocoa_varsity_jacket_v1.png")
+    RETIRED_AVATAR_ART
   ),
   topMaleDustyNavyChoreJacketV1: asset(
     "avatar_room_top_male_dusty_navy_chore_jacket_v1",
-    require("../assets/room/avatar_room_top_male_dusty_navy_chore_jacket_v1.png")
+    RETIRED_AVATAR_ART
   ),
   bottomMaleMidBlueStraightJeansV1: asset(
     "avatar_room_bottom_male_mid_blue_straight_jeans_v1",
-    require("../assets/room/avatar_room_bottom_male_mid_blue_straight_jeans_v1.png")
+    RETIRED_AVATAR_ART
   ),
   bottomMaleCharcoalTaperedChinosV1: asset(
     "avatar_room_bottom_male_charcoal_tapered_chinos_v1",
-    require("../assets/room/avatar_room_bottom_male_charcoal_tapered_chinos_v1.png")
+    RETIRED_AVATAR_ART
   ),
   bottomMaleWarmSandRelaxedPantsV1: asset(
     "avatar_room_bottom_male_warm_sand_relaxed_pants_v1",
-    require("../assets/room/avatar_room_bottom_male_warm_sand_relaxed_pants_v1.png")
+    RETIRED_AVATAR_ART
   ),
   shoesMaleCloudWhiteTrainersV1: asset(
     "avatar_room_shoes_male_cloud_white_trainers_v1",
-    require("../assets/room/avatar_room_shoes_male_cloud_white_trainers_v1.png")
+    RETIRED_AVATAR_ART
   ),
   shoesMaleCocoaPennyLoafersV1: asset(
     "avatar_room_shoes_male_cocoa_penny_loafers_v1",
-    require("../assets/room/avatar_room_shoes_male_cocoa_penny_loafers_v1.png")
+    RETIRED_AVATAR_ART
   ),
   shoesMaleDustyBlueCanvasSneakersV1: asset(
     "avatar_room_shoes_male_dusty_blue_canvas_sneakers_v1",
-    require("../assets/room/avatar_room_shoes_male_dusty_blue_canvas_sneakers_v1.png")
+    RETIRED_AVATAR_ART
   )
 } as const
 

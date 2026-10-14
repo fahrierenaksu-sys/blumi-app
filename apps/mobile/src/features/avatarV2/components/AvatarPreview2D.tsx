@@ -1,11 +1,10 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native"
 import { blumiEntryTheme, uiTheme } from "../../../ui/theme"
-import type { AvatarCatalogItem, AvatarItemType, UserAvatar } from "../avatarV2.types"
+import type { AvatarItemType, UserAvatar } from "../avatarV2.types"
 import { AvatarTryOnFigure } from "./AvatarTryOnFigure"
 
 export interface AvatarPreview2DProps {
   avatar?: Partial<UserAvatar>
-  catalog?: AvatarCatalogItem[]
   size?: number
   stageHeight?: number
   selectedType?: AvatarItemType
@@ -21,7 +20,6 @@ export interface AvatarPreview2DProps {
 export function AvatarPreview2D(props: AvatarPreview2DProps) {
   const {
     avatar,
-    catalog,
     size = 220,
     stageHeight = 286,
     selectedType,
@@ -48,7 +46,6 @@ export function AvatarPreview2D(props: AvatarPreview2DProps) {
         <View style={[styles.avatar, { width: size, height: avatarHeight }]}>
           <AvatarTryOnFigure
             avatar={avatar}
-            catalog={catalog}
             width={size}
             height={avatarHeight}
             accessibilityLabel={props.accessibilityLabel ?? label ?? ""}

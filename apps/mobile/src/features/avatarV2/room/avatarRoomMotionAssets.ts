@@ -1,3 +1,4 @@
+import { RETIRED_AVATAR_ART } from "../retiredAvatarArt"
 import {
   roomAvatarAsset,
   roomAvatarAssetSequence,
@@ -238,27 +239,27 @@ export const roomAvatarMotionLayerAssets = {
   hairBackFemaleHoneyHalfupWavesV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_back_female_honey_halfup_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_honey_halfup_waves_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_honey_halfup_waves_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_honey_halfup_waves_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_honey_halfup_waves_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_back_female_honey_halfup_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_honey_halfup_waves_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairFrontFemaleHoneyHalfupWavesV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_front_female_honey_halfup_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_honey_halfup_waves_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_honey_halfup_waves_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_honey_halfup_waves_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_honey_halfup_waves_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_front_female_honey_halfup_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_honey_halfup_waves_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairBackFemaleCocoaCloudPonytailV2: frameAwareHeadMotion(
@@ -295,222 +296,222 @@ export const roomAvatarMotionLayerAssets = {
   ),
   hairBackFemaleCherryRibbonTwinBraidsV2: frameAwareHeadMotion(
     "room_avatar_hair_back_female_cherry_ribbon_twin_braids_v2",
-    require("../assets/room/motion/room_avatar_hair_back_female_cherry_ribbon_twin_braids_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_cherry_ribbon_twin_braids_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_cherry_ribbon_twin_braids_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_cherry_ribbon_twin_braids_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_cherry_ribbon_twin_braids_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   hairFrontFemaleCherryRibbonTwinBraidsV2: frameAwareHeadMotion(
     "room_avatar_hair_front_female_cherry_ribbon_twin_braids_v2",
-    require("../assets/room/motion/room_avatar_hair_front_female_cherry_ribbon_twin_braids_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_cherry_ribbon_twin_braids_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_cherry_ribbon_twin_braids_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_cherry_ribbon_twin_braids_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_cherry_ribbon_twin_braids_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   hairBackFemaleRosewoodButterflyLayersV2: frameAwareHeadMotion(
     "room_avatar_hair_back_female_rosewood_butterfly_layers_v2",
-    require("../assets/room/motion/room_avatar_hair_back_female_rosewood_butterfly_layers_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_rosewood_butterfly_layers_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_rosewood_butterfly_layers_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_rosewood_butterfly_layers_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_rosewood_butterfly_layers_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   hairFrontFemaleRosewoodButterflyLayersV2: frameAwareHeadMotion(
     "room_avatar_hair_front_female_rosewood_butterfly_layers_v2",
-    require("../assets/room/motion/room_avatar_hair_front_female_rosewood_butterfly_layers_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_rosewood_butterfly_layers_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_rosewood_butterfly_layers_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_rosewood_butterfly_layers_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_rosewood_butterfly_layers_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   hairBackFemaleCaramelBraidedCrownV2: frameAwareHeadMotion(
     "room_avatar_hair_back_female_caramel_braided_crown_v2",
-    require("../assets/room/motion/room_avatar_hair_back_female_caramel_braided_crown_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_caramel_braided_crown_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_caramel_braided_crown_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_caramel_braided_crown_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_caramel_braided_crown_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   hairFrontFemaleCaramelBraidedCrownV2: frameAwareHeadMotion(
     "room_avatar_hair_front_female_caramel_braided_crown_v2",
-    require("../assets/room/motion/room_avatar_hair_front_female_caramel_braided_crown_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_caramel_braided_crown_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_caramel_braided_crown_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_caramel_braided_crown_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_caramel_braided_crown_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   hairBackFemaleBerryVelvetSoftUpdoV2: frameAwareHeadMotion(
     "room_avatar_hair_back_female_berry_velvet_soft_updo_v2",
-    require("../assets/room/motion/room_avatar_hair_back_female_berry_velvet_soft_updo_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_berry_velvet_soft_updo_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_berry_velvet_soft_updo_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_berry_velvet_soft_updo_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_hair_back_female_berry_velvet_soft_updo_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   hairFrontFemaleBerryVelvetSoftUpdoV2: frameAwareHeadMotion(
     "room_avatar_hair_front_female_berry_velvet_soft_updo_v2",
-    require("../assets/room/motion/room_avatar_hair_front_female_berry_velvet_soft_updo_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_berry_velvet_soft_updo_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_berry_velvet_soft_updo_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_berry_velvet_soft_updo_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_hair_front_female_berry_velvet_soft_updo_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   hairBackFemaleChestnutButterflyBobV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_back_female_chestnut_butterfly_bob_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_chestnut_butterfly_bob_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_chestnut_butterfly_bob_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_chestnut_butterfly_bob_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_chestnut_butterfly_bob_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_back_female_chestnut_butterfly_bob_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_chestnut_butterfly_bob_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairFrontFemaleChestnutButterflyBobV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_front_female_chestnut_butterfly_bob_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_chestnut_butterfly_bob_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_chestnut_butterfly_bob_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_chestnut_butterfly_bob_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_chestnut_butterfly_bob_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_front_female_chestnut_butterfly_bob_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_chestnut_butterfly_bob_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairBackFemaleGoldenWavesV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_back_female_golden_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_golden_waves_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_golden_waves_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_golden_waves_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_golden_waves_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_back_female_golden_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_golden_waves_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairFrontFemaleGoldenWavesV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_front_female_golden_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_golden_waves_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_golden_waves_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_golden_waves_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_golden_waves_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_front_female_golden_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_golden_waves_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairBackFemaleInkPageboyStarV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_back_female_ink_pageboy_star_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_pageboy_star_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_pageboy_star_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_pageboy_star_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_pageboy_star_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_back_female_ink_pageboy_star_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_pageboy_star_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairFrontFemaleInkPageboyStarV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_front_female_ink_pageboy_star_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_pageboy_star_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_pageboy_star_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_pageboy_star_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_pageboy_star_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_front_female_ink_pageboy_star_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_pageboy_star_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairBackFemaleInkTwinBraidsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_back_female_ink_twin_braids_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_twin_braids_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_twin_braids_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_twin_braids_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_twin_braids_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_back_female_ink_twin_braids_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_ink_twin_braids_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairFrontFemaleInkTwinBraidsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_front_female_ink_twin_braids_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_twin_braids_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_twin_braids_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_twin_braids_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_twin_braids_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_front_female_ink_twin_braids_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_ink_twin_braids_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairBackFemalePaleGoldenBowBobV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_back_female_pale_golden_bow_bob_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_pale_golden_bow_bob_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_pale_golden_bow_bob_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_pale_golden_bow_bob_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_pale_golden_bow_bob_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_back_female_pale_golden_bow_bob_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_pale_golden_bow_bob_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairFrontFemalePaleGoldenBowBobV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_front_female_pale_golden_bow_bob_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_pale_golden_bow_bob_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_pale_golden_bow_bob_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_pale_golden_bow_bob_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_pale_golden_bow_bob_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_front_female_pale_golden_bow_bob_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_pale_golden_bow_bob_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairBackFemaleCopperBowWavesV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_back_female_copper_bow_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_copper_bow_waves_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_copper_bow_waves_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_copper_bow_waves_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_back_female_copper_bow_waves_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_back_female_copper_bow_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_back_female_copper_bow_waves_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   hairFrontFemaleCopperBowWavesV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_hair_front_female_copper_bow_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_copper_bow_waves_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_copper_bow_waves_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_copper_bow_waves_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_hair_front_female_copper_bow_waves_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_hair_front_female_copper_bow_waves_v2",
-      require("../assets/room/motion/room_avatar_hair_front_female_copper_bow_waves_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   eyesFemaleMochaDoeV2: {
@@ -766,27 +767,27 @@ export const roomAvatarMotionLayerAssets = {
   shoesFemaleCherrySatinBalletsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_shoes_female_cherry_satin_ballets_v2",
-      require("../assets/room/motion/room_avatar_shoes_female_cherry_satin_ballets_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_cherry_satin_ballets_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_cherry_satin_ballets_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_cherry_satin_ballets_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_shoes_female_cherry_satin_ballets_v2",
-      require("../assets/room/motion/room_avatar_shoes_female_cherry_satin_ballets_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   shoesFemaleOnyxHeartMaryJanesV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_shoes_female_onyx_heart_mary_janes_v2",
-      require("../assets/room/motion/room_avatar_shoes_female_onyx_heart_mary_janes_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_onyx_heart_mary_janes_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_onyx_heart_mary_janes_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_onyx_heart_mary_janes_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_shoes_female_onyx_heart_mary_janes_v2",
-      require("../assets/room/motion/room_avatar_shoes_female_onyx_heart_mary_janes_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   topFemaleCreamBasicTeeV2: {
@@ -818,183 +819,183 @@ export const roomAvatarMotionLayerAssets = {
   bottomFemaleStripedCrochetShortsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_striped_crochet_shorts_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_striped_crochet_shorts_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_striped_crochet_shorts_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_striped_crochet_shorts_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_striped_crochet_shorts_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_striped_crochet_shorts_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_striped_crochet_shorts_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   bottomFemaleLayeredLaceRuffleMiniSkirtV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_layered_lace_ruffle_mini_skirt_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_layered_lace_ruffle_mini_skirt_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_layered_lace_ruffle_mini_skirt_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_layered_lace_ruffle_mini_skirt_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_layered_lace_ruffle_mini_skirt_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_layered_lace_ruffle_mini_skirt_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_layered_lace_ruffle_mini_skirt_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   bottomFemaleBlackPalmEmbellishedPantsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_black_palm_embellished_pants_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_black_palm_embellished_pants_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_black_palm_embellished_pants_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_black_palm_embellished_pants_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_black_palm_embellished_pants_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_black_palm_embellished_pants_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_black_palm_embellished_pants_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   bottomFemaleCoralEmbellishedLaceupPantsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_coral_embellished_laceup_pants_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_coral_embellished_laceup_pants_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_coral_embellished_laceup_pants_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_coral_embellished_laceup_pants_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_coral_embellished_laceup_pants_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_coral_embellished_laceup_pants_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_coral_embellished_laceup_pants_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   bottomFemaleSmokyFloralMeshPantsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_smoky_floral_mesh_pants_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_smoky_floral_mesh_pants_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_smoky_floral_mesh_pants_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_smoky_floral_mesh_pants_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_smoky_floral_mesh_pants_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_smoky_floral_mesh_pants_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_smoky_floral_mesh_pants_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   bottomFemaleYellowBowLaceRuffleSkirtV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_yellow_bow_lace_ruffle_skirt_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_yellow_bow_lace_ruffle_skirt_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_yellow_bow_lace_ruffle_skirt_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_yellow_bow_lace_ruffle_skirt_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_yellow_bow_lace_ruffle_skirt_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_yellow_bow_lace_ruffle_skirt_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_yellow_bow_lace_ruffle_skirt_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   topFemaleBohoPatchworkMaxiDressV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_top_female_boho_patchwork_maxi_dress_v2",
-      require("../assets/room/motion/room_avatar_top_female_boho_patchwork_maxi_dress_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_female_boho_patchwork_maxi_dress_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_female_boho_patchwork_maxi_dress_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_female_boho_patchwork_maxi_dress_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_top_female_boho_patchwork_maxi_dress_v2",
-      require("../assets/room/motion/room_avatar_top_female_boho_patchwork_maxi_dress_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   bottomFemaleBohoPatchworkMaxiDressV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_boho_patchwork_maxi_dress_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_boho_patchwork_maxi_dress_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_boho_patchwork_maxi_dress_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_boho_patchwork_maxi_dress_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_boho_patchwork_maxi_dress_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_boho_patchwork_maxi_dress_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_boho_patchwork_maxi_dress_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   topFemaleEmbroideredHalterWrapDressV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_top_female_embroidered_halter_wrap_dress_v2",
-      require("../assets/room/motion/room_avatar_top_female_embroidered_halter_wrap_dress_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_female_embroidered_halter_wrap_dress_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_female_embroidered_halter_wrap_dress_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_female_embroidered_halter_wrap_dress_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_top_female_embroidered_halter_wrap_dress_v2",
-      require("../assets/room/motion/room_avatar_top_female_embroidered_halter_wrap_dress_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   bottomFemaleEmbroideredHalterWrapDressV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_embroidered_halter_wrap_dress_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_embroidered_halter_wrap_dress_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_embroidered_halter_wrap_dress_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_embroidered_halter_wrap_dress_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_embroidered_halter_wrap_dress_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_embroidered_halter_wrap_dress_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_embroidered_halter_wrap_dress_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   topFemaleRuchedPatchworkMiniDressV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_top_female_ruched_patchwork_mini_dress_v2",
-      require("../assets/room/motion/room_avatar_top_female_ruched_patchwork_mini_dress_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_female_ruched_patchwork_mini_dress_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_female_ruched_patchwork_mini_dress_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_female_ruched_patchwork_mini_dress_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_top_female_ruched_patchwork_mini_dress_v2",
-      require("../assets/room/motion/room_avatar_top_female_ruched_patchwork_mini_dress_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   bottomFemaleRuchedPatchworkMiniDressV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_ruched_patchwork_mini_dress_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_ruched_patchwork_mini_dress_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_ruched_patchwork_mini_dress_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_ruched_patchwork_mini_dress_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_ruched_patchwork_mini_dress_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_ruched_patchwork_mini_dress_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_ruched_patchwork_mini_dress_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   topFemaleWhiteLaceCamiMiniDressV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_top_female_white_lace_cami_mini_dress_v2",
-      require("../assets/room/motion/room_avatar_top_female_white_lace_cami_mini_dress_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_female_white_lace_cami_mini_dress_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_female_white_lace_cami_mini_dress_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_female_white_lace_cami_mini_dress_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_top_female_white_lace_cami_mini_dress_v2",
-      require("../assets/room/motion/room_avatar_top_female_white_lace_cami_mini_dress_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   bottomFemaleWhiteLaceCamiMiniDressV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_bottom_female_white_lace_cami_mini_dress_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_white_lace_cami_mini_dress_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_white_lace_cami_mini_dress_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_white_lace_cami_mini_dress_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_bottom_female_white_lace_cami_mini_dress_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_bottom_female_white_lace_cami_mini_dress_v2",
-      require("../assets/room/motion/room_avatar_bottom_female_white_lace_cami_mini_dress_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   accessoryFemaleIvoryRibbonBeretV2: {
@@ -1013,198 +1014,198 @@ export const roomAvatarMotionLayerAssets = {
   accessoryFemaleCherryBowHeadbandV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_accessory_female_cherry_bow_headband_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_bow_headband_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_bow_headband_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_bow_headband_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_bow_headband_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_accessory_female_cherry_bow_headband_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_bow_headband_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   accessoryFemaleSageHeartGlassesV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_accessory_female_sage_heart_glasses_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_sage_heart_glasses_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_sage_heart_glasses_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_sage_heart_glasses_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_sage_heart_glasses_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_accessory_female_sage_heart_glasses_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_sage_heart_glasses_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   accessoryFemaleRoseRoundGlassesV2: frameAwareHeadMotion(
     "room_avatar_accessory_female_rose_round_glasses_v2",
-    require("../assets/room/motion/room_avatar_accessory_female_rose_round_glasses_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_rose_round_glasses_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_rose_round_glasses_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_rose_round_glasses_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_rose_round_glasses_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   accessoryFemaleLavenderPearlCatEyeGlassesV2: frameAwareHeadMotion(
     "room_avatar_accessory_female_lavender_pearl_cat_eye_glasses_v2",
-    require("../assets/room/motion/room_avatar_accessory_female_lavender_pearl_cat_eye_glasses_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_lavender_pearl_cat_eye_glasses_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_lavender_pearl_cat_eye_glasses_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_lavender_pearl_cat_eye_glasses_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_lavender_pearl_cat_eye_glasses_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   accessoryFemaleMintStarOvalGlassesV2: frameAwareHeadMotion(
     "room_avatar_accessory_female_mint_star_oval_glasses_v2",
-    require("../assets/room/motion/room_avatar_accessory_female_mint_star_oval_glasses_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_mint_star_oval_glasses_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_mint_star_oval_glasses_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_mint_star_oval_glasses_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_mint_star_oval_glasses_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   accessoryFemaleHoneyBlossomSquareGlassesV2: frameAwareHeadMotion(
     "room_avatar_accessory_female_honey_blossom_square_glasses_v2",
-    require("../assets/room/motion/room_avatar_accessory_female_honey_blossom_square_glasses_v2_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_honey_blossom_square_glasses_v2_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_honey_blossom_square_glasses_v2_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_honey_blossom_square_glasses_v2_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_honey_blossom_square_glasses_v2_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   accessoryFemalePearlDropEarringsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_accessory_female_pearl_drop_earrings_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_accessory_female_pearl_drop_earrings_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   accessoryFemalePearlDropEarringsV2EarringRear: frameAwareHeadMotion(
     "room_avatar_accessory_female_pearl_drop_earrings_v2_part_earring-rear",
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_earring-rear_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_earring-rear_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_earring-rear_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_earring-rear_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_earring-rear_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   accessoryFemalePearlDropEarringsV2PearlFront: frameAwareHeadMotion(
     "room_avatar_accessory_female_pearl_drop_earrings_v2_part_pearl-front",
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_pearl-front_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_pearl-front_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_pearl-front_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_pearl-front_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_pearl_drop_earrings_v2_part_pearl-front_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   accessoryFemaleGoldenHeartLocketV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_accessory_female_golden_heart_locket_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_golden_heart_locket_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_golden_heart_locket_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_golden_heart_locket_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_golden_heart_locket_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_accessory_female_golden_heart_locket_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_golden_heart_locket_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   accessoryFemaleButtercreamNeckScarfV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_accessory_female_buttercream_neck_scarf_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_buttercream_neck_scarf_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_buttercream_neck_scarf_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_buttercream_neck_scarf_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_buttercream_neck_scarf_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_accessory_female_buttercream_neck_scarf_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_buttercream_neck_scarf_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   accessoryFemaleCherryMicroBagV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_accessory_female_cherry_micro_bag_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_accessory_female_cherry_micro_bag_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   accessoryFemaleCherryMicroBagV2BagBack: frameAwareHeadMotion(
     "room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-back",
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-back_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-back_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-back_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-back_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-back_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   accessoryFemaleCherryMicroBagV2StrapBack: frameAwareHeadMotion(
     "room_avatar_accessory_female_cherry_micro_bag_v2_part_strap-back",
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_strap-back_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_strap-back_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_strap-back_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_strap-back_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_strap-back_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   accessoryFemaleCherryMicroBagV2BagFront: frameAwareHeadMotion(
     "room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-front",
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-front_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-front_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-front_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-front_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_cherry_micro_bag_v2_part_bag-front_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   accessoryFemaleSunnyStarClipsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_accessory_female_sunny_star_clips_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_accessory_female_sunny_star_clips_v2",
-      require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   accessoryFemaleSunnyStarClipsV2ClipsFront: frameAwareHeadMotion(
     "room_avatar_accessory_female_sunny_star_clips_v2_part_clips-front",
-    require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_part_clips-front_walking_front_f01.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_part_clips-front_walking_front_f02.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_part_clips-front_walking_front_f03.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_part_clips-front_walking_front_f04.png"),
-    require("../assets/room/motion/room_avatar_accessory_female_sunny_star_clips_v2_part_clips-front_sitting_front_f01.png")
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART,
+    RETIRED_AVATAR_ART
   ),
   shoesFemaleRosewoodPlatformLoafersV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_shoes_female_rosewood_platform_loafers_v2",
-      require("../assets/room/motion/room_avatar_shoes_female_rosewood_platform_loafers_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_rosewood_platform_loafers_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_rosewood_platform_loafers_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_rosewood_platform_loafers_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_shoes_female_rosewood_platform_loafers_v2",
-      require("../assets/room/motion/room_avatar_shoes_female_rosewood_platform_loafers_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   shoesFemalePearlSlingbackSandalsV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_shoes_female_pearl_slingback_sandals_v2",
-      require("../assets/room/motion/room_avatar_shoes_female_pearl_slingback_sandals_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_pearl_slingback_sandals_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_pearl_slingback_sandals_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_shoes_female_pearl_slingback_sandals_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_shoes_female_pearl_slingback_sandals_v2",
-      require("../assets/room/motion/room_avatar_shoes_female_pearl_slingback_sandals_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   topFemaleBlushLaceCardiganV2: {
@@ -1223,14 +1224,14 @@ export const roomAvatarMotionLayerAssets = {
   topFemaleSageRibbonKnitJacketV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_top_female_sage_ribbon_knit_jacket_v2",
-      require("../assets/room/motion/room_avatar_top_female_sage_ribbon_knit_jacket_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_female_sage_ribbon_knit_jacket_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_female_sage_ribbon_knit_jacket_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_female_sage_ribbon_knit_jacket_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_top_female_sage_ribbon_knit_jacket_v2",
-      require("../assets/room/motion/room_avatar_top_female_sage_ribbon_knit_jacket_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   topFemaleCherryHeartMilkmaidBlouseV2: {
@@ -1249,14 +1250,14 @@ export const roomAvatarMotionLayerAssets = {
   topFemalePowderBlueRibbonCorsetTopV2: {
     walkingFront: walkingFrontSequence(
       "room_avatar_top_female_powder_blue_ribbon_corset_top_v2",
-      require("../assets/room/motion/room_avatar_top_female_powder_blue_ribbon_corset_top_v2_walking_front_f01.png"),
-      require("../assets/room/motion/room_avatar_top_female_powder_blue_ribbon_corset_top_v2_walking_front_f02.png"),
-      require("../assets/room/motion/room_avatar_top_female_powder_blue_ribbon_corset_top_v2_walking_front_f03.png"),
-      require("../assets/room/motion/room_avatar_top_female_powder_blue_ribbon_corset_top_v2_walking_front_f04.png")
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART,
+      RETIRED_AVATAR_ART
     ),
     sittingFront: sittingFrontFrame(
       "room_avatar_top_female_powder_blue_ribbon_corset_top_v2",
-      require("../assets/room/motion/room_avatar_top_female_powder_blue_ribbon_corset_top_v2_sitting_front_f01.png")
+      RETIRED_AVATAR_ART
     )
   },
   topFemaleNoirRoseHeartCardiganV2: {

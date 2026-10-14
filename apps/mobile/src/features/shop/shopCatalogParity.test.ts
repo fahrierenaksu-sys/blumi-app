@@ -471,8 +471,5 @@ test("every piece the 2.5D rig draws shows its baked thumb on wardrobe and Shop 
       if (source === undefined) continue;
       assert.ok(String(source).endsWith(ownThumb), `${id} ${surface} shows its baked thumb, not ${String(source)}`);
     }
-    if (shop.getShopProductThumbnailSource(id) !== undefined) {
-      assert.equal(shop.getShopProductThumbnailBounds(id), undefined, `${id} Shop card must not crop its thumb with pre-2.5D bounds`);
-    }
   }
 });
