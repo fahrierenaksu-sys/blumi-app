@@ -14,6 +14,9 @@ const CONSENT_KEY = "@blumi/privacy/product_analytics_consent_v1"
  * A PostHog client on the real @posthog/core logic. Its only stand-ins are
  * the network (counted, never sent) and storage. Like posthog-react-native,
  * it loads remote flags at start unless `preloadFeatureFlags` is false.
+ * It does not model the real constructor's remote-config fetch, so "no
+ * request" here means no client was constructed (the app builds one only
+ * after consent), not that a constructed client stays silent.
  */
 function createSdk() {
   const requests: string[] = []
@@ -103,4 +106,40 @@ test("withdrawing consent makes no telemetry request", async () => {
   await settle()
   assert.deepEqual(sdk.requests, [])
   assert.equal(sdk.instances.every((instance) => instance.optedOut), true)
+})
+
+/** Sends what the client queued and returns the request paths it made. */
+async function flushedRequests(sdk: ReturnType<typeof createSdk>): Promise<string[]> {
+  await Promise.all(sdk.instances.map((instance) => instance.flush()))
+  await settle()
+  return sdk.requests
+}
+
+test("granting consent later creates the client and sends events", async () => {
+  const { sdk, consent, analytics } = loadConsent(null)
+  await consent.hydrateAnalyticsConsent()
+  assert.equal(sdk.instances.length, 0, "no client before consent")
+
+  await consent.setAnalyticsConsent("granted")
+  analytics.captureProductEvent("activation_session_started")
+  const requests = await flushedRequests(sdk)
+
+  assert.equal(sdk.instances.length, 1)
+  assert.ok(requests.some((url) => /\/batch\/?$/.test(url)), `expected a batch request, got ${JSON.stringify(requests)}`)
+})
+
+test("granting again after a withdrawal reuses the client and sends events", async () => {
+  const { sdk, consent, analytics } = loadConsent(null)
+  await consent.setAnalyticsConsent("granted")
+  await consent.setAnalyticsConsent("denied")
+  await settle()
+  sdk.requests.length = 0
+
+  await consent.setAnalyticsConsent("granted")
+  analytics.captureProductEvent("activation_session_started")
+  const requests = await flushedRequests(sdk)
+
+  assert.equal(sdk.instances.length, 1)
+  assert.equal(sdk.instances[0].optedOut, false)
+  assert.ok(requests.some((url) => /\/batch\/?$/.test(url)), `expected a batch request, got ${JSON.stringify(requests)}`)
 })
