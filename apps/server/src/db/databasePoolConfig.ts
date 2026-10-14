@@ -1,4 +1,4 @@
-import { Pool, type PoolConfig } from "pg"
+import { Pool, type ClientBase, type PoolConfig } from "pg"
 import { isPostgresServerError } from "../operations/databaseErrorStatus"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 
@@ -10,8 +10,21 @@ import { safeOperationalErrorKind } from "../operations/safeErrorLog"
  * | BLUMI_DB_POOL_MAX                     | 10      | 2-100          | Unchanged from the node-postgres default. One connection is held by realtime LISTEN. With Supabase's session pooler (port 5432) every pooled connection pins one pooler connection, so keep this at or below the project's pool size minus the migrator and admin sessions. |
  * | BLUMI_DB_POOL_IDLE_TIMEOUT_MS         | 30000   | 1000-600000    | node-postgres closes idle connections after 10 s, so bursty traffic kept paying the TLS and pooler handshake (several round trips) again. |
  * | BLUMI_DB_POOL_CONNECTION_TIMEOUT_MS   | 10000   | 1000-60000     | node-postgres waits forever by default: a saturated or unreachable database stalled requests without bound. Now a request fails after this wait and the client retries. |
- * | BLUMI_DB_STATEMENT_TIMEOUT_MS         | unset   | 1000-600000    | Server-side statement limit, sent as a startup parameter. Off by default until it is verified through the Supavisor pooler in staging. |
- * | BLUMI_DB_QUERY_TIMEOUT_MS             | unset   | 1000-600000    | Client-side limit; the server statement keeps running. |
+ * | BLUMI_DB_STATEMENT_TIMEOUT_MS         | 10000   | 1000-600000    | Server-side statement limit (audit D07, 2026-10-14). The live role default was 120 s. |
+ * | BLUMI_DB_LOCK_TIMEOUT_MS              | 3000    | 100-600000     | Server-side lock wait limit; the live default waited forever. |
+ * | BLUMI_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS | 30000 | 1000-600000    | Ends a transaction left idle, for example by a stalled request. Above the 10 s push provider call held inside one. |
+ * | BLUMI_DB_QUERY_TIMEOUT_MS             | statement + 2000 | 1000-600000 | Client-side backstop for a stalled network or pooler; must exceed the statement limit so the server cancels first. |
+ *
+ * The three server-side limits are set with set_config(..., false) once per
+ * new connection (pg-pool's awaited onConnect hook), not as startup
+ * parameters: Supavisor does not reliably forward startup parameters, and
+ * the live DATABASE_URL is the session pooler (port 5432), where a session
+ * setting stays with the client's pinned backend. Statements that need more
+ * (account export, SMS admission) raise or lower it with SET LOCAL. Behind a
+ * transaction pooler (port 6543) a session setting is not tied to this
+ * client; there the client-side timeout still holds, and a role-level
+ * `ALTER ROLE ... SET` is the owner's choice. Only the app pools get this
+ * budget: the migrator and backup/restore tools open their own connections.
  * | BLUMI_DB_APPLICATION_NAME             | unset   | [A-Za-z0-9._-]{1,63} | Labels sessions in pg_stat_activity. |
  *
  * TCP keepalive is always on, so a connection silently dropped by a NAT or
@@ -40,29 +53,46 @@ export interface DatabasePoolSettings {
   max: number
   idleTimeoutMillis: number
   connectionTimeoutMillis: number
-  statementTimeoutMs?: number
-  queryTimeoutMs?: number
+  statementTimeoutMs: number
+  lockTimeoutMs: number
+  idleInTransactionTimeoutMs: number
+  queryTimeoutMs: number
   applicationName?: string
 }
+
+const QUERY_TIMEOUT_MARGIN_MS = 2_000
 
 export const DEFAULT_DATABASE_POOL_SETTINGS: Readonly<DatabasePoolSettings> = Object.freeze({
   max: 10,
   idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000
+  connectionTimeoutMillis: 10_000,
+  statementTimeoutMs: 10_000,
+  lockTimeoutMs: 3_000,
+  idleInTransactionTimeoutMs: 30_000,
+  queryTimeoutMs: 12_000
 })
 
 export function resolveDatabasePoolSettings(env: NodeJS.ProcessEnv): DatabasePoolSettings {
+  const statementTimeoutMs = readInteger(env, "BLUMI_DB_STATEMENT_TIMEOUT_MS", 1_000, 600_000) ??
+    DEFAULT_DATABASE_POOL_SETTINGS.statementTimeoutMs
+  const queryTimeoutMs = readInteger(env, "BLUMI_DB_QUERY_TIMEOUT_MS", 1_000, 600_000) ??
+    statementTimeoutMs + QUERY_TIMEOUT_MARGIN_MS
+  if (queryTimeoutMs <= statementTimeoutMs) {
+    throw new Error("BLUMI_DB_QUERY_TIMEOUT_MS must exceed BLUMI_DB_STATEMENT_TIMEOUT_MS so the server cancels a statement first.")
+  }
   const settings: DatabasePoolSettings = {
     max: readInteger(env, "BLUMI_DB_POOL_MAX", 2, 100) ?? DEFAULT_DATABASE_POOL_SETTINGS.max,
     idleTimeoutMillis: readInteger(env, "BLUMI_DB_POOL_IDLE_TIMEOUT_MS", 1_000, 600_000) ??
       DEFAULT_DATABASE_POOL_SETTINGS.idleTimeoutMillis,
     connectionTimeoutMillis: readInteger(env, "BLUMI_DB_POOL_CONNECTION_TIMEOUT_MS", 1_000, 60_000) ??
-      DEFAULT_DATABASE_POOL_SETTINGS.connectionTimeoutMillis
+      DEFAULT_DATABASE_POOL_SETTINGS.connectionTimeoutMillis,
+    statementTimeoutMs,
+    lockTimeoutMs: readInteger(env, "BLUMI_DB_LOCK_TIMEOUT_MS", 100, 600_000) ??
+      DEFAULT_DATABASE_POOL_SETTINGS.lockTimeoutMs,
+    idleInTransactionTimeoutMs: readInteger(env, "BLUMI_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", 1_000, 600_000) ??
+      DEFAULT_DATABASE_POOL_SETTINGS.idleInTransactionTimeoutMs,
+    queryTimeoutMs
   }
-  const statementTimeoutMs = readInteger(env, "BLUMI_DB_STATEMENT_TIMEOUT_MS", 1_000, 600_000)
-  if (statementTimeoutMs !== undefined) settings.statementTimeoutMs = statementTimeoutMs
-  const queryTimeoutMs = readInteger(env, "BLUMI_DB_QUERY_TIMEOUT_MS", 1_000, 600_000)
-  if (queryTimeoutMs !== undefined) settings.queryTimeoutMs = queryTimeoutMs
   const applicationName = env.BLUMI_DB_APPLICATION_NAME?.trim()
   if (applicationName) {
     if (!/^[A-Za-z0-9._-]{1,63}$/.test(applicationName)) {
@@ -138,11 +168,23 @@ export function toPoolConfig(connectionString: string | undefined, settings: Dat
     connectionTimeoutMillis: settings.connectionTimeoutMillis,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10_000,
-    ...(settings.statementTimeoutMs !== undefined ? { statement_timeout: settings.statementTimeoutMs } : {}),
-    ...(settings.queryTimeoutMs !== undefined ? { query_timeout: settings.queryTimeoutMs } : {}),
-    ...(settings.applicationName ? { application_name: settings.applicationName } : {})
+    query_timeout: settings.queryTimeoutMs,
+    ...(settings.applicationName ? { application_name: settings.applicationName } : {}),
+    // pg-pool awaits this before handing the connection out; if it fails the
+    // connection is closed and the checkout fails instead of running unbounded.
+    onConnect: async (client: Pick<ClientBase, "query">) => {
+      await client.query(APPLY_SESSION_BUDGET_SQL, [
+        `${settings.statementTimeoutMs}ms`,
+        `${settings.lockTimeoutMs}ms`,
+        `${settings.idleInTransactionTimeoutMs}ms`
+      ])
+    }
   }
 }
+
+const APPLY_SESSION_BUDGET_SQL = `SELECT set_config('statement_timeout', $1, false),
+  set_config('lock_timeout', $2, false),
+  set_config('idle_in_transaction_session_timeout', $3, false)`
 
 function readInteger(env: NodeJS.ProcessEnv, name: string, minimum: number, maximum: number): number | undefined {
   const raw = env[name]?.trim()
