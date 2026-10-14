@@ -13,51 +13,51 @@
  "sets": {
   "back": {
    "file": "back.astc.zip",
-   "fileBytes": 8143120,
-   "gpuBytes": 8143120,
-   "height": 1192,
+   "fileBytes": 8469520,
+   "gpuBytes": 8469520,
+   "height": 1240,
    "layers": 5,
    "levels": [
     {
-     "bh": 298,
+     "bh": 310,
      "bw": 256,
-     "h": 1192,
+     "h": 1240,
      "w": 1024
     },
     {
-     "bh": 149,
+     "bh": 155,
      "bw": 128,
-     "h": 596,
+     "h": 620,
      "w": 512
     },
     {
-     "bh": 75,
+     "bh": 78,
      "bw": 64,
-     "h": 298,
+     "h": 310,
      "w": 256
     },
     {
-     "bh": 38,
+     "bh": 39,
      "bw": 32,
-     "h": 149,
+     "h": 155,
      "w": 128
     },
     {
-     "bh": 19,
+     "bh": 20,
      "bw": 16,
-     "h": 74,
+     "h": 77,
      "w": 64
     },
     {
      "bh": 10,
      "bw": 8,
-     "h": 37,
+     "h": 38,
      "w": 32
     },
     {
      "bh": 5,
      "bw": 4,
-     "h": 18,
+     "h": 19,
      "w": 16
     },
     {
@@ -92,63 +92,63 @@
     "back_page3.png",
     "back_page4.png"
    ],
-   "sha256": "4d236032fc6062640478d80111e172fa6ed71bc5ca118c06b9baaf6ac7815586",
+   "sha256": "cd4b0a0f1f332ea87c8e1e55528cf0bd3556d9bbfb418fd7768e38eee5f5f7e1",
    "sourceSha256": {
-    "back_page0.png": "c53cc8fec0fae31c336d72f7111406978fc07edbc0317eec7a65ad738f44e94e",
-    "back_page1.png": "06715d3eaa6b5903e54a9f1797088f56d054ecbe992906e2af515be11027d202",
-    "back_page2.png": "829b1168d9209c1beecf19d93b94dfa620befc47ec59368306f113759d16987e",
-    "back_page3.png": "4078c39524f8dd2502020e2dda92c18e9229c5c84356dd272b64e392d8cd987c",
-    "back_page4.png": "88c1811a974d513a30829fb75eeb4001ff8b6a6765639c2d42fe80388e1a37be"
+    "back_page0.png": "015bb57fa689d3555e1a3b5fe5406da413b98d7dcc275f96752a2bd417ac3dee",
+    "back_page1.png": "0aa030fa1aacaaa16f743523a94321276a6fe5f44da186be48c99c82b7e4eec1",
+    "back_page2.png": "eab5417a0a0cf014e57ae512dc989e1357c318e62c723419073f97b0b3b9c15e",
+    "back_page3.png": "f3991a2c3dc9d3b6b366d1d1f2af4b7452c72dee4a203f81ac2760d72609e9ab",
+    "back_page4.png": "cd18237e51619802e585ddb9b07a5f3c8735cde9b8876ed288593dc6a512e66a"
    },
    "width": 1024
   },
   "front": {
    "file": "front.astc.zip",
-   "fileBytes": 8084240,
-   "gpuBytes": 8084240,
-   "height": 1184,
+   "fileBytes": 8413200,
+   "gpuBytes": 8413200,
+   "height": 1232,
    "layers": 5,
    "levels": [
     {
-     "bh": 296,
+     "bh": 308,
      "bw": 256,
-     "h": 1184,
+     "h": 1232,
      "w": 1024
     },
     {
-     "bh": 148,
+     "bh": 154,
      "bw": 128,
-     "h": 592,
+     "h": 616,
      "w": 512
     },
     {
-     "bh": 74,
+     "bh": 77,
      "bw": 64,
-     "h": 296,
+     "h": 308,
      "w": 256
     },
     {
-     "bh": 37,
+     "bh": 39,
      "bw": 32,
-     "h": 148,
+     "h": 154,
      "w": 128
     },
     {
-     "bh": 19,
+     "bh": 20,
      "bw": 16,
-     "h": 74,
+     "h": 77,
      "w": 64
     },
     {
      "bh": 10,
      "bw": 8,
-     "h": 37,
+     "h": 38,
      "w": 32
     },
     {
      "bh": 5,
      "bw": 4,
-     "h": 18,
+     "h": 19,
      "w": 16
     },
     {
@@ -183,13 +183,13 @@
     "front_page3.png",
     "front_page4.png"
    ],
-   "sha256": "21f0141cb5093fe26f2caccc85b2cb6a3b4904ac16280c1eb551c4e0d52bdde5",
+   "sha256": "a42cddaaa92d8e10e7e5945b2c436eae31b698c5bd6d73c107666783bbc4b9e1",
    "sourceSha256": {
-    "front_page0.png": "9757f3402d999b516fdca4b0978f4d8d5ce2714c0c77304fdacf2aec30a55d41",
-    "front_page1.png": "558e5863ab38f6432c8b595920a2eec89a87a700433be2b8e5805c1fef874c00",
-    "front_page2.png": "c958cd8ee7c22eb045fe15fbf2628a090261694aef3cc05bc534cd928a5b2097",
-    "front_page3.png": "550405d5da3c1f2425a2f5c646b1196ce1b73066314c3b4820c39567dd66dab8",
-    "front_page4.png": "c45c01a5e2c660a923165d70eec82a87a9ebd06e4eb5986f1ac04a2eb961795d"
+    "front_page0.png": "db7fa80e4afaed92564b7763cba3fe2a1409a68cdc3eda08980d1e4fcebe4041",
+    "front_page1.png": "d5949acffdb459e1177b38dbcea26e5277986239e60d15395953843d4279a6f8",
+    "front_page2.png": "4fde4e860d39a1bfb341e59e1880412cd881ba7397e10597997e4aeaa33a11b4",
+    "front_page3.png": "2627d821f03e4a5046e60bec95a4ca836cf49aa39dee3dd15578038af6886f43",
+    "front_page4.png": "012fecba331d8efc7f59b8d18ad7b632633f50d38d9e635cdf09ff531b1033b2"
    },
    "width": 1024
   }

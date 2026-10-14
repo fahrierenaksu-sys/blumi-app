@@ -187,14 +187,18 @@ test("the shipped girl's crop tops bare her waist and her black trousers bring t
     for (const crop of crops) for (const bottom of [undefined, BOTTOM, TROUSERS]) {
       const worn = [crop, ...(bottom ? [bottom] : []), SHOES, HAIR]
       // exactly one torso is drawn and it is the top's bare belly (with the trousers: their drawing of it, shorts trimmed);
-      // the arms and seated card are the trousers' or the body's
+      // the arms are the trousers' or the body's
       const torso = avatar25PoseRanges(girl, view, worn, pose).filter((e) => e.name.startsWith("torso"))
       assert.equal(torso.length, 1, `${view} ${pose} ${crop} ${bottom}`)
       assert.deepEqual([torso[0]!.owner, torso[0]!.name], bottom === TROUSERS ? [TROUSERS, `${torsoNow[0]}@with:${crop}`] : [crop, `${torsoNow[0]}@body`])
-      for (const part of ["farArm", "nearArm", "sit"]) {
+      for (const part of ["farArm", "nearArm"]) {
         const now = bodyDrawn([], view, pose, part)
         assert.equal(bodyDrawn(worn, view, pose, part), now === "body" && bottom === TROUSERS ? TROUSERS : now, `${view} ${pose} ${part}`)
       }
+      // the body's own seated card shows the tank beside her arms, so under a crop it never draws: the crop's tank-free
+      // copy of it does (with the trousers: their copy fitted to the crop)
+      const seatedNow = bodyDrawn([], view, pose, "sit")
+      assert.equal(bodyDrawn(worn, view, pose, "sit"), seatedNow === "body" ? (bottom === TROUSERS ? TROUSERS : crop) : seatedNow, `${view} ${pose} sit`)
     }
     // the trousers with any other top draw the torso too; the starter outfit draws the body's own
     assert.equal(bodyDrawn([TOP, TROUSERS, SHOES, HAIR], view, pose, torsoNow[0]!), TROUSERS)
@@ -205,7 +209,9 @@ test("the shipped girl's crop tops bare her waist and her black trousers bring t
     const sit = drawn(girl, view, [crop, bottom, SHOES, HAIR], "sit")
     const belly = sit.findIndex((k) => k.includes(":torsoCardArms@"))
     assert.ok(belly >= 0, `${view} ${crop} ${bottom}`)
-    // (the item's own seated card, not the trousers' replacement of the body's card, `sit@body`)
-    for (const id of [bottom, SHOES]) assert.ok(sit.findIndex((k) => k.startsWith(`${id}:sit@`) && !k.startsWith(`${id}:sit@body`)) > belly, `${view} ${bottom} ${id}`)
+    // (the item's own seated card `<id>:sit@<order>`, not the trousers' replacement of the body's card, `sit@body` /
+    // `sit@with:<crop>`)
+    const ownCard = (id: string) => sit.findIndex((k) => k.startsWith(`${id}:sit@`) && /^[\d.]+$/.test(k.slice(`${id}:sit@`.length)))
+    for (const id of [bottom, SHOES]) assert.ok(ownCard(id) > belly, `${view} ${bottom} ${id}`)
   }
 })
