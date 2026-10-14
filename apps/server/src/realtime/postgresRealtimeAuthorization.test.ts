@@ -7,13 +7,14 @@ import { createPostgresAuthRepository } from "../db/postgresAuthRepository"
 import { createConnectionManager } from "./connectionManager"
 import { createInMemoryRealtimeFanout } from "./realtimeFanout"
 import { createPostgresRealtimeTicketStore } from "../db/postgresRealtimeTicketStore"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 
 test("PostgreSQL family authority gates remote delivery after rotation, expiry and revocation", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(databaseUrl)
+  assertDisposablePostgresDatabase(databaseUrl)
   const firstPool = new Pool({ connectionString: databaseUrl })
   const secondPool = new Pool({ connectionString: databaseUrl })
   const firstRepository = createPostgresAuthRepository(firstPool)
@@ -82,7 +83,8 @@ async function eventually(predicate: () => boolean): Promise<void> {
   assert.ok(predicate(), "timed out waiting for authorized delivery")
 }
 
-test("PostgreSQL expiry cleanup skips locked tickets and never consumes valid tickets", { skip: !databaseUrl }, async () => {
+test("PostgreSQL expiry cleanup skips locked tickets and never consumes valid tickets", { skip: disposablePostgresSkip().skip }, async () => {
+  assertDisposablePostgresDatabase(databaseUrl)
   const pool = new Pool({ connectionString: databaseUrl })
   const store = createPostgresRealtimeTicketStore(pool)
   const now = new Date()

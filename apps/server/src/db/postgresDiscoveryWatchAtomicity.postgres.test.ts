@@ -8,11 +8,12 @@ import { createPhoneBanHasher } from "../auth/moderationPhoneBan"
 import { createNotificationService } from "../notifications/notificationService"
 import type { DiscoveryWatchClaim } from "../matches/matchRepository"
 import { createSeedDiscoverProfiles } from "../matches/matchRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 test("F45 transaction rollback, stable reclaim, cancellation and dispatch admission share durable authority", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1", timeout: 30_000
+  skip: disposablePostgresSkip().skip, timeout: 30_000
 }, async () => {
-  assert.ok(process.env.DATABASE_URL)
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 })
   const match = createPostgresMatchRepository(pool)
   const repository = createPostgresNotificationRepository(pool)
@@ -137,9 +138,9 @@ test("F45 transaction rollback, stable reclaim, cancellation and dispatch admiss
 })
 
 for (const first of ["delete", "dispatch"] as const) test(`F54 ${first}-first confirmed deletion and dispatch never invert device/watch locks`, {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1", timeout: 15_000
+  skip: disposablePostgresSkip().skip, timeout: 15_000
 }, async () => {
-  assert.ok(process.env.DATABASE_URL)
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 })
   const userId = `delete_watch_race_${first}`
   const now = new Date("2026-09-05T10:00:00Z")
@@ -224,8 +225,9 @@ for (const first of ["delete", "dispatch"] as const) test(`F54 ${first}-first co
 })
 
 test("F56 deletion starting without a watch serializes against concurrent creation and dispatch", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1", timeout: 15_000
+  skip: disposablePostgresSkip().skip, timeout: 15_000
 }, async () => {
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 })
   const userId = "watch_absent_delete_race"
   const now = new Date("2026-09-05T10:00:00Z")

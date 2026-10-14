@@ -8,6 +8,7 @@ import { createPresenceService } from "../presence/presenceService"
 import type { PresenceRecord } from "../presence/presenceRepository"
 import { createRoomService, PUBLIC_LOBBY_ROOM_ID } from "../rooms/roomService"
 import { createPostgresPresenceRepository } from "./postgresPresenceRepository"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 interface QueryCall {
   text: string
@@ -78,11 +79,11 @@ function createFakePool(rows: Record<string, unknown>[] = []) {
 }
 
 const requirePostgres = {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }
 
 test("PostgreSQL presence reads show the canonical account avatar, never a stale cached copy, and never delete", requirePostgres, async () => {
-  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new pg.Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   const suffix = randomUUID()
   const roomId = `presence_avatar_room_${suffix}`
   const otherRoomId = `presence_avatar_other_${suffix}`
@@ -124,7 +125,7 @@ test("PostgreSQL presence reads show the canonical account avatar, never a stale
 })
 
 test("PostgreSQL presence writes with a stale or malformed cached avatar never change the account avatar", requirePostgres, async () => {
-  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new pg.Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   const suffix = randomUUID()
   const roomId = `presence_write_room_${suffix}`
   const userId = `presence_write_${suffix}`
@@ -187,16 +188,16 @@ test("presence metadata writes ignore malformed cached avatars", async () => {
 })
 
 test("postgres serializes concurrent spot reservations across independent pools", {
-  skip: !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const suffix = randomUUID()
   const firstPool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: disposablePostgresUrl(process.env.DATABASE_URL),
     application_name: `presence-reserve-a-${suffix}`,
     max: 2
   })
   const secondPool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: disposablePostgresUrl(process.env.DATABASE_URL),
     application_name: `presence-reserve-b-${suffix}`,
     max: 2
   })
@@ -251,7 +252,7 @@ test("postgres serializes concurrent spot reservations across independent pools"
 })
 
 test("postgres serializes a join reservation against a move into the same spot", {
-  skip: !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const roomId = `presence-join-move-${randomUUID()}`
   const setup = await createPresenceRaceHarness(roomId)
@@ -317,7 +318,7 @@ test("postgres serializes a join reservation against a move into the same spot",
 })
 
 test("move cannot recreate presence deleted by a concurrent leave", {
-  skip: !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const setup = await createPresenceRaceHarness()
   const { firstPool, secondPool, observerPool, roomId, userId, now, blocker } = setup
@@ -351,7 +352,7 @@ test("move cannot recreate presence deleted by a concurrent leave", {
 })
 
 test("move cannot recreate presence expired while waiting for its room lock", {
-  skip: !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const setup = await createPresenceRaceHarness()
   const { firstPool, observerPool, roomId, userId, now, blocker } = setup
@@ -385,7 +386,7 @@ test("move cannot recreate presence expired while waiting for its room lock", {
 })
 
 test("move cannot renew a lease that expires while waiting for the presence row lock", {
-  skip: !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const setup = await createPresenceRaceHarness()
   const { firstPool, observerPool, roomId, userId, now, blocker } = setup
@@ -426,7 +427,7 @@ test("move cannot renew a lease that expires while waiting for the presence row 
 })
 
 test("join preserves the latest in-mini-room value after reading stale presence", {
-  skip: !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const setup = await createPresenceRaceHarness()
   const { firstPool, observerPool, roomId, userId, now, blocker } = setup
@@ -459,7 +460,7 @@ test("join preserves the latest in-mini-room value after reading stale presence"
 })
 
 test("move preserves the latest in-mini-room value after reading stale presence", {
-  skip: !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const setup = await createPresenceRaceHarness()
   const { firstPool, observerPool, roomId, userId, now, blocker } = setup
@@ -494,7 +495,7 @@ test("move preserves the latest in-mini-room value after reading stale presence"
 })
 
 test("join treats an upsert-conflicted lease as expired after its row-lock wait", {
-  skip: !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const setup = await createPresenceRaceHarness()
   const { firstPool, observerPool, roomId, userId, now, blocker } = setup
@@ -586,17 +587,17 @@ async function createPresenceRaceHarness(
   const firstApplicationName = `presence-race-a-${suffix}`
   const secondApplicationName = `presence-race-b-${suffix}`
   const firstPool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: disposablePostgresUrl(process.env.DATABASE_URL),
     application_name: firstApplicationName,
     max: 4
   })
   const secondPool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: disposablePostgresUrl(process.env.DATABASE_URL),
     application_name: secondApplicationName,
     max: 4
   })
   const observerPool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: disposablePostgresUrl(process.env.DATABASE_URL),
     application_name: `presence-race-observer-${suffix}`
   })
   const blocker = await firstPool.connect()

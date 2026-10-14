@@ -4,11 +4,12 @@ import { Pool } from "pg"
 import { createPostgresAdminUserRepository } from "./postgresAdminUserRepository"
 import { AdminQuotaExtensionLimitError, AdminUserNotFoundError } from "../admin/adminUsersService"
 import { createAdminUsersService } from "../admin/adminUsersService"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 test("PostgreSQL admin search and quota changes are scoped, bounded, concurrent-safe, and audited", {
-  skip: !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL) })
   const userId = "admin_console_fixture"
   const now = new Date("2026-09-27T23:50:00.000Z")
   try {

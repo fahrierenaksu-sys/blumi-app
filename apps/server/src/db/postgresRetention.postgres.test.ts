@@ -3,11 +3,12 @@ import { randomUUID } from "node:crypto"
 import test from "node:test"
 import { Pool } from "pg"
 import { createPostgresRetentionService, RETENTION_POLICIES } from "./postgresRetention"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
+const requirePostgres = { skip: disposablePostgresSkip().skip }
 
 function openPool(): Pool {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   return new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
 }
 

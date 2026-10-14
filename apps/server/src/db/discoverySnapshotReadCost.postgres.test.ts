@@ -3,12 +3,13 @@ import test from "node:test"
 import { Pool, type QueryResultRow } from "pg"
 import { DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT } from "../matches/discoverySnapshot"
 import { createPostgresDiscoverySnapshots } from "./postgresDiscoverySnapshots"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 // A Discover page read re-checks only the page's snapshot candidates. It used
 // to re-rank every eligible account once per page row: with 20k
 // accounts one page took about 3 s (61 external sorts of the whole pool).
 
-const skip = !process.env.DATABASE_URL
+const skip = disposablePostgresSkip().skip
 const filters = { ageMin: 18, ageMax: 99, genders: [], vibes: [] }
 const avatar = {
   schemaVersion: 1, bodyId: "avatar_v2_body_default", faceId: "avatar_v2_face_default",
@@ -35,7 +36,7 @@ function accountRowsVisited(node: PlanNode): number {
 }
 
 test("a Discover page read checks only the page's candidates, not the whole account pool", { skip }, async () => {
-  assert.equal(process.env.BLUMI_TEST_REQUIRE_POSTGRES, "1", "run only through the disposable PostgreSQL gate")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   try {
     const existing = await pool.query("SELECT EXISTS(SELECT 1 FROM blumi_accounts) AS accounts")

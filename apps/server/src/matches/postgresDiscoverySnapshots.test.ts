@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { randomUUID } from "node:crypto"
 import test from "node:test"
 import { Pool } from "pg"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 import { createPostgresDiscoverySnapshots } from "../db/postgresDiscoverySnapshots"
 import { DISCOVERY_SNAPSHOT_CANDIDATE_LIMIT, createDiscoverySnapshotService } from "./discoverySnapshot"
 
@@ -10,18 +11,6 @@ const avatar = {schemaVersion:1,bodyId:"avatar_v2_body_default",faceId:"avatar_v
   eyesId:"avatar_v2_eyes_mocha_doe",noseId:"avatar_v2_nose_soft_button",mouthId:"avatar_v2_mouth_peach_whisper_smile",
   hairId:"avatar_v2_hair_mocha_ribbon_blowout",topId:"avatar_v2_top_default",bottomId:"avatar_v2_bottom_default",
   shoesId:"avatar_v2_shoes_milk_tea_court_sneakers",accessoryIds:["avatar_v2_accessory_golden_heart_locket"]}
-
-function assertDisposablePostgresDatabase(databaseUrl: string | undefined): asserts databaseUrl is string {
-  assert.ok(databaseUrl, "DATABASE_URL is required")
-  assert.equal(process.env.BLUMI_TEST_REQUIRE_POSTGRES,"1",
-    "run this integration test only through the disposable PostgreSQL gate")
-  const url = new URL(databaseUrl)
-  assert.equal(url.hostname,"localhost","PostgreSQL gate must use its local Unix socket")
-  assert.match(url.searchParams.get("host") ?? "",/blumi-pg-gate-/,
-    "PostgreSQL socket must belong to a disposable blumi-pg-gate cluster")
-  assert.match(url.pathname,/^\/blumi_gate_\d+$/,
-    "integration tests require a per-file disposable blumi_gate database")
-}
 
 async function cleanupSnapshotFixtures(pool: Pool, userIds: string[]): Promise<void> {
   const client = await pool.connect()
@@ -47,7 +36,7 @@ async function cleanupSnapshotFixtures(pool: Pool, userIds: string[]): Promise<v
   }
 }
 
-test("PostgreSQL snapshot survives decisions, current eligibility changes, another instance and expiration", {skip:!process.env.DATABASE_URL}, async () => {
+test("PostgreSQL snapshot survives decisions, current eligibility changes, another instance and expiration", disposablePostgresSkip(), async () => {
   assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const fixtureRunId = randomUUID().replaceAll("-","")
   const fixturePrefix = `snapshot_test_${fixtureRunId}`

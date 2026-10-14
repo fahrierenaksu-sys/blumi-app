@@ -4,11 +4,12 @@ import { randomUUID } from "node:crypto"
 import { Pool } from "pg"
 import { createPostgresMiniRoomRepository } from "./postgresMiniRoomRepository"
 import { createPostgresPersonalRoomDecorRepository } from "./postgresPersonalRoomDecorRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 test("PostgreSQL acceptance captures only current inviter decor and keeps it stable across connections", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use isolated postgres-gate")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const repository = createPostgresMiniRoomRepository(pool)
   const decor = createPostgresPersonalRoomDecorRepository(pool)

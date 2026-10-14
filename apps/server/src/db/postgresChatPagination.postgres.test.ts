@@ -3,9 +3,10 @@ import test from "node:test"
 import { Pool } from "pg"
 import { createPostgresChatRepository } from "./postgresChatRepository"
 import { createChatService } from "../chat/chatService"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
-test("chat pagination reads a constant number of times per page, preserves microsecond cursor and durable unread across connections", { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }, async () => {
-  assert.ok(process.env.DATABASE_URL)
+test("chat pagination reads a constant number of times per page, preserves microsecond cursor and durable unread across connections", { skip: disposablePostgresSkip().skip }, async () => {
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const other = new Pool({ connectionString: process.env.DATABASE_URL })
   const service = createChatService({ repository: createPostgresChatRepository(pool) })

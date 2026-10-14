@@ -16,13 +16,14 @@ import { TEST_ECONOMY_CATALOG, TEST_ROOM_STARTER_ITEM_ID } from "../economy/test
 import { createReferralService } from "../referrals/referralService"
 import { createPersonalRoomDecorService } from "../rooms/personalRoomDecorService"
 import { createServer } from "../server"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 
 // PostgreSQL twin of routes/economyAdversarial.test.ts: the same attacks run
 // through the real routes against real row locks, constraints and CTEs.
 // Concurrency stays at or below 20 parallel requests per attack.
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
+const requirePostgres = { skip: disposablePostgresSkip().skip }
 const CODE = "482931"
 const WEBHOOK_SECRET = "adversarial-test-webhook-secret"
 // Plan X15: the live catalog sells no avatar item, so the avatar attacks run on the test-only fixture catalog
@@ -37,8 +38,8 @@ let pool: Pool
 let phoneCounter = 0
 
 test.before(() => {
-  if (process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1") return
-  assert.ok(databaseUrl, "Use the isolated postgres-gate")
+  if (disposablePostgresSkip().skip) return
+  assertDisposablePostgresDatabase(databaseUrl)
   pool = new Pool({ connectionString: databaseUrl, max: 25 })
 })
 

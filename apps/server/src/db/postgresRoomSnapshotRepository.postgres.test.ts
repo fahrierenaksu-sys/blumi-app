@@ -7,11 +7,12 @@ import { createPostgresRoomSnapshotRepository } from "./postgresRoomSnapshotRepo
 import { createRoomSnapshotService } from "../rooms/roomSnapshotService"
 import { registerRoomSnapshotRoutes } from "../routes/roomSnapshotRoutes"
 import type { PersonalRoomDecorSnapshot } from "../rooms/personalRoomDecorRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 test("two PostgreSQL connections preserve accepted hide and headline during render", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
   const renderClient = await pool.connect()
   const preferenceClient = await pool.connect()
@@ -66,9 +67,9 @@ test("two PostgreSQL connections preserve accepted hide and headline during rend
 })
 
 test("PostgreSQL snapshot saves never replace a newer revision or the owner's visibility and headline", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
   const userId = `snapshot_order_${randomUUID()}`
   const snapshot = (roomRevision: number, isPublic: boolean, headline: string | null) => ({

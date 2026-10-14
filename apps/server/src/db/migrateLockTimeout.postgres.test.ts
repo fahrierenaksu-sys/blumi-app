@@ -6,6 +6,7 @@ import { join } from "node:path"
 import test from "node:test"
 import { Pool } from "pg"
 import { runMigrationsWithClient } from "./migrate"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 
@@ -14,7 +15,7 @@ const databaseUrl = process.env.DATABASE_URL?.trim()
 // private schema with its own ledger so the real ledger is never touched.
 async function createFixture() {
   const schema = `lock_probe_${randomUUID().replaceAll("-", "").slice(0, 12)}`
-  const admin = new Pool({ connectionString: databaseUrl, max: 2 })
+  const admin = new Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: 2 })
   await admin.query(`CREATE SCHEMA ${schema}`)
   await admin.query(`CREATE TABLE ${schema}.sessions (id TEXT PRIMARY KEY)`)
   await admin.query(`CREATE TABLE ${schema}.accounts (id TEXT PRIMARY KEY)`)
@@ -30,7 +31,7 @@ async function createFixture() {
   // One connection, scoped to the private schema, exactly like the migrator's
   // single pooled connection.
   const migrator = new Pool({
-    connectionString: databaseUrl,
+    connectionString: disposablePostgresUrl(databaseUrl),
     max: 1,
     options: `-c search_path=${schema}`
   })
@@ -52,7 +53,7 @@ async function createFixture() {
 }
 
 test("a blocked migration stops at the lock timeout and leaves no partial change", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const fixture = await createFixture()
   const holder = await fixture.admin.connect()

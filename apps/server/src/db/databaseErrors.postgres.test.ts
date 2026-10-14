@@ -5,11 +5,12 @@ import { Pool } from "pg"
 import { classifyDatabaseError } from "../operations/databaseErrorStatus"
 import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import { retryStatementConflictOnce } from "./databasePoolConfig"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
+const requirePostgres = { skip: disposablePostgresSkip().skip }
 
 function openPool(): Pool {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   return new Pool({ connectionString: process.env.DATABASE_URL, max: 3 })
 }
 

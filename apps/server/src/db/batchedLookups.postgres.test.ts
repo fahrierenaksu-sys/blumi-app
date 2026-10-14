@@ -14,10 +14,11 @@ import { createPostgresChatRepository } from "./postgresChatRepository"
 import { createPostgresMatchRepository } from "./postgresMatchRepository"
 import { createPostgresPresenceRepository } from "./postgresPresenceRepository"
 import { createPostgresSafetyRepository } from "./postgresSafetyRepository"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 // Runs only inside the isolated PostgreSQL gate (npm run verify:postgres).
 const databaseUrl = process.env.DATABASE_URL?.trim()
-const skip = process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !databaseUrl
+const skip = disposablePostgresSkip().skip
 const avatarSelection = JSON.stringify(toAvatarLoadoutV2(DEFAULT_FEMALE_AVATAR_LOADOUT))
 
 /** Wraps pool.query and pooled clients so every SQL statement is recorded. */
@@ -93,7 +94,7 @@ function countTableReads(statements: readonly string[]) {
 }
 
 test("PostgreSQL findAccountsByUserIds and listBlockedUserIdsBetween match their single-row forms in one statement", { skip }, async () => {
-  const pool = new pg.Pool({ connectionString: databaseUrl })
+  const pool = new pg.Pool({ connectionString: disposablePostgresUrl(databaseUrl) })
   try {
     const suffix = randomUUID().slice(0, 8)
     const [a, b, c] = [`user_a_${suffix}`, `user_b_${suffix}`, `user_c_${suffix}`]
@@ -130,7 +131,7 @@ test("PostgreSQL findAccountsByUserIds and listBlockedUserIdsBetween match their
 test("PostgreSQL sync-matches and block-list SQL reads stay constant as partners grow", { skip }, async () => {
   const observed: Record<number, { sync: ReturnType<typeof countTableReads>; blocks: ReturnType<typeof countTableReads> }> = {}
   for (const partnerCount of [1, 5]) {
-    const pool = new pg.Pool({ connectionString: databaseUrl })
+    const pool = new pg.Pool({ connectionString: disposablePostgresUrl(databaseUrl) })
     const authService = createAuthService({
       repository: createPostgresAuthRepository(pool),
       codeFactory: () => "482931",
@@ -188,7 +189,7 @@ test("PostgreSQL sync-matches and block-list SQL reads stay constant as partners
 })
 
 test("PostgreSQL presence reads hide expired rows without deleting; purge is bounded and parity-matched in memory", { skip }, async () => {
-  const pool = new pg.Pool({ connectionString: databaseUrl })
+  const pool = new pg.Pool({ connectionString: disposablePostgresUrl(databaseUrl) })
   try {
     const suffix = randomUUID().slice(0, 8)
     const users = [0, 1, 2, 3].map((index) => `user_presence_${index}_${suffix}`)

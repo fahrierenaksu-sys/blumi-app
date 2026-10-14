@@ -55,6 +55,8 @@ The allowlists in that file are the tolerated debt and may only shrink (exceptio
 
 Reduce Motion behaviour is tested where it lives: `src/ui/reducedMotionStore.test.ts`, `src/ui/motion.test.ts` (token resolution), `src/ui/animations.test.ts` (entrances crossfade without moving) and `src/ui/PressableScale.test.ts` (a pressed control dims and does not move).
 
+Server database tests (`apps/server/src/db/disposablePostgres.test.ts`): every server test or test helper that opens a pool from `DATABASE_URL` must call `assertDisposablePostgresDatabase` or `disposablePostgresUrl` before it connects, and skip through `disposablePostgresSkip()`. `npm test` also drops `DATABASE_URL` from the test environment unless the isolated PostgreSQL gate set it, so a shell-exported production URL can never be written to.
+
 Elsewhere (mobile paths are relative to `apps/mobile`):
 
 - Route params carry serialisable data only, never functions or class instances (`src/navigation/routeParamsSerialisable.test.mjs`).

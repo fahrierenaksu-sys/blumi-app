@@ -13,6 +13,7 @@ import {
   simultaneousLikesMakeOneMatch,
   type ScenarioContext
 } from "./socialLoopScenarios"
+import { disposablePostgresSkip } from "../db/disposablePostgres"
 
 /**
  * The social-loop scenarios of socialLoop.e2e.test.ts against PostgreSQL:
@@ -25,7 +26,7 @@ import {
  */
 
 const requirePostgres = {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }
 /** A hang or a lost event fails; the measured times are reported, not tuned. */
 const POSTGRES_EVENT_BUDGET_MS = 1_000

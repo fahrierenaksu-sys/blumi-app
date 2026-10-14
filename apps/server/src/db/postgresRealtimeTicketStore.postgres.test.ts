@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto"
 import test from "node:test"
 import { Pool } from "pg"
 import { createPostgresRealtimeTicketStore } from "./postgresRealtimeTicketStore"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 const PARALLEL_CONSUMERS = 20
@@ -11,8 +12,8 @@ function digest(): string {
   return randomBytes(32).toString("hex")
 }
 
-test("a ticket raced by parallel upgrades is consumed exactly once", { skip: !databaseUrl, timeout: 10_000 }, async () => {
-  const pool = new Pool({ connectionString: databaseUrl, max: PARALLEL_CONSUMERS })
+test("a ticket raced by parallel upgrades is consumed exactly once", { skip: disposablePostgresSkip().skip, timeout: 10_000 }, async () => {
+  const pool = new Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: PARALLEL_CONSUMERS })
   try {
     const store = createPostgresRealtimeTicketStore(pool)
     const ticketDigest = digest()
@@ -28,8 +29,8 @@ test("a ticket raced by parallel upgrades is consumed exactly once", { skip: !da
   }
 })
 
-test("parallel issue of one digest stores it once and never overwrites the owner", { skip: !databaseUrl, timeout: 10_000 }, async () => {
-  const pool = new Pool({ connectionString: databaseUrl, max: 10 })
+test("parallel issue of one digest stores it once and never overwrites the owner", { skip: disposablePostgresSkip().skip, timeout: 10_000 }, async () => {
+  const pool = new Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: 10 })
   try {
     const store = createPostgresRealtimeTicketStore(pool)
     const ticketDigest = digest()
@@ -44,8 +45,8 @@ test("parallel issue of one digest stores it once and never overwrites the owner
   }
 })
 
-test("an expired ticket never authenticates and is collected by the bounded purge", { skip: !databaseUrl, timeout: 10_000 }, async () => {
-  const pool = new Pool({ connectionString: databaseUrl })
+test("an expired ticket never authenticates and is collected by the bounded purge", { skip: disposablePostgresSkip().skip, timeout: 10_000 }, async () => {
+  const pool = new Pool({ connectionString: disposablePostgresUrl(databaseUrl) })
   try {
     const store = createPostgresRealtimeTicketStore(pool)
     const expired = digest()

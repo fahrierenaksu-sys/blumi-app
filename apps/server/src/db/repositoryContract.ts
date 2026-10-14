@@ -1,6 +1,7 @@
 import test from "node:test"
 import { randomInt, randomUUID } from "node:crypto"
 import { Pool } from "pg"
+import { disposablePostgresUrl } from "./disposablePostgres"
 
 /**
  * Shared repository contract harness.
@@ -57,10 +58,7 @@ export function runRepositoryContract<Repository>(input: {
     test(`${input.name} contract (postgres): ${caseName}`, {
       skip: postgresRequired ? false : "PostgreSQL contract runs in the isolated gate"
     }, async () => {
-      if (!input.databaseUrl) {
-        throw new Error("Use the isolated postgres-gate runner for PostgreSQL contracts.")
-      }
-      const pool = new Pool({ connectionString: input.databaseUrl, max: 4 })
+      const pool = new Pool({ connectionString: disposablePostgresUrl(input.databaseUrl), max: 4 })
       try {
         await runCase({
           kind: "postgres",
