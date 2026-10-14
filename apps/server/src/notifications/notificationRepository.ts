@@ -104,7 +104,12 @@ export interface NotificationRepository {
   removeDeviceRegistration(input: { userId: string; pushToken: string; registrationId: string }): Promise<void>
   listDevices(userId: string): Promise<DeviceRegistration[]>
   saveDevice(device: DeviceRegistration): Promise<void>
-  /** Atomic admission; existing tokens on this account remain usable above the limit. */
+  /**
+   * Atomic admission; existing tokens on this account remain usable above the
+   * limit. At the limit a token that is new to every account replaces this
+   * account's oldest registrations (token rotation, reinstall); "limit" only when
+   * the token belongs to another account.
+   */
   saveDeviceBounded(device: DeviceRegistration): Promise<"saved" | "limit">
   removeDevice(userId: string, pushToken: string): Promise<void>
   removeAllDevices(userId: string): Promise<void>
@@ -240,8 +245,23 @@ export function createInMemoryNotificationRepository(): NotificationRepository {
       // still shares the token lock with dispatch and removal.
       return admissionQueue(device.userId, () => deviceQueue(device.pushToken, async () => {
         const existing = devices.get(deviceKey(device.userId, device.pushToken))
-        const count = [...devices.values()].filter((entry) => entry.userId === device.userId).length
-        if (!existing && count >= MAX_DEVICES_PER_ACCOUNT) return "limit" as const
+        const own = [...devices.values()].filter((entry) => entry.userId === device.userId)
+        if (!existing && own.length >= MAX_DEVICES_PER_ACCOUNT) {
+          // A full quota must not block a rotated token (the app removes the old
+          // one only after the new one registers, and a reinstall never knows it).
+          // A token that is new to every account replaces this account's oldest
+          // registrations; a token that belongs to another account is never taken
+          // this way.
+          const takenByOther = [...devices.values()].some((entry) =>
+            entry.pushToken === device.pushToken && entry.userId !== device.userId)
+          if (takenByOther) return "limit" as const
+          for (const evicted of oldestDevicesFirst(own).slice(0, own.length - MAX_DEVICES_PER_ACCOUNT + 1)) {
+            devices.delete(deviceKey(evicted.userId, evicted.pushToken))
+            for (const [id, delivery] of deliveries) {
+              if (delivery.userId === evicted.userId && delivery.pushToken === evicted.pushToken) deliveries.delete(id)
+            }
+          }
+        }
         persistDevice(device)
         return "saved" as const
       }))
@@ -422,6 +442,13 @@ function resolvePolicyReason(input: {
     Date.parse(event.occurredAt) > oneHourAgo
   ).length >= preferences.maxPushesPerHour) return "frequency_cap"
   return "queued"
+}
+
+/** Registration order, oldest first; token order breaks ties (as for delivery selection). */
+function oldestDevicesFirst(devices: DeviceRegistration[]): DeviceRegistration[] {
+  return [...devices].sort((a, b) =>
+    Date.parse(a.registeredAt) - Date.parse(b.registeredAt) ||
+    (a.pushToken < b.pushToken ? -1 : a.pushToken > b.pushToken ? 1 : 0))
 }
 
 function deviceKey(userId: string, pushToken: string): string {
