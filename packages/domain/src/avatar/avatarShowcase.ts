@@ -92,7 +92,7 @@ export function resolveShowcaseLayers(
   const hasCanvas = Number.isFinite(base?.canvas?.width) && Number.isFinite(base?.canvas?.height);
   if (!base || !hasCanvas) return fallback("no-showcase-base");
   const drawn = avatarStillDrawnItems(body, loadout);
-  const underSlots = new Set(base.underSlots ?? []);
+  const underSlots = new Set<string>(base.underSlots ?? []);
   // the base regions a drawn item stands in for: a one-piece dress is drawn instead of the top and the bottom
   const coveredBy = (slot: AvatarStillDrawSlot): readonly string[] => (slot === "dress" ? ["dress", "top", "bottom"] : [slot]);
   const front: DrawnFrontLayer[] = [];

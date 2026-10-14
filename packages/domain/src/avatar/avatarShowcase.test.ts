@@ -233,3 +233,50 @@ test("a piece whose body-under layer is missing draws the whole 3/4 still instea
   assert.equal(resolved.kind, "fallback");
   if (resolved.kind === "fallback") assert.equal(resolved.reason, "item-without-showcase");
 });
+
+// New item kinds (WB integration/slots_2140 DESIGN §7): the girl's real front base, plus fixture front layers for a
+// one-piece dress and glasses (the fixture catalog's items).
+import { TEST_AVATAR_ITEM as FX, TEST_AVATAR_ITEM_RULES as FX_RULES } from "./avatarItemRulesFixture";
+import { toAvatarLoadoutV2 } from "./avatarLoadoutRules";
+
+function frontManifest(dressUnder: boolean): AvatarStillManifest {
+  const girl = AVATAR_STILL_MANIFEST.bodies.female;
+  const top = girl.items[girl.starter.top!]!.showcase!;
+  const layer = (key: string, order: number, under: boolean) =>
+    ({ key, rect: top.rect, order, ...(under && top.under ? { under: { ...top.under, key: `${key}_under` } } : {}) });
+  const item = (slot: string, showcase: ReturnType<typeof layer>) => ({ slot, rigItemId: slot, thumb: slot, showcase });
+  return {
+    ...AVATAR_STILL_MANIFEST,
+    bodies: {
+      ...AVATAR_STILL_MANIFEST.bodies,
+      female: {
+        ...girl,
+        items: { ...girl.items, [FX.onePieceDress]: item("dress", layer("dress_front", 30, dressUnder)), [FX.paidEyewear]: item("glasses", layer("glasses_front", 35, false)) },
+      },
+    },
+  };
+}
+const fxLook = (dressId: string | null, accessoryIds: string[] = []) => ({ ...toAvatarLoadoutV2(FX_RULES.starters.female, FX_RULES), dressId, accessoryIds });
+
+test("a front figure in a one-piece dress draws the dress and its under layer instead of the top and the bottom", () => {
+  const girl = AVATAR_STILL_MANIFEST.bodies.female;
+  const dressed = resolveShowcaseLayers(fxLook(FX.onePieceDress), "card", frontManifest(true), {}, FX_RULES);
+  assert.equal(dressed.kind, "showcase");
+  const assets = dressed.kind === "showcase" ? dressed.layers.map((l) => l.asset) : [];
+  assert.ok(assets.includes("female/showcase/dress_front") && assets.includes("female/showcase/dress_front_under"));
+  for (const slot of ["top", "bottom"] as const) {
+    assert.ok(!assets.includes(`female/showcase/${girl.items[girl.starter[slot]!]!.showcase!.key}`), slot);
+  }
+  // without its under layer the erased base would show a hole: the whole figure is the 3/4 still
+  assert.equal(resolveShowcaseLayers(fxLook(FX.onePieceDress), "card", frontManifest(false), {}, FX_RULES).kind, "fallback");
+});
+
+test("front glasses are added over the look and taking them off restores the exact figure", () => {
+  const manifest = frontManifest(true);
+  const bare = resolveShowcaseLayers(fxLook(null), "card", manifest, {}, FX_RULES);
+  const worn = resolveShowcaseLayers(fxLook(null, [FX.paidEyewear]), "card", manifest, {}, FX_RULES);
+  assert.equal(worn.kind, "showcase");
+  const assets = (figure: AvatarShowcaseResolved) => (figure.kind === "showcase" ? figure.layers.map((l) => l.asset) : []);
+  assert.deepEqual(assets(worn).filter((asset) => !assets(bare).includes(asset)), ["female/showcase/glasses_front"]);
+  assert.deepEqual(resolveShowcaseLayers(fxLook(null, []), "card", manifest, {}, FX_RULES), bare);
+});
