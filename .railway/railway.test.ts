@@ -38,7 +38,7 @@ for (const environment of ["staging", "production"] as const) {
 const repositoryFile = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8")
 const pinnedNodeVersion = repositoryFile(".nvmrc").trim()
 
-test("one Node version is pinned for local, CI and Railway", () => {
+test("one Node version is pinned for local, CI, Railway and EAS builds", () => {
   assert.match(pinnedNodeVersion, /^22\.\d+\.\d+$/)
   // Node 22.23.2 (2026-07-28) is the newest 22.x security release; never pin below it.
   const [, minor, patch] = pinnedNodeVersion.split(".").map(Number)
@@ -49,5 +49,12 @@ test("one Node version is pinned for local, CI and Railway", () => {
     const source = repositoryFile(workflow)
     assert.match(source, /node-version-file: \.nvmrc/, workflow)
     assert.doesNotMatch(source, /node-version: /, workflow)
+  }
+  // EAS installs the profile's Node instead of the image default, so every
+  // native build and OTA export must use the same pinned release.
+  const easProfiles = Object.entries(JSON.parse(repositoryFile("apps/mobile/eas.json")).build)
+  assert.ok(easProfiles.length > 0)
+  for (const [name, profile] of easProfiles) {
+    assert.equal((profile as { node?: string }).node, pinnedNodeVersion, `eas.json build profile ${name}`)
   }
 })
