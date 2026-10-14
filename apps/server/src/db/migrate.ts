@@ -67,7 +67,12 @@ export async function runMigrationsWithClient(
     options.lockTimeoutMs ?? DEFAULT_MIGRATION_LOCK_TIMEOUT_MS,
     "lockTimeoutMs"
   )
+  // A connection whose lock_timeout could not be reset must not be reused.
+  let broken: Error | undefined
   try {
+    // Session-level, so it also bounds the ledger DDL and the advisory-lock
+    // wait. The per-migration transaction sets its own local value below.
+    await client.query("SELECT set_config('lock_timeout', $1, false)", [`${lockTimeoutMs}ms`])
     await client.query(MIGRATIONS_TABLE_SQL)
     await client.query(
       "SELECT pg_advisory_lock(hashtextextended('blumi:migrations', 0))"
@@ -130,7 +135,12 @@ export async function runMigrationsWithClient(
       )
     }
   } finally {
-    client.release()
+    try {
+      await client.query("RESET lock_timeout")
+    } catch (resetError) {
+      broken = resetError instanceof Error ? resetError : new Error("RESET lock_timeout failed.")
+    }
+    client.release(broken)
   }
 }
 

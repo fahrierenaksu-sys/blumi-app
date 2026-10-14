@@ -118,6 +118,50 @@ test("connection wait is bounded separately from the lock timeout", async () => 
   }
 })
 
+test("the lock timeout bounds the ledger DDL and the advisory-lock wait, then is reset before the client is released", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "blumi-migration-session-timeout-"))
+  await writeFile(join(directory, "001_first.sql"), "SELECT 1")
+  const client = createFakeMigrationClient()
+  const release = client.release.bind(client)
+  client.release = () => {
+    client.executedSql.push("<release>")
+    release()
+  }
+
+  await runMigrationsWithClient(client as never, directory, { lockTimeoutMs: 321 })
+
+  const sql = client.executedSql
+  const setTimeout = sql.findIndex((statement) => statement.includes("set_config('lock_timeout'") && statement.includes("false"))
+  const ledger = sql.findIndex((statement) => statement.includes("CREATE TABLE IF NOT EXISTS blumi_migrations"))
+  const advisoryLock = sql.findIndex((statement) => statement.includes("pg_advisory_lock"))
+  assert.ok(setTimeout >= 0, "a session-level lock_timeout must be set")
+  assert.deepEqual(client.executedValues[setTimeout], ["321ms"])
+  assert.ok(setTimeout < ledger, "the timeout must apply to the ledger DDL")
+  assert.ok(setTimeout < advisoryLock, "the timeout must apply to the advisory-lock wait")
+  assert.deepEqual(sql.slice(-3).map((statement) => statement.replace(/\s+/g, " ")), [
+    "SELECT pg_advisory_unlock(hashtextextended('blumi:migrations', 0))",
+    "RESET lock_timeout",
+    "<release>"
+  ])
+})
+
+test("a connection that cannot reset its lock timeout is destroyed, not reused", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "blumi-migration-reset-failure-"))
+  const client = createFakeMigrationClient()
+  const resetError = new Error("connection lost")
+  const query = client.query.bind(client)
+  client.query = async (sql: string, values?: unknown[]) => {
+    if (sql.trim() === "RESET lock_timeout") throw resetError
+    return query(sql, values)
+  }
+  const released: unknown[] = []
+  client.release = (error?: unknown) => { released.push(error) }
+
+  await runMigrationsWithClient(client as never, directory)
+
+  assert.deepEqual(released, [resetError])
+})
+
 function createFakeMigrationClient() {
   const applied = new Map<string, string | null>()
   return {
