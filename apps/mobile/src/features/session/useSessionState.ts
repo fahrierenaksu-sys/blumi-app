@@ -98,6 +98,7 @@ import {
 import { getSecureSessionStorageRecoveryMessage } from "./sessionPersistence"
 import { getSessionErrorMessageForDisplay } from "./sessionErrorCopy"
 import { isSessionInvalidError } from "../network/apiRequestError"
+import { isSensitiveReauthOpen } from "./sensitiveReauthGate"
 import { claimReferralInvite } from "../referrals/referralApi"
 import {
   clearPendingReferralCode,
@@ -515,6 +516,9 @@ export function useSessionState(): UseSessionStateResult {
       }
       if (state !== "active") return
       if (!actor || !shouldRefreshSessionSoon(actor)) return
+      // A rotation now would void a pending SMS re-auth code; refresh on a
+      // later foreground once the re-auth is over.
+      if (isSensitiveReauthOpen()) return
 
       void refreshCoordinator.refresh(actor)
         .then((refreshedActor) => {

@@ -21,6 +21,7 @@ import {
 } from "../session/settingsActionErrorCopy"
 import type { SettingsCopy } from "./settingsCopy"
 import { sanitizeVerificationCode } from "./settingsPresentationModel"
+import { useSensitiveReauthHold } from "./useSensitiveReauthHold"
 
 /**
  * Account deletion: prompt -> one-time code to the sign-in phone -> server
@@ -39,6 +40,7 @@ export function useAccountDeletion(input: {
   const [deletionCodeVisible, setDeletionCodeVisible] = useState(false)
   const deletionFirebaseConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
   const deletionChallengeRef = useRef<string | null>(null)
+  const reauthHold = useSensitiveReauthHold()
 
   const deleteAccount = useCallback(async (confirmationToken: string): Promise<void> => {
     if (isDeletingAccount) return
@@ -79,6 +81,7 @@ export function useAccountDeletion(input: {
     try {
       const currentPhoneNumber = getFirebaseCurrentPhoneNumber()
       if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
+      reauthHold.hold()
       deletionChallengeRef.current = (await requestFirebaseAccountActionChallenge(
         MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "account_deletion" }
       )).challengeId
@@ -94,7 +97,7 @@ export function useAccountDeletion(input: {
     } finally {
       setIsDeletingAccount(false)
     }
-  }, [copy, isDeletingAccount, locale, sessionActor])
+  }, [copy, isDeletingAccount, locale, reauthHold, sessionActor])
 
   const verifyDeletionCode = useCallback(async () => {
     if (isDeletingAccount || sessionActor.session.mode !== "production") return
@@ -111,6 +114,7 @@ export function useAccountDeletion(input: {
       )
       deletionFirebaseConfirmationRef.current = null
       deletionChallengeRef.current = null
+      reauthHold.release()
       setDeletionCodeVisible(false)
       Alert.alert(
         copy.deletePermanentlyTitle,
@@ -128,7 +132,7 @@ export function useAccountDeletion(input: {
     } finally {
       setIsDeletingAccount(false)
     }
-  }, [copy, deleteAccount, deletionCode, isDeletingAccount, locale, sessionActor])
+  }, [copy, deleteAccount, deletionCode, isDeletingAccount, locale, reauthHold, sessionActor])
 
   const handleDeleteAccountPrompt = useCallback(() => {
     Alert.alert(
@@ -150,7 +154,10 @@ export function useAccountDeletion(input: {
   const changeDeletionCode = useCallback((value: string) => {
     setDeletionCode(sanitizeVerificationCode(value))
   }, [])
-  const closeDeletionCode = useCallback(() => setDeletionCodeVisible(false), [])
+  const closeDeletionCode = useCallback(() => {
+    reauthHold.release()
+    setDeletionCodeVisible(false)
+  }, [reauthHold])
 
   return {
     isDeletingAccount,

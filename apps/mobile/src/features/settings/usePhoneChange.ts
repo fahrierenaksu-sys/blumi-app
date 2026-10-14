@@ -35,6 +35,7 @@ import {
   isPhoneChangePrimaryDisabled,
   phoneChangeFormReducer
 } from "./settingsPhoneChangeModel"
+import { useSensitiveReauthHold } from "./useSensitiveReauthHold"
 
 interface NewPhoneProof {
   confirmationToken: string
@@ -98,6 +99,8 @@ export function usePhoneChange(input: {
   // The phone verified at the start. After the new phone's code is confirmed,
   // Firebase reports the new phone, so a restart must not ask Firebase again.
   const verifiedCurrentPhoneRef = useRef<string | null>(null)
+  // Holds foreground token refresh while an SMS challenge is pending.
+  const reauthHold = useSensitiveReauthHold()
   const newPhoneAnalysis = analyzeLocalPhoneNumber(newPhoneNumber, newPhoneCountry)
 
   const resetPhoneChangeFlow = useCallback(() => {
@@ -108,7 +111,8 @@ export function usePhoneChange(input: {
     newPhoneChallengeRef.current = null
     newPhoneProofRef.current = null
     finalOutcomeUnknownRef.current = false
-  }, [])
+    reauthHold.release()
+  }, [reauthHold])
 
   const requestPhoneChangeCurrentCode = useCallback(async () => {
     if (isChangingPhone || sessionActor.session.mode !== "production") {
@@ -125,6 +129,7 @@ export function usePhoneChange(input: {
         verifiedCurrentPhoneRef.current ?? getFirebaseCurrentPhoneNumber()
       if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
       verifiedCurrentPhoneRef.current = currentPhoneNumber
+      reauthHold.hold()
       currentPhoneChallengeRef.current = (await requestFirebaseAccountActionChallenge(
         MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "phone_change_current" }
       )).challengeId
@@ -139,7 +144,7 @@ export function usePhoneChange(input: {
     } finally {
       setIsChangingPhone(false)
     }
-  }, [copy, isChangingPhone, locale, sessionActor])
+  }, [copy, isChangingPhone, locale, reauthHold, sessionActor])
 
   const verifyCurrentPhoneChangeCode = useCallback(async () => {
     if (isChangingPhone || sessionActor.session.mode !== "production") return
@@ -177,6 +182,7 @@ export function usePhoneChange(input: {
     }
     setIsChangingPhone(true)
     try {
+      reauthHold.hold()
       newPhoneChallengeRef.current = (await requestFirebaseAccountActionChallenge(
         MOBILE_HTTP_BASE_URL,
         sessionActor.session.sessionToken,
@@ -195,7 +201,7 @@ export function usePhoneChange(input: {
     } finally {
       setIsChangingPhone(false)
     }
-  }, [copy, currentPhoneConfirmationToken, isChangingPhone, locale, newPhoneAnalysis.normalizedPhoneNumber, sessionActor])
+  }, [copy, currentPhoneConfirmationToken, isChangingPhone, locale, newPhoneAnalysis.normalizedPhoneNumber, reauthHold, sessionActor])
 
   const applyFinalisingFailure = (
     resolution: Exclude<FinalisingFailure, "completed">,
@@ -253,6 +259,7 @@ export function usePhoneChange(input: {
           newPhoneFirebaseConfirmationRef.current = null
           newPhoneChallengeRef.current = null
           newPhoneProofRef.current = proof
+          reauthHold.release()
         } catch (error) {
           showToast({
             ...getSettingsVerificationErrorToastForDisplay("verifyNewPhoneCode", error, locale),
@@ -296,6 +303,7 @@ export function usePhoneChange(input: {
     isChangingPhone,
     locale,
     newPhoneCode,
+    reauthHold,
     resetPhoneChangeFlow,
     sessionActor
   ])

@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../testing/hookHarness"
 import * as apiRequestError from "../network/apiRequestError"
+import * as sensitiveReauthGate from "../session/sensitiveReauthGate"
 
 // Drives the real usePhoneChange hook through its own API. Only the Firebase
 // and Blumi API boundaries are fakes. Phone numbers are obviously fake.
@@ -18,7 +19,11 @@ const serverError = (status: number, code: apiRequestError.ApiRequestErrorCode) 
   new apiRequestError.ApiRequestError({ status, code, message: `fake ${status}` })
 const timeoutError = () => Object.assign(new Error("timed out"), { name: "TimeoutError" })
 
+const mountedHolders: Array<{ release: (() => void) | null }> = []
+
 function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
+  // Each test starts with no re-auth hold left open by an earlier test.
+  for (const holder of mountedHolders.splice(0)) holder.release?.()
   const runtime = createFakeReactRuntime()
   let alertButtons: Array<{ onPress?: () => void }> = []
   const calls = {
@@ -31,6 +36,8 @@ function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
     events: [] as string[]
   }
   let firebasePhone = OLD_PHONE
+  const reauthHolder: { release: (() => void) | null } = { release: null }
+  mountedHolders.push(reauthHolder)
   let verifyCount = 0
   const mod = loadSourceWithFakeReact<{ usePhoneChange: (input: unknown) => any }>(
     "features/settings/usePhoneChange.ts", runtime, {
@@ -40,6 +47,16 @@ function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
         "../../config/env": { MOBILE_HTTP_BASE_URL: "https://fixture.invalid" },
         "../../ui/toast": { showToast: (toast: { type: string; body?: string }) => calls.toasts.push(`${toast.type}:${toast.body}`) },
         "../network/apiRequestError": apiRequestError,
+        // The real gate behind a hook-free stand-in for the React hook.
+        "./useSensitiveReauthHold": {
+          useSensitiveReauthHold: () => {
+            const holder = reauthHolder
+            return {
+              hold: () => { holder.release?.(); holder.release = sensitiveReauthGate.holdSensitiveReauth() },
+              release: () => { holder.release?.(); holder.release = null }
+            }
+          }
+        },
         "../session/firebasePhoneAuth": {
           confirmFirebasePhoneCode: async (confirmation: { phone: string }) => {
             calls.firebaseConfirms += 1
@@ -154,4 +171,19 @@ test("an expired re-authentication drops the proof instead of retrying it", asyn
   assert.equal(f.hook().phoneChangeVisible, false)
   await f.restartFlow()
   assert.equal(f.calls.codeRequests.at(-1), OLD_PHONE)
+})
+
+test("token refresh is held from the first SMS challenge until the new phone is verified", async () => {
+  const f = mountPhoneChange([serverError(503, "server_unavailable"), "ok"])
+  assert.equal(sensitiveReauthGate.isSensitiveReauthOpen(), false)
+
+  await f.startFlow()
+  const openWhileCodePending = sensitiveReauthGate.isSensitiveReauthOpen()
+  await f.hook().verifyNewPhoneChangeCode()
+  const openAfterVerified = sensitiveReauthGate.isSensitiveReauthOpen()
+  await f.hook().verifyNewPhoneChangeCode()
+
+  assert.equal(openWhileCodePending, true)
+  assert.equal(openAfterVerified, false, "the proof is no longer bound to the token")
+  assert.equal(sensitiveReauthGate.isSensitiveReauthOpen(), false)
 })

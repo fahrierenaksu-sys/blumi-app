@@ -35,6 +35,7 @@ function mount() {
           saveSessionActor: async () => undefined
         },
         "../network/apiRequestError": { isSessionInvalidError: () => false },
+        "./sensitiveReauthGate": { isSensitiveReauthOpen: () => false },
         "./sessionRefresh": {
           createSessionRefreshCoordinator: () => {
             calls.push("createRefreshCoordinator")

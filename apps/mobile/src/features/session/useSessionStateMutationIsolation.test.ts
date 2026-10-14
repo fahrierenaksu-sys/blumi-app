@@ -11,6 +11,7 @@ import { createDemoSessionActor, type SessionActor } from "./sessionModel"
 import * as sessionMutationCoordinator from "./sessionMutationCoordinator"
 import * as sessionRefresh from "./sessionRefresh"
 import * as apiRequestError from "../network/apiRequestError"
+import * as sensitiveReauthGate from "./sensitiveReauthGate"
 import * as preAuthOnboardingDraft from "./preAuthOnboardingDraft"
 import type { UseSessionStateResult } from "./useSessionState"
 
@@ -201,6 +202,7 @@ function mount(options: MountOptions = {}) {
         "./onboardingCompletion": onboardingCompletion,
         "./sessionModel": sessionModel,
         "../network/apiRequestError": apiRequestError,
+        "./sensitiveReauthGate": sensitiveReauthGate,
         "./sessionRefresh": {
           ...sessionRefresh,
           refreshAndPersistSession: async (_url: string, _actor: SessionActor, input: { signal: AbortSignal }) => {
@@ -612,4 +614,40 @@ test("an account-ending completion still resets its own session after a token re
 
   assert.equal(f.current(), null)
   assert.deepEqual(f.clears, ["production"])
+})
+
+// The server binds an SMS re-auth challenge to the requesting token; a
+// rotation in between voids the code. Foreground refresh waits until the
+// re-auth is over (or its hold expires).
+test("foreground refresh waits while a sensitive re-auth code is pending", async () => {
+  const f = mount()
+  await f.profileStarted.promise
+  f.profile.resolve(f.snapshot)
+  await settle()
+  const release = sensitiveReauthGate.holdSensitiveReauth()
+
+  f.foreground()
+  await settle()
+  const refreshesWhileHeld = f.refreshCalls()
+  release()
+  f.foreground()
+  await f.refreshStarted.promise
+
+  assert.equal(refreshesWhileHeld, 0)
+  assert.equal(f.refreshCalls(), 1)
+  f.refresh.resolve(f.rotated)
+  await settle()
+  f.runtime.unmount()
+})
+
+test("a forgotten re-auth hold expires after the server challenge would have", () => {
+  const startMs = Date.UTC(2026, 0, 1)
+  const release = sensitiveReauthGate.holdSensitiveReauth(startMs)
+  assert.equal(sensitiveReauthGate.isSensitiveReauthOpen(startMs + 1), true)
+  assert.equal(
+    sensitiveReauthGate.isSensitiveReauthOpen(startMs + sensitiveReauthGate.SENSITIVE_REAUTH_HOLD_MS + 1),
+    false
+  )
+  release()
+  assert.equal(sensitiveReauthGate.isSensitiveReauthOpen(startMs + 1), false)
 })
