@@ -30,9 +30,9 @@ function mountExport(options: { holdCode?: boolean } = {}) {
   const runtime = createFakeReactRuntime()
   const events: string[] = []
   const signals: AbortSignal[] = []
-  const downloads: Array<Deferred<{ dispose: () => Promise<void> }>> = []
-  const codes: Array<Deferred<string>> = []
-  let buttons: Array<{ onPress?: () => void }> = []
+  const downloads: Deferred<{ dispose: () => Promise<void> }>[] = []
+  const codes: Deferred<string>[] = []
+  let buttons: { onPress?: () => void }[] = []
   const hook = loadSourceWithFakeReact<{ useAccountDataExport: (input: unknown) => ExportApi }>(
     "features/settings/useAccountDataExport.ts", runtime, {
       modules: {

@@ -72,7 +72,7 @@ test("profile edit offers no search-distance control", () => {
 })
 
 test("using every profile control and saving keeps the stored search distance", async () => {
-  const saved: Array<{ discoveryPreferences?: { radiusKm?: number } }> = []
+  const saved: { discoveryPreferences?: { radiusKm?: number } }[] = []
   const { runtime, tree } = renderProfileEdit(saved)
   for (const element of tree().filter((candidate) => candidate.props.accessibilityRole === "radio")) {
     element.props.onPress?.()
