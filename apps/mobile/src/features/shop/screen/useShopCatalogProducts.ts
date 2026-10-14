@@ -1,9 +1,11 @@
+import type { CapabilityMap } from "@blumi/contracts"
 import {
   ECONOMY_CATALOG,
   resolveR1PublishedEconomyCatalog
 } from "@blumi/domain"
 import { useMemo } from "react"
 import type { UserAvatar } from "../../avatarV2/avatarV2.types"
+import { isAvatarItemSavable } from "../../avatarV2/avatarDressWriteGate"
 import type { BlumiInventorySnapshot } from "../../inventory/inventoryStore"
 import type { FurnitureItem, UserRoomDecor } from "../../roomV2/roomV2.types"
 import type { AppLocale } from "../../session/appLocale"
@@ -34,6 +36,8 @@ export function useShopCatalogProducts(input: {
   roomFurnitureCatalog: FurnitureItem[] | undefined
   qaOnlyOwnedRoomItemIds: readonly string[] | undefined
   semanticOutfitMerchandisingEnabled: boolean
+  /** The server's capabilities: a one-piece dress is sold only when a look wearing it can be saved. */
+  capabilities: Partial<CapabilityMap>
   shopMode: ShopMode
   selectedCategoryId: string
   locale: AppLocale
@@ -46,6 +50,7 @@ export function useShopCatalogProducts(input: {
     roomFurnitureCatalog,
     qaOnlyOwnedRoomItemIds,
     semanticOutfitMerchandisingEnabled,
+    capabilities,
     shopMode,
     selectedCategoryId,
     locale
@@ -109,8 +114,9 @@ export function useShopCatalogProducts(input: {
           .filter((item) =>
             semanticOutfitMerchandisingEnabled || !item.avatarItem?.outfitKey
           )
+          .filter((item) => !item.avatarItem || isAvatarItemSavable(item.avatarItem, capabilities))
       ),
-    [semanticOutfitMerchandisingEnabled, avatarShopItems]
+    [semanticOutfitMerchandisingEnabled, avatarShopItems, capabilities]
   )
   const roomProducts = useMemo(
     () => sortRoomShopProducts(roomShopItems),

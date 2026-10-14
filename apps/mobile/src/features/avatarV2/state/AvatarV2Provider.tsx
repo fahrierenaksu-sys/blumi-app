@@ -33,6 +33,7 @@ import type {
   UserAvatar
 } from "../avatarV2.types"
 import type { AvatarSaveOutcome } from "../avatarSaveOutcome"
+import { isAvatarItemSavable, ONE_PIECE_DRESS_UNAVAILABLE_MESSAGE } from "../avatarDressWriteGate"
 import { createFailClosedCapabilityResolution } from "../../capabilities/capabilityApi"
 import {
   getAvatarV2StorageKey,
@@ -273,12 +274,12 @@ export function AvatarV2Provider({
 
   const equipItem = useCallback(
     (item: AvatarCatalogItem): boolean => {
-      if (!canEquipItem(item)) return false
+      if (!canEquipItem(item) || !isAvatarItemSavable(item, resolvedCapabilities)) return false
       hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
       updateAvatar((current) => equipAvatarV2Item(current, item))
       return true
     },
-    [canEquipItem, updateAvatar]
+    [canEquipItem, resolvedCapabilities, updateAvatar]
   )
 
   const saveAvatar = useCallback(
@@ -413,6 +414,9 @@ export function AvatarV2Provider({
       if (!canEquipItem(item)) {
         return { ok: false, reason: "error", errorMessage: "Unlock this look first" }
       }
+      if (!isAvatarItemSavable(item, resolvedCapabilities)) {
+        return { ok: false, reason: "error", errorMessage: ONE_PIECE_DRESS_UNAVAILABLE_MESSAGE }
+      }
       if (!qaPersistencePolicy.allowRemotePersistence) {
         hasLocalCustomizationRef.current = markAvatarLocallyCustomized()
         setSaveErrorMessage(null)
@@ -496,7 +500,7 @@ export function AvatarV2Provider({
         }
       }
     },
-    [avatar, canEquipItem, onSaveAvatar, qaPersistencePolicy.allowRemotePersistence, requireServerInventory, updateAvatar]
+    [avatar, canEquipItem, onSaveAvatar, qaPersistencePolicy.allowRemotePersistence, requireServerInventory, resolvedCapabilities, updateAvatar]
   )
 
   const value = useMemo<AvatarV2ContextValue>(

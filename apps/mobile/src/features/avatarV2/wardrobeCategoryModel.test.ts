@@ -240,3 +240,27 @@ test("glasses toggle on and off, and another pair replaces the worn one", () => 
   const worn = equipAvatarV2Item(equipAvatarV2Item(base, first!), bag)
   assert.deepEqual(equipAvatarV2Item(worn, second!).accessoryIds, [bag.id, second!.id])
 })
+
+// Review slots_1330 HIGH-2: without the server's V2 loadout write a one-piece dress cannot be saved, so it is never
+// offered: no Elbise tab, no dress card, no try-on. A legacy paired dress (a top + bottom pair) still saves over V1.
+const {
+  filterSavableAvatarCatalog,
+  isAvatarItemSavable
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+} = require("./avatarDressWriteGate") as typeof import("./avatarDressWriteGate")
+
+test("without the V2 loadout write the closet offers no one-piece dress, and offers it once the server allows it", () => {
+  const withDress = [...AVATAR_V2_CATALOG, ONE_PIECE, GLASSES]
+  for (const capabilities of [undefined, {}, { avatar_loadout_v2_read: true, avatar_loadout_v2_write: false }]) {
+    const closet = filterSavableAvatarCatalog(withDress, capabilities)
+    assert.ok(!getAvatarStudioTabs("closet", closet, DEFAULT_AVATAR_V2).some((tab) => tab.id === "dress"))
+    assert.ok(!getWardrobeCategoryItems(closet, "dress").some((item) => item.id === ONE_PIECE.id))
+    assert.equal(isAvatarItemSavable(ONE_PIECE, capabilities), false)
+    assert.ok(getAvatarStudioTabs("closet", closet, DEFAULT_AVATAR_V2).some((tab) => tab.id === "glasses"), "glasses ride on V1")
+  }
+  const allowed = filterSavableAvatarCatalog(withDress, { avatar_loadout_v2_write: true })
+  assert.ok(getAvatarStudioTabs("closet", allowed, DEFAULT_AVATAR_V2).some((tab) => tab.id === "dress"))
+  assert.equal(isAvatarItemSavable(ONE_PIECE, { avatar_loadout_v2_write: true }), true)
+  const pairTop = { ...AVATAR_V2_CATALOG.find((item) => item.type === "top")!, outfitKey: "fixture_pair" }
+  assert.equal(isAvatarItemSavable(pairTop, {}), true, "a legacy paired dress is carried by V1")
+})

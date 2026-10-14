@@ -6,6 +6,7 @@ import type {
   CompleteAvatarSelection
 } from "@blumi/contracts"
 import {
+  type AvatarItemRules,
   projectAvatarLoadoutV1 as projectDomainAvatarLoadoutV1,
   toAvatarLoadoutV2
 } from "@blumi/domain"
@@ -97,13 +98,14 @@ export function loadoutToUserAvatar(loadout: AvatarLoadout): UserAvatar {
 }
 
 export function projectAvatarLoadoutV1(
-  loadout: AvatarLoadout
+  loadout: AvatarLoadout,
+  rules?: AvatarItemRules
 ): AvatarLoadoutV1 {
   const canonical = normalizeAvatarLoadout(loadout)
   if (!canonical) {
     throw new Error("Avatar loadout is invalid.")
   }
-  return projectDomainAvatarLoadoutV1(canonical)
+  return projectDomainAvatarLoadoutV1(canonical, rules)
 }
 
 export function cloneAvatarSelection(selection: AvatarSelection): AvatarSelection {

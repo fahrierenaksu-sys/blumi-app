@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { saveProductionAvatar } from "./avatarApi"
+import { TEST_AVATAR_ITEM, TEST_AVATAR_ITEM_RULES } from "@blumi/domain"
 import { registerBoundedRequestTests } from "../network/boundedRequestContract"
 
 const LOADOUT = {
@@ -224,4 +225,30 @@ test("avatar API fails closed on malformed canonical responses", async () => {
     ),
     /confirm your saved avatar/
   )
+})
+
+// Review slots_1330 HIGH-2: a one-piece dress has no V1 form. Without the V2 write the server keeps a dress only when
+// one is already stored, so a reply without the worn dress must never pass as a silent success.
+const DRESSED = { ...LOADOUT, dressId: TEST_AVATAR_ITEM.onePieceDress }
+const replyWith = (loadout: typeof LOADOUT | typeof DRESSED) => async () => new Response(JSON.stringify({
+  avatar: { presetId: LOADOUT.bodyId, loadout, revision: 3 }
+}), { status: 200 })
+
+test("with V2 write off, a saved look that lost the worn one-piece dress comes back as the server look with a Turkish notice", async () => {
+  const result = await saveProductionAvatar(
+    "https://api.blumi.test", "session-token", { loadout: DRESSED, revision: 2 }, replyWith(LOADOUT),
+    undefined, { avatar_loadout_v2_read: true }, TEST_AVATAR_ITEM_RULES
+  )
+  assert.equal(result.kind, "conflict")
+  if (result.kind !== "conflict") return
+  assert.equal(result.current.loadout.schemaVersion === 2 ? result.current.loadout.dressId : null, null)
+  assert.match(result.message ?? "", /Elbise/)
+})
+
+test("with V2 write off, a stored dress the server keeps saves normally", async () => {
+  const result = await saveProductionAvatar(
+    "https://api.blumi.test", "session-token", { loadout: DRESSED, revision: 2 }, replyWith(DRESSED),
+    undefined, { avatar_loadout_v2_read: true }, TEST_AVATAR_ITEM_RULES
+  )
+  assert.equal(result.kind, "updated")
 })

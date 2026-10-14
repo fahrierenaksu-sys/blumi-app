@@ -211,6 +211,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     roomFurnitureCatalog: props.roomFurnitureCatalog,
     qaOnlyOwnedRoomItemIds: props.qaOnlyOwnedRoomItemIds,
     semanticOutfitMerchandisingEnabled,
+    capabilities: avatarV2.resolvedCapabilities,
     shopMode,
     selectedCategoryId,
     locale

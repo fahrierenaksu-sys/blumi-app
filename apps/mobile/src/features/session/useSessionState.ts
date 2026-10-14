@@ -953,7 +953,7 @@ export function useSessionState(): UseSessionStateResult {
             return {
               kind: "conflict",
               current: result.current,
-              message: "Your avatar changed on another device. Review the latest look and try again."
+              message: result.message ?? "Your avatar changed on another device. Review the latest look and try again."
             }
           }
           selection = result.selection
