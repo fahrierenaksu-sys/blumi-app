@@ -549,6 +549,8 @@ function ChatThreadScreenView(props: ChatThreadScreenProps) {
           )}
           <ChatTypingBubble threadId={resolvedThreadId} partnerUserId={partnerUserId} partnerName={partnerName} locale={chatLocale} />
           <ChatComposer
+            draftAccountId={currentUserId}
+            draftThreadId={isPendingThread ? undefined : resolvedThreadId}
             draftTyping={draftTyping}
             chatCopy={chatCopy}
             partnerName={partnerName}

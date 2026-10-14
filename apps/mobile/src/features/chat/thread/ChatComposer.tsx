@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Pressable, TextInput, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../../../ui/layout/PageContainer"
@@ -9,6 +9,7 @@ import { GesturePressableScale } from "../../../ui/GesturePressableScale"
 import { animateTo, useMotion } from "../../../ui/motion"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
+import { readChatComposerDraft, writeChatComposerDraft } from "../chatComposerDraftStore"
 import type { ChatThreadCopy } from "./chatThreadCopy"
 import { reconcileComposerTextAfterSend } from "./chatComposerDraftModel"
 import { styles } from "./chatThreadStyles"
@@ -17,8 +18,14 @@ import { RoomInviteComposerIcon } from "./RoomInviteComposerIcon"
 /** Scale the send button springs back from after a send: a subtle pop (MOTION_PLAN §D.4). */
 const SEND_POP_SCALE = 0.9
 
-/** Owns the draft text so typing never re-renders the timeline owner. */
+/**
+ * Owns the draft text so typing never re-renders the timeline owner. With a
+ * draft owner (account + conversation) the unsent text survives leaving the
+ * conversation, in memory only (chatComposerDraftStore).
+ */
 export function ChatComposer({
+  draftAccountId,
+  draftThreadId,
   chatCopy,
   partnerName,
   chatLocale,
@@ -31,6 +38,10 @@ export function ChatComposer({
   onSend,
   draftTyping
 }: {
+  /** The signed-in account the draft belongs to. */
+  draftAccountId?: string
+  /** The conversation the draft belongs to; none while it is still being created. */
+  draftThreadId?: string
   chatCopy: ChatThreadCopy
   partnerName: string
   chatLocale: ChatLocale
@@ -44,13 +55,34 @@ export function ChatComposer({
   /** Typing signal for the partner (chat_typing); never sees programmatic text. */
   draftTyping?: ChatDraftTyping
 }) {
-  const [inputText, setInputText] = useState("")
+  // A restored draft is shown as the input's value only: no native change
+  // event, so it never reaches draftTyping as typing.
+  const [restoredDraft] = useState(() => readChatComposerDraft(draftAccountId ?? "", draftThreadId ?? ""))
+  const [inputText, setInputText] = useState(restoredDraft)
   const inputRef = useRef<TextInput>(null)
   // The draft of the last send while a late keystroke may still bring it
   // back (chatComposerDraftModel); null otherwise.
   const sentDraftRef = useRef<string | null>(null)
   // What the input shows, also between a send and the next render.
-  const shownTextRef = useRef("")
+  const shownTextRef = useRef(restoredDraft)
+  const draftOwnerRef = useRef({ accountId: draftAccountId, threadId: draftThreadId })
+  const previousOwner = draftOwnerRef.current
+  if (previousOwner.accountId !== draftAccountId || previousOwner.threadId !== draftThreadId) {
+    draftOwnerRef.current = { accountId: draftAccountId, threadId: draftThreadId }
+    // Another conversation (or account) shows its own draft. A conversation
+    // that was still being created keeps what was typed meanwhile.
+    if (previousOwner.threadId !== undefined || previousOwner.accountId !== draftAccountId) {
+      const ownerDraft = readChatComposerDraft(draftAccountId ?? "", draftThreadId ?? "")
+      shownTextRef.current = ownerDraft
+      sentDraftRef.current = null
+      setInputText(ownerDraft)
+    }
+  }
+  // Every shown text is remembered, so an accepted send forgets the draft
+  // and a refused one keeps it.
+  useEffect(() => {
+    if (draftAccountId && draftThreadId) writeChatComposerDraft(draftAccountId, draftThreadId, shownTextRef.current)
+  }, [draftAccountId, draftThreadId, inputText])
   const motion = useMotion()
   // The press itself is GesturePressableScale's (the shared `press` token,
   // with a still hit target); this outer scale carries only the post-send

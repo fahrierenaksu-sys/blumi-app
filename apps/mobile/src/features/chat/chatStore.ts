@@ -28,6 +28,7 @@ import {
 } from "./chatErrorCopy"
 import { applyReceiptEvent, applyReceiptSnapshot } from "./chatReceiptModel"
 import { keepLocalRenderKey, resetMessageRenderKeys } from "./chatMessageRenderKeys"
+import { clearChatComposerDrafts, resetChatComposerDrafts } from "./chatComposerDraftStore"
 import { forgetPartnerReceipts, getPartnerReceipts, resetPartnerReceipts, setPartnerReceipts } from "./chatPartnerReceiptsState"
 import { compareMessageOrder, forgetReadHere, getReadHereThrough, noteReadHere, resetReadHere } from "./chatReadHere"
 export { getPartnerReceipts } from "./chatPartnerReceiptsState"
@@ -353,6 +354,7 @@ export function removeChatThreadsWithPartner(partnerUserId: string): string[] {
   summaryLastMessageByThread = new Map([...summaryLastMessageByThread].filter(([threadId]) => !removed.has(threadId)))
   forgetPartnerReceipts(removed)
   forgetReadHere(removed)
+  clearChatComposerDrafts(removedIds)
   participantUpdatesByUserId = new Map([...participantUpdatesByUserId].filter(([userId]) => userId !== partnerUserId))
   if (activeThreadId && removed.has(activeThreadId)) activeThreadId = null
   notify()
@@ -663,6 +665,7 @@ export function resetChatStore(): void {
   summaryLastMessageByThread = new Map()
   resetPartnerReceipts()
   resetReadHere()
+  resetChatComposerDrafts()
   activeThreadId = null
   learnedSequenceByThreadId = new Map()
   removedSequenceByThreadId = new Map()
