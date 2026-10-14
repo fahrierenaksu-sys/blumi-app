@@ -281,7 +281,7 @@ export function resolveServerConfig(
   )
   const databaseUrl = env.DATABASE_URL?.trim()
   const sessionCacheTtlMs = parseSessionCacheTtlMs(env.BLUMI_SESSION_CACHE_TTL_MS)
-  const rateBudgetStore = parseRateBudgetStore(env.BLUMI_RATE_BUDGET_STORE)
+  const rateBudgetStore = resolveRateBudgetStore(env.BLUMI_RATE_BUDGET_STORE, authRepositoryMode, nodeEnv)
   const databasePool = resolveDatabasePoolSettings(env)
   const databaseListenUrl = resolveDatabaseListenUrl(env)
   const otpHmacSecret = env.BLUMI_OTP_HMAC_SECRET?.trim()
@@ -531,11 +531,36 @@ export function parseSessionCacheTtlMs(value: string | undefined): number {
   return parsed
 }
 
-export function parseRateBudgetStore(value: string | undefined): "memory" | "postgres" {
+export function parseRateBudgetStore(value: string | undefined): "memory" | "postgres" | undefined {
   const normalized = value?.trim().toLowerCase()
-  if (!normalized || normalized === "memory") return "memory"
-  if (normalized === "postgres") return "postgres"
+  if (!normalized) return undefined
+  if (normalized === "memory" || normalized === "postgres") return normalized
   throw new Error("BLUMI_RATE_BUDGET_STORE must be memory or postgres.")
+}
+
+/**
+ * The in-process budget counts per instance, so two instances would each
+ * allow the full quota (audit D09). With PostgreSQL repositories the shared
+ * PostgreSQL budget is the default and production refuses the memory store.
+ * Memory repositories have no database, so asking them for a shared budget
+ * fails instead of being silently ignored.
+ */
+export function resolveRateBudgetStore(
+  value: string | undefined,
+  repositoryMode: string,
+  nodeEnv: string | undefined
+): "memory" | "postgres" {
+  const requested = parseRateBudgetStore(value)
+  if (repositoryMode !== "postgres") {
+    if (requested === "postgres") {
+      throw new Error("BLUMI_RATE_BUDGET_STORE=postgres needs BLUMI_AUTH_REPOSITORY=postgres.")
+    }
+    return "memory"
+  }
+  if (requested === "memory" && nodeEnv === "production") {
+    throw new Error("BLUMI_RATE_BUDGET_STORE=memory is not shared across instances; production must use postgres.")
+  }
+  return requested ?? "postgres"
 }
 
 export function parseAdminSigningKeys(value: string | undefined): readonly AdminSigningKey[] {
@@ -730,7 +755,7 @@ export function createConfiguredServerServices(
       },
       sharedRateLimiter: config.rateBudgetStore === "postgres" ? createPostgresRateBudget(pool) : createInMemoryRateBudget(),
       // Authentication controls must remain shared even when ordinary API
-      // traffic uses the optional single-process budget.
+      // local, non-production traffic opts into the single-process budget.
       authRateLimiter: createPostgresRateBudget(pool),
       discoverySnapshots: createDiscoverySnapshotService(createPostgresDiscoverySnapshots(pool)),
       threadRoomInviteReader: createPostgresThreadRoomInviteReader(pool),
