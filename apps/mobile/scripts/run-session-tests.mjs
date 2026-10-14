@@ -174,6 +174,7 @@ try {
       "src/features/settings/settingsCopy.test.ts",
       "src/features/settings/settingsPresentationModel.test.ts",
       "src/features/settings/settingsPhoneChangeModel.test.ts",
+      "src/features/settings/usePhoneChangeRecovery.test.ts",
       "src/features/settings/useHiddenPeople.test.ts",
       "src/features/settings/useNotificationSettings.test.ts",
       "src/features/settings/chatPreferencesApi.test.ts",

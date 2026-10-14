@@ -2,6 +2,11 @@ import { useCallback, useReducer, useRef, useState } from "react"
 import { Alert } from "react-native"
 import { MOBILE_HTTP_BASE_URL } from "../../config/env"
 import { showToast } from "../../ui/toast"
+import {
+  ApiRequestError,
+  isRetryableRequestFailure,
+  isSessionInvalidError
+} from "../network/apiRequestError"
 import type { AppLocale } from "../session/appLocale"
 import {
   confirmFirebasePhoneCode,
@@ -31,9 +36,41 @@ import {
   phoneChangeFormReducer
 } from "./settingsPhoneChangeModel"
 
+interface NewPhoneProof {
+  confirmationToken: string
+  expiresAt: string
+}
+
+function isProofUsable(proof: NewPhoneProof | null, nowMs = Date.now()): proof is NewPhoneProof {
+  if (!proof) return false
+  const expiresAtMs = new Date(proof.expiresAt).getTime()
+  return !Number.isFinite(expiresAtMs) || expiresAtMs > nowMs
+}
+
+type FinalisingFailure = "retry" | "completed" | "new_number" | "restart"
+
+/**
+ * How a failed final confirmation is resolved. The new-phone proof is kept
+ * while the outcome is still open. A transient failure may have reached the
+ * server (lost response); the change deletes every session of the account, so
+ * a later verified invalid session means it landed.
+ */
+function classifyFinalisingFailure(
+  error: unknown,
+  outcomeUnknown: boolean
+): FinalisingFailure {
+  if (isRetryableRequestFailure(error)) return "retry"
+  if (isSessionInvalidError(error) && outcomeUnknown) return "completed"
+  if (error instanceof ApiRequestError && error.code === "conflict") return "new_number"
+  return "restart"
+}
+
 /**
  * Phone number change: verify the current phone, enter and verify a new
- * country-aware number, confirm on the server, then sign out.
+ * country-aware number, confirm on the server, then sign out. The verified
+ * new-phone proof survives a failed final confirmation until the outcome is
+ * known, so a retry never needs a fresh code (Firebase is by then signed in
+ * as the new phone and cannot be asked for one again).
  */
 export function usePhoneChange(input: {
   sessionActor: SessionActor
@@ -55,6 +92,11 @@ export function usePhoneChange(input: {
   const currentPhoneChallengeRef = useRef<string | null>(null)
   const newPhoneFirebaseConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
   const newPhoneChallengeRef = useRef<string | null>(null)
+  const newPhoneProofRef = useRef<NewPhoneProof | null>(null)
+  const finalOutcomeUnknownRef = useRef(false)
+  // The phone verified at the start. After the new phone's code is confirmed,
+  // Firebase reports the new phone, so a restart must not ask Firebase again.
+  const verifiedCurrentPhoneRef = useRef<string | null>(null)
   const newPhoneAnalysis = analyzeLocalPhoneNumber(newPhoneNumber, newPhoneCountry)
 
   const resetPhoneChangeFlow = useCallback(() => {
@@ -63,6 +105,8 @@ export function usePhoneChange(input: {
     currentPhoneChallengeRef.current = null
     newPhoneFirebaseConfirmationRef.current = null
     newPhoneChallengeRef.current = null
+    newPhoneProofRef.current = null
+    finalOutcomeUnknownRef.current = false
   }, [])
 
   const requestPhoneChangeCurrentCode = useCallback(async () => {
@@ -76,8 +120,10 @@ export function usePhoneChange(input: {
     }
     setIsChangingPhone(true)
     try {
-      const currentPhoneNumber = getFirebaseCurrentPhoneNumber()
+      const currentPhoneNumber =
+        verifiedCurrentPhoneRef.current ?? getFirebaseCurrentPhoneNumber()
       if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
+      verifiedCurrentPhoneRef.current = currentPhoneNumber
       currentPhoneChallengeRef.current = (await requestFirebaseAccountActionChallenge(
         MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "phone_change_current" }
       )).challengeId
@@ -150,6 +196,28 @@ export function usePhoneChange(input: {
     }
   }, [copy, currentPhoneConfirmationToken, isChangingPhone, locale, newPhoneAnalysis.normalizedPhoneNumber, sessionActor])
 
+  const applyFinalisingFailure = (
+    resolution: Exclude<FinalisingFailure, "completed">,
+    error: unknown
+  ) => {
+    if (resolution === "retry") {
+      finalOutcomeUnknownRef.current = true
+    } else if (resolution === "new_number") {
+      newPhoneProofRef.current = null
+      finalOutcomeUnknownRef.current = false
+      dispatch({ type: "currentPhoneVerified", confirmationToken: currentPhoneConfirmationToken })
+    } else {
+      // The proofs are no longer accepted: close the flow so a restart asks
+      // the verified current phone for a fresh code.
+      resetPhoneChangeFlow()
+    }
+    showToast({
+      title: copy.changePhone,
+      body: getSettingsActionErrorMessageForDisplay("confirmPhoneChange", error, locale),
+      type: "warning"
+    })
+  }
+
   const verifyNewPhoneChangeCode = useCallback(async () => {
     if (
       isChangingPhone ||
@@ -160,49 +228,56 @@ export function usePhoneChange(input: {
     }
     setIsChangingPhone(true)
     try {
-      let next: { confirmationToken: string; expiresAt: string }
-      try {
-        const firebaseConfirmation = newPhoneFirebaseConfirmationRef.current
-        const challengeId = newPhoneChallengeRef.current
-        if (!firebaseConfirmation || !challengeId) throw new Error("Request a verification code first.")
-        const idToken = await confirmFirebasePhoneCode(firebaseConfirmation, newPhoneCode)
-        next = await verifyFirebaseAccountAction(
-          MOBILE_HTTP_BASE_URL,
-          sessionActor.session.sessionToken,
-          {
-            idToken,
-            challengeId,
-            purpose: "phone_change_new",
-            currentPhoneConfirmationToken
-          }
-        )
-        newPhoneFirebaseConfirmationRef.current = null
-        newPhoneChallengeRef.current = null
-      } catch (error) {
-        showToast({
-          ...getSettingsVerificationErrorToastForDisplay("verifyNewPhoneCode", error, locale),
-          type: "warning"
-        })
-        return
+      // Verified: reuse a still-valid proof from an attempt whose outcome is open.
+      let proof = newPhoneProofRef.current
+      if (!isProofUsable(proof)) {
+        newPhoneProofRef.current = null
+        finalOutcomeUnknownRef.current = false
+        try {
+          const firebaseConfirmation = newPhoneFirebaseConfirmationRef.current
+          const challengeId = newPhoneChallengeRef.current
+          if (!firebaseConfirmation || !challengeId) throw new Error("Request a verification code first.")
+          const idToken = await confirmFirebasePhoneCode(firebaseConfirmation, newPhoneCode)
+          proof = await verifyFirebaseAccountAction(
+            MOBILE_HTTP_BASE_URL,
+            sessionActor.session.sessionToken,
+            {
+              idToken,
+              challengeId,
+              purpose: "phone_change_new",
+              currentPhoneConfirmationToken
+            }
+          )
+          newPhoneFirebaseConfirmationRef.current = null
+          newPhoneChallengeRef.current = null
+          newPhoneProofRef.current = proof
+        } catch (error) {
+          showToast({
+            ...getSettingsVerificationErrorToastForDisplay("verifyNewPhoneCode", error, locale),
+            type: "warning"
+          })
+          return
+        }
       }
 
+      // Finalising: the outcome stays open until the server answers.
       try {
         await confirmPhoneChange(
           MOBILE_HTTP_BASE_URL,
           sessionActor.session.sessionToken,
           currentPhoneConfirmationToken,
-          next.confirmationToken
+          proof.confirmationToken
         )
       } catch (error) {
-        showToast({
-          title: copy.changePhone,
-          body: getSettingsActionErrorMessageForDisplay("confirmPhoneChange", error, locale),
-          type: "warning"
-        })
-        return
+        const resolution = classifyFinalisingFailure(error, finalOutcomeUnknownRef.current)
+        if (resolution !== "completed") {
+          applyFinalisingFailure(resolution, error)
+          return
+        }
       }
 
       resetPhoneChangeFlow()
+      verifiedCurrentPhoneRef.current = null
       await onResetSession()
       showToast({
         title: copy.changePhone,

@@ -293,7 +293,9 @@ export async function confirmPhoneChange(
     fetcher
   )
   if (!response.ok) {
-    throw new Error(
+    throw createApiRequestError(
+      response.status,
+      payload,
       getApiErrorMessage(payload, "We could not change your sign-in phone yet.")
     )
   }
