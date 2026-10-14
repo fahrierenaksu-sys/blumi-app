@@ -18,6 +18,7 @@ import {
   type Avatar25AstcManifest,
   type Avatar25AstcSource
 } from "./avatar25Astc"
+import { AVATAR25_PACKED_ASTC_ENCODING, decodeAvatar25PackedAstc } from "./avatar25PackedAstc"
 import { compileAvatar } from "./avatar25Pose"
 import type { Rig25 } from "./rigTypes"
 
@@ -69,7 +70,7 @@ test("flag on with the feature picks the blob, in its own texture cache namespac
   assert.equal(choice.kind, "astc")
   if (choice.kind !== "astc") return
   assert.deepEqual(choice.pageIndices, [0, 2])
-  assert.equal(choice.set.file, "front.astc.zip")
+  assert.equal(choice.set.file, "front.astc-packed.zip")
   assert.notEqual(avatar25PageSourceNamespace("female", choice), "female")
 })
 
@@ -95,7 +96,12 @@ for (const dir of RIG_DIRS) {
 
   test(`${dir}: each blob matches its recorded hash and size, and its writes tile the file exactly`, () => {
     for (const set of Object.values(readManifest(dir).sets)) {
-      const blob = readFileSync(resolve(here, dir, "astc", set.file))
+      const packed = readFileSync(resolve(here, dir, "astc", set.file))
+      assert.equal(set.packed.encoding, AVATAR25_PACKED_ASTC_ENCODING)
+      assert.equal(packed.byteLength, set.packed.bytes)
+      assert.equal(sha256(packed), set.packed.sha256)
+      // the decoded blob is byte-identical to the one the ASTC encoder wrote: the GPU receives exactly the same texture
+      const blob = Buffer.from(decodeAvatar25PackedAstc(packed.buffer.slice(packed.byteOffset, packed.byteOffset + packed.byteLength)))
       assert.equal(sha256(blob), set.sha256)
       assert.doesNotThrow(() => assertAvatar25AstcBlob(set, blob.byteLength))
       const all = avatar25AstcUploads(set, set.pages.map((_, i) => i))
@@ -129,3 +135,41 @@ for (const dir of RIG_DIRS) {
     }
   })
 }
+
+/** A packed file built by hand: `blocks` 16-byte blocks of `fill`, except the given runs. */
+function packedOf(blockCount: number, fill: number, runs: Array<[first: number, blocks: number[]]>, trailing = 0): ArrayBuffer {
+  const payload = runs.flatMap(([, blocks]) => blocks)
+  const bytes = new Uint8Array(28 + runs.length * 8 + payload.length * 16 + trailing)
+  const view = new DataView(bytes.buffer)
+  bytes.set([0x42, 0x53, 0x41, 0x31])
+  view.setUint32(4, blockCount * 16, true)
+  view.setUint32(8, runs.length, true)
+  bytes.fill(fill, 12, 28)
+  runs.forEach(([first, blocks], index) => {
+    view.setUint32(28 + index * 8, first, true)
+    view.setUint32(32 + index * 8, blocks.length, true)
+  })
+  payload.forEach((value, index) => bytes.fill(value, 28 + runs.length * 8 + index * 16, 44 + runs.length * 8 + index * 16))
+  return bytes.buffer
+}
+
+test("a packed ASTC blob decodes to the fill block everywhere except its runs", () => {
+  const blob = new Uint8Array(decodeAvatar25PackedAstc(packedOf(7, 0xaa, [[1, [1, 2]], [5, [3]]])))
+  const blockValues = Array.from({ length: 7 }, (_, block) => blob[block * 16])
+  assert.deepEqual(blockValues, [0xaa, 1, 2, 0xaa, 0xaa, 3, 0xaa])
+  assert.equal(blob.byteLength, 7 * 16)
+  assert.ok(blob.every((value, index) => value === blob[index - (index % 16)]), "each block is uniform")
+  assert.equal(decodeAvatar25PackedAstc(packedOf(0, 0, [])).byteLength, 0)
+})
+
+test("a corrupt packed ASTC blob is refused instead of reaching the GPU", () => {
+  const good = packedOf(4, 0, [[1, [9]]])
+  const wrongMagic = new Uint8Array(good.slice(0))
+  wrongMagic[0] = 0
+  assert.throws(() => decodeAvatar25PackedAstc(wrongMagic.buffer), /wrong magic/)
+  assert.throws(() => decodeAvatar25PackedAstc(good.slice(0, 20)), /header/)
+  assert.throws(() => decodeAvatar25PackedAstc(good.slice(0, good.byteLength - 1)), /no bytes/)
+  assert.throws(() => decodeAvatar25PackedAstc(packedOf(4, 0, [[1, [9]]], 3)), /trailing/)
+  assert.throws(() => decodeAvatar25PackedAstc(packedOf(4, 0, [[3, [1, 2]]])), /out of range/)
+  assert.throws(() => decodeAvatar25PackedAstc(packedOf(4, 0, [[2, [1]], [1, [2]]])), /out of order/)
+})
