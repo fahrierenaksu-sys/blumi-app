@@ -96,7 +96,7 @@ function mount(options: MountOptions = {}) {
   let profileSignal: AbortSignal | undefined
   let refreshSignal: AbortSignal | undefined
   let nextLogin: SessionActor | null = null
-  const authCalls = { cachedTokens: 0, confirmations: 0, completions: 0 }
+  const authCalls = { cachedTokens: 0, confirmations: 0, completions: 0, pendingPhoneChangeClears: 0 }
 
   const pausedNetwork = async () => {
     network.started.resolve()
@@ -252,6 +252,9 @@ function mount(options: MountOptions = {}) {
         "../referrals/referralModel": {
           resolvePendingReferralClaim: () => ({ kind: "discard" }),
           shouldClaimCapturedReferral: () => false
+        },
+        "../settings/pendingPhoneChange": {
+          pendingPhoneChange: { clear: async () => { authCalls.pendingPhoneChangeClears += 1 } }
         }
       }
     }
@@ -284,6 +287,19 @@ function mount(options: MountOptions = {}) {
     }
   }
 }
+
+test("signing out forgets a pending phone change", async () => {
+  const f = mount()
+  await f.profileStarted.promise
+  f.profile.resolve(f.snapshot)
+  await settle()
+
+  await f.result().clearSessionActor()
+
+  assert.equal(f.current(), null)
+  assert.equal(f.authCalls.pendingPhoneChangeClears, 1)
+  f.runtime.unmount()
+})
 
 test("a cached Firebase identity cannot sign in without a new code request", async () => {
   const f = mount()

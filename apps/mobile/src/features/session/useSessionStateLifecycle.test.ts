@@ -59,7 +59,8 @@ function mount() {
           isOnboardingComplete: () => false,
           shouldApplyProductionAccountSync: () => true
         },
-        "../referrals/referralCaptureSignal": { subscribeToPendingReferralCapture: () => () => undefined }
+        "../referrals/referralCaptureSignal": { subscribeToPendingReferralCapture: () => () => undefined },
+        "../settings/pendingPhoneChange": { pendingPhoneChange: { clear: async () => undefined } }
       },
       real: ["./sessionMutationCoordinator"],
       inertUnknown: true
