@@ -64,5 +64,11 @@ test("the client-side query timeout ends a stalled statement and the pool replac
     assert.ok(next.ms < 1_500 + SLACK_MS, "the next query is not queued behind the stalled one")
   } finally {
     await pool.end()
+    // The client gave up, but the server statement runs on (the app's 10 s statement_timeout bounds it in
+    // production; it is 60 s here). End it so the gate can drop its database.
+    const admin = new Pool({ connectionString: databaseUrl, max: 1 })
+    await admin.query(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+      WHERE datname = current_database() AND pid <> pg_backend_pid() AND query = 'SELECT pg_sleep(20)'`)
+    await admin.end()
   }
 })
