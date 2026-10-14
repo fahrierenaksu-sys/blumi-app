@@ -89,6 +89,7 @@ try {
       ...coverageArguments,
       "--test",
       join(outputDirectory, "navigation/rootNavigationModel.test.js"),
+      join(outputDirectory, "navigation/bottomNavReturnPreview.test.js"),
       join(outputDirectory, "navigation/rootNavigationChromeStore.test.js"),
       join(outputDirectory, "navigation/mainTabPager/mainTabPagerModel.test.js"),
       join(outputDirectory, "navigation/mainTabPager/mainTabPagerRouter.test.js"),
@@ -107,7 +108,8 @@ try {
       resolve(workspaceRoot, "src/navigation/rootNavigatorConcerns.test.mjs"),
       resolve(workspaceRoot, "src/navigation/routeParamsSerialisable.test.mjs"),
       resolve(workspaceRoot, "src/ui/gestureFrameWork.test.mjs"),
-      resolve(workspaceRoot, "src/navigation/routeErrorBoundary.test.mjs")
+      resolve(workspaceRoot, "src/navigation/routeErrorBoundary.test.mjs"),
+      resolve(workspaceRoot, "src/navigation/mobileTestInventory.test.mjs")
     ],
     {
       cwd: workspaceRoot,
