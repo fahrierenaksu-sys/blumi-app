@@ -413,7 +413,9 @@ async function bakeBody(rigId, rigDir, files) {
     const canonical = canonicalOf[rigItemId]
     const own = rendered.filter((r) => r.layer.rigItemId === rigItemId && r.layer.legVariant === undefined)
     const withBody = composite(own, canvas)
-    const { rgba: alone, removed } = withoutBodyArt(withBody, bodySkin, canvas)
+    const { rgba: alone, removed } = THUMB_KEEPS_BODY_ART.has(canonical)
+      ? { rgba: withBody, removed: new Uint8Array(canvas.width * canvas.height) }
+      : withoutBodyArt(withBody, bodySkin, canvas)
     if (debugThumbs) debugThumbs.push({ canonical, withBody, alone, removed })
     const rect = alphaRect(alone, canvas.width, canvas.height)
     const scale = Math.min(1, THUMB_MAX_PX / Math.max(rect[2], rect[3]))
@@ -440,6 +442,11 @@ async function bakeBody(rigId, rigDir, files) {
     evidence
   }
 }
+
+/** Items whose thumb is not cleaned: their own colour lies inside the body's skin model, so withoutBodyArt cuts holes
+ *  into the item itself (honey pigtails lose crown and tail strands). Their art carries no eye, ear or hand fragments
+ *  (checked 2026-10-14, rc_beta4_1530). Remove an entry once the cleaner can tell such an item from skin. */
+const THUMB_KEEPS_BODY_ART = new Set(["hair_girl_pigtails"])
 
 /** Body layers that are skin and face only: far arm, far leg, near leg, head, near arm (stand orders 0, 1, 2, 4, 5). */
 const BODY_SKIN_ORDERS = new Set([0, 1, 2, 4, 5])
