@@ -8,7 +8,7 @@ import {
 import { PREMIUM_FACE_PREVIEW_SOURCES } from "../avatarV2PreviewAssets"
 import type { AvatarCatalogItem } from "../avatarV2.types"
 import { getGarmentThumbnailOverride } from "../garmentThumbnailOverrides"
-import { AVATAR_STILL_ASSETS } from "../../avatar/stills/stillAssets"
+import { getAvatarItemStillThumbnail } from "../../avatar/stills/stillThumbnail"
 
 const AVATAR_ITEM_PREVIEW_SOURCES: Partial<Record<string, ImageSourcePropType>> = {
   ...MALE_CAPSULE_PREVIEW_SOURCES,
@@ -169,21 +169,17 @@ export const WARDROBE_SQUARE_THUMBNAIL_SOURCES: Partial<Record<string, ImageSour
     require("../assets/shop-thumbnails/avatar_v2_shoes_pearl_slingback_sandals.png")
 }
 
-/** The 2.5D item thumbnail: the whole garment, cropped tight to its pixels (not a 256x384 room canvas). */
-function getStillThumbnailSource(itemId: string): ImageSourcePropType | undefined {
-  return AVATAR_STILL_ASSETS[`male/thumb/${itemId}`] ?? AVATAR_STILL_ASSETS[`female/thumb/${itemId}`]
-}
-
 function getLegacyPreviewSource(itemId: string): ImageSourcePropType | undefined {
   return getGarmentThumbnailOverride(itemId)?.source
     ?? WARDROBE_SQUARE_THUMBNAIL_SOURCES[itemId]
     ?? AVATAR_ITEM_PREVIEW_SOURCES[itemId]
 }
 
+/** A piece the 2.5D rig draws always shows its baked thumbnail, even when pre-2.5D artwork for it remains. */
 export function getAvatarItemPreviewSource(
   item: AvatarCatalogItem
 ): ImageSourcePropType | undefined {
-  return getLegacyPreviewSource(item.id) ?? getStillThumbnailSource(item.id)
+  return getAvatarItemStillThumbnail(item.id) ?? getLegacyPreviewSource(item.id)
 }
 
 /**
@@ -191,5 +187,5 @@ export function getAvatarItemPreviewSource(
  * never shifted like the old room-canvas layers, or a shoe falls out of the frame and a top shows only its hem.
  */
 export function isAvatarItemCutoutPreview(item: Pick<AvatarCatalogItem, "id">): boolean {
-  return !getLegacyPreviewSource(item.id) && Boolean(getStillThumbnailSource(item.id))
+  return Boolean(getAvatarItemStillThumbnail(item.id))
 }

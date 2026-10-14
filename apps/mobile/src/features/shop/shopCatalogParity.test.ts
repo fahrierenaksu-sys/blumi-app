@@ -441,3 +441,38 @@ test("every 2.5D wardrobe piece of both bodies has a wardrobe card picture of it
     assert.ok(String(source).includes(`/thumb/${id}.webp`), `${id} card shows its own baked thumb`);
   }
 });
+
+test("every piece the 2.5D rig draws shows its baked thumb on wardrobe and Shop cards, never pre-2.5D art", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset loading requires static require.
+  const wardrobe = require("../avatarV2/wardrobe/wardrobePreviewSources") as typeof import("../avatarV2/wardrobe/wardrobePreviewSources");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset loading requires static require.
+  const shop = require("./shopAssets") as typeof import("./shopAssets");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset loading requires static require.
+  const { listAvatarItemArt } = require("../avatar/model/avatarItemArt") as typeof import("../avatar/model/avatarItemArt");
+  const rigItemIds = [...new Set(listAvatarItemArt().map(({ itemId }) => itemId))];
+  // the girl's starter pieces carried pre-2.5D cards before; they must be covered here
+  for (const starterId of [
+    "avatar_v2_hair_ink_pageboy_star",
+    "avatar_v2_shoes_mint_ribbon_court_sneakers",
+  ]) {
+    assert.ok(rigItemIds.includes(starterId), `${starterId} is drawn by the 2.5D rig`);
+  }
+  for (const id of rigItemIds) {
+    const item = AVATAR_V2_CATALOG.find((candidate) => candidate.id === id);
+    assert.ok(item, `${id} is in the avatar catalog`);
+    const ownThumb = `/thumb/${id}.webp`;
+    // the test loader maps an image require to its file path
+    assert.ok(String(wardrobe.getAvatarItemPreviewSource(item)).endsWith(ownThumb), `${id} wardrobe card shows its baked thumb`);
+    assert.ok(wardrobe.isAvatarItemCutoutPreview(item), `${id} wardrobe card is fitted whole`);
+    for (const [surface, source] of [
+      ["Shop card", shop.getShopProductThumbnailSource(id)],
+      ["Shop preview", shop.getAvatarItemPreviewSource(id)],
+    ] as const) {
+      if (source === undefined) continue;
+      assert.ok(String(source).endsWith(ownThumb), `${id} ${surface} shows its baked thumb, not ${String(source)}`);
+    }
+    if (shop.getShopProductThumbnailSource(id) !== undefined) {
+      assert.equal(shop.getShopProductThumbnailBounds(id), undefined, `${id} Shop card must not crop its thumb with pre-2.5D bounds`);
+    }
+  }
+});

@@ -7,6 +7,7 @@ import { MALE_CAPSULE_PREVIEW_SOURCES } from "../avatarV2/maleCapsulePreviewSour
 import { PREMIUM_FACE_PREVIEW_SOURCES } from "../avatarV2/avatarV2PreviewAssets"
 import { roomAvatarLayerAssets } from "../avatarV2/room/avatarRoomAssets"
 import { getGarmentThumbnailOverride } from "../avatarV2/garmentThumbnailOverrides"
+import { getAvatarItemStillThumbnail } from "../avatar/stills/stillThumbnail"
 import shopThumbnailBounds from "./shopThumbnailBounds.json"
 
 export const PRODUCT_REFERENCE_AVATAR_ITEM_IDS = new Set([
@@ -187,20 +188,36 @@ export const SHOP_THUMBNAIL_SOURCES: Partial<Record<string, ImageSourcePropType>
   avatar_v2_accessory_sunny_star_clips: require("../avatarV2/assets/shop-thumbnails/avatar_v2_accessory_sunny_star_clips.png")
 }
 
+/**
+ * A piece the 2.5D rig draws shows its baked thumbnail wherever the Shop has a picture for it, never its pre-2.5D
+ * artwork. Whether the Shop has a picture at all (and so lists the piece) is unchanged.
+ */
+function preferStillThumbnail(
+  itemId: string,
+  legacySource: ImageSourcePropType | undefined
+): ImageSourcePropType | undefined {
+  return legacySource === undefined ? undefined : getAvatarItemStillThumbnail(itemId) ?? legacySource
+}
+
 export function getAvatarItemPreviewSource(
   item: { id: string } | string
 ): ImageSourcePropType | undefined {
-  return AVATAR_ITEM_PREVIEW_SOURCES[typeof item === "string" ? item : item.id]
+  const itemId = typeof item === "string" ? item : item.id
+  return preferStillThumbnail(itemId, AVATAR_ITEM_PREVIEW_SOURCES[itemId])
 }
 
 export function getShopProductThumbnailSource(
   sourceItemId: string
 ): ImageSourcePropType | undefined {
-  return getGarmentThumbnailOverride(sourceItemId)?.source
-    ?? SHOP_THUMBNAIL_SOURCES[sourceItemId]
+  return preferStillThumbnail(
+    sourceItemId,
+    getGarmentThumbnailOverride(sourceItemId)?.source ?? SHOP_THUMBNAIL_SOURCES[sourceItemId]
+  )
 }
 
+/** Visible-pixel bounds of the pre-2.5D Shop artwork; a baked thumbnail is already tight, so it has none. */
 export function getShopProductThumbnailBounds(sourceItemId: string): readonly number[] | undefined {
+  if (getAvatarItemStillThumbnail(sourceItemId)) return undefined
   return getGarmentThumbnailOverride(sourceItemId)?.bounds
     ?? (shopThumbnailBounds as Record<string, number[]>)[sourceItemId]
 }
