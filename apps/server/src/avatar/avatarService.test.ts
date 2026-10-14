@@ -174,7 +174,8 @@ for (const [label, catalog] of [
 const GIRL_NEW_LOOKS = [
   { ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair[0] },
   { ...DEFAULT_FEMALE_AVATAR_LOADOUT, shoesId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes[0] },
-  { ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair[0], shoesId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes[0] }
+  { ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair[0], shoesId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes[0] },
+  ...GIRL_WARDROBE_PREVIEW_ITEM_IDS.top.map((topId) => ({ ...DEFAULT_FEMALE_AVATAR_LOADOUT, topId }))
 ]
 
 for (const [label, catalog] of [
@@ -200,12 +201,18 @@ for (const [label, catalog] of [
   test(`the boy cannot wear the girl's new pieces (${label} catalog)`, async () => {
     const { avatarService, verified } = await signInWith(catalog)
     await saveEach(avatarService, verified.sessionToken, [DEFAULT_MALE_AVATAR_LOADOUT])
-    for (const [slot, ids] of [["hairId", GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair], ["shoesId", GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes]] as const) {
-      const result = await avatarService.saveAvatar(verified.sessionToken, {
-        loadout: { ...DEFAULT_MALE_AVATAR_LOADOUT, [slot]: ids[0] },
-        revision: 1
-      })
-      assert.equal(result.kind, "invalid", slot)
+    for (const [slot, ids] of [
+      ["hairId", GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair],
+      ["topId", GIRL_WARDROBE_PREVIEW_ITEM_IDS.top],
+      ["shoesId", GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes]
+    ] as const) {
+      for (const itemId of ids) {
+        const result = await avatarService.saveAvatar(verified.sessionToken, {
+          loadout: { ...DEFAULT_MALE_AVATAR_LOADOUT, [slot]: itemId },
+          revision: 1
+        })
+        assert.equal(result.kind, "invalid", itemId)
+      }
     }
   })
 }

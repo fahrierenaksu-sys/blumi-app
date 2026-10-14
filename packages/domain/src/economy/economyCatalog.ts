@@ -49,10 +49,13 @@ const roomItem = (
   ...(ownedByDefault ? { ownedByDefault: true } : {})
 })
 
-/** "avatar_v2_top_male_navy_knit_polo" -> "Navy Knit Polo", "avatar_v2_shoes_white_clean_sneakers" -> "White Clean Sneakers" */
+/**
+ * "avatar_v2_top_male_navy_knit_polo" -> "Navy Knit Polo", "avatar_v2_shoes_white_clean_sneakers" -> "White Clean Sneakers",
+ * "top_sage_ribbon_knit_jacket" -> "Sage Ribbon Knit Jacket"
+ */
 const titleFromItemId = (itemId: string): string =>
   itemId
-    .replace(/^avatar_v2_[a-z]+_(male_)?/, "")
+    .replace(/^(avatar_v2_[a-z]+_(male_)?|(hair|top|bottom|shoes)_)/, "")
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ")

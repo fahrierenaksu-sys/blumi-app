@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "b3285aca17eae89464e072449325292be57ea49478efff35d205bcb45a4443b9",
+      "rigSha256": "987f636516278b8e6f22a8ecadd3d2478a2a62abfc49f1082ffd03e26bfc1935",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -118,6 +118,11 @@
             }
           }
         },
+        "top_sage_ribbon_knit_jacket": {
+          "slot": "top",
+          "rigItemId": "top_sage_ribbon_knit_jacket",
+          "thumb": "top_sage_ribbon_knit_jacket"
+        },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
@@ -174,6 +179,19 @@
               312,
               25,
               53
+            ]
+          },
+          {
+            "key": "top_sage_ribbon_knit_jacket__o0p45",
+            "owner": "top_sage_ribbon_knit_jacket",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              193,
+              275,
+              65,
+              167
             ]
           },
           {
@@ -461,6 +479,19 @@
             ]
           },
           {
+            "key": "top_sage_ribbon_knit_jacket__o3p45",
+            "owner": "top_sage_ribbon_knit_jacket",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              219,
+              270,
+              165,
+              223
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -524,6 +555,19 @@
               62,
               110
             ]
+          },
+          {
+            "key": "top_sage_ribbon_knit_jacket__o5p45",
+            "owner": "top_sage_ribbon_knit_jacket",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              364,
+              283,
+              74,
+              128
+            ]
           }
         ],
         "bust": [
@@ -551,6 +595,19 @@
               183,
               20,
               37
+            ]
+          },
+          {
+            "key": "top_sage_ribbon_knit_jacket__o0p45",
+            "owner": "top_sage_ribbon_knit_jacket",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              56,
+              160,
+              44,
+              96
             ]
           },
           {
@@ -590,6 +647,19 @@
               148,
               107,
               108
+            ]
+          },
+          {
+            "key": "top_sage_ribbon_knit_jacket__o3p45",
+            "owner": "top_sage_ribbon_knit_jacket",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              71,
+              157,
+              103,
+              99
             ]
           },
           {
@@ -655,6 +725,19 @@
               164,
               42,
               72
+            ]
+          },
+          {
+            "key": "top_sage_ribbon_knit_jacket__o5p45",
+            "owner": "top_sage_ribbon_knit_jacket",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              160,
+              165,
+              50,
+              83
             ]
           }
         ]
