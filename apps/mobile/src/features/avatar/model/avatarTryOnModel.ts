@@ -37,15 +37,18 @@ export function avatarTryOnRenderer(
 ): AvatarTryOnRenderer {
   const manifest = options.manifest ?? AVATAR_STILL_MANIFEST
   const loadout = coerceAvatarLoadout(look, options.hints ?? {}, options.rules)
-  // the 2.5D resolvers ignore a dress (its pair is drawn per slot), so a worn dress is not truthful there yet
-  if ("dressId" in loadout && loadout.dressId) return "legacy"
   const rig = avatarStillRigForBody(loadout.bodyId)
+  const body = manifest.bodies[rig]
+  const drawn = avatarStillDrawnItems(body, loadout)
+  // a worn dress is truthful only when it has 2.5D art (a one-piece dress); a legacy pair is drawn per slot
+  const dressId = loadout.schemaVersion === 2 ? loadout.dressId : null
+  if (dressId !== null && drawn.get("dress") !== dressId) return "legacy"
   // each rig has one drawn face: another face, eyes, nose or mouth is only drawn by the old renderer
   const bodyFace = rig === "male" ? DEFAULT_MALE_AVATAR_LOADOUT : DEFAULT_FEMALE_AVATAR_LOADOUT
   if (FACE_KEYS.some((key) => loadout[key] !== bodyFace[key])) return "legacy"
-  const body = manifest.bodies[rig]
-  const drawn = avatarStillDrawnItems(body, loadout)
   for (const [slot, key] of AVATAR_STILL_SLOT_KEYS) {
+    // under a drawn dress the stored top and bottom are kept, not shown
+    if (dressId !== null && (slot === "top" || slot === "bottom")) continue
     const worn = loadout[key]
     if (worn && drawn.get(slot) !== worn) return "legacy"
   }

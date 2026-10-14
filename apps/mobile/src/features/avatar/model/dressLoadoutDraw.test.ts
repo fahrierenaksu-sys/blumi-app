@@ -50,3 +50,63 @@ test("a valid old dress loadout is drawn as the girl's rig starter top and botto
   assert.notEqual(stored.faceId, starterLook.faceId)
   assert.equal(JSON.stringify(stored), before, "the stored loadout is never rewritten by drawing it")
 })
+
+// New item kinds (WB integration/slots_2140 DESIGN §5): a girl rig with a one-piece dress, glasses and an accessory
+// (copies of her real items re-slotted), the fixture catalog's items mapped to them, drawn by the real resolver and
+// compiled by the real renderer.
+import { TEST_AVATAR_ITEM as FX, TEST_AVATAR_ITEM_RULES as FX_RULES, toAvatarLoadoutV2 } from "@blumi/domain"
+import { compileAvatar } from "../renderer/avatar25Pose"
+import { AVATAR_ITEM_ART } from "./avatarItemArt"
+
+function rigWithNewKinds(): Rig25 {
+  const rig = structuredClone(girlRig)
+  const starterTop = AVATAR_ITEM_ART.female[AVATAR_RIG_STARTER.female.top!]!
+  const starterHair = AVATAR_ITEM_ART.female[AVATAR_RIG_STARTER.female.hair!]!
+  for (const view of [rig.views.front, rig.views.back]) {
+    view.items.dress_test = { ...structuredClone(view.items[starterTop]!), slot: "dress" }
+    view.items.glasses_test = { ...structuredClone(view.items[starterHair]!), slot: "glasses" }
+    view.items.acc_test = { ...structuredClone(view.items[starterHair]!), slot: "accessory" }
+  }
+  return rig
+}
+const NEW_RIGS = { female: rigWithNewKinds(), male: boyRig }
+const NEW_ART = {
+  ...AVATAR_ITEM_ART,
+  female: { ...AVATAR_ITEM_ART.female, [FX.onePieceDress]: "dress_test", [FX.paidEyewear]: "glasses_test", [FX.paidEarrings]: "acc_test" }
+}
+const look = (dressId: string | null, accessoryIds: string[] = []) =>
+  ({ ...toAvatarLoadoutV2(FX_RULES.starters.female, FX_RULES), dressId, accessoryIds })
+const drawOf = (loadout: unknown, direction: "front" | "back" = "front") =>
+  resolveAvatarDraw(NEW_RIGS, { loadout, state: "idle", direction }, { art: NEW_ART, rules: FX_RULES }).itemIds
+
+test("a worn one-piece dress is drawn instead of the top and the bottom, in both views", () => {
+  for (const direction of ["front", "back"] as const) {
+    const ids = drawOf(look(FX.onePieceDress), direction)
+    assert.ok(ids.includes("dress_test"), direction)
+    assert.ok(!ids.some((id) => id.startsWith("top_") || id.startsWith("bottom_")), ids.join())
+    assert.ok(ids.some((id) => id.startsWith("hair_")) && ids.some((id) => id.startsWith("shoes_")))
+    const compiled = compileAvatar(NEW_RIGS.female, direction, ids)
+    assert.ok(compiled.indexData.length > 0)
+  }
+})
+
+test("taking the dress off draws the separates stored under it again", () => {
+  const separates = drawOf(look(null))
+  assert.deepEqual(drawOf({ ...look(FX.onePieceDress), dressId: null }), separates)
+  assert.ok(separates.some((id) => id.startsWith("top_")) && separates.some((id) => id.startsWith("bottom_")))
+})
+
+test("glasses and an accessory are drawn while worn and leave the look exactly as before when taken off", () => {
+  const bare = drawOf(look(null))
+  const worn = drawOf(look(null, [FX.paidEarrings, FX.paidEyewear]))
+  assert.deepEqual(worn, [...bare, "glasses_test", "acc_test"])
+  assert.deepEqual(drawOf(look(null, [])), bare)
+})
+
+test("a dress the body has no art for draws the separates, and the stored look is never rewritten", () => {
+  const stored = look(FX.onePieceDress)
+  const before = JSON.stringify(stored)
+  const ids = resolveAvatarDraw(RIGS, { loadout: stored, state: "idle", direction: "front" }, { rules: FX_RULES }).itemIds
+  assert.ok(ids.some((id) => id.startsWith("top_")) && ids.some((id) => id.startsWith("bottom_")))
+  assert.equal(JSON.stringify(stored), before)
+})

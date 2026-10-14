@@ -454,7 +454,7 @@ function buildDrawEntries(v: Rig25View, worn: string[], motion: boolean, has: Se
       entries.push({
         set: k + 1, start: r.start, count: r.count, mask: pm.mask, frame: pm.frame, order: r.order, seq: seq++, leg,
         walkBaked: Boolean(r.walk) && r.legVariant === undefined,
-        seat: item.slot === "bottom" && r.layer === "torso",
+        seat: (item.slot === "bottom" || item.slot === "dress") && r.layer === "torso",
         seated: r.name === "sit",
         ...(maskRange ? { legMask: maskRange } : {})
       })
