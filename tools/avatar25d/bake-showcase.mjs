@@ -34,8 +34,15 @@ const WEBP = { quality: 90, alphaQuality: 100, effort: 6, smartSubsample: false 
 const CROPS = ["card", "head", "push"]
 const RIGS = ["female", "male"]
 const ERASED_SLOTS = ["shoes", "bottom", "top"]
+/**
+ * The erase regions an item's mask joins and its `under` refills: its own slot, and for a one-piece dress (drawn
+ * instead of the top and the bottom) both of theirs (slots_2140 DESIGN §7).
+ */
+const ERASE_REGIONS_OF = { shoes: ["shoes"], bottom: ["bottom"], top: ["top"], dress: ["bottom", "top"] }
 /** Output pixels each slot region reaches past its erase masks (body only, identical in base and under: no seam). */
 const UNDER_OVERLAP_PX = 2
+/** The slots a front layer can be worn as (the rig item's slot; slots_2140 DESIGN §7). */
+const SHOWCASE_SLOTS = ["shoes", "bottom", "top", "hair", "dress", "glasses", "accessory"]
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex")
 const fail = (message) => {
@@ -56,9 +63,10 @@ export function validateAllowlist(list, { allowPendingOwnerApproval = false } = 
     for (const crop of ["head", "push"]) if (!Array.isArray(body.crops[crop]) || body.crops[crop].length !== 4) throw new Error(`${rig}: crop ${crop} needs [x, y, w, h]`)
     for (const [id, item] of Object.entries(body.items)) {
       for (const key of ["slot", "file", "sha256", "order"]) if (item[key] === undefined) throw new Error(`${rig}.${id}: missing ${key}`)
+      if (!SHOWCASE_SLOTS.includes(item.slot)) throw new Error(`${rig}.${id}: unknown slot ${item.slot}`)
       if (item.backFile && !item.backSha256) throw new Error(`${rig}.${id}: backFile needs backSha256`)
       if (item.eraseFile && !item.eraseSha256) throw new Error(`${rig}.${id}: eraseFile needs eraseSha256`)
-      if (item.eraseFile && !ERASED_SLOTS.includes(item.slot)) throw new Error(`${rig}.${id}: only shoes, bottoms and tops erase the body`)
+      if (item.eraseFile && !ERASE_REGIONS_OF[item.slot]) throw new Error(`${rig}.${id}: only shoes, bottoms, tops and dresses erase the body`)
       if ([item.file, item.backFile, item.eraseFile].some((path) => /candidate/i.test(path ?? ""))) throw new Error(`${rig}.${id}: a candidate path cannot enter the app`)
     }
     if (/candidate/i.test(body.base)) throw new Error(`${rig}: a candidate path cannot enter the app`)
@@ -180,6 +188,12 @@ export function slotRegions(scaledMasks, width, height) {
   return { claimed, regions }
 }
 
+/** The union of region masks: undefined for none, the one mask itself for one (so a slot's own region is unchanged). */
+function unionOf(masks) {
+  if (masks.length <= 1) return masks[0]
+  return masks[0].map((_, i) => (masks.some((mask) => mask[i]) ? 1 : 0))
+}
+
 /** Keeps the pixels of `raw` inside `mask` (the rest become transparent). */
 function keepOnly(raw, mask, invert = false) {
   const out = Buffer.from(raw)
@@ -212,7 +226,7 @@ export async function bakeBody(rig, body, scale, pad, srcRoot) {
   const scaledMasks = {}
   for (const entry of items.filter((e) => e.erase)) {
     entry.scaledErase = (await scaledLayer(entry.erase, canvas, scale)).raw
-    scaledMasks[entry.item.slot] = [...(scaledMasks[entry.item.slot] ?? []), entry.scaledErase]
+    for (const slot of ERASE_REGIONS_OF[entry.item.slot]) scaledMasks[slot] = [...(scaledMasks[slot] ?? []), entry.scaledErase]
   }
   const { claimed, regions } = slotRegions(scaledMasks, outWidth, outHeight)
   const anyClaimed = new Uint8Array(outWidth * outHeight)
@@ -230,7 +244,7 @@ export async function bakeBody(rig, body, scale, pad, srcRoot) {
       files.set(backLayer.key, backLayer.bytes)
       entry.back = { key: backLayer.key, rect: backLayer.rect }
     }
-    const region = regions[item.slot]
+    const region = unionOf((ERASE_REGIONS_OF[item.slot] ?? []).map((slot) => regions[slot]).filter(Boolean))
     if (region) {
       const body = erase ? erased(base, erase) : base
       const scaledBody = await scaledLayer(body, canvas, scale)

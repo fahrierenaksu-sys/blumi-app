@@ -71,9 +71,15 @@ SRC = pathlib.Path(ARGS[0]) if ARGS else _DEFAULT_SRC
 import os
 OUT = OUT_ARG.resolve() if OUT_ARG else pathlib.Path(os.environ['BAKE25_OUT']) if os.environ.get('BAKE25_OUT') else ROOT_DIR / 'apps/mobile/src/features/avatar/rigs/girl'
 PAD = 6   # source px around each packed part: still 3 px at the 0.5 page scale, so mips do not bleed between parts
-SLOT_ORDER = {'shoes': 0.15, 'bottom': 0.3, 'top': 0.45, 'hair': 0.6}
+# Draw order of an item part = its body layer's order + its slot's offset (WB integration/slots_2140 DESIGN §5): on the
+# head (4) the eyes < glasses 4.5 < the fringe 4.6 < a hat or clip 4.7; on the torso (3) a bottom 3.3 < a top or dress
+# 3.45 < a necklace or bag 3.7. A dress is never worn with a top or a bottom, so it shares the top's offset.
+SLOT_ORDER = {'shoes': 0.15, 'bottom': 0.3, 'top': 0.45, 'dress': 0.45, 'glasses': 0.5, 'hair': 0.6, 'accessory': 0.7}
 LOWER_Z = 2.5
 LOWER_SLOTS = {'shoes', 'bottom'}
+NEW_KIND_SLOTS = ('dress', 'glasses', 'accessory')
+GLASSES_LAYERS = ('head',)
+LEG_LAYERS = ('farLeg', 'nearLeg')
 
 
 def decode(uri):
@@ -590,6 +596,41 @@ def export_motion(M, bone_names):
 
 
 LEG_ROLES = ('bottom', 'shoes')
+# the leg role of an item's slot: a one-piece dress is the bottom for the legs (the bare legs under its skirt)
+LEG_ROLE_OF_SLOT = {'bottom': 'bottom', 'dress': 'bottom', 'shoes': 'shoes'}
+
+
+def slot_order(iid, slot):
+    """The draw-order offset of an item's slot; an unknown slot stops the export (it used to become 0.5 silently)."""
+    if slot not in SLOT_ORDER:
+        raise SystemExit(f'{iid}: unknown slot {slot!r} (one of {sorted(SLOT_ORDER)})')
+    return SLOT_ORDER[slot]
+
+
+def part_stand_only(slot, layer):
+    """A part hidden while seated (the item's seated card draws it): a bottom's or shoes' torso and leg parts, and a
+    dress's leg parts (its torso fabric draws seated like a top's)."""
+    if slot in LOWER_SLOTS:
+        return layer in ('torso',) + LEG_LAYERS
+    return slot == 'dress' and layer in LEG_LAYERS
+
+
+def check_item_slots(rig):
+    """Export gates for the item kinds (DESIGN slots_2140 §10): every item's slot is known; glasses draw only on the head;
+    a dress, glasses or accessory exists in both views (the back may have no parts). Stops the export on the first
+    problem. Pure."""
+    views = {n: v for n, v in rig.items() if n in ('front', 'back')}
+    for name, v in sorted(views.items()):
+        for iid, it in sorted(v.get('items', {}).items()):
+            slot_order(iid, it.get('slot'))
+            if it['slot'] == 'glasses':
+                bad = sorted({p['layer'] for p in it.get('parts', [])} - set(GLASSES_LAYERS))
+                if bad:
+                    raise SystemExit(f'{iid} ({name}): glasses draw on the head only, not on {bad}')
+            if it['slot'] in NEW_KIND_SLOTS and len(views) == 2:
+                other = next(n for n in views if n != name)
+                if iid not in views[other].get('items', {}):
+                    raise SystemExit(f'{iid}: a {it["slot"]} needs the {other} view too (it may have no parts)')
 
 
 def _leg_part(part, items, slot_item, keyed=frozenset()):
@@ -604,9 +645,9 @@ def _leg_part(part, items, slot_item, keyed=frozenset()):
         return owners[0], part
     if part not in items:
         raise SystemExit(f'leg variant {part}: not a slot and not an item of this view')
-    role = items[part]['slot']
+    role = LEG_ROLE_OF_SLOT.get(items[part]['slot'])
     if role not in LEG_ROLES:
-        raise SystemExit(f'leg variant {part}: a {role} item cannot own a leg drawing')
+        raise SystemExit(f'leg variant {part}: a {items[part]["slot"]} item cannot own a leg drawing')
     return part, role
 
 
@@ -766,10 +807,9 @@ def export_view(name, v, motion=None):
         page_taken.setdefault(page, []).extend(ir.values())
         items_src.append((iid, it, page))
         im = Mesh()
-        f = SLOT_ORDER.get(it['slot'], 0.5)
-        lower = it['slot'] in LOWER_SLOTS
+        f = slot_order(iid, it['slot'])
         for k, p in enumerate(it.get('parts', [])):
-            stand_only = lower and p['layer'] in ('torso', 'farLeg', 'nearLeg')
+            stand_only = part_stand_only(it['slot'], p['layer'])
             # a part drawn in some poses only (factory `poseOnly`, e.g. a bottom's wave-only hip patch over the waving
             # torso's briefs) carries that list; parts without one export exactly as before
             only = {'poseOnly': pose_only(iid, k, p)} if p.get('poseOnly') else {}
@@ -898,6 +938,7 @@ def read_motion_config():
 
 def main():
     rig = json.loads(SRC.read_text())
+    check_item_slots(rig)
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob('*.png'):   # generated output only: the previous export's textures
         old.unlink()

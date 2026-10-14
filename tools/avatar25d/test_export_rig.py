@@ -553,5 +553,81 @@ class ExportItemKeyedBoyTest(unittest.TestCase):
                     self.assertEqual(r['count'], body[r['layer']]['count'])   # the body leg's own triangles
 
 
+class ItemKindGateTest(unittest.TestCase):
+    """New item kinds (WB integration/slots_2140 DESIGN §5, §10): pure gates, no lab art needed."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(HERE))
+        sys.argv = [sys.argv[0]]
+        import export_rig
+        cls.er = export_rig
+
+    def rig(self, front, back=None):
+        return {'front': {'items': front}, 'back': {'items': front if back is None else back}}
+
+    def test_the_new_kinds_take_their_draw_order_between_the_body_layers(self):
+        order = self.er.slot_order
+        self.assertLess(4 + 0, 4 + order('g', 'glasses'))                       # above the eyes (head drawing)
+        self.assertLess(4 + order('g', 'glasses'), 4 + order('h', 'hair'))    # below the fringe
+        self.assertLess(4 + order('h', 'hair'), 4 + order('a', 'accessory'))   # a hat or clip over the hair
+        self.assertLess(3 + order('a', 'accessory'), 4)                         # a necklace stays under the head
+        self.assertEqual(order('d', 'dress'), order('t', 'top'))
+
+    def test_a_dress_hides_its_legs_while_seated_and_keeps_its_torso_fabric(self):
+        so = self.er.part_stand_only
+        self.assertTrue(so('dress', 'nearLeg') and so('dress', 'farLeg'))
+        self.assertFalse(so('dress', 'torso'))
+        self.assertTrue(so('bottom', 'torso'))          # unchanged rules for the old slots
+        self.assertFalse(so('top', 'torso') or so('glasses', 'head') or so('accessory', 'torso'))
+
+    def test_bad_slots_glasses_off_the_head_and_one_view_items_stop_the_export(self):
+        check = self.er.check_item_slots
+        ok = {'d': {'slot': 'dress', 'parts': [{'layer': 'torso'}]}, 'g': {'slot': 'glasses', 'parts': [{'layer': 'head'}]},
+              'a': {'slot': 'accessory', 'parts': [{'layer': 'nearArm'}]}}
+        check(self.rig(ok, {**ok, 'g': {'slot': 'glasses', 'parts': []}}))   # the back may have no parts
+        with self.assertRaises(SystemExit):
+            check(self.rig({'x': {'slot': 'cape', 'parts': []}}))
+        with self.assertRaises(SystemExit):
+            check(self.rig({'g': {'slot': 'glasses', 'parts': [{'layer': 'torso'}]}}))
+        with self.assertRaises(SystemExit):
+            check(self.rig(ok, {k: v for k, v in ok.items() if k != 'd'}))
+
+    def test_a_dress_owns_its_bare_legs_like_a_bottom_and_pairs_with_shoes(self):
+        items = {'dress_a': {'slot': 'dress'}, 'shoes_a': {'slot': 'shoes'}, 'hair_a': {'slot': 'hair'}}
+        owners = self.er.leg_variant_owners({'dress_a': {}, 'shoes_a': {}, 'dress_a+shoes_a': {}}, items)
+        self.assertEqual(owners, {'dress_a': [('dress_a', 'bottom')], 'shoes_a': [('shoes_a', 'shoes')]})
+        with self.assertRaises(SystemExit):
+            self.er.leg_variant_owners({'hair_a': {}}, items)
+
+
+@unittest.skipUnless(SRC.exists(), 'lab39 rig not on this machine')
+class ExportItemKindsTest(unittest.TestCase):
+    def test_a_dress_glasses_and_an_accessory_export_with_their_slot_and_draw_order(self):
+        rig = json.loads(SRC.read_text())
+        for v in (rig['front'], rig['back']):
+            hair = next(it for it in v['items'].values() if it['slot'] == 'hair')
+            bottom = next(it for it in v['items'].values() if it['slot'] == 'bottom')
+            bare = lambda it, slot: {**{k: x for k, x in it.items() if k not in ('sit', 'wave')}, 'slot': slot}
+            v['items']['glasses_test'] = bare(hair, 'glasses')
+            v['items']['acc_test'] = bare(hair, 'accessory')
+            v['items']['dress_test'] = {**bottom, 'slot': 'dress'}
+        with tempfile.TemporaryDirectory() as tmp:
+            src = pathlib.Path(tmp) / 'rig.json'
+            src.write_text(json.dumps(rig))
+            out = pathlib.Path(tmp) / 'out'
+            run = export_full_resolution(src, out)
+            self.assertEqual(run.returncode, 0, run.stderr[-2000:])
+            front = json.loads((out / 'rig25.json').read_text())['views']['front']
+            items = front['items']
+            parts = lambda iid: {r['layer']: r for r in items[iid]['mesh']['ranges'] if r['name'].startswith('part')}
+            self.assertEqual({items[i]['slot'] for i in ('glasses_test', 'acc_test', 'dress_test')}, {'glasses', 'accessory', 'dress'})
+            self.assertAlmostEqual(parts('glasses_test')['head']['order'], 4.5)
+            self.assertAlmostEqual(parts('acc_test')['head']['order'], 4.7)
+            self.assertAlmostEqual(parts('dress_test')['torso']['order'], 3.45)
+            self.assertNotIn('standOnly', {k for k, x in parts('dress_test')['torso'].items() if x})
+            self.assertTrue(parts('dress_test')['nearLeg'].get('standOnly'))
+
+
 if __name__ == '__main__':
     unittest.main()

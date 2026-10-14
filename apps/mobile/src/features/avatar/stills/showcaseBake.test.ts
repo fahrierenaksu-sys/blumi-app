@@ -96,6 +96,11 @@ test("the allowlist rejects candidate paths, a missing hash and a crop that is n
   assert.throws(() => validateAllowlist(list({ items: { a: { slot: "top", order: 1, file: "a.png" } } })), /sha256/)
   assert.throws(() => validateAllowlist(list({ crops: { head: [1, 2], push: [1, 2, 3, 4] } })), /head/)
   assert.throws(() => validateAllowlist({ scale: 0.5, bodies: { robot: { ...body, ...approved } } }), /unknown body/)
+  // the new item kinds have front layers too; an unknown slot is refused
+  for (const slot of ["dress", "glasses", "accessory"]) {
+    assert.doesNotThrow(() => validateAllowlist(list({ items: { a: { slot, order: 35, file: "a.png", sha256: "0" } } })), slot)
+  }
+  assert.throws(() => validateAllowlist(list({ items: { a: { slot: "cape", order: 1, file: "a.png", sha256: "0" } } })), /unknown slot/)
 })
 
 test("an entry without a QA PASS record or without the owner's approval is refused", async () => {
