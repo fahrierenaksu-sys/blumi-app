@@ -9,7 +9,7 @@
       "baseSha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0",
       "qaPass": "line_1900/REPORT.md (o_g1fix8 16:37 FINAL; G5 starter-shoes waiver = owner yes 2026-10-12 20:07)",
       "ownerApproved": true,
-      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed.",
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-14 15:23 +0300: the owner approved ('evet') the front looks of hair_girl_bob and hair_girl_pigtails (factory girl_bob_2130 and girl_pigtails_2130 sc/final_r2, shown in girl_preview_1500/girl_wardrobe_now.png; OWNER_DECISIONS.md FRONT SHOWCASE line of 2026-10-14). Ribbon waves and white sneakers are still pending.",
       "crops": {
         "head": [
           876,
@@ -57,6 +57,22 @@
           "backFile": "line_1900/girl/o_g1fix8/layers/girl_hair_back.png",
           "sha256": "c3b5c05e12dde72ffecb470fda8253e96d2d36c6a68d28e7fea5e04f89e3f13a",
           "backSha256": "d3c4d51297869f3ad7a243f4c50a216fc475c58132450e30f76819ed60b7ae85"
+        },
+        "hair_girl_bob": {
+          "slot": "hair",
+          "order": 4,
+          "file": "girl_hairs_2130/hair_girl_bob_showcase_front.png",
+          "backFile": "girl_hairs_2130/hair_girl_bob_showcase_back.png",
+          "sha256": "fde79f35f40cf0ecc061b7679472939d5d462750d473e568d05785d2624c870b",
+          "backSha256": "8a81dfea8bce43ea50e2f7b78dda7ff4390bdecc76d00568639102f87d5c5745"
+        },
+        "hair_girl_pigtails": {
+          "slot": "hair",
+          "order": 4,
+          "file": "girl_hairs_2130/hair_girl_pigtails_showcase_front.png",
+          "backFile": "girl_hairs_2130/hair_girl_pigtails_showcase_back.png",
+          "sha256": "33908532a87bca73c1ed81f9fe049c80391f050f1678615c57b9b176fa83dd5e",
+          "backSha256": "60b66d344ea6b83a7676267364d2c50e89d792db974edaf1cda152c1e57c5bfb"
         }
       }
     },

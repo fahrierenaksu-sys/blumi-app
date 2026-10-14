@@ -120,6 +120,46 @@
               386
             ]
           }
+        },
+        "hair_girl_bob": {
+          "key": "hair_girl_bob__front",
+          "rect": [
+            133,
+            67,
+            354,
+            349
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "hair_girl_bob__back",
+            "rect": [
+              97,
+              54,
+              415,
+              363
+            ]
+          }
+        },
+        "hair_girl_pigtails": {
+          "key": "hair_girl_pigtails__front",
+          "rect": [
+            121,
+            67,
+            364,
+            492
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "hair_girl_pigtails__back",
+            "rect": [
+              125,
+              58,
+              355,
+              501
+            ]
+          }
         }
       },
       "files": {
@@ -131,7 +171,11 @@
         "avatar_v2_shoes_mint_ribbon_court_sneakers__front": "6eeb193d0ca5bf09ceb22b8cdcc32aaf599fe79d31692491f868caed49a3833c",
         "avatar_v2_shoes_mint_ribbon_court_sneakers__under": "d5ed9ba88985b2524a4294ad696c3cb39d31a6a79fcf0cb7c56304efa11310c5",
         "avatar_v2_hair_ink_pageboy_star__front": "76351dc1d6eee23becbb7dbee0fa26a4baf5b8d7741a31c88cb0ed1b935b1353",
-        "avatar_v2_hair_ink_pageboy_star__back": "9e098edf7ef166638839578a5584ccdb7d8e67a9cf0a1a3c32e64903e71ccc01"
+        "avatar_v2_hair_ink_pageboy_star__back": "9e098edf7ef166638839578a5584ccdb7d8e67a9cf0a1a3c32e64903e71ccc01",
+        "hair_girl_bob__front": "b0cc6a150dd3b7b8d8544a95b2ac9bd29f6330f03285d895e75e8ea15b3cd4ad",
+        "hair_girl_bob__back": "aac78e76d49f594db22bdd0fc1e6198e4431580d0f745cdb511ebf4b3cd11d35",
+        "hair_girl_pigtails__front": "f7bc74c0d76d539abac7bd77966cfa322277523878f476b06bb66cf0c6ba97f3",
+        "hair_girl_pigtails__back": "3d80d83d80344edd346ee03d1144e325398788747ec07082a3a1c3920ae28508"
       }
     },
     "male": {

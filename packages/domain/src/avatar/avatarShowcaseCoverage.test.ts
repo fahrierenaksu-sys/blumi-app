@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
-import { GIRL_WARDROBE_PREVIEW_ALL_IDS } from "./girlWardrobePreview";
 
 /**
  * Ratchet: every item with baked rig art needs a front (showcase) layer, so the figure outside the room is never the
@@ -17,9 +16,11 @@ import { GIRL_WARDROBE_PREVIEW_ALL_IDS } from "./girlWardrobePreview";
  * their QA'd room art; their factory front layers exist but are not owner-approved and allowlisted yet (same rule).
  * 2026-10-14 (wip/girl-hairs): the bob and pigtails hairs join for the same reason; their front layers (factory
  * girl_bob_2130 and girl_pigtails_2130 sc/final_r2) passed QA and wait for the owner's yes on the front look.
+ * 2026-10-14 15:23 (OWNER_DECISIONS): the owner approved the bob and pigtails front looks, so they are allowlisted and
+ * baked and their entries are gone. Ribbon waves and white sneakers still wait for that yes.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: [...GIRL_WARDROBE_PREVIEW_ALL_IDS],
+  female: ["avatar_v2_hair_mocha_ribbon_waves", "avatar_v2_shoes_white_clean_sneakers"],
   male: [],
 };
 

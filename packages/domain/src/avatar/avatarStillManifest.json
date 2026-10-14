@@ -150,12 +150,50 @@
         "hair_girl_bob": {
           "slot": "hair",
           "rigItemId": "hair_girl_bob",
-          "thumb": "hair_girl_bob"
+          "thumb": "hair_girl_bob",
+          "showcase": {
+            "key": "hair_girl_bob__front",
+            "rect": [
+              133,
+              67,
+              354,
+              349
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_girl_bob__back",
+              "rect": [
+                97,
+                54,
+                415,
+                363
+              ]
+            }
+          }
         },
         "hair_girl_pigtails": {
           "slot": "hair",
           "rigItemId": "hair_girl_pigtails",
-          "thumb": "hair_girl_pigtails"
+          "thumb": "hair_girl_pigtails",
+          "showcase": {
+            "key": "hair_girl_pigtails__front",
+            "rect": [
+              121,
+              67,
+              364,
+              492
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_girl_pigtails__back",
+              "rect": [
+                125,
+                58,
+                355,
+                501
+              ]
+            }
+          }
         }
       },
       "layers": {
