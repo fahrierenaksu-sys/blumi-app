@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "7494b8e72dd27d91c88b0e7a6e7ad43b3ff215f7d9bc137eb081553689c052eb",
+      "rigSha256": "7418ef55307796f910837e6678bc347f47212ec40d24a899ff8b979e5e33a3cd",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -108,14 +108,6 @@
             },
             {
               "part": "sit"
-            },
-            {
-              "part": "sit",
-              "with": "avatar_v2_top_black_cute_crop_top"
-            },
-            {
-              "part": "sit",
-              "with": "avatar_v2_top_white_cute_crop_top"
             }
           ]
         },
@@ -143,6 +135,10 @@
             },
             {
               "part": "sit"
+            },
+            {
+              "part": "sit",
+              "with": "avatar_v2_bottom_black_highwaist_trousers"
             }
           ]
         },
@@ -165,6 +161,10 @@
             },
             {
               "part": "sit"
+            },
+            {
+              "part": "sit",
+              "with": "avatar_v2_bottom_black_highwaist_trousers"
             }
           ]
         },
@@ -639,10 +639,10 @@
             "order": 3.3,
             "seq": 2000,
             "rect": [
-              223,
+              224,
               425,
-              167,
-              193
+              166,
+              194
             ]
           },
           {

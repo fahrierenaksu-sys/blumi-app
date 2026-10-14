@@ -196,9 +196,10 @@ test("the shipped girl's crop tops bare her waist and her black trousers bring t
         assert.equal(bodyDrawn(worn, view, pose, part), now === "body" && bottom === TROUSERS ? TROUSERS : now, `${view} ${pose} ${part}`)
       }
       // the body's own seated card shows the tank beside her arms, so under a crop it never draws: the crop's tank-free
-      // copy of it does (with the trousers: their copy fitted to the crop)
+      // copy of it does (with the trousers: the copy of their card, carried by the crop as its pair with them)
       const seatedNow = bodyDrawn([], view, pose, "sit")
-      assert.equal(bodyDrawn(worn, view, pose, "sit"), seatedNow === "body" ? (bottom === TROUSERS ? TROUSERS : crop) : seatedNow, `${view} ${pose} sit`)
+      const seated = avatar25PoseRanges(girl, view, worn, pose).find((e) => e.name === "sit" || e.name.startsWith("sit@body") || e.name.startsWith("sit@with:"))
+      assert.deepEqual(seated && seatedNow === "body" ? [seated.owner, seated.name] : seatedNow, seatedNow === "body" ? [crop, bottom === TROUSERS ? `sit@with:${TROUSERS}` : "sit@body"] : seatedNow, `${view} ${pose} sit`)
     }
     // the trousers with any other top draw the torso too; the starter outfit draws the body's own
     assert.equal(bodyDrawn([TOP, TROUSERS, SHOES, HAIR], view, pose, torsoNow[0]!), TROUSERS)
