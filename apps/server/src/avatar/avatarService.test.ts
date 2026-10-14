@@ -172,7 +172,7 @@ for (const [label, catalog] of [
 // she saves them alone and mixed with her starter, an account made before they existed gets them by the inventory
 // self-heal, the boy cannot wear them and nobody can buy them.
 const GIRL_NEW_LOOKS = [
-  { ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair[0] },
+  ...GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair.map((hairId) => ({ ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId })),
   { ...DEFAULT_FEMALE_AVATAR_LOADOUT, shoesId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes[0] },
   { ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair[0], shoesId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes[0] }
 ]
@@ -201,11 +201,13 @@ for (const [label, catalog] of [
     const { avatarService, verified } = await signInWith(catalog)
     await saveEach(avatarService, verified.sessionToken, [DEFAULT_MALE_AVATAR_LOADOUT])
     for (const [slot, ids] of [["hairId", GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair], ["shoesId", GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes]] as const) {
-      const result = await avatarService.saveAvatar(verified.sessionToken, {
-        loadout: { ...DEFAULT_MALE_AVATAR_LOADOUT, [slot]: ids[0] },
-        revision: 1
-      })
-      assert.equal(result.kind, "invalid", slot)
+      for (const itemId of ids) {
+        const result = await avatarService.saveAvatar(verified.sessionToken, {
+          loadout: { ...DEFAULT_MALE_AVATAR_LOADOUT, [slot]: itemId },
+          revision: 1
+        })
+        assert.equal(result.kind, "invalid", itemId)
+      }
     }
   })
 }
