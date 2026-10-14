@@ -96,7 +96,14 @@ export function createSessionPersistence(
               now,
               secureStore
             )
-            if (secureActor) return secureActor
+            if (secureActor) {
+              // The verified secure record wins. A plaintext copy left by an
+              // interrupted migration or an older build must not linger.
+              if (legacyValue) {
+                await dependencies.asyncStore.removeItem(SESSION_ACTOR_STORAGE_KEY)
+              }
+              return secureActor
+            }
           }
         } catch (error) {
           if (!isCredentialStoreUnavailable(error)) throw error
