@@ -287,7 +287,12 @@ function createAvatarProviderHarness({ storageScopeId = "owner-a", onSaveAvatar 
         }
       }
     },
-    "../avatarEquipLifecycle": lifecycleModule
+    "../avatarEquipLifecycle": lifecycleModule,
+    "../avatarDressWriteGate": {
+      isAvatarItemSavable: (item, capabilities) =>
+        item.type !== "dress" || capabilities?.avatar_loadout_v2_write === true,
+      ONE_PIECE_DRESS_UNAVAILABLE_MESSAGE: "Elbiseler şu an giyilip kaydedilemiyor."
+    }
   }
   const providerModule = { exports: {} }
   const providerJs = ts.transpileModule(providerSource, {
