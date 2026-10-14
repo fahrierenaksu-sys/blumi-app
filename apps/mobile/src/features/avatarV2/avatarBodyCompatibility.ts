@@ -82,5 +82,8 @@ export function normalizeAvatarV2ForBody(
     const item = catalog.find((entry) => entry.id === id && entry.type === "accessory")
     return item ? isAvatarV2ItemCompatibleWithBody(item, bodyId) : false
   })
-  return { ...next, accessoryIds }
+  // a one-piece dress that does not fit this body comes off (the separates under it stay)
+  const dress = next.dressId ? catalog.find((entry) => entry.id === next.dressId && entry.type === "dress") : undefined
+  const dressFits = !dress || (!isRetiredAvatarItemId(dress.id) && isAvatarV2ItemCompatibleWithBody(dress, bodyId))
+  return { ...next, accessoryIds, ...(dressFits ? {} : { dressId: null }) }
 }

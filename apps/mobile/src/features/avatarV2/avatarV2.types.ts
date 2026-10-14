@@ -11,6 +11,8 @@ export type AvatarItemType =
   | "bottom"
   | "shoes"
   | "accessory"
+  /** A one-piece dress (2.5D): worn as `dressId`, drawn instead of the top and the bottom kept under it. */
+  | "dress"
 
 export type AvatarAnimationState =
   | "idle_front"

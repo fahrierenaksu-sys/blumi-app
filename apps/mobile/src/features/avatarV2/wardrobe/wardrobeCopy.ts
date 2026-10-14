@@ -24,6 +24,7 @@ export const AVATAR_STUDIO_COPY = {
     hair: "Hair",
     top: "Tops",
     dress: "Dresses",
+    glasses: "Glasses",
     bottom: "Bottoms",
     shoes: "Shoes",
     accessory: "Accessories",
@@ -68,7 +69,8 @@ export const AVATAR_STUDIO_COPY = {
     mouth: "Ağız",
     hair: "Saç",
     top: "Üstler",
-    dress: "Elbiseler",
+    dress: "Elbise",
+    glasses: "Gözlük",
     bottom: "Altlar",
     shoes: "Ayakkabı",
     accessory: "Aksesuar",
@@ -105,7 +107,8 @@ export const CATEGORY_ICONS: Record<AvatarItemType, keyof typeof Ionicons.glyphM
   top: "shirt",
   bottom: "layers",
   shoes: "walk",
-  accessory: "glasses"
+  accessory: "glasses",
+  dress: "sparkles"
 }
 
 /** Thin line icons for the four tabs of each section. */
@@ -113,7 +116,9 @@ export const WARDROBE_TAB_ICONS: Record<AvatarStudioTabId, keyof typeof Ionicons
   top: "shirt-outline",
   bottom: "layers-outline",
   shoes: "footsteps-outline",
-  accessory: "glasses-outline",
+  dress: "sparkles-outline",
+  glasses: "glasses-outline",
+  accessory: "bag-handle-outline",
   hair: "cut-outline",
   face: "happy-outline",
   eyes: "eye-outline",

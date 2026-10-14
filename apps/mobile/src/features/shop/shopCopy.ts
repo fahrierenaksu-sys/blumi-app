@@ -177,7 +177,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
     categories: {
       owned: "Owned", face: "Face", eyes: "Eyes", nose: "Nose", mouth: "Mouth",
       top: "Tops", bottom: "Bottoms", dress: "Dresses", outerwear: "Outerwear", shoes: "Shoes", hair: "Hair",
-      accessory: "Accessories", all: "All", seating: "Seating", table: "Tables",
+      glasses: "Glasses", accessory: "Accessories", all: "All", seating: "Seating", table: "Tables",
       lighting: "Lighting", rug: "Rugs", wallDecor: "Wall", plant: "Plants", misc: "Storage & decor"
     },
     readyToPlace: "Ready to place",
@@ -306,7 +306,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
     categories: {
       owned: "Sahip oldukların", face: "Yüz", eyes: "Gözler", nose: "Burun", mouth: "Ağız",
       top: "Üstler", bottom: "Altlar", dress: "Elbiseler", outerwear: "Dış giyim", shoes: "Ayakkabılar", hair: "Saç",
-      accessory: "Aksesuarlar", all: "Tümü", seating: "Oturma", table: "Masalar",
+      glasses: "Gözlükler", accessory: "Aksesuarlar", all: "Tümü", seating: "Oturma", table: "Masalar",
       lighting: "Aydınlatma", rug: "Halılar", wallDecor: "Duvar", plant: "Bitkiler", misc: "Depolama ve dekor"
     },
     readyToPlace: "Yerleştirmeye hazır",
