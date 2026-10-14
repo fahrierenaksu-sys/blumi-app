@@ -581,6 +581,9 @@ function linkingWith({ initialUrl = null } = {}) {
       }
     },
     ROOT_LINK_SCREENS,
+    // The query/param policy is covered by rootLinkConfig.test.ts.
+    getStateFromPath: () => undefined,
+    createSafeGetStateFromPath: (parse) => parse,
     pendingDeepLinks,
     parseReferralCodeFromUrl,
     capturePendingReferral: async (referral) => { captured.push(referral) },

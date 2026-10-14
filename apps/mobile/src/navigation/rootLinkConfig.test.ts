@@ -2,11 +2,24 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { getStateFromPath as defaultGetStateFromPath } from "@react-navigation/core"
 import { createPendingDeepLinkStore, type DeepLinkOwner } from "./pendingDeepLink"
-import { ROOT_LINK_SCREENS, createSafeGetStateFromPath } from "./rootLinkConfig"
+import { createSafeGetStateFromPath } from "./rootLinkConfig"
+
+// The root linking config (rootLinking.ts imports react-native, so it is mirrored here).
+const ROOT_LINK_SCREENS = {
+  Lobby: "discover",
+  Inbox: "inbox",
+  ChatThread: "chat/:threadId",
+  ProfilePreview: "profile/:userId",
+  Settings: "settings",
+  MyRoom: "room",
+  MyRoomEditor: "room/edit",
+  WardrobeV2: "wardrobe",
+  CosmeticShop: "shop"
+} as const
 
 const PREFIX = "blumi://"
 const OPTIONS = { screens: ROOT_LINK_SCREENS }
-const parse = createSafeGetStateFromPath(defaultGetStateFromPath)
+const parse = createSafeGetStateFromPath(defaultGetStateFromPath, ROOT_LINK_SCREENS)
 const OWNER: DeepLinkOwner = { userId: "owner-a", sessionId: "session-a" }
 
 /** Mirrors the container: strips the prefix and parses the path. */

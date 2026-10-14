@@ -1,44 +1,36 @@
 /**
- * Root deep-link path config and the policy that turns an outside URL into
- * navigation state. Kept free of runtime imports so it runs under plain Node.
+ * The policy that turns an outside deep-link URL into navigation state. Kept
+ * free of runtime imports so it runs under plain Node.
  */
 
-export const ROOT_LINK_SCREENS = {
-  Lobby: "discover",
-  Inbox: "inbox",
-  ChatThread: "chat/:threadId",
-  ProfilePreview: "profile/:userId",
-  Settings: "settings",
-  MyRoom: "room",
-  MyRoomEditor: "room/edit",
-  WardrobeV2: "wardrobe",
-  CosmeticShop: "shop"
-} as const
-
 type LinkRoute = { name: string; params?: object; state?: LinkState }
-type LinkState = { routes: ReadonlyArray<LinkRoute> }
+type LinkState = { routes: readonly LinkRoute[] }
 export type GetStateFromPath<Options, State> = (path: string, options?: Options) => State | undefined
 
-type RootLinkRouteName = keyof typeof ROOT_LINK_SCREENS
+export type LinkScreens = Readonly<Record<string, string>>
 
 /** The only params a URL may set: the `:segments` of each route's own path. */
-const LINK_PARAM_ALLOW_LIST: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
-  (Object.keys(ROOT_LINK_SCREENS) as RootLinkRouteName[]).map((routeName) => [
+function linkParamAllowList(screens: LinkScreens): ReadonlyMap<string, readonly string[]> {
+  return new Map(Object.entries(screens).map(([routeName, pattern]) => [
     routeName,
-    ROOT_LINK_SCREENS[routeName]
+    pattern
       .split("/")
       .filter((segment) => segment.startsWith(":"))
       .map((segment) => segment.slice(1))
-  ])
-)
+  ]))
+}
 
 /** Query and hash never reach navigation: app commands are in-app only. */
 export function stripLinkQueryAndHash(path: string): string {
   return path.split(/[?#]/)[0]
 }
 
-function pickAllowedParams(routeName: string, params: object | undefined): object | undefined {
-  const allowed = LINK_PARAM_ALLOW_LIST[routeName] ?? []
+function pickAllowedParams(
+  allowList: ReadonlyMap<string, readonly string[]>,
+  routeName: string,
+  params: object | undefined
+): object | undefined {
+  const allowed = allowList.get(routeName) ?? []
   const source = (params ?? {}) as Record<string, unknown>
   const kept = Object.fromEntries(
     allowed
@@ -49,10 +41,13 @@ function pickAllowedParams(routeName: string, params: object | undefined): objec
   return Object.keys(kept).length > 0 ? kept : undefined
 }
 
-function sanitizeLinkState<State extends LinkState>(state: State): State {
+function sanitizeLinkState<State extends LinkState>(
+  allowList: ReadonlyMap<string, readonly string[]>,
+  state: State
+): State {
   const routes = state.routes.map((route): LinkRoute => {
-    const params = pickAllowedParams(route.name, route.params)
-    const nested = route.state ? sanitizeLinkState(route.state) : undefined
+    const params = pickAllowedParams(allowList, route.name, route.params)
+    const nested = route.state ? sanitizeLinkState(allowList, route.state) : undefined
     return {
       ...route,
       params,
@@ -69,10 +64,12 @@ function sanitizeLinkState<State extends LinkState>(state: State): State {
  * reach a screen.
  */
 export function createSafeGetStateFromPath<Options, State extends LinkState>(
-  defaultGetStateFromPath: GetStateFromPath<Options, State>
+  defaultGetStateFromPath: GetStateFromPath<Options, State>,
+  screens: LinkScreens
 ): GetStateFromPath<Options, State> {
+  const allowList = linkParamAllowList(screens)
   return (path, options) => {
     const state = defaultGetStateFromPath(stripLinkQueryAndHash(path), options)
-    return state ? sanitizeLinkState(state) : state
+    return state ? sanitizeLinkState(allowList, state) : state
   }
 }

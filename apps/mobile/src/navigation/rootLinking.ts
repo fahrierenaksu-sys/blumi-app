@@ -6,9 +6,19 @@ import { capturePendingReferral } from "../features/referrals/referralStorage"
 import { createPendingDeepLinkStore } from "./pendingDeepLink"
 import type { RootStackParamList } from "./RootNavigator"
 import { navigationRef } from "./rootNavigationRef"
-import { ROOT_LINK_SCREENS as BASE_ROOT_LINK_SCREENS, createSafeGetStateFromPath } from "./rootLinkConfig"
+import { createSafeGetStateFromPath } from "./rootLinkConfig"
 
-const ROOT_LINK_SCREENS = BASE_ROOT_LINK_SCREENS satisfies Partial<Record<keyof RootStackParamList, string>>
+const ROOT_LINK_SCREENS = {
+  Lobby: "discover",
+  Inbox: "inbox",
+  ChatThread: "chat/:threadId",
+  ProfilePreview: "profile/:userId",
+  Settings: "settings",
+  MyRoom: "room",
+  MyRoomEditor: "room/edit",
+  WardrobeV2: "wardrobe",
+  CosmeticShop: "shop"
+} satisfies Partial<Record<keyof RootStackParamList, string>>
 
 /**
  * Deep links for the root stack. Referral links are captured for later
@@ -22,7 +32,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
   config: {
     screens: ROOT_LINK_SCREENS
   },
-  getStateFromPath: createSafeGetStateFromPath(getStateFromPath),
+  getStateFromPath: createSafeGetStateFromPath(getStateFromPath, ROOT_LINK_SCREENS),
   async getInitialURL() {
     const url = await Linking.getInitialURL()
     if (!url) return url
