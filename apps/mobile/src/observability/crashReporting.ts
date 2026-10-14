@@ -19,9 +19,15 @@ export function initializeCrashReporting(): void {
     attachScreenshot: false,
     attachViewHierarchy: false,
     enableAutoSessionTracking: true,
-    tracesSampleRate: BLUMI_BUILD_PROFILE === "production" ? 0.05 : 0,
+    // Tracing stays off: beforeSend does not see transactions, and span names
+    // and URLs carry ids. No tracesSampleRate means no spans are recorded; the
+    // transaction hook drops anything that still gets through.
+    enableAutoPerformanceTracing: false,
     beforeSend(event) {
       return sanitizeCrashEvent(event) as typeof event
+    },
+    beforeSendTransaction() {
+      return null
     }
   })
 }

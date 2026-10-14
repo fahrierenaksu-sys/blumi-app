@@ -139,7 +139,8 @@ try {
       "src/features/matches/matchMeeting.test.ts",
       "src/navigation/nativeSheets/nativeSheets.test.ts",
       "src/ui/bottomPanelEntrance.test.ts",
-      "src/navigation/useNotificationResponseRouting.test.ts"
+      "src/navigation/useNotificationResponseRouting.test.ts",
+      "src/observability/crashReportingTransport.test.ts"
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
