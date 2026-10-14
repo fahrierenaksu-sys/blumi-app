@@ -5,6 +5,7 @@ import { Text, View } from "react-native"
 import Animated, { useSharedValue } from "react-native-reanimated"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
 import { useAvatarV2 } from "../features/avatarV2/state/AvatarV2Provider"
+import { filterSavableAvatarCatalog } from "../features/avatarV2/avatarDressWriteGate"
 import type { RootStackParamList } from "../navigation/RootNavigator"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
 import { hapticSelection } from "../ui/haptics"
@@ -59,7 +60,8 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
   const panelEntrance = useBottomPanelEntranceProps(navigation, reduceMotion)
   const {
     avatar,
-    catalog,
+    catalog: fullCatalog,
+    resolvedCapabilities,
     canEquipItem,
     saveAvatar,
     isSaving,
@@ -82,6 +84,11 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
     openLockedItemInShop
   } = useWardrobeLockedPreview({ navigation, displayedAvatar, copy: studioCopy })
 
+  // a one-piece dress is offered only when the server can save it (avatarDressWriteGate)
+  const catalog = useMemo(
+    () => filterSavableAvatarCatalog(fullCatalog, resolvedCapabilities),
+    [fullCatalog, resolvedCapabilities]
+  )
   const studioTabs = useMemo(
     () => getAvatarStudioTabs(activeSection, catalog, avatar),
     [activeSection, avatar, catalog]

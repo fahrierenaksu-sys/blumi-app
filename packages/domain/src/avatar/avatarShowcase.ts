@@ -2,8 +2,8 @@ import { coerceAvatarLoadout, type AvatarLoadoutCoercionHints } from "./avatarLo
 import type { AvatarItemRules } from "./avatarItemRules";
 import {
   AVATAR_STILL_MANIFEST,
-  AVATAR_STILL_SLOT_KEYS,
   avatarStillDrawnItems,
+  avatarStillDrawnKey,
   avatarStillRigForBody,
   resolveAvatarStillLayers,
   type AvatarShowcaseBase,
@@ -12,8 +12,8 @@ import {
   type AvatarStillManifest,
   type AvatarStillRect,
   type AvatarStillResolved,
+  type AvatarStillDrawSlot,
   type AvatarStillRigId,
-  type AvatarStillSlot,
 } from "./avatarStills";
 
 /**
@@ -34,7 +34,7 @@ export interface AvatarShowcaseFront {
   readonly windows: AvatarShowcaseBase["windows"];
   /** The crop this figure is shown in; its window is `windows[crop]`. */
   readonly crop: AvatarShowcaseCrop;
-  /** Equal front looks in the same crop share one key: bakerVersion|rig|hair|top|bottom|shoes|showcase|crop. */
+  /** Equal front looks in the same crop share one key: bakerVersion|rig|shoes|bottom|top|hair|showcase|crop, then any drawn dress, glasses, accessories. */
   readonly cacheKey: string;
 }
 
@@ -52,7 +52,7 @@ export interface AvatarShowcaseFallback {
 export type AvatarShowcaseResolved = AvatarShowcaseFront | AvatarShowcaseFallback;
 
 interface DrawnFrontLayer {
-  readonly slot: AvatarStillSlot;
+  readonly slot: AvatarStillDrawSlot;
   readonly layer: AvatarShowcaseItemLayer;
 }
 
@@ -92,19 +92,22 @@ export function resolveShowcaseLayers(
   const hasCanvas = Number.isFinite(base?.canvas?.width) && Number.isFinite(base?.canvas?.height);
   if (!base || !hasCanvas) return fallback("no-showcase-base");
   const drawn = avatarStillDrawnItems(body, loadout);
-  const underSlots = new Set(base.underSlots ?? []);
+  const underSlots = new Set<string>(base.underSlots ?? []);
+  // the base regions a drawn item stands in for: a one-piece dress is drawn instead of the top and the bottom
+  const coveredBy = (slot: AvatarStillDrawSlot): readonly string[] => (slot === "dress" ? ["dress", "top", "bottom"] : [slot]);
   const front: DrawnFrontLayer[] = [];
   for (const [slot, itemId] of drawn) {
     const layer = body.items[itemId]?.showcase;
     if (!layer) return fallback("item-without-showcase");
     // The base has no body in this slot's region: an item that cannot draw it would leave a hole.
-    if (underSlots.has(slot) && !layer.under) return fallback("item-without-showcase");
+    if (coveredBy(slot).some((region) => underSlots.has(region)) && !layer.under) return fallback("item-without-showcase");
     front.push({ slot, layer });
   }
   for (const slot of underSlots) {
-    if (!front.some((entry) => entry.slot === slot)) return fallback("item-without-showcase");
+    if (!front.some((entry) => coveredBy(entry.slot).includes(slot))) return fallback("item-without-showcase");
   }
   const ordered = frontDrawOrder(front);
+  const drawnKey = avatarStillDrawnKey(drawn);
   const byOrder = [...front].sort((a, b) => a.layer.order - b.layer.order);
   const part = (layer: { readonly key: string; readonly rect: AvatarStillRect }) => ({ asset: `${rig}/showcase/${layer.key}`, rect: layer.rect });
   const behind = byOrder.flatMap((entry) => (entry.layer.back ? [part(entry.layer.back)] : []));
@@ -121,6 +124,6 @@ export function resolveShowcaseLayers(
     space: base.canvas,
     windows: base.windows,
     crop,
-    cacheKey: [manifest.bakerVersion, rig, ...AVATAR_STILL_SLOT_KEYS.map(([slot]) => drawn.get(slot) ?? "-"), "showcase", crop].join("|"),
+    cacheKey: [manifest.bakerVersion, rig, ...drawnKey.slots, "showcase", crop, ...drawnKey.extra].join("|"),
   };
 }

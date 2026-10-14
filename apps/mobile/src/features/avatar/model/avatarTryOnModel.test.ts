@@ -110,3 +110,18 @@ test("total for anything stored or received: never throws and never changes the 
     assert.equal(JSON.stringify(raw), before)
   }
 })
+
+test("a worn one-piece dress with 2.5D art is tried on as the 2.5D figure; without art the old drawing stays", async () => {
+  const { TEST_AVATAR_ITEM, TEST_AVATAR_ITEM_RULES, toAvatarLoadoutV2 } = await import("@blumi/domain")
+  const dressId = TEST_AVATAR_ITEM.onePieceDress
+  const dressRow = TEST_AVATAR_ITEM_RULES.items.find((item) => item.itemId === dressId)!
+  const rules: AvatarItemRules = { ...AVATAR_ITEM_RULES, items: [...AVATAR_ITEM_RULES.items, dressRow] }
+  const withArt = {
+    ...AVATAR_STILL_MANIFEST,
+    bodies: { ...AVATAR_STILL_MANIFEST.bodies, female: { ...female, items: { ...female.items, [dressId]: { slot: "dress", rigItemId: "dress", thumb: dressId } } } }
+  }
+  const dressed = { ...toAvatarLoadoutV2(GIRL_2_5D), dressId }
+  assert.equal(avatarTryOnRenderer(dressed, { rules, manifest: withArt }), "showcase")
+  assert.equal(avatarTryOnRenderer(dressed, { rules }), "legacy")
+  assert.equal(avatarTryOnRenderer({ ...dressed, dressId: null }, { rules, manifest: withArt }), "showcase")
+})

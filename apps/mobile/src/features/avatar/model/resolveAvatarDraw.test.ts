@@ -145,3 +145,30 @@ test("every item in the art map and every rig starter piece has its rig item in 
     for (const itemId of Object.values(slots)) assert.ok(AVATAR_ITEM_ART[rig][itemId], `${rig} starter ${itemId} has art`)
   }
 })
+
+// Review slots_1330 MEDIUM-2: the room picks glasses and accessories by the RIG slot while the server allows one item
+// per catalog accessoryGroup. Every art entry must agree with the catalog, or it would draw at the wrong depth.
+test("every rig item's slot agrees with its catalog item: glasses are eyewear, a dress is a dress, earrings say so", async () => {
+  const { avatarItemArtSlotProblems } = await import("./avatarItemArt")
+  const { TEST_AVATAR_ITEM: FX, TEST_AVATAR_ITEM_RULES: FX_RULES } = await import("@blumi/domain")
+  assert.deepEqual(avatarItemArtSlotProblems(AVATAR_ITEM_ART, RIGS), [])
+
+  const girl = girlRig.views
+  const withItems = (items: Record<string, { slot: string; group?: string }>) => ({
+    ...RIGS,
+    female: { ...girlRig, views: Object.fromEntries((["front", "back"] as const).map((view) => [view, {
+      ...girl[view], items: { ...girl[view].items, ...Object.fromEntries(Object.entries(items).map(([id, it]) => [id, { ...girl[view].items.hair_ink_pageboy_star!, ...it }])) }
+    }])) as Rig25["views"] }
+  })
+  const art = (entries: Record<string, string>) => ({ ...AVATAR_ITEM_ART, female: { ...AVATAR_ITEM_ART.female, ...entries } })
+  const good = withItems({ rig_glasses: { slot: "glasses" }, rig_dress: { slot: "dress" } })
+  assert.deepEqual(avatarItemArtSlotProblems(art({ [FX.paidEyewear]: "rig_glasses", [FX.onePieceDress]: "rig_dress" }), good, FX_RULES), [])
+  const swapped = withItems({ rig_glasses: { slot: "accessory" }, rig_dress: { slot: "top" } })
+  assert.equal(avatarItemArtSlotProblems(art({ [FX.paidEyewear]: "rig_glasses", [FX.onePieceDress]: "rig_dress" }), swapped, FX_RULES).length, 4)
+  const hatAsGlasses = withItems({ rig_glasses: { slot: "glasses" } })
+  assert.equal(avatarItemArtSlotProblems(art({ [FX.onePieceDress]: "rig_glasses" }), hatAsGlasses, FX_RULES).length, 2)
+  const earrings = (group?: string) => withItems({ rig_ear: { slot: "accessory", ...(group ? { group } : {}) } })
+  assert.equal(avatarItemArtSlotProblems(art({ [FX.paidEarrings]: "rig_ear" }), earrings(), FX_RULES).length, 2, "earrings must draw under the fringe")
+  assert.deepEqual(avatarItemArtSlotProblems(art({ [FX.paidEarrings]: "rig_ear" }), earrings("earrings"), FX_RULES), [])
+  assert.equal(avatarItemArtSlotProblems(art({ [FX.paidHeadwear]: "rig_ear" }), earrings("earrings"), FX_RULES).length, 2)
+})

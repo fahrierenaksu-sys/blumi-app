@@ -1,4 +1,5 @@
-import { DEFAULT_MALE_AVATAR_LOADOUT } from "@blumi/domain"
+import { AVATAR_ITEM_RULES, DEFAULT_MALE_AVATAR_LOADOUT, findAvatarRuleItem, type AvatarItemRules } from "@blumi/domain"
+import type { Rig25, Rig25Item } from "../renderer/rigTypes"
 import type { AvatarRigId } from "./avatarRoomContract"
 
 /** The worn slots the rigs draw, in painter's slot order (shoes under bottom under top under hair). */
@@ -87,4 +88,39 @@ export function listAvatarItemArt(): { rig: AvatarRigId; itemId: string; rigItem
 /** Whether a body's 2.5D rig draws this canonical item (the wardrobe lists it for room preview). */
 export function hasAvatarItemRigArt(itemId: string): boolean {
   return Object.values(AVATAR_ITEM_ART).some((art) => itemId in art)
+}
+
+/** Accessory groups whose rig item must say so, because the exporter gives them their own draw order. */
+const RIG_ORDERED_ACCESSORY_GROUPS: ReadonlySet<string> = new Set(["earrings"])
+
+/** Why a rig item cannot draw this catalog item, or null when its slot agrees with the catalog. Pure. */
+function rigSlotProblem(item: Rig25Item, rule: ReturnType<typeof findAvatarRuleItem>): string | null {
+  const isEyewear = rule?.slot === "accessory" && rule.accessoryGroup === "eyewear"
+  if ((item.slot === "glasses") !== isEyewear) return `rig slot ${item.slot}, catalog ${rule?.slot ?? "none"}/${rule?.accessoryGroup ?? "-"}`
+  if ((item.slot === "dress") !== (rule?.slot === "dress")) return `rig slot ${item.slot}, catalog slot ${rule?.slot ?? "none"}`
+  if (item.slot === "accessory" && rule?.slot !== "accessory") return `rig accessory, catalog slot ${rule?.slot ?? "none"}`
+  if (item.group !== undefined && item.group !== rule?.accessoryGroup) return `rig group ${item.group}, catalog group ${rule?.accessoryGroup ?? "-"}`
+  if (item.slot === "accessory" && RIG_ORDERED_ACCESSORY_GROUPS.has(rule?.accessoryGroup ?? "") && item.group !== rule?.accessoryGroup) {
+    return `catalog group ${rule?.accessoryGroup} needs the rig group (its own draw order)`
+  }
+  return null
+}
+
+/**
+ * Tree-wide guard (review slots_1330 MEDIUM-2): the room picks glasses and accessories by the rig slot, the server by
+ * the catalog `accessoryGroup`. For every art entry and view: rig `glasses` exactly when the catalog item is eyewear,
+ * rig `dress` exactly when the catalog slot is `dress`, rig `accessory` only for another accessory, and a rig `group`
+ * equal to the catalog group (required for earrings). Returns one line per problem; [] when all agree. Pure.
+ */
+export function avatarItemArtSlotProblems(
+  art: Readonly<Record<AvatarRigId, Readonly<Record<string, string>>>>,
+  rigs: Readonly<Record<AvatarRigId, Rig25>>,
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
+): string[] {
+  return (Object.keys(art) as AvatarRigId[]).flatMap((rig) => Object.entries(art[rig]).flatMap(([itemId, rigItemId]) =>
+    (["front", "back"] as const).flatMap((view) => {
+      const item = rigs[rig].views[view].items[rigItemId]
+      const problem = item ? rigSlotProblem(item, findAvatarRuleItem(rules, itemId)) : null
+      return problem ? [`${rig} ${view} ${itemId}: ${problem}`] : []
+    })))
 }

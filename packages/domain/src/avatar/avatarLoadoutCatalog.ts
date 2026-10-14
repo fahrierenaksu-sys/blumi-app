@@ -16,7 +16,9 @@ export type AvatarLoadoutSlot =
   | "bottom"
   | "shoes"
   | "outerwear"
-  | "accessory";
+  | "accessory"
+  /** A one-piece dress, worn as the loadout's `dressId`: drawn instead of the top and the bottom (kept underneath). */
+  | "dress";
 
 export type AvatarAccessoryGroup =
   "headwear" | "eyewear" | "earrings" | "neck" | "bag" | "hairClip";
@@ -41,7 +43,7 @@ export type ReadonlyAvatarLoadout<
   : never;
 
 const slotItems = (
-  slot: Exclude<AvatarLoadoutSlot, "accessory">,
+  slot: Exclude<AvatarLoadoutSlot, "accessory" | "dress">,
   itemIds: readonly string[],
   supportedBodyIds: readonly string[] = ["avatar_v2_body_default"],
 ): AvatarLoadoutCatalogItem[] =>
@@ -57,6 +59,12 @@ const accessoryItem = (
   accessoryGroup,
   supportedBodyIds,
 });
+
+/** A one-piece dress (2.5D): one item, one ID, worn as `dressId`. Factory art adds rows with this helper. */
+export const dressItem = (
+  itemId: string,
+  supportedBodyIds: readonly string[] = ["avatar_v2_body_default"],
+): AvatarLoadoutCatalogItem => ({ itemId, slot: "dress", supportedBodyIds });
 
 const outfitItems = (
   outfitKey: string,

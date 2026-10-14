@@ -17,6 +17,7 @@ export type WardrobeCategoryId =
   | "bottom"
   | "shoes"
   | "hair"
+  | "glasses"
   | "accessory"
 
 export const WARDROBE_CATEGORIES: readonly {
@@ -33,6 +34,7 @@ export const WARDROBE_CATEGORIES: readonly {
   { id: "nose", label: "Nose" },
   { id: "mouth", label: "Lips" },
   { id: "hair", label: "Hair" },
+  { id: "glasses", label: "Glasses" },
   { id: "accessory", label: "Extras" }
 ]
 
@@ -46,7 +48,9 @@ export const AVATAR_STUDIO_SECTIONS = [
 export type AvatarStudioTabId =
   | "top"
   | "bottom"
+  | "dress"
   | "shoes"
+  | "glasses"
   | "accessory"
   | "hair"
   | "face"
@@ -59,14 +63,16 @@ export interface AvatarStudioTab {
   categories: readonly WardrobeCategoryId[]
 }
 
-// Each section exposes four tabs. A tab may group related catalog categories
-// behind a sub filter: dresses live under Tops; lips and the base body live
-// under Face.
+// A tab may group related catalog categories behind a sub filter (lips and the base body live under Face). The closet
+// has a tab per worn kind: tops, bottoms, dresses, shoes, glasses and accessories; a tab without a wearable item for
+// the body is hidden (getAvatarStudioTabs), so the closet shows only the kinds that have 2.5D art.
 const AVATAR_STUDIO_TABS: Record<AvatarStudioSectionId, readonly AvatarStudioTab[]> = {
   closet: [
-    { id: "top", categories: ["top", "dress"] },
+    { id: "top", categories: ["top"] },
     { id: "bottom", categories: ["bottom"] },
+    { id: "dress", categories: ["dress"] },
     { id: "shoes", categories: ["shoes"] },
+    { id: "glasses", categories: ["glasses"] },
     { id: "accessory", categories: ["accessory"] }
   ],
   appearance: [
@@ -208,8 +214,16 @@ export function getWardrobeCategoryItems(
   category: WardrobeCategoryId
 ): AvatarCatalogItem[] {
   if (category === "dress") {
-    return getAvatarV2ItemsByType(catalog, "top").filter((item) =>
-      Boolean(item.outfitKey)
+    // one-piece dresses, then the legacy paired-outfit dresses (their top)
+    return [
+      ...getAvatarV2ItemsByType(catalog, "dress"),
+      ...getAvatarV2ItemsByType(catalog, "top").filter((item) => Boolean(item.outfitKey))
+    ]
+  }
+  if (category === "glasses" || category === "accessory") {
+    const isGlasses = category === "glasses"
+    return getAvatarV2ItemsByType(catalog, "accessory").filter((item) =>
+      (item.accessoryGroup === "eyewear") === isGlasses
     )
   }
   return getAvatarV2ItemsByType(catalog, category).filter(

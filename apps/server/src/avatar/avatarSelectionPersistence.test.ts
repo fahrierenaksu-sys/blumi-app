@@ -5,6 +5,9 @@ import {
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT,
   RETIRED_AVATAR_ITEM_IDS,
+  TEST_AVATAR_ITEM,
+  TEST_AVATAR_ITEM_RULES,
+  projectAvatarLoadoutV1,
   toAvatarLoadoutV2
 } from "@blumi/domain"
 import {
@@ -155,4 +158,23 @@ test("V1 semantic writes map paired dresses and preserve current V2 outerwear", 
   assert.equal(merged.bottomId, DEFAULT_FEMALE_AVATAR_LOADOUT.bottomId)
   assert.equal(merged.outerwearId, current.outerwearId)
   assert.equal(current.dressId, null)
+})
+
+test("an old (V1) client keeps a worn one-piece dress it never touched and takes it off when it changes clothes", () => {
+  const rules = TEST_AVATAR_ITEM_RULES
+  const current: AvatarLoadoutV2 = {
+    ...toAvatarLoadoutV2(rules.starters.female, rules),
+    dressId: TEST_AVATAR_ITEM.onePieceDress
+  }
+  // what the old client was shown, with only the hair changed
+  const hairOnly = { ...projectAvatarLoadoutV1(current, rules), hairId: TEST_AVATAR_ITEM.girlHairPaid }
+  const kept = resolveSemanticAvatarWrite(hairOnly, current, rules)
+  assert.equal(kept.schemaVersion === 2 && kept.dressId, TEST_AVATAR_ITEM.onePieceDress)
+  assert.equal(kept.hairId, TEST_AVATAR_ITEM.girlHairPaid)
+
+  const newTop = { ...projectAvatarLoadoutV1(current, rules), topId: TEST_AVATAR_ITEM.girlTopPaid }
+  const changed = resolveSemanticAvatarWrite(newTop, current, rules)
+  assert.equal(changed.schemaVersion === 2 && changed.dressId, null)
+  assert.equal(changed.topId, TEST_AVATAR_ITEM.girlTopPaid)
+  assert.equal(current.dressId, TEST_AVATAR_ITEM.onePieceDress, "the stored look is never mutated")
 })

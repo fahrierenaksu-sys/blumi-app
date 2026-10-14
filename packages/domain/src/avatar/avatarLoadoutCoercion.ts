@@ -120,6 +120,8 @@ function wearableAccessories(value: unknown, bodyId: string, rules: AvatarItemRu
 }
 
 function wearableDressId(value: unknown, bodyId: string, rules: AvatarItemRules): string | null {
+  const onePiece = wearableItem(value, "dress", bodyId, rules)
+  if (onePiece) return onePiece.itemId
   const top = wearableItem(value, "top", bodyId, rules)
   if (!top?.pairedItemId) return null
   return wearableItem(top.pairedItemId, "bottom", bodyId, rules) ? top.itemId : null

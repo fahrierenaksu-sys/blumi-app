@@ -22,7 +22,7 @@ import {
 } from "./avatarBodyCompatibility"
 import { isRetiredAvatarItemId } from "@blumi/domain"
 
-type RequiredAvatarItemType = Exclude<AvatarItemType, "accessory">
+type RequiredAvatarItemType = Exclude<AvatarItemType, "accessory" | "dress">
 
 const REQUIRED_TYPES: RequiredAvatarItemType[] = [
   "body",
@@ -68,6 +68,7 @@ export function isAvatarV2ItemEquipped(
   item: AvatarCatalogItem
 ): boolean {
   if (item.type === "accessory") return avatar.accessoryIds.includes(item.id)
+  if (item.type === "dress") return avatar.dressId === item.id
   if (avatar.dressId && (item.type === "top" || item.type === "bottom")) {
     return item.type === "top" && item.outfitKey
       ? avatar.dressId === item.id
@@ -95,6 +96,10 @@ export function equipAvatarV2Item(
           item.id
         ]
     return { ...avatar, accessoryIds }
+  }
+  if (item.type === "dress") {
+    // a one-piece dress goes over the separates (kept); tapping it again takes it off and they show again
+    return { ...avatar, dressId: avatar.dressId === item.id ? null : item.id }
   }
   if (item.type === "top" || item.type === "bottom") {
     return applyAvatarOutfitSelection(
@@ -255,6 +260,8 @@ function getEquippedIdForType(
       return avatar.shoesId
     case "accessory":
       return avatar.accessoryIds[0]
+    case "dress":
+      return avatar.dressId ?? undefined
   }
 }
 
@@ -284,6 +291,8 @@ function setEquippedIdForType(
       return { ...avatar, shoesId: id }
     case "accessory":
       return avatar
+    case "dress":
+      return { ...avatar, dressId: id }
   }
 }
 

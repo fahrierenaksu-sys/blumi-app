@@ -37,8 +37,22 @@ export interface Rig25Mesh {
   ranges: Rig25Range[]
 }
 
+/**
+ * What a rig item is worn as. A one-piece `dress` is drawn instead of the top and the bottom and is the bottom for the
+ * legs (its leg drawing, the seated fabric); `glasses` sit on the head over the eyes, under the fringe; `accessory` is
+ * a bag, clip, necklace, hat or earrings (export_rig.py SLOT_ORDER gives each its draw order).
+ */
+export type Rig25ItemSlot = "hair" | "top" | "bottom" | "shoes" | "dress" | "glasses" | "accessory"
+
+/** Slots worn on the lower body: the leg drawings, the seated crotch fabric and painted walk cards follow them. */
+export function isRig25LowerBodySlot(slot: Rig25ItemSlot): boolean {
+  return slot === "bottom" || slot === "shoes" || slot === "dress"
+}
+
 export interface Rig25Item {
-  slot: "hair" | "top" | "bottom" | "shoes"
+  slot: Rig25ItemSlot
+  /** An accessory's catalog group when its draw order depends on it (earrings under the fringe); export_rig.py. */
+  group?: string
   lift: number
   page: number
   /** Painted walk cards for this item (only meaningful when the body has painted walk frames). */

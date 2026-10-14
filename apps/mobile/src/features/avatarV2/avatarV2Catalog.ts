@@ -40,6 +40,7 @@ export const AVATAR_V2_LAYER_ORDER: Record<AvatarItemType, number> = {
   hair: 30,
   bottom: 40,
   top: 50,
+  dress: 50,
   shoes: 60,
   accessory: 70
 }

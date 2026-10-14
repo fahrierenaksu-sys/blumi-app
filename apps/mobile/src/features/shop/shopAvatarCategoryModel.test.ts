@@ -87,3 +87,24 @@ test("identity parts and owned state never become Shop categories", () => {
   ], "owned"), [])
   assert.equal(getAvatarShopCategoryId(regularTop), "top")
 })
+
+// New item kinds (WB integration/slots_2140 DESIGN §9): Elbise holds one-piece dresses too; Gözlük holds eyewear,
+// which leaves Aksesuar; an empty category is not offered (the shelf builder counts products per category).
+const onePiece = product(avatarItem("avatar_v2_dress_one_piece", "dress"))
+const glasses = product(avatarItem("avatar_v2_accessory_round_glasses", "accessory", { accessoryGroup: "eyewear" }))
+const bag = product(avatarItem("avatar_v2_accessory_mini_bag", "accessory", { accessoryGroup: "bag" }))
+
+test("one-piece dresses are Dresses, glasses are Glasses and never Accessories", () => {
+  const all = [regularTop, dressTop, regularBottom, onePiece, glasses, bag]
+  assert.deepEqual(filterAvatarShopProductsByCategory(all, "dress").map((item) => item.id), [dressTop.id, onePiece.id])
+  assert.deepEqual(filterAvatarShopProductsByCategory(all, "glasses").map((item) => item.id), [glasses.id])
+  assert.deepEqual(filterAvatarShopProductsByCategory(all, "accessory").map((item) => item.id), [bag.id])
+  assert.deepEqual(filterAvatarShopProductsByCategory(all, "top").map((item) => item.id), [regularTop.id])
+  assert.equal(getAvatarShopCategoryId(onePiece), "dress")
+  assert.equal(getAvatarShopCategoryId(glasses), "glasses")
+  assert.equal(getAvatarShopCategoryId(bag), "accessory")
+  for (const item of all) {
+    const id = getAvatarShopCategoryId(item)
+    assert.ok(id && filterAvatarShopProductsByCategory([item], id).length === 1, `${item.id} is listed on its own shelf`)
+  }
+})

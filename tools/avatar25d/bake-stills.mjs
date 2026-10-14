@@ -43,7 +43,9 @@ const STILLS = join(AVATAR, "stills")
 const MANIFEST = join(ROOT, "packages/domain/src/avatar/avatarStillManifest.json")
 const SHOWCASE_BAKED = join(ROOT, "tools/avatar25d/showcase-baked.json")
 const RIG_DIRS = { female: "girl", male: "boy" }
-const SLOT_RANK = { shoes: 0, bottom: 1, top: 2, hair: 3 }
+// worn order of the live renderer (resolveAvatarDraw): the four slots, then a dress, glasses, accessories (appended, so
+// the seq of every existing layer is unchanged)
+const SLOT_RANK = { shoes: 0, bottom: 1, top: 2, hair: 3, dress: 4, glasses: 5, accessory: 6 }
 const CHECK = process.argv.includes("--check")
 const option = (flag) => { const k = process.argv.indexOf(flag); return k >= 0 ? process.argv[k + 1] : undefined }
 /** --rig <rigId>=<dir> --out <dir>: bake one rig from outside the repo (a factory wardrobe) for QA, nothing committed. */

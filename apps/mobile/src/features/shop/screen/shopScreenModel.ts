@@ -85,6 +85,8 @@ export function maskUnverifiedProductOwnership(
 export function getCompactCategoryLabel(category: ShopCategoryOption, locale: AppLocale): string {
   if (locale === "tr" && category.id === "shoes") return "Ayakkabı"
   if (locale === "tr" && category.id === "accessory") return "Aksesuar"
+  if (locale === "tr" && category.id === "glasses") return "Gözlük"
+  if (locale === "tr" && category.id === "dress") return "Elbise"
   return category.label
 }
 
@@ -99,6 +101,7 @@ export function getAvatarIcon(
   if (type === "bottom") return "layers"
   if (type === "shoes") return "walk"
   if (type === "accessory") return "glasses"
+  if (type === "dress") return "sparkles"
   return "person"
 }
 
@@ -161,7 +164,8 @@ export function buildShopCategoryOptions(
     dress: "sparkles",
     outerwear: "snow",
     shoes: "walk",
-    accessory: "glasses",
+    glasses: "glasses",
+    accessory: "bag-handle",
     hair: "color-wand"
   }
   const candidates: Omit<ShopCategoryOption, "count">[] =

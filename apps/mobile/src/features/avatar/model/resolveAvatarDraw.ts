@@ -1,6 +1,6 @@
-import { coerceAvatarLoadout } from "@blumi/domain"
+import { coerceAvatarLoadout, type AvatarItemRules } from "@blumi/domain"
 import type { RoomWorldMovementTiming } from "../../roomWorld/roomWorldRuntime"
-import type { Rig25, Rig25Motion } from "../renderer/rigTypes"
+import { isRig25LowerBodySlot, type Rig25, type Rig25ItemSlot, type Rig25Motion } from "../renderer/rigTypes"
 import type { AvatarDrawInput, AvatarDrawSpec, AvatarPose, AvatarRigId } from "./avatarRoomContract"
 import { AVATAR_ART_SLOTS, AVATAR_ITEM_ART, AVATAR_RIG_STARTER, avatarRigForBody, type AvatarArtSlot } from "./avatarItemArt"
 
@@ -29,35 +29,78 @@ function toView(direction: AvatarDrawInput["direction"]): Pick<AvatarDrawSpec, "
   return { view: "front", mirror: false }
 }
 
-/** The rig item drawing this canonical ID in this view, if the body has art for it (and walk cards where needed). */
-function rigItemFor(rig: Rig25, rigId: AvatarRigId, view: "front" | "back", canonicalId: string | undefined): string | null {
-  const rigItemId = canonicalId ? AVATAR_ITEM_ART[rigId][canonicalId] : undefined
-  const art = rigItemId ? rig.views[view].items[rigItemId] : undefined
-  if (!rigItemId || !art) return null
+/**
+ * The rig item drawing this canonical ID in this view, if the body has art for it (and walk cards where needed).
+ * With `slots`, only art worn as one of those slots counts.
+ */
+/** Canonical item ID → rig item, per body (`AVATAR_ITEM_ART`; tests pass their own). */
+type AvatarItemArtMap = Readonly<Record<AvatarRigId, Readonly<Record<string, string>>>>
+
+function rigItemFor(
+  rig: Rig25,
+  rigId: AvatarRigId,
+  view: "front" | "back",
+  canonicalId: string | null | undefined,
+  art: AvatarItemArtMap,
+  slots?: readonly Rig25ItemSlot[]
+): string | null {
+  const rigItemId = canonicalId ? art[rigId][canonicalId] : undefined
+  const item = rigItemId ? rig.views[view].items[rigItemId] : undefined
+  if (!rigItemId || !item) return null
+  if (slots && !slots.includes(item.slot)) return null
   // with painted walk frames, a lower-body item without its own walk cards would vanish mid-walk
   const paintedWalk = rig.views[view].walk.frames.length > 0
-  if (paintedWalk && (art.slot === "bottom" || art.slot === "shoes") && !art.hasWalk) return null
+  if (paintedWalk && isRig25LowerBodySlot(item.slot) && !item.hasWalk) return null
   return rigItemId
+}
+
+/**
+ * The worn one-piece dress, glasses and accessories this body has rig art for (DESIGN slots_2140 §5): the dress
+ * replaces the top and the bottom, then glasses, then accessories by canonical ID. A look without them adds nothing.
+ */
+function newKindItems(
+  rig: Rig25,
+  rigId: AvatarRigId,
+  view: "front" | "back",
+  loadout: ReturnType<typeof coerceAvatarLoadout>,
+  art: AvatarItemArtMap
+) {
+  const dress = rigItemFor(rig, rigId, view, loadout.schemaVersion === 2 ? loadout.dressId : null, art, ["dress"])
+  const worn = [...loadout.accessoryIds].sort()
+  const glasses = worn.map((id) => rigItemFor(rig, rigId, view, id, art, ["glasses"])).find((id) => id !== null) ?? null
+  const accessories = worn.map((id) => rigItemFor(rig, rigId, view, id, art, ["accessory"])).filter((id): id is string => id !== null)
+  return { dress, extra: [...(dress ? [dress] : []), ...(glasses ? [glasses] : []), ...accessories] }
 }
 
 /**
  * The drawing for anyone's avatar (the owner's or a remote participant's). Total: never null, never throws.
  * 1. The loadout is coerced by the domain rule (`coerceAvatarLoadout`, the same one the server reads with), so a
  *    remote snapshot with unknown, retired or other-body IDs still resolves.
- * 2. Draw-only: a slot whose item has no rig art for that body is drawn as the body's rig starter piece; dresses,
- *    outerwear and accessories have no rig art yet and are not drawn. The stored loadout never changes.
+ * 2. Draw-only: a slot whose item has no rig art for that body is drawn as the body's rig starter piece. A worn
+ *    one-piece dress with rig art is drawn instead of the top and the bottom (without art, the separates stored under
+ *    it are drawn); glasses and accessories with rig art are added; outerwear is not drawn. The stored loadout never
+ *    changes.
  */
-export function resolveAvatarDraw(rigs: Readonly<Record<AvatarRigId, Rig25>>, input: AvatarDrawInput): AvatarDrawSpec {
-  const loadout = coerceAvatarLoadout(input.loadout, input.hints ?? {})
+export function resolveAvatarDraw(
+  rigs: Readonly<Record<AvatarRigId, Rig25>>,
+  input: AvatarDrawInput,
+  /** Test seam: the item art map and the item rules coercion reads (default: the live ones). */
+  options: { readonly art?: AvatarItemArtMap; readonly rules?: AvatarItemRules } = {}
+): AvatarDrawSpec {
+  const art = options.art ?? AVATAR_ITEM_ART
+  const loadout = coerceAvatarLoadout(input.loadout, input.hints ?? {}, options.rules)
   const rigId = avatarRigForBody(loadout.bodyId)
   const rig = rigs[rigId]
   const { view, mirror } = toView(input.direction)
+  const { dress, extra } = newKindItems(rig, rigId, view, loadout, art)
   const itemIds: string[] = []
   for (const slot of AVATAR_ART_SLOTS) {
-    const worn = rigItemFor(rig, rigId, view, loadout[SLOT_KEY[slot]])
-    const drawn = worn ?? rigItemFor(rig, rigId, view, AVATAR_RIG_STARTER[rigId][slot])
+    if (dress && (slot === "top" || slot === "bottom")) continue
+    const worn = rigItemFor(rig, rigId, view, loadout[SLOT_KEY[slot]], art)
+    const drawn = worn ?? rigItemFor(rig, rigId, view, AVATAR_RIG_STARTER[rigId][slot], art)
     if (drawn) itemIds.push(drawn)
   }
+  itemIds.push(...extra)
   return { rig: rigId, view, mirror, pose: toPose(input.state), itemIds }
 }
 

@@ -39,7 +39,8 @@ export interface LegPlan {
  */
 export function legPlan(v: Rig25View, worn: string[]): LegPlan | null {
   const owns = (k: number, key: string) => k >= 0 && v.items[worn[k]].mesh.ranges.some((r) => r.legVariant === key && r.layer)
-  const bottom = worn.findIndex((id) => v.items[id].slot === "bottom")
+  // a one-piece dress is the bottom for the legs (the bare legs under its skirt)
+  const bottom = worn.findIndex((id) => v.items[id].slot === "bottom" || v.items[id].slot === "dress")
   const shoes = worn.findIndex((id) => v.items[id].slot === "shoes")
   if (bottom >= 0 && shoes >= 0) {
     const pair = worn.findIndex((_, k) => owns(k, "bottom+shoes"))

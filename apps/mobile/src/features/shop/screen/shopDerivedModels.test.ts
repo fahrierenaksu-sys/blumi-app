@@ -291,7 +291,7 @@ function mountCatalog() {
             avatarProductOrder.sortAvatarShopProducts(products, "tr")
         }
       },
-      real: ["./shopScreenModel"]
+      real: ["./shopScreenModel", "../../avatarV2/avatarDressWriteGate"]
     }
   ).useShopCatalogProducts
   const inventory: BlumiInventorySnapshot = {
@@ -302,7 +302,7 @@ function mountCatalog() {
     enforcePublishedCatalog: true, inventory, avatar: DEFAULT_AVATAR_V2,
     roomDecor: { roomShellId: DEFAULT_ROOM_V2_SHELL_ID, placedItems: [] },
     roomFurnitureCatalog: undefined, qaOnlyOwnedRoomItemIds: undefined,
-    semanticOutfitMerchandisingEnabled: true, shopMode: "avatar",
+    semanticOutfitMerchandisingEnabled: true, capabilities: {}, shopMode: "avatar",
     selectedCategoryId: "tops", locale: "tr"
   }
   const first = runtime.render(() => hook(input))
