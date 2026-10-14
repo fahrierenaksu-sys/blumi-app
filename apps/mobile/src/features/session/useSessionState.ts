@@ -147,6 +147,12 @@ export interface UseSessionStateResult {
   acknowledgeModeration: () => Promise<void>
   refreshAccountModeration: () => Promise<void>
   clearSessionActor: () => Promise<void>
+  /**
+   * Returns a reset bound to the current account and login generation. Call
+   * it when an account-ending action (deletion, phone change) starts; a late
+   * completion after logout or another login then leaves the newer session.
+   */
+  bindSessionReset: () => () => Promise<void>
 }
 
 export function getErrorMessage(error: unknown): string {
@@ -810,6 +816,21 @@ export function useSessionState(): UseSessionStateResult {
       setIsBootstrapping(false)
     }
   }, [mutationCoordinator, refreshCoordinator, sessionActor])
+  const clearSessionActorRef = useRef(clearSessionActor)
+  clearSessionActorRef.current = clearSessionActor
+
+  const bindSessionReset = useCallback((): (() => Promise<void>) => {
+    const boundGeneration = mutationCoordinator.currentGeneration()
+    const boundUserId = sessionActorRef.current?.session.userId ?? null
+    return async () => {
+      if (
+        boundUserId === null ||
+        mutationCoordinator.currentGeneration() !== boundGeneration ||
+        sessionActorRef.current?.session.userId !== boundUserId
+      ) return
+      await clearSessionActorRef.current()
+    }
+  }, [mutationCoordinator])
 
   const persistProfileUpdate = useCallback(
     async (
@@ -1153,6 +1174,7 @@ export function useSessionState(): UseSessionStateResult {
     clearErrorMessage,
     acknowledgeModeration,
     refreshAccountModeration,
-    clearSessionActor
+    clearSessionActor,
+    bindSessionReset
   }
 }

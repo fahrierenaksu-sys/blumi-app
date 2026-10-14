@@ -30,9 +30,10 @@ export function useAccountDeletion(input: {
   sessionActor: SessionActor
   copy: SettingsCopy
   locale: AppLocale
-  onResetSession: () => Promise<void>
+  /** Returns a reset bound to the session the final request starts in. */
+  bindSessionReset: () => () => Promise<void>
 }) {
-  const { copy, locale, onResetSession, sessionActor } = input
+  const { bindSessionReset, copy, locale, sessionActor } = input
   const [isDeletingAccount, setIsDeletingAccount] = useState(false)
   const [deletionCode, setDeletionCode] = useState("")
   const [deletionCodeVisible, setDeletionCodeVisible] = useState(false)
@@ -42,6 +43,7 @@ export function useAccountDeletion(input: {
   const deleteAccount = useCallback(async (confirmationToken: string): Promise<void> => {
     if (isDeletingAccount) return
     setIsDeletingAccount(true)
+    const resetDeletedSession = bindSessionReset()
     try {
       let deletionStatus: "deleted" | "pending_firebase_deletion" = "deleted"
       if (sessionActor.session.mode === "production") {
@@ -51,7 +53,7 @@ export function useAccountDeletion(input: {
           confirmationToken
         )
       }
-      await onResetSession()
+      await resetDeletedSession()
       showToast({
         title: deletionStatus === "deleted" ? copy.deletedTitle : copy.deletionPendingTitle,
         body: deletionStatus === "deleted" ? copy.deletedBody : copy.deletionPendingBody,
@@ -66,7 +68,7 @@ export function useAccountDeletion(input: {
     } finally {
       setIsDeletingAccount(false)
     }
-  }, [copy, isDeletingAccount, locale, onResetSession, sessionActor])
+  }, [bindSessionReset, copy, isDeletingAccount, locale, sessionActor])
 
   const requestDeletionCode = useCallback(async () => {
     if (isDeletingAccount || sessionActor.session.mode !== "production") {

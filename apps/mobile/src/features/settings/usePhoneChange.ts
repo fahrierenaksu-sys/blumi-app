@@ -76,9 +76,10 @@ export function usePhoneChange(input: {
   sessionActor: SessionActor
   copy: SettingsCopy
   locale: AppLocale
-  onResetSession: () => Promise<void>
+  /** Returns a reset bound to the session the final request starts in. */
+  bindSessionReset: () => () => Promise<void>
 }) {
-  const { copy, locale, onResetSession, sessionActor } = input
+  const { bindSessionReset, copy, locale, sessionActor } = input
   const [isChangingPhone, setIsChangingPhone] = useState(false)
   const [form, dispatch] = useReducer(phoneChangeFormReducer, INITIAL_PHONE_CHANGE_FORM_STATE)
   const {
@@ -227,6 +228,7 @@ export function usePhoneChange(input: {
       return
     }
     setIsChangingPhone(true)
+    const resetChangedSession = bindSessionReset()
     try {
       // Verified: reuse a still-valid proof from an attempt whose outcome is open.
       let proof = newPhoneProofRef.current
@@ -278,7 +280,7 @@ export function usePhoneChange(input: {
 
       resetPhoneChangeFlow()
       verifiedCurrentPhoneRef.current = null
-      await onResetSession()
+      await resetChangedSession()
       showToast({
         title: copy.changePhone,
         body: copy.signOutBody,
@@ -288,12 +290,12 @@ export function usePhoneChange(input: {
       setIsChangingPhone(false)
     }
   }, [
+    bindSessionReset,
     copy,
     currentPhoneConfirmationToken,
     isChangingPhone,
     locale,
     newPhoneCode,
-    onResetSession,
     resetPhoneChangeFlow,
     sessionActor
   ])

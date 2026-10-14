@@ -570,3 +570,46 @@ test("foreground refresh with a verified invalid session signs out", async () =>
   assert.equal(f.current(), null)
   f.runtime.unmount()
 })
+
+// A deletion or phone change that finishes late resets only the session it
+// started in. Another login (or a new login of the same user) in between
+// keeps the newer session.
+for (const relogin of relogins) {
+  test(`a late account-ending completion cannot reset the session after logout and ${relogin.label}`, async () => {
+    const f = mount()
+    await f.profileStarted.promise
+    f.profile.resolve(f.snapshot)
+    await settle()
+    const resetStartedSession = f.result().bindSessionReset()
+
+    await f.result().clearSessionActor()
+    const next = productionActor(relogin.userId, relogin.token)
+    await f.login(next)
+    const clearsBefore = f.clears.length
+    await resetStartedSession()
+    await settle()
+
+    assert.deepEqual(f.current(), next)
+    assert.deepEqual(f.stored(), next)
+    assert.equal(f.clears.length, clearsBefore)
+    f.runtime.unmount()
+  })
+}
+
+test("an account-ending completion still resets its own session after a token refresh", async () => {
+  const f = mount()
+  await f.profileStarted.promise
+  f.profile.resolve(f.snapshot)
+  await settle()
+  const resetStartedSession = f.result().bindSessionReset()
+  f.foreground()
+  await f.refreshStarted.promise
+  f.refresh.resolve(f.rotated)
+  await settle()
+
+  await resetStartedSession()
+  await settle()
+
+  assert.equal(f.current(), null)
+  assert.deepEqual(f.clears, ["production"])
+})

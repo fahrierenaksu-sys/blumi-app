@@ -37,6 +37,8 @@ export function createSessionMutationCoordinator(dependencies: {
   return {
     invalidate() { generation += 1 },
     beginReplacement(): number { generation += 1; return generation },
+    /** Changes on every login, logout and unmount, not on a token refresh. */
+    currentGeneration(): number { return generation },
     capture(actor: SessionActor, isMutation = true): MutationTicket {
       const ticket = { generation, userId: actor.session.userId, mode: actor.session.mode, mutation: null }
       requireCurrent(ticket)

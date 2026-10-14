@@ -27,7 +27,8 @@ function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
     resets: 0,
     codeRequests: [] as string[],
     toasts: [] as string[],
-    proofsSent: [] as string[]
+    proofsSent: [] as string[],
+    events: [] as string[]
   }
   let firebasePhone = OLD_PHONE
   let verifyCount = 0
@@ -59,6 +60,7 @@ function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
           },
           confirmPhoneChange: async (_url: string, _token: string, _current: string, next: string) => {
             calls.confirm += 1
+            calls.events.push("confirm")
             calls.proofsSent.push(next)
             const outcome = confirmOutcomes.shift() ?? "ok"
             if (outcome !== "ok") throw outcome
@@ -75,7 +77,10 @@ function mountPhoneChange(confirmOutcomes: Array<Error | "ok">) {
     sessionActor: actor,
     copy,
     locale: "en",
-    onResetSession: async () => { calls.resets += 1 }
+    bindSessionReset: () => {
+      calls.events.push("bind")
+      return async () => { calls.resets += 1 }
+    }
   })))
   const hook = () => api
   async function startFlow() {
@@ -108,6 +113,7 @@ test("a transient failure while finishing keeps the new-phone proof and the retr
   assert.deepEqual(f.calls.proofsSent, ["fake-proof-2", "fake-proof-2"])
   assert.equal(f.calls.firebaseConfirms, 2, "the new-phone code is confirmed once, not again on retry")
   assert.equal(f.calls.resets, 1)
+  assert.deepEqual(f.calls.events, ["bind", "confirm", "bind", "confirm"], "each final request binds the reset to its session first")
 })
 
 test("a lost success response is recovered when the retry finds the old session already ended", async () => {
