@@ -431,3 +431,66 @@ test("the test-only fixture catalog shares no item ID with the live catalogs and
   assert.equal(validateAvatarLoadout(fixtureGirl, fixtureOwnedIds, fixtureRules).ok, true)
   assert.equal(validateAvatarLoadout(fixtureBoy, fixtureOwnedIds, fixtureRules).ok, true)
 })
+
+// New item kinds (slots_2140 DESIGN §3-4): a one-piece dress is ONE item worn as `dressId`; the separates stay stored
+// under it; glasses and accessories are optional `accessoryIds`.
+const withOnePieceDress = (dressId: string | null): AvatarLoadoutV2 => ({
+  ...toAvatarLoadoutV2(fixtureGirl, fixtureRules),
+  topId: T.girlTopPaid,
+  bottomId: T.girlBottomPaid,
+  dressId
+})
+const fixtureOwnedWith = (...ids: string[]) => [...fixtureOwnedIds, T.girlTopPaid, T.girlBottomPaid, ...ids]
+
+test("an owned one-piece dress is worn over the stored separates, and taking it off keeps them", () => {
+  const worn = withOnePieceDress(T.onePieceDress)
+  const result = validateAvatarLoadout(worn, fixtureOwnedWith(T.onePieceDress), fixtureRules)
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.loadout, worn)
+
+  const off = validateAvatarLoadout({ ...worn, dressId: null }, fixtureOwnedWith(T.onePieceDress), fixtureRules)
+  assert.equal(off.ok, true)
+  assert.equal(off.loadout?.topId, T.girlTopPaid)
+  assert.equal(off.loadout?.bottomId, T.girlBottomPaid)
+})
+
+test("the server rejects a one-piece dress the account does not own, or one for the other body", () => {
+  const unowned = validateAvatarLoadout(withOnePieceDress(T.onePieceDress), fixtureOwnedWith(), fixtureRules)
+  assert.equal(unowned.code, "unowned_item")
+
+  const boyLook = { ...toAvatarLoadoutV2(fixtureBoy, fixtureRules), dressId: T.onePieceDress }
+  const otherBody = validateAvatarLoadout(boyLook, [...fixtureOwnedIds, T.onePieceDress], fixtureRules)
+  assert.equal(otherBody.code, "incompatible_item")
+})
+
+test("a one-piece dress is only a dress: it cannot be worn as a top", () => {
+  const asTop = { ...withOnePieceDress(null), topId: T.onePieceDress }
+  assert.equal(validateAvatarLoadout(asTop, fixtureOwnedWith(T.onePieceDress), fixtureRules).code, "wrong_slot")
+})
+
+test("an old client is shown the separates under a one-piece dress, never its unknown ID", () => {
+  const worn = withOnePieceDress(T.onePieceDress)
+  const v1 = projectAvatarLoadoutV1(worn, fixtureRules)
+  assert.equal(v1.topId, T.girlTopPaid)
+  assert.equal(v1.bottomId, T.girlBottomPaid)
+  assert.ok(!Object.values(v1).flat().includes(T.onePieceDress))
+})
+
+test("glasses toggle on and off as an optional accessory, one pair at a time, and must be owned", () => {
+  const look = toAvatarLoadoutV2(fixtureGirl, fixtureRules)
+  const owned = [...fixtureOwnedIds, T.paidEyewear]
+  assert.equal(validateAvatarLoadout({ ...look, accessoryIds: [T.paidEyewear] }, owned, fixtureRules).ok, true)
+  assert.equal(validateAvatarLoadout({ ...look, accessoryIds: [] }, owned, fixtureRules).ok, true)
+  assert.equal(validateAvatarLoadout({ ...look, accessoryIds: [T.paidEyewear] }, fixtureOwnedIds, fixtureRules).code, "unowned_item")
+})
+
+test("old loadouts without the new kinds validate and project exactly as before", () => {
+  for (const look of [DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT]) {
+    const before = JSON.stringify(look)
+    const result = validateAvatarLoadout(look, ownedDefaultIds)
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.loadout, look)
+    assert.deepEqual(projectAvatarLoadoutV1(toAvatarLoadoutV2(look)), cloneAvatarLoadout(look))
+    assert.equal(JSON.stringify(look), before)
+  }
+})

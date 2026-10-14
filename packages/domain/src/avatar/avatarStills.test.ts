@@ -133,3 +133,66 @@ test("the girl keeps her QA'd pair drawing and no layer of hers is a sheet part"
   assert.ok(layers.every((l) => l.source === undefined));
   assert.deepEqual(legAssets(layers).map((l) => l.asset.split("__").pop()), ["bottom-shoes", "bottom-shoes"]);
 });
+
+// New item kinds (slots_2140 DESIGN §8): a manifest whose girl has baked art for a one-piece dress, glasses and an
+// accessory (the fixture items; rules = the fixture catalog), built from her real entries.
+import { TEST_AVATAR_ITEM as FIXTURE, TEST_AVATAR_ITEM_RULES as FIXTURE_RULES } from "./avatarItemRulesFixture";
+import { toAvatarLoadoutV2 } from "./avatarLoadoutRules";
+import type { AvatarStillManifest } from "./avatarStills";
+
+function manifestWithNewKinds(): AvatarStillManifest {
+  const girl = AVATAR_STILL_MANIFEST.bodies.female;
+  const copyOf = (owner: string, slot: string, key: string): AvatarStillLayerEntry[] =>
+    girl.layers.full.filter((e) => e.owner === girl.starter.top && e.legVariant === undefined).map((e, i) => ({ ...e, owner, slot, key: `${key}${i}` }));
+  const extra = [
+    ...copyOf(FIXTURE.onePieceDress, "dress", "dress__"),
+    ...copyOf(FIXTURE.paidEyewear, "glasses", "glasses__"),
+    ...copyOf(FIXTURE.paidEarrings, "accessory", "earrings__"),
+  ];
+  const item = (slot: string, id: string) => ({ slot, rigItemId: id, thumb: id });
+  return {
+    ...AVATAR_STILL_MANIFEST,
+    bodies: {
+      ...AVATAR_STILL_MANIFEST.bodies,
+      female: {
+        ...girl,
+        items: { ...girl.items, [FIXTURE.onePieceDress]: item("dress", "d"), [FIXTURE.paidEyewear]: item("glasses", "g"), [FIXTURE.paidEarrings]: item("accessory", "e") },
+        layers: { ...girl.layers, full: [...girl.layers.full, ...extra] },
+      },
+    },
+  };
+}
+
+const fixtureLook = (dressId: string | null, accessoryIds: string[] = []) => ({
+  ...toAvatarLoadoutV2(FIXTURE_RULES.starters.female, FIXTURE_RULES),
+  dressId,
+  accessoryIds,
+});
+const resolveFixture = (look: unknown) => resolveAvatarStillLayers(look, "full", { manifest: manifestWithNewKinds(), rules: FIXTURE_RULES });
+
+test("a worn one-piece dress is drawn instead of the top and the bottom; taking it off draws the separates again", () => {
+  const separates = resolveFixture(fixtureLook(null));
+  const dressed = resolveFixture(fixtureLook(FIXTURE.onePieceDress));
+  const girl = AVATAR_STILL_MANIFEST.bodies.female;
+  assert.ok(owners(dressed.layers).includes("dress"));
+  assert.ok(!dressed.layers.some((l) => l.asset.includes(girl.starter.top!) || l.asset.includes(`/${girl.starter.bottom!}__`)));
+  assert.ok(dressed.cacheKey.endsWith(`|dress=${FIXTURE.onePieceDress}`));
+  assert.deepEqual(resolveFixture(fixtureLook(null)), separates);
+  assert.ok(owners(separates.layers).includes(girl.starter.top!));
+});
+
+test("glasses and an accessory add their layers when worn and leave the look unchanged when taken off", () => {
+  const bare = resolveFixture(fixtureLook(null));
+  const worn = resolveFixture(fixtureLook(null, [FIXTURE.paidEyewear, FIXTURE.paidEarrings]));
+  const added = worn.layers.filter((l) => !bare.layers.some((b) => b.asset === l.asset));
+  assert.ok(bare.layers.every((b) => worn.layers.some((l) => l.asset === b.asset)), "nothing of the look is lost");
+  assert.deepEqual([...new Set(owners(added))].sort(), ["earrings", "glasses"]);
+  assert.ok(worn.cacheKey.endsWith(`|glasses=${FIXTURE.paidEyewear}|accessory=${FIXTURE.paidEarrings}`));
+  assert.equal(resolveFixture(fixtureLook(null, [])).cacheKey, bare.cacheKey);
+});
+
+test("current looks keep their exact still layers and cache keys", () => {
+  const still = resolveAvatarStillLayers(GIRL_RIG_OUTFIT, "full");
+  const s = AVATAR_STILL_MANIFEST.bodies.female.starter;
+  assert.equal(still.cacheKey, [AVATAR_STILL_MANIFEST.bakerVersion, "female", s.shoes, s.bottom, s.top, s.hair, "full", 0].join("|"));
+});

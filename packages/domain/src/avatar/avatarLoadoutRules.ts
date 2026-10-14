@@ -207,10 +207,13 @@ export function projectAvatarLoadoutV1(
   loadout: ReadonlyAvatarLoadout,
   rules: AvatarItemRules = AVATAR_ITEM_RULES
 ): AvatarLoadoutV1 {
-  const dressItems = loadout.schemaVersion === 2 && loadout.dressId !== null
+  // a one-piece dress has no V1 form: an old client is shown the separates stored under it
+  const onePiece = loadout.schemaVersion === 2 && loadout.dressId !== null &&
+    findAvatarRuleItem(rules, loadout.dressId)?.slot === "dress"
+  const dressItems = loadout.schemaVersion === 2 && loadout.dressId !== null && !onePiece
     ? findDressItems(loadout.dressId, rules)
     : null
-  if (loadout.schemaVersion === 2 && loadout.dressId !== null && !dressItems) {
+  if (loadout.schemaVersion === 2 && loadout.dressId !== null && !onePiece && !dressItems) {
     throw new Error("Cannot project an unknown or incomplete dress entitlement.")
   }
   return {
@@ -255,12 +258,14 @@ function resolveDressItems(
   itemId: string,
   rules: AvatarItemRules
 ):
-  | { ok: true; items: readonly [AvatarLoadoutCatalogItem, AvatarLoadoutCatalogItem] }
+  | { ok: true; items: readonly AvatarLoadoutCatalogItem[] }
   | { ok: false; error: AvatarLoadoutValidationResult & { ok: false } } {
   const dressTop = findAvatarRuleItem(rules, itemId)
   if (!dressTop) {
     return { ok: false, error: invalid("unknown_item", "Unknown avatar item.") }
   }
+  // a one-piece dress is one item; a legacy dress is a paired top and bottom
+  if (dressTop.slot === "dress") return { ok: true, items: [dressTop] }
   if (dressTop.slot !== "top" || !dressTop.outfitKey || !dressTop.pairedItemId) {
     return {
       ok: false,

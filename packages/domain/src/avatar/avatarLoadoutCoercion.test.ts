@@ -9,7 +9,7 @@ import { coerceAvatarLoadout } from "./avatarLoadoutCoercion"
 import { toAvatarLoadoutV2, validateAvatarLoadout } from "./avatarLoadoutRules"
 import { RETIRED_AVATAR_ITEM_IDS } from "./retiredAvatarItems"
 import { AVATAR_ITEM_RULES, type AvatarItemRules } from "./avatarItemRules"
-import { TEST_AVATAR_ITEM_RULES } from "./avatarItemRulesFixture"
+import { TEST_AVATAR_ITEM, TEST_AVATAR_ITEM_RULES } from "./avatarItemRulesFixture"
 
 const ALL_IDS = AVATAR_LOADOUT_CATALOG.map((item) => item.itemId)
 const SLOT_KEYS = ["faceId", "eyesId", "noseId", "mouthId", "hairId", "topId", "bottomId", "shoesId"] as const
@@ -110,4 +110,18 @@ test("a loadout the strict rules accept is returned unchanged", () => {
     }
   }
   assert.ok(checked > 50, `only ${checked} strictly valid looks were checked`)
+})
+
+test("a stored one-piece dress is kept when wearable and dropped (separates show) when not", () => {
+  const T = TEST_AVATAR_ITEM
+  const rules = TEST_AVATAR_ITEM_RULES
+  const girl = { ...toAvatarLoadoutV2(rules.starters.female, rules), topId: T.girlTopPaid, dressId: T.onePieceDress }
+  const kept = coerceAvatarLoadout(girl, {}, rules)
+  assert.equal(kept.schemaVersion === 2 && kept.dressId, T.onePieceDress)
+  assert.equal(kept.topId, T.girlTopPaid)
+
+  const boy = { ...toAvatarLoadoutV2(rules.starters.male, rules), dressId: T.onePieceDress }
+  const dropped = coerceAvatarLoadout(boy, {}, rules)
+  assert.equal(dropped.schemaVersion === 2 && dropped.dressId, null)
+  assert.equal(dropped.topId, rules.starters.male.topId)
 })

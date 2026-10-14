@@ -11,6 +11,12 @@ import type { AvatarLoadout } from "@blumi/contracts";
 export type AvatarStillRigId = "female" | "male";
 export type AvatarStillProduct = "full" | "bust";
 export type AvatarStillSlot = "shoes" | "bottom" | "top" | "hair";
+/**
+ * What a drawn item is drawn as: one of the four worn slots, a one-piece dress (instead of the top and the bottom),
+ * glasses, or one accessory (`accessory:<canonical id>`, several can be worn). Manifest item slots: the four, then
+ * "dress", "glasses", "accessory" (the rig item's slot).
+ */
+export type AvatarStillDrawSlot = AvatarStillSlot | "dress" | "glasses" | `accessory:${string}`;
 export type AvatarStillRect = readonly [number, number, number, number];
 
 export interface AvatarStillLayerEntry {
@@ -115,7 +121,7 @@ export interface AvatarStillResolved {
   /** Crop windows in that space (full: bust, half, full; bust: the whole window). */
   readonly windows: AvatarStillBody["windows"];
   readonly mirror: boolean;
-  /** Equal looks share one key: bakerVersion|rig|hair|top|bottom|shoes|product|mirror (drawn items). */
+  /** Equal looks share one key: bakerVersion|rig|shoes|bottom|top|hair|product|mirror, then any drawn dress, glasses, accessories. */
   readonly cacheKey: string;
 }
 
@@ -131,20 +137,48 @@ export function avatarStillRigForBody(bodyId: string): AvatarStillRigId {
   return bodyId === DEFAULT_MALE_AVATAR_LOADOUT.bodyId ? "male" : "female";
 }
 
+/** The worn one-piece dress when this body has baked art for it, else undefined (the separates are drawn). */
+function drawnDress(body: AvatarStillBody, loadout: AvatarLoadout): string | undefined {
+  const dressId = loadout.schemaVersion === 2 ? loadout.dressId : null;
+  return dressId !== null && body.items[dressId]?.slot === "dress" ? dressId : undefined;
+}
+
 /**
  * Which item each slot draws for a coerced loadout: the worn item when this body has baked art for it in that slot,
- * else the body's starter piece, else nothing. Shared by the 3/4 stills and the front showcase.
+ * else the body's starter piece, else nothing. A worn one-piece dress with art is drawn instead of the top and the
+ * bottom; worn glasses and accessories with art are added (by canonical ID). Shared by the 3/4 stills and the front
+ * showcase. A look without them draws exactly the four slots as before.
  */
-export function avatarStillDrawnItems(body: AvatarStillBody, loadout: AvatarLoadout): ReadonlyMap<AvatarStillSlot, string> {
-  const drawn = new Map<AvatarStillSlot, string>();
+export function avatarStillDrawnItems(body: AvatarStillBody, loadout: AvatarLoadout): ReadonlyMap<AvatarStillDrawSlot, string> {
+  const drawn = new Map<AvatarStillDrawSlot, string>();
+  const dress = drawnDress(body, loadout);
   for (const [slot, key] of AVATAR_STILL_SLOT_KEYS) {
+    if (dress && (slot === "top" || slot === "bottom")) continue;
     const worn = loadout[key];
     const own = body.items[worn]?.slot === slot ? worn : undefined;
     const starter = body.starter[slot];
     const item = own ?? (starter && body.items[starter]?.slot === slot ? starter : undefined);
     if (item) drawn.set(slot, item);
   }
+  if (dress) drawn.set("dress", dress);
+  const worn = [...loadout.accessoryIds].sort();
+  const glasses = worn.find((id) => body.items[id]?.slot === "glasses");
+  if (glasses) drawn.set("glasses", glasses);
+  for (const id of worn) if (body.items[id]?.slot === "accessory") drawn.set(`accessory:${id}`, id);
   return drawn;
+}
+
+/**
+ * The cache-key parts naming what is drawn: `slots`, the four slots in AVATAR_STILL_SLOT_KEYS order ("-" when empty),
+ * and `extra`, one segment per drawn dress, glasses or accessory. Keys put `extra` last, so a look without those keeps
+ * exactly its previous key.
+ */
+export function avatarStillDrawnKey(drawn: ReadonlyMap<AvatarStillDrawSlot, string>): { readonly slots: readonly string[]; readonly extra: readonly string[] } {
+  const isFourSlot = (slot: AvatarStillDrawSlot) => AVATAR_STILL_SLOT_KEYS.some(([own]) => own === slot);
+  return {
+    slots: AVATAR_STILL_SLOT_KEYS.map(([slot]) => drawn.get(slot) ?? "-"),
+    extra: [...drawn].filter(([slot]) => !isFourSlot(slot)).map(([slot, id]) => `${slot.split(":")[0]}=${id}`),
+  };
 }
 
 /**
@@ -155,9 +189,10 @@ export function avatarStillDrawnItems(body: AvatarStillBody, loadout: AvatarLoad
  */
 export function avatarStillLegLayers(
   all: readonly AvatarStillLayerEntry[],
-  drawn: ReadonlyMap<AvatarStillSlot, string>,
+  drawn: ReadonlyMap<AvatarStillDrawSlot, string>,
 ): readonly AvatarStillLayerEntry[] {
-  const bottom = drawn.get("bottom");
+  // a one-piece dress is the bottom for the legs (it may own the bare legs under its skirt)
+  const bottom = drawn.get("bottom") ?? drawn.get("dress");
   const shoes = drawn.get("shoes");
   const own = (owner: string | undefined, variant: string) =>
     all.filter((entry) => owner !== undefined && entry.owner === owner && entry.legVariant === variant && entry.gatedBy === undefined);
@@ -175,7 +210,7 @@ export function avatarStillLegLayers(
 export function avatarStillLayersFor(
   rig: AvatarStillRigId,
   body: AvatarStillBody,
-  drawn: ReadonlyMap<AvatarStillSlot, string>,
+  drawn: ReadonlyMap<AvatarStillDrawSlot, string>,
   product: AvatarStillProduct,
 ): readonly AvatarStillLayer[] {
   const all = body.layers[product];
@@ -218,6 +253,7 @@ export function resolveAvatarStillLayers(
   const rig = avatarStillRigForBody(loadout.bodyId);
   const body = manifest.bodies[rig];
   const drawn = avatarStillDrawnItems(body, loadout);
+  const drawnKey = avatarStillDrawnKey(drawn);
   const mirror = options.mirror === true;
   const space = product === "full" ? body.canvas : { width: body.bustPx, height: body.bustPx };
   const windows =
@@ -231,7 +267,7 @@ export function resolveAvatarStillLayers(
     space,
     windows,
     mirror,
-    cacheKey: [manifest.bakerVersion, rig, ...AVATAR_STILL_SLOT_KEYS.map(([slot]) => drawn.get(slot) ?? "-"), product, mirror ? 1 : 0].join("|"),
+    cacheKey: [manifest.bakerVersion, rig, ...drawnKey.slots, product, mirror ? 1 : 0, ...drawnKey.extra].join("|"),
   };
 }
 

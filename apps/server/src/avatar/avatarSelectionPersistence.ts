@@ -1,5 +1,6 @@
 import type {
   AvatarLoadout,
+  AvatarLoadoutV1,
   AvatarLoadoutV2,
   CompleteAvatarSelection
 } from "@blumi/contracts"
@@ -11,6 +12,7 @@ import {
   AVATAR_ITEM_RULES,
   cloneAvatarLoadout,
   coerceAvatarLoadout,
+  findAvatarRuleItem,
   toAvatarLoadoutV2,
   type AvatarItemRules
 } from "@blumi/domain"
@@ -76,9 +78,26 @@ export function resolveSemanticAvatarWrite(
   }
   return {
     ...converted,
+    dressId: converted.dressId ?? keptOnePieceDress(requested, current, rules),
     outerwearId: isAvatarLoadoutV2(current) ? current.outerwearId : null,
     accessoryIds: [...converted.accessoryIds]
   } satisfies AvatarLoadoutV2
+}
+
+/**
+ * A V1 client sees a worn one-piece dress as the separates stored under it (`projectAvatarLoadoutV1`). Its write keeps
+ * the dress while it leaves those separates as they are, and takes it off when it changes the top or the bottom.
+ */
+function keptOnePieceDress(
+  requested: AvatarLoadoutV1,
+  current: AvatarLoadout,
+  rules: AvatarItemRules
+): string | null {
+  if (!isAvatarLoadoutV2(current) || current.dressId === null) return null
+  if (findAvatarRuleItem(rules, current.dressId)?.slot !== "dress") return null
+  const untouched = requested.bodyId === current.bodyId &&
+    requested.topId === current.topId && requested.bottomId === current.bottomId
+  return untouched ? current.dressId : null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
