@@ -13,7 +13,7 @@ import sharp from "sharp"
 const BAKER = pathToFileURL(resolve(import.meta.dirname, "../../../../../../tools/avatar25d/bake-showcase.mjs")).href
 interface Baker {
   validateAllowlist(list: unknown, options?: { allowPendingOwnerApproval?: boolean }): void
-  bakeBody(rig: string, body: unknown, scale: number, pad: number, srcRoot: string): Promise<{
+  bakeBody(rig: string, body: unknown, scale: number, pad: number, srcRoot: string, redrawRoot?: string): Promise<{
     showcaseBase: { key: string; canvas: { width: number; height: number }; windows: Record<string, number[]> }
     items: Record<string, { key: string; rect: number[]; order: number; back?: { key: string; rect: number[] }; under?: { key: string; rect: number[] } }>
     files: Map<string, Buffer>
@@ -80,6 +80,31 @@ test("a still whose bytes are not the approved ones is refused, so nothing unapp
   try {
     writeFileSync(join(dir, "g", "top.png"), await still([110, 250, 180, 150], { r: 10, g: 200, b: 10 }))
     await assert.rejects(bakeBody("female", body, 0.5, 20, dir), /not the approved still/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test("a pinned hand-finished layer replaces the baked one only with the exact bytes and the baked size", async () => {
+  const { bakeBody } = await loadBaker()
+  const { dir, body } = await fixture()
+  try {
+    const plain = await bakeBody("female", body, 0.5, 20, dir)
+    const [, , w, h] = plain.items.item_hair!.rect
+    const redrawn = await sharp({ create: { width: w, height: h, channels: 4, background: { r: 90, g: 40, b: 40, alpha: 1 } } }).webp({ lossless: true }).toBuffer()
+    mkdirSync(join(dir, "redraws", "female"), { recursive: true })
+    writeFileSync(join(dir, "redraws", "female", "item_hair__front.webp"), redrawn)
+    const pinned = { ...body, items: { ...body.items, item_hair: { ...body.items.item_hair, frontRedrawSha256: sha(redrawn) } } }
+    const baked = await bakeBody("female", pinned, 0.5, 20, dir, join(dir, "redraws"))
+    assert.deepEqual(baked.files.get("item_hair__front"), redrawn, "the pinned redraw is the layer")
+    assert.deepEqual(baked.files.get("item_hair__back"), plain.files.get("item_hair__back"), "an unpinned layer is still baked from its source")
+    assert.deepEqual(baked.items.item_hair!.rect, plain.items.item_hair!.rect, "the source still fixes the rect")
+    const wrongPin = { ...body, items: { ...body.items, item_hair: { ...body.items.item_hair, frontRedrawSha256: "0".repeat(64) } } }
+    await assert.rejects(bakeBody("female", wrongPin, 0.5, 20, dir, join(dir, "redraws")), /differs from its pin/)
+    const wrongSize = await sharp({ create: { width: w + 1, height: h, channels: 4, background: { r: 1, g: 2, b: 3, alpha: 1 } } }).webp({ lossless: true }).toBuffer()
+    writeFileSync(join(dir, "redraws", "female", "item_hair__front.webp"), wrongSize)
+    const sizedPin = { ...body, items: { ...body.items, item_hair: { ...body.items.item_hair, frontRedrawSha256: sha(wrongSize) } } }
+    await assert.rejects(bakeBody("female", sizedPin, 0.5, 20, dir, join(dir, "redraws")), /baked rect/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

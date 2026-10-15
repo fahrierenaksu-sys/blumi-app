@@ -80,7 +80,9 @@
           "file": "girl_fronts7_1030/hair_waves_front.png",
           "backFile": "girl_fronts7_1030/hair_waves_back.png",
           "sha256": "755d41d8ce27cf4ed57847a5197a1ce4e06b2631df93d83b048fbeb7b721f9db",
-          "backSha256": "81d9b4856126a37317a8aa5cce571a891af107befabc4a2b5c3473fc7d734b5d"
+          "backSha256": "81d9b4856126a37317a8aa5cce571a891af107befabc4a2b5c3473fc7d734b5d",
+          "frontRedrawSha256": "4e3ec96f1ab8bbd359ef0261fcd836c59eca5a03f7d9ae222e6f2380f66ff3ab",
+          "backRedrawSha256": "abc296f4d272afcdfd300a97230119c69ff4290da73ced8bbb3ae0c911d83e2e"
         },
         "avatar_v2_shoes_white_clean_sneakers": {
           "slot": "shoes",
