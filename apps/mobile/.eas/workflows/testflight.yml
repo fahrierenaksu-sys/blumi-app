@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Check source, types, lint, tests and dependency audit
+    name: Require full Verify for this commit, then check source, types, lint, tests and dependency audit
     environment: production
     steps:
       - uses: eas/checkout
@@ -24,6 +24,9 @@ jobs:
         working_directory: ../..
         run: |
           set -euo pipefail
+          # The full `npm run verify` (PostgreSQL, rig, Expo Doctor) runs in GitHub Verify;
+          # the build only starts for a commit where that run succeeded.
+          node scripts/security/require-verify-run.mjs
           node -e "require('./apps/mobile/scripts/mobile-release-assets.cjs').assertShowcaseLooksOwnerApproved('tools/avatar25d/showcase-baked.json')"
           npm run verify:source-hygiene
           npm run build:packages
