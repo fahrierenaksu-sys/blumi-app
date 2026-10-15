@@ -67,8 +67,14 @@ function mountExport(options: { holdCode?: boolean } = {}) {
         },
         "../session/settingsActionErrorCopy": { getSettingsActionErrorMessageForDisplay: () => "error" },
         "./accountReauthPhone": {
-          resolveAccountReauthPhone: async (input: { serverPhone?: string; firebasePhone: () => string | null }) =>
-            input.serverPhone ?? input.firebasePhone()
+          requestAccountReauthTarget: async (input: {
+            firebasePhone: () => string | null
+            requestChallenge: (knownPhone: string | undefined) => Promise<{ targetPhoneNumber?: string }>
+          }) => {
+            const phone = input.firebasePhone()
+            const challenge = await input.requestChallenge(phone ?? undefined)
+            return { challenge, phoneNumber: challenge.targetPhoneNumber ?? phone }
+          }
         },
         "./pendingPhoneChange": { pendingPhoneChange: { readOrigin: async () => null, clear: async () => {} } },
         "./settingsPresentationModel": { sanitizeVerificationCode: (value: string) => value }

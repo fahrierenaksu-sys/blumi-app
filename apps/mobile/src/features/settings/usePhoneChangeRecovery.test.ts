@@ -53,13 +53,25 @@ function fakeSecureStore(world: FakeWorld) {
   }
 }
 
-/** The server's challenge; it names the account's phone unless it is an older server. */
+/**
+ * The server's challenge. Like the server, it names the account's phone only
+ * back to a client that sent it (it never reveals it to a token alone); an
+ * older server names nothing.
+ */
 function fakeChallenge(world: FakeWorld) {
-  return async (_url: string, _token: string, input: { purpose: string }) => ({
-    challengeId: "fake-challenge",
-    expiresAt: new Date(Date.now() + 600_000).toISOString(),
-    ...(world.serverNamesPhone && input.purpose !== "phone_change_new" ? { targetPhoneNumber: world.accountPhone } : {})
-  })
+  return async (_url: string, _token: string, input: { purpose: string; targetPhoneNumber?: string }) => {
+    const challenge = { challengeId: "fake-challenge", expiresAt: new Date(Date.now() + 600_000).toISOString() }
+    if (world.server === "older" || input.purpose === "phone_change_new") return challenge
+    return input.targetPhoneNumber === world.accountPhone
+      ? { ...challenge, targetPhoneNumber: world.accountPhone }
+      : { ...challenge, targetPhoneNumberWithheld: true }
+  }
+}
+
+/** The saved original outlives its 24 h TTL (the record stays on the device). */
+function expireSavedOriginal(world: FakeWorld): void {
+  const [key, raw] = [...world.storage.entries()][0]
+  world.storage.set(key, JSON.stringify({ ...JSON.parse(raw), expiresAtMs: Date.now() - 1 }))
 }
 
 /** Like the server: a re-authentication proof must come from the account's own phone. */
@@ -81,12 +93,12 @@ interface FakeWorld {
   storage: Map<string, string>
   proofTtlMs: number
   revokes: number
-  /** The server's challenge names the account's phone (false: an older server). */
-  serverNamesPhone: boolean
+  /** "confirms": names the account's phone to a client that sent it; "older": names none. */
+  server: "confirms" | "older"
 }
 
 function createWorld(): FakeWorld {
-  return { firebasePhone: OLD_PHONE, accountPhone: OLD_PHONE, sessionValid: true, storage: new Map(), proofTtlMs: 600_000, revokes: 0, serverNamesPhone: true }
+  return { firebasePhone: OLD_PHONE, accountPhone: OLD_PHONE, sessionValid: true, storage: new Map(), proofTtlMs: 600_000, revokes: 0, server: "confirms" }
 }
 
 /** The change reached the server, but the client sees `error` instead of the answer. */
@@ -430,7 +442,7 @@ test("after the saved original expires, a restart still texts the account's phon
   const firstLaunch = mountPhoneChange([serverError(503, "server_unavailable")], world)
   await firstLaunch.startFlow()
   await firstLaunch.hook().verifyNewPhoneChangeCode()
-  world.storage.clear() // the 24 h record expired
+  expireSavedOriginal(world)
   assert.notEqual(world.firebasePhone, world.accountPhone)
 
   const nextLaunch = mountPhoneChange([], world)
@@ -445,7 +457,7 @@ test("after the saved original expires, a restart still texts the account's phon
 
 test("an older server that names no phone still restarts from the saved original", async () => {
   const world = createWorld()
-  world.serverNamesPhone = false
+  world.server = "older"
   const firstLaunch = mountPhoneChange([serverError(503, "server_unavailable")], world)
   await firstLaunch.startFlow()
   await firstLaunch.hook().verifyNewPhoneChangeCode()
@@ -461,7 +473,7 @@ test("account deletion and data export text the account's phone while Firebase h
   const phoneChange = mountPhoneChange([serverError(503, "server_unavailable")], world)
   await phoneChange.startFlow()
   await phoneChange.hook().verifyNewPhoneChangeCode()
-  world.storage.clear() // even with no saved original left
+  expireSavedOriginal(world) // even after the saved original expired
   assert.notEqual(world.firebasePhone, world.accountPhone)
 
   const exportFlow = mountAccountAction(world)
@@ -475,6 +487,27 @@ test("account deletion and data export text the account's phone while Firebase h
   assert.deepEqual(deletionFlow.calls.codeRequests, [OLD_PHONE])
   assert.equal(deletionFlow.calls.deleted, 1, "deletion is never blocked")
   assert.equal(deletionFlow.calls.resets, 1)
+})
+
+test("with no phone on the device that the server confirms, nothing is texted and signing in again unblocks deletion", async () => {
+  const world = createWorld()
+  const phoneChange = mountPhoneChange([serverError(503, "server_unavailable")], world)
+  await phoneChange.startFlow()
+  await phoneChange.hook().verifyNewPhoneChangeCode()
+  world.storage.clear() // the saved original is gone (secure storage failed)
+  assert.notEqual(world.firebasePhone, world.accountPhone)
+
+  const stale = mountAccountAction(world)
+  await stale.deleteAccount()
+  assert.deepEqual(stale.calls.codeRequests, [], "no code goes to a phone the server did not confirm")
+  assert.equal(stale.calls.deleted, 0)
+  assert.ok(stale.calls.toasts.includes("warning:Sign in again to verify your phone."))
+
+  world.firebasePhone = world.accountPhone // signed in again with the account's phone
+  const signedInAgain = mountAccountAction(world)
+  await signedInAgain.deleteAccount()
+  assert.deepEqual(signedInAgain.calls.codeRequests, [OLD_PHONE])
+  assert.equal(signedInAgain.calls.deleted, 1, "deletion is never blocked")
 })
 
 test("end to end: change lands but its answer is lost, app killed, restart, the user deletes the account", async () => {

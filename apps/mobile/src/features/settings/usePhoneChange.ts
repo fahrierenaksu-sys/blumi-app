@@ -33,7 +33,7 @@ import {
   getSettingsActionErrorMessageForDisplay,
   getSettingsVerificationErrorToastForDisplay
 } from "../session/settingsActionErrorCopy"
-import { resolveAccountReauthPhone } from "./accountReauthPhone"
+import { requestAccountReauthTarget } from "./accountReauthPhone"
 import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import {
@@ -162,19 +162,19 @@ export function usePhoneChange(input: {
     setIsChangingPhone(true)
     try {
       reauthHold.hold()
-      const challenge = await requestFirebaseAccountActionChallenge(
-        MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "phone_change_current" }
-      )
       // After an interrupted change Firebase may hold the new phone (or a lost
-      // answer hid a landed change): text the phone the server says the
+      // answer hid a landed change): text the phone the server confirms the
       // account has. An older server falls back to the saved original.
-      const currentPhoneNumber = (!challenge.targetPhoneNumber && verifiedCurrentPhoneRef.current) ||
-        await resolveAccountReauthPhone({
-          userId: sessionActor.session.userId,
-          serverPhone: challenge.targetPhoneNumber,
-          pending: pendingPhoneChange,
-          firebasePhone: getFirebaseCurrentPhoneNumber
-        })
+      const { challenge, phoneNumber: currentPhoneNumber } = await requestAccountReauthTarget({
+        userId: sessionActor.session.userId,
+        pending: pendingPhoneChange,
+        firebasePhone: getFirebaseCurrentPhoneNumber,
+        verifiedPhone: verifiedCurrentPhoneRef.current,
+        requestChallenge: (knownPhone) => requestFirebaseAccountActionChallenge(
+          MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken,
+          { purpose: "phone_change_current", ...(knownPhone ? { targetPhoneNumber: knownPhone } : {}) }
+        )
+      })
       if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
       verifiedCurrentPhoneRef.current = currentPhoneNumber
       currentPhoneChallengeRef.current = challenge.challengeId
