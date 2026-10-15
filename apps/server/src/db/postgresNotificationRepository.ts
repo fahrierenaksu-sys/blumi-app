@@ -123,6 +123,7 @@ export function createPostgresNotificationRepository(
           [`blumi:push-device-token:${device.pushToken}`])
         const admitted = await client.query(`SELECT
           EXISTS (SELECT 1 FROM blumi_push_devices WHERE user_id = $1 AND push_token = $2) AS existing,
+          EXISTS (SELECT 1 FROM blumi_push_devices WHERE user_id <> $1 AND push_token = $2) AS taken_by_other,
           (SELECT count(*)::integer FROM blumi_push_devices WHERE user_id = $1) AS device_count`,
         [device.userId, device.pushToken])
         const row = admitted.rows[0]
@@ -130,8 +131,22 @@ export function createPostgresNotificationRepository(
           throw new Error("Device admission state is unavailable.")
         }
         if (!row.existing && Number(row.device_count) >= MAX_DEVICES_PER_ACCOUNT) {
-          await client.query("COMMIT")
-          return "limit"
+          // Token rotation or reinstall at a full quota: a token that is new to
+          // every account replaces this account's oldest registrations. Another
+          // account's token is never taken this way.
+          if (row.taken_by_other) {
+            await client.query("COMMIT")
+            return "limit"
+          }
+          await client.query(`WITH evicted AS (
+              DELETE FROM blumi_push_devices
+               WHERE user_id = $1 AND push_token IN (
+                 SELECT push_token FROM blumi_push_devices WHERE user_id = $1
+                  ORDER BY registered_at ASC, push_token ASC LIMIT $2)
+              RETURNING push_token
+            ) DELETE FROM blumi_push_delivery_outbox
+               WHERE user_id = $1 AND push_token IN (SELECT push_token FROM evicted)`,
+          [device.userId, Number(row.device_count) - MAX_DEVICES_PER_ACCOUNT + 1])
         }
         await persistDevice(client, device)
         await client.query("COMMIT")

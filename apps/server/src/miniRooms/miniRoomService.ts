@@ -169,7 +169,20 @@ export function createMiniRoomService(
   const repository = options.repository ?? createInMemoryMiniRoomRepository(undefined, options.getPersonalRoomDecor)
   const roomInvalidationListeners = new Set<(id: string) => void>()
   const roomReadyListeners = new Set<(room: MiniRoomRecord) => void>()
-  const announceReady = (room: MiniRoomRecord): void => {
+  /**
+   * Counts every room invalidation (leave, separation, block). A join or accept
+   * reads the room, then awaits more checks; a room closed in between must not
+   * be primed from that stale read, or motion would accept entry and moves for
+   * a closed room for the revalidation window. Any invalidation while a call was
+   * in flight skips its prefetch: the cost is one database read on first entry.
+   */
+  let invalidationEpoch = 0
+  const notifyRoomInvalidated = (roomId: string): void => {
+    invalidationEpoch += 1
+    for (const listener of roomInvalidationListeners) listener(roomId)
+  }
+  const announceReady = (room: MiniRoomRecord, epochAtStart: number): void => {
+    if (epochAtStart !== invalidationEpoch) return
     // A listener only prefetches; it can never fail the accept or join.
     for (const listener of roomReadyListeners) {
       try { listener(room) } catch { /* best effort */ }
@@ -238,6 +251,7 @@ export function createMiniRoomService(
       return repository.listInvitesForThread(threadId, now)
     },
     async decideChatInvite(input, now = new Date()) {
+      const epochAtStart = invalidationEpoch
       const invite = await repository.findInvite(input.inviteId)
       if (!invite?.sourceThreadId) {
         throw new ChatRoomInviteError(
@@ -280,7 +294,7 @@ export function createMiniRoomService(
             "That room invite is not available."
           )
         }
-        announceReady(miniRoom)
+        announceReady(miniRoom, epochAtStart)
         return buildChatInviteResult({
           invite,
           miniRoom,
@@ -382,7 +396,7 @@ export function createMiniRoomService(
             "That room invite is not available."
           )
         }
-        announceReady(persistedRoom)
+        announceReady(persistedRoom, epochAtStart)
         return buildChatInviteResult({
           invite: acceptedInvite,
           miniRoom: persistedRoom,
@@ -414,7 +428,7 @@ export function createMiniRoomService(
             "That room invite is not available."
           )
         }
-        announceReady(currentRoom)
+        announceReady(currentRoom, epochAtStart)
         return buildChatInviteResult({
           invite: currentInvite,
           miniRoom: currentRoom,
@@ -477,6 +491,7 @@ export function createMiniRoomService(
       return cancelled
     },
     async joinChatRoom(input, now = new Date()) {
+      const epochAtStart = invalidationEpoch
       const miniRoom = await repository.findMiniRoom(input.miniRoomId)
       if (!miniRoom?.sourceThreadId || miniRoom.endedAt) {
         throw new ChatRoomInviteError(
@@ -517,7 +532,7 @@ export function createMiniRoomService(
           "That room is not available."
         )
       }
-      announceReady(miniRoom)
+      announceReady(miniRoom, epochAtStart)
       return {
         miniRoom,
         mediaSession: options.livekitTokenService.createMediaSession({
@@ -802,7 +817,7 @@ export function createMiniRoomService(
         endedAt
       )
       if (!endedRoom?.endedAt || !endedRoom.endedByUserId) return null
-      for (const listener of roomInvalidationListeners) listener(miniRoomId)
+      notifyRoomInvalidated(miniRoomId)
       await options.presenceService.setMiniRoomStatus(
         endedRoom.participantUserIds,
         false
@@ -837,7 +852,7 @@ export function createMiniRoomService(
       otherUserId,
       endedAt: now.toISOString()
     })
-    for (const room of endedRooms) for (const listener of roomInvalidationListeners) listener(room.miniRoomId)
+    for (const room of endedRooms) notifyRoomInvalidated(room.miniRoomId)
     await Promise.all(
       endedRooms.map((room) =>
         options.presenceService.setMiniRoomStatus(room.participantUserIds, false)

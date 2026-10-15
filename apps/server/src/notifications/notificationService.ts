@@ -1,5 +1,7 @@
 import {
   createInMemoryNotificationRepository,
+  isEnabled,
+  isWithinQuietHours,
   MAX_DEVICES_PER_ACCOUNT,
   type DeviceRegistration,
   type NotificationPreferences,
@@ -393,6 +395,32 @@ export function createNotificationService(
           if (delivery.leaseToken) await repository.markDeliveryFailed({
             deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt,
             now: dispatchAt, errorCode: "no_longer_relevant"
+          })
+          return
+        }
+      }
+      // The recipient may have changed preferences since this was queued (or
+      // since the last failed attempt). Policy: a category turned off drops the
+      // push, and so does quiet hours beginning before it is sent. Quiet hours
+      // drop rather than defer, matching the enqueue-time decision, so a push
+      // never arrives later as a stale surprise. The hourly cap and duplicate
+      // checks were claimed at enqueue and are not repeated.
+      const policyType = resolveNotificationPolicy(delivery.notification, dispatchAt)?.type
+      if (policyType) {
+        let preferences: NotificationPreferences
+        try {
+          preferences = await repository.getPreferences(delivery.userId)
+        } catch {
+          await scheduleRetryOrFail(delivery, attempt, dispatchAt, "preference_check_failed")
+          return
+        }
+        const droppedFor = !isEnabled(preferences, policyType) ? "preference_disabled"
+          : isWithinQuietHours(dispatchAt, preferences) ? "quiet_hours"
+          : undefined
+        if (droppedFor) {
+          if (delivery.leaseToken) await repository.markDeliveryFailed({
+            deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt,
+            now: dispatchAt, errorCode: droppedFor
           })
           return
         }

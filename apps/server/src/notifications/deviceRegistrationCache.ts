@@ -86,10 +86,13 @@ export function withDeviceRegistrationInvalidation(
       }
     },
     async saveDeviceBounded(device) {
+      // At a full quota this may replace older registrations of the account.
+      cache.forgetUser(device.userId)
       cache.forgetToken(device.pushToken)
       try {
         return await repository.saveDeviceBounded(device)
       } finally {
+        cache.forgetUser(device.userId)
         cache.forgetToken(device.pushToken)
       }
     },

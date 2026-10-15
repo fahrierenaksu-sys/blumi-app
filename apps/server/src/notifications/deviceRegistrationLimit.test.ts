@@ -3,19 +3,20 @@ import test from "node:test"
 import { createNotificationService, DeviceRegistrationLimitError } from "./notificationService"
 import { MAX_DEVICES_PER_ACCOUNT } from "./notificationRepository"
 
-test("concurrent new device registrations stop at the account cap and notification fanout stays bounded", async () => {
+test("concurrent new device registrations keep the account at the cap and notification fanout stays bounded", async () => {
+  // A full account replaces its oldest registrations instead of refusing a rotated
+  // token (see deviceTokenRotation.test.ts), so the cap is on stored devices.
   const service = createNotificationService({ pushProvider: { async sendPush() {} } })
   const results = await Promise.allSettled(Array.from({ length: 40 }, (_, index) =>
     service.registerDevice("synthetic-recipient", { platform: "ios", pushToken: `token-${index}` })))
-  assert.equal(results.filter((result) => result.status === "fulfilled").length, MAX_DEVICES_PER_ACCOUNT)
   for (const result of results) {
     if (result.status === "rejected") assert.ok(result.reason instanceof DeviceRegistrationLimitError)
   }
-  const before = await service.repository.listDevices("synthetic-recipient")
-  assert.equal(before.length, MAX_DEVICES_PER_ACCOUNT)
-  await assert.rejects(service.registerDevice("synthetic-recipient", { platform: "ios", pushToken: "one-more" }),
-    { code: "DEVICE_REGISTRATION_LIMIT", statusCode: 429 })
-  assert.deepEqual(await service.repository.listDevices("synthetic-recipient"), before)
+  assert.equal((await service.repository.listDevices("synthetic-recipient")).length, MAX_DEVICES_PER_ACCOUNT)
+  await service.registerDevice("synthetic-recipient", { platform: "ios", pushToken: "one-more" })
+  const after = await service.repository.listDevices("synthetic-recipient")
+  assert.equal(after.length, MAX_DEVICES_PER_ACCOUNT)
+  assert.ok(after.some((device) => device.pushToken === "one-more"))
   const queued = await service.sendPushToUser("synthetic-recipient", { title: "Blumi", body: "Update" })
   assert.equal(queued.deliveryCount, MAX_DEVICES_PER_ACCOUNT)
 })
