@@ -83,6 +83,16 @@ export class OnboardingPrerequisiteError extends Error {
   }
 }
 
+/**
+ * A Firebase re-authentication challenge. For the account's own phone
+ * (deletion, export, current phone) the phone is named only back to a client
+ * that sent it as `targetPhoneNumber`, proving it already holds it; otherwise
+ * the answer says it was withheld. A session token alone never learns it.
+ */
+export type FirebaseActionChallengeAnswer =
+  | { challengeId: string; expiresAt: string; targetPhoneNumber?: string }
+  | { challengeId: string; expiresAt: string; targetPhoneNumberWithheld: true }
+
 export interface AuthService {
   store: BlumiBackendStore
   repository: AuthRepository
@@ -91,7 +101,7 @@ export interface AuthService {
     purpose: "account_deletion" | AccountActionPurpose,
     targetPhoneNumber?: string,
     now?: Date
-  ): Promise<{ challengeId: string; expiresAt: string; targetPhoneNumber?: string } | null>
+  ): Promise<FirebaseActionChallengeAnswer | null>
   consumeFirebaseActionChallenge(input: {
     sessionToken: string
     purpose: "account_deletion" | AccountActionPurpose
@@ -430,12 +440,16 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
         issuedAt: Math.ceil(now.getTime() / 1000) * 1000,
         expiresAt
       })
-      // The account's own phone, told only to its own session: the client
-      // texts it rather than whatever Firebase holds, so an interrupted phone
-      // change can never leave re-authentication aimed at the wrong number.
-      return purpose === "phone_change_new"
-        ? { challengeId, expiresAt: new Date(expiresAt).toISOString() }
-        : { challengeId, expiresAt: new Date(expiresAt).toISOString(), targetPhoneNumber: phoneNumber }
+      const answer = { challengeId, expiresAt: new Date(expiresAt).toISOString() }
+      if (purpose === "phone_change_new") return answer
+      // The client texts the account's phone, never whatever Firebase holds,
+      // so an interrupted phone change cannot aim the code at the wrong number.
+      // It is confirmed only to a client that already holds it (Firebase's
+      // phone or the saved original on the device): a leaked session token
+      // alone never learns it. The challenge itself is never refused.
+      return isSamePhoneNumber(targetPhoneNumber, phoneNumber)
+        ? { ...answer, targetPhoneNumber: phoneNumber }
+        : { ...answer, targetPhoneNumberWithheld: true }
     },
 
     async consumeFirebaseActionChallenge(input) {
@@ -1329,6 +1343,16 @@ function normalizeDisplayName(displayName: string): string {
     throw new PublicRequestError("Use a display name from 2 to 30 characters.")
   }
   return normalized
+}
+
+/** True when `candidate` is `accountPhone`; a malformed candidate never matches. */
+function isSamePhoneNumber(candidate: string | undefined, accountPhone: string): boolean {
+  if (typeof candidate !== "string") return false
+  try {
+    return normalizePhoneNumber(candidate) === accountPhone
+  } catch {
+    return false
+  }
 }
 
 function normalizePhoneNumber(phoneNumber: string): string {
