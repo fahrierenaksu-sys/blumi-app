@@ -1,7 +1,6 @@
 import type { QueryResultRow } from "pg"
 import { cloneMiniRoom } from "../miniRooms/miniRoomRepository"
-import { sharedRoomDecorSnapshotSchema } from "@blumi/contracts"
-import { isActiveRoomItemId, projectRoomDecorItems } from "../rooms/roomItemProjection"
+import { readSharedDecor } from "../miniRooms/sharedDecorSnapshot"
 import type {
   MiniRoomCompletionIntent,
   MiniRoomInviteRecord,
@@ -438,7 +437,7 @@ function mapMiniRoom(row: QueryResultRow): MiniRoomRecord {
     ],
     livekitRoomName: String(row.livekit_room_name),
     startedAt: new Date(row.started_at).toISOString(),
-    ...(row.shared_decor ? { sharedDecor: readSharedDecor(row.shared_decor) } : {}),
+    ...(row.shared_decor ? { sharedDecor: readSharedDecorForRoom(row.shared_decor) } : {}),
     ...(typeof row.source_thread_id === "string" && row.source_thread_id
       ? { sourceThreadId: row.source_thread_id }
       : {}),
@@ -461,11 +460,10 @@ function mapCompletionIntent(row: QueryResultRow): MiniRoomCompletionIntent {
   }
 }
 
-/**
- * The SQL copies the host's stored decor row at accept time, so legacy, unknown and held items are dropped here, on
- * read (the V14 projection; ownership was checked when the host saved).
- */
-function readSharedDecor(value: unknown) {
-  const snapshot = sharedRoomDecorSnapshotSchema.parse(value)
-  return { ...snapshot, decor: projectRoomDecorItems(snapshot.decor, isActiveRoomItemId) }
+function readSharedDecorForRoom(value: unknown) {
+  const { snapshot, omittedItemCount } = readSharedDecor(value)
+  if (omittedItemCount > 0) {
+    console.warn("Shared room decor exceeded the item cap; extra placements are not shown", { omittedItemCount })
+  }
+  return snapshot
 }
