@@ -175,7 +175,7 @@ test("an older server that refuses the starter bed as unowned still lets the acc
 
 test("a timeout, network failure or 5xx keeps the user's bed and surfaces the error without a second save", async () => {
   const timeout = Object.assign(new Error("This is taking too long. Check your connection and try again."), { name: "TimeoutError" })
-  const failures: Array<[string, () => Response | Promise<Response>, RegExp]> = [
+  const failures: [string, () => Response | Promise<Response>, RegExp][] = [
     ["timeout", () => { throw timeout }, /taking too long/],
     ["network", () => { throw new TypeError("Network request failed") }, /Network request failed/],
     ["5xx", () => new Response(JSON.stringify({ error: "Try again soon." }), { status: 503 }), /Try again soon/],

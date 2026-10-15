@@ -9,7 +9,7 @@ export interface Rig25Range {
   layer?: string
   standOnly?: boolean
   /** Drawn in these poses only (an item part such as a bottom's wave-only hip patch); combined with every other rule (lab40 doll25). */
-  poseOnly?: Array<"stand" | "walk" | "sit" | "wave">
+  poseOnly?: ("stand" | "walk" | "sit" | "wave")[]
   /** The mesh has baked walk weights for this range (lab40 `walkWeights`): the retargeted walk skins it with those. */
   walk?: boolean
   /**

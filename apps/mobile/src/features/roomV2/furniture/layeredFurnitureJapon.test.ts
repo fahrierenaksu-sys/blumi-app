@@ -61,6 +61,7 @@ const { createRoomAvatar25dFurnitureCatalog } = require("./layeredFurnitureCatal
   typeof import("./layeredFurnitureCatalog")
 const { ROOM_V2_FURNITURE_CATALOG } = require("../roomV2Catalog") as
   typeof import("../roomV2Catalog")
+// eslint-disable-next-line import/first -- the test room loads image modules, which need the require hook above first.
 import { createLayeredFurnitureTestRoom } from "./layeredFurnitureTestRoom"
 const { EDIT_ROOM_AVATAR_SPAWN } = require("../editor/roomEditorPlacementModel") as
   typeof import("../editor/roomEditorPlacementModel")

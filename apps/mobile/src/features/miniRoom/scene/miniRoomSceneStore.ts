@@ -16,7 +16,7 @@ import {
   ROOM_WORLD_MINI_ROOM_MOVEMENT_TIMING,
   resolveRoomWorldInteractiveTarget
 } from "../../roomWorld/roomWorldRuntime"
-import type { ResolvedRoomV2Scene } from "../../roomV2/roomV2.types"
+import type { ResolvedRoomV2Scene, RoomShellEntry } from "../../roomV2/roomV2.types"
 import { canMiniRoomAvatarUseMotion } from "../miniRoomAvatarMotion"
 import {
   chooseMiniRoomSeatFromTap,
@@ -30,7 +30,6 @@ import {
 import { resolveMiniRoomRefusedSeatStand } from "./miniRoomSeatRefusalModel"
 import { createMiniRoomEntryPlan } from "./miniRoomEntryModel"
 import { withMiniRoomPresence } from "./miniRoomPresentation"
-import type { RoomShellEntry } from "../../roomV2/roomV2.types"
 import {
   createMiniRoomAvatarPosition,
   createMiniRoomPathAnimator,

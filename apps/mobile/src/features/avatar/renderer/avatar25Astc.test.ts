@@ -137,7 +137,7 @@ for (const dir of RIG_DIRS) {
 }
 
 /** A packed file built by hand: `blocks` 16-byte blocks of `fill`, except the given runs. */
-function packedOf(blockCount: number, fill: number, runs: Array<[first: number, blocks: number[]]>, trailing = 0): ArrayBuffer {
+function packedOf(blockCount: number, fill: number, runs: [first: number, blocks: number[]][], trailing = 0): ArrayBuffer {
   const payload = runs.flatMap(([, blocks]) => blocks)
   const bytes = new Uint8Array(28 + runs.length * 8 + payload.length * 16 + trailing)
   const view = new DataView(bytes.buffer)

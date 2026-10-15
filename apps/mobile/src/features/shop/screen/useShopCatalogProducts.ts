@@ -105,7 +105,8 @@ export function useShopCatalogProducts(input: {
       qaOnlyOwnedRoomItemIds,
       roomFurnitureCatalog,
       publishedItemIds,
-      roomDecor
+      roomDecor,
+      locale
     ]
   )
 

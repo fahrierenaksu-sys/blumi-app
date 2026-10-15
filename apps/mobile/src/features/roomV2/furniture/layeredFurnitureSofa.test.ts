@@ -53,6 +53,7 @@ for (const extension of [".png", ".webp", ".jpg"]) {
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro image fixture loading needs the hook first.
 const { ROOM_V2_FURNITURE_CATALOG } = require("../roomV2Catalog") as typeof import("../roomV2Catalog")
+// eslint-disable-next-line import/first -- the test room loads image modules, which need the require hook above first.
 import { createLayeredFurnitureTestRoom } from "./layeredFurnitureTestRoom"
 
 const SOFA_SPEC = LAYERED_FURNITURE_SPECS[ROOM_AVATAR_25D_SOFA_ID]!

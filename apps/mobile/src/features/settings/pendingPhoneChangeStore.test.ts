@@ -111,7 +111,7 @@ test("a start-up whose stored session was refused still drops the record at the 
 
 /** Like the server: names the account phone only back to a client that sent it. */
 function fakeServer(accountPhone: string | null) {
-  const sent: Array<string | undefined> = []
+  const sent: (string | undefined)[] = []
   return {
     sent,
     requestChallenge: async (knownPhone: string | undefined) => {

@@ -5,10 +5,14 @@ import test from "node:test"
 import {
   AVATAR_LOADOUT_CATALOG,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
-  resolveAvatarStillLayers
+  resolveAvatarStillLayers,
+  TEST_AVATAR_ITEM as FX,
+  TEST_AVATAR_ITEM_RULES as FX_RULES,
+  toAvatarLoadoutV2
 } from "@blumi/domain"
+import { compileAvatar } from "../renderer/avatar25Pose"
 import type { Rig25 } from "../renderer/rigTypes"
-import { AVATAR_RIG_STARTER } from "./avatarItemArt"
+import { AVATAR_ITEM_ART, AVATAR_RIG_STARTER } from "./avatarItemArt"
 import { resolveAvatarDraw } from "./resolveAvatarDraw"
 
 const girlRig = JSON.parse(readFileSync(resolve(import.meta.dirname, "../rigs/girl/rig25.json"), "utf8")) as Rig25
@@ -54,9 +58,6 @@ test("a valid old dress loadout is drawn as the girl's rig starter top and botto
 // New item kinds (WB integration/slots_2140 DESIGN §5): a girl rig with a one-piece dress, glasses and an accessory
 // (copies of her real items re-slotted), the fixture catalog's items mapped to them, drawn by the real resolver and
 // compiled by the real renderer.
-import { TEST_AVATAR_ITEM as FX, TEST_AVATAR_ITEM_RULES as FX_RULES, toAvatarLoadoutV2 } from "@blumi/domain"
-import { compileAvatar } from "../renderer/avatar25Pose"
-import { AVATAR_ITEM_ART } from "./avatarItemArt"
 
 function rigWithNewKinds(): Rig25 {
   const rig = structuredClone(girlRig)

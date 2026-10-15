@@ -12,7 +12,8 @@ const {
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixture setup must precede imports.
 } = require("./shopAvatarPreviewAssets") as typeof import("./shopAvatarPreviewAssets")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixture setup must precede imports.
-const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("../avatarV2/room/avatarRoomProjection") as typeof import("../avatarV2/room/avatarRoomProjection") // eslint-disable-line @typescript-eslint/no-require-imports
+const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("../avatarV2/room/avatarRoomProjection") as typeof import("../avatarV2/room/avatarRoomProjection")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset fixture setup must precede imports.
 const { getIdleAvatarLayerAssets } = require("../avatarV2/room/avatarIdleAssets") as typeof import("../avatarV2/room/avatarIdleAssets")
 
 test("current-scene warmup selects only equipped front/idle layers", () => {
