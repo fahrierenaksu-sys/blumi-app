@@ -4,6 +4,11 @@ import {
   getSettingsActionErrorMessageForDisplay,
   getSettingsVerificationErrorToastForDisplay
 } from "./settingsActionErrorCopy"
+import {
+  getReauthSignInRequiredCopy,
+  isReauthSignInRequiredError,
+  ReauthSignInRequiredError
+} from "../settings/reauthSignInRequired"
 
 const technicalError =
   "fetch failed: UnexpectedException: Could not connect to the server. (at ExpoModulesCore/Promise.swift:56)"
@@ -119,4 +124,19 @@ test("settings security errors remain private and actionable in Turkish", () => 
       body: "Bu kod kabul edilmedi. 6 haneli kodu kontrol edip tekrar dene."
     }
   )
+})
+
+test("a withheld re-auth phone tells the user to sign in again, whichever action asked", () => {
+  const withheld = new ReauthSignInRequiredError()
+  const kinds = ["requestDeletionCode", "requestDataExport", "requestCurrentPhoneCode"] as const
+  for (const locale of ["en", "tr"] as const) {
+    const expected = getReauthSignInRequiredCopy(locale).body
+    for (const kind of kinds) {
+      const shown = getSettingsActionErrorMessageForDisplay(kind, withheld, locale)
+      assert.equal(shown, expected)
+      assert.notEqual(shown, getSettingsActionErrorMessageForDisplay(kind, technicalError, locale))
+    }
+  }
+  assert.ok(isReauthSignInRequiredError(withheld))
+  assert.equal(isReauthSignInRequiredError(new Error("Sign in again to verify your phone.")), false)
 })

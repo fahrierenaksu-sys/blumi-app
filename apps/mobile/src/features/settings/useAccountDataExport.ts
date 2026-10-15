@@ -17,7 +17,8 @@ import {
 } from "../session/sessionApi"
 import type { SessionActor } from "../session/sessionModel"
 import { getSettingsActionErrorMessageForDisplay } from "../session/settingsActionErrorCopy"
-import { resolveAccountReauthPhone } from "./accountReauthPhone"
+import { requestAccountReauthTarget } from "./accountReauthPhone"
+import { isReauthSignInRequiredError, reauthSignInAlertArgs } from "./reauthSignInRequired"
 import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import { sanitizeVerificationCode } from "./settingsPresentationModel"
@@ -32,8 +33,10 @@ export function useAccountDataExport(input: {
   sessionActor: SessionActor
   copy: SettingsCopy
   locale: AppLocale
+  /** Signs the user out so they can sign in again by SMS (a withheld phone). */
+  onSignInAgain?: () => void
 }) {
-  const { copy, locale, sessionActor } = input
+  const { copy, locale, onSignInAgain, sessionActor } = input
   const [isExportingAccountData, setIsExportingAccountData] = useState(false)
   const exportControllerRef = useRef<AbortController | null>(null)
   useEffect(() => () => { exportControllerRef.current?.abort() }, [sessionActor.session.userId])
@@ -56,23 +59,26 @@ export function useAccountDataExport(input: {
     }
     setIsExportingAccountData(true)
     try {
-      const challenge = await requestFirebaseAccountActionChallenge(
-        MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "account_data_export" }
-      )
       // The account's phone, not Firebase's: an interrupted phone change must
       // never block the export.
-      const accountPhoneNumber = await resolveAccountReauthPhone({
+      const { challenge, phoneNumber: accountPhoneNumber } = await requestAccountReauthTarget({
         userId: sessionActor.session.userId,
-        serverPhone: challenge.targetPhoneNumber,
         pending: pendingPhoneChange,
-        firebasePhone: getFirebaseCurrentPhoneNumber
+        firebasePhone: getFirebaseCurrentPhoneNumber,
+        requestChallenge: (knownPhone) => requestFirebaseAccountActionChallenge(
+          MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken,
+          { purpose: "account_data_export", ...(knownPhone ? { targetPhoneNumber: knownPhone } : {}) }
+        )
       })
-      if (!accountPhoneNumber) throw new Error("Sign in again to verify your phone.")
       exportChallengeRef.current = challenge.challengeId
       exportFirebaseConfirmationRef.current = await requestFirebasePhoneCode(accountPhoneNumber)
       setExportCode("")
       setExportCodeVisible(true)
     } catch (error) {
+      if (isReauthSignInRequiredError(error)) {
+        Alert.alert(...reauthSignInAlertArgs(locale, copy.cancel, onSignInAgain))
+        return
+      }
       showToast({
         title: copy.codeNotSent,
         body: getSettingsActionErrorMessageForDisplay("requestDataExport", error, locale),
@@ -81,7 +87,7 @@ export function useAccountDataExport(input: {
     } finally {
       setIsExportingAccountData(false)
     }
-  }, [copy, isExportingAccountData, locale, sessionActor])
+  }, [copy, isExportingAccountData, locale, onSignInAgain, sessionActor])
 
   const verifyExportCode = useCallback(async () => {
     if (

@@ -10,12 +10,18 @@
  * Minimal and short-lived: one record for the signed-in user, dropped on
  * success, on every session change after start-up (sign-out, forced reset,
  * a new sign-in, another user; createPendingPhoneChangeSessionWatcher), on
- * expiry, and whenever the server's account phone disagrees with it
- * (resolveAccountReauthPhone). It is only a fallback: re-authentication texts
- * the phone the server names. Never logged.
+ * expiry, and whenever the server confirms another phone as the account's
+ * (requestAccountReauthTarget). Re-authentication texts only a phone the server
+ * confirms; the record is one candidate it offers. Never logged.
  */
 export const PENDING_PHONE_CHANGE_STORAGE_KEY = "blumi.mobile.pending_phone_change.v1"
+/** How long the record is used without the server confirming it (older servers). */
 export const PENDING_PHONE_CHANGE_TTL_MS = 1000 * 60 * 60 * 24
+/**
+ * How long the record may still be offered for the server to confirm. A
+ * confirmed phone can never misdirect a code, so this only bounds retention.
+ */
+export const PENDING_PHONE_CHANGE_CONFIRMABLE_MS = 1000 * 60 * 60 * 24 * 30
 
 export interface PendingPhoneChangeKeyValueStore {
   getItem: (key: string) => Promise<string | null>
@@ -26,8 +32,12 @@ export interface PendingPhoneChangeKeyValueStore {
 export interface PendingPhoneChangeStore {
   /** Remembers the verified original phone of `userId`. */
   remember: (userId: string, originPhone: string) => Promise<void>
-  /** The original phone of `userId`, or null (other users' records are dropped). */
-  readOrigin: (userId: string) => Promise<string | null>
+  /**
+   * The original phone of `userId`, or null (other users' records are
+   * dropped). `pastTtl`: also after the TTL, up to the confirmable age, for a
+   * phone the server will confirm before anything is texted.
+   */
+  readOrigin: (userId: string, options?: { pastTtl?: boolean }) => Promise<string | null>
   clear: () => Promise<void>
 }
 
@@ -84,7 +94,7 @@ export function createPendingPhoneChangeStore(
         warnStorageFailure()
       }
     },
-    readOrigin: async (userId) => {
+    readOrigin: async (userId, options) => {
       let raw: string | null
       try {
         raw = await store.getItem(PENDING_PHONE_CHANGE_STORAGE_KEY)
@@ -94,7 +104,14 @@ export function createPendingPhoneChangeStore(
       }
       if (raw === null) return null
       const record = parseRecord(raw)
-      if (!record || record.userId !== userId || record.expiresAtMs <= now()) {
+      if (!record || record.userId !== userId) {
+        await clear()
+        return null
+      }
+      const usableUntilMs = options?.pastTtl
+        ? record.expiresAtMs - PENDING_PHONE_CHANGE_TTL_MS + PENDING_PHONE_CHANGE_CONFIRMABLE_MS
+        : record.expiresAtMs
+      if (usableUntilMs <= now()) {
         await clear()
         return null
       }

@@ -196,6 +196,15 @@ test("a Firebase challenge keeps the account phone the server names, and only a 
   assert.equal("targetPhoneNumber" in (await challenge({ targetPhoneNumber: "not a phone" })), false)
 })
 
+test("a Firebase challenge keeps the server's withheld flag only when it is exactly true", async () => {
+  const challenge = (body: Record<string, unknown>) => requestFirebaseAccountActionChallenge("https://api.blumi.test", "token", {
+    purpose: "account_deletion", targetPhoneNumber: "+900000000001"
+  }, async () => new Response(JSON.stringify({ challengeId: "challenge", expiresAt: "2999-01-01T00:05:00.000Z", ...body }), { status: 200 }))
+  assert.equal((await challenge({ targetPhoneNumberWithheld: true })).targetPhoneNumberWithheld, true)
+  assert.equal("targetPhoneNumberWithheld" in (await challenge({})), false, "an older server sends no flag")
+  assert.equal("targetPhoneNumberWithheld" in (await challenge({ targetPhoneNumberWithheld: "yes" })), false)
+})
+
 test("account deletion calls the production account boundary", async () => {
   const fetchCalls: { url: string; init?: RequestInit }[] = []
   await deleteProductionAccount(

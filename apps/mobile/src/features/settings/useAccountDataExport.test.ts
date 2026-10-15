@@ -35,6 +35,7 @@ function mountExport(options: { holdCode?: boolean } = {}) {
   let buttons: { onPress?: () => void }[] = []
   const hook = loadSourceWithFakeReact<{ useAccountDataExport: (input: unknown) => ExportApi }>(
     "features/settings/useAccountDataExport.ts", runtime, {
+      real: ["./reauthSignInRequired"],
       modules: {
         "react-native": { Alert: { alert: (_title: string, _body: string, next: typeof buttons) => { buttons = next } } },
         "../../config/env": { MOBILE_HTTP_BASE_URL: "https://api.invalid" },
@@ -67,8 +68,14 @@ function mountExport(options: { holdCode?: boolean } = {}) {
         },
         "../session/settingsActionErrorCopy": { getSettingsActionErrorMessageForDisplay: () => "error" },
         "./accountReauthPhone": {
-          resolveAccountReauthPhone: async (input: { serverPhone?: string; firebasePhone: () => string | null }) =>
-            input.serverPhone ?? input.firebasePhone()
+          requestAccountReauthTarget: async (input: {
+            firebasePhone: () => string | null
+            requestChallenge: (knownPhone: string | undefined) => Promise<{ targetPhoneNumber?: string }>
+          }) => {
+            const phone = input.firebasePhone()
+            const challenge = await input.requestChallenge(phone ?? undefined)
+            return { challenge, phoneNumber: challenge.targetPhoneNumber ?? phone }
+          }
         },
         "./pendingPhoneChange": { pendingPhoneChange: { readOrigin: async () => null, clear: async () => {} } },
         "./settingsPresentationModel": { sanitizeVerificationCode: (value: string) => value }

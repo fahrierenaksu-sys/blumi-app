@@ -127,28 +127,83 @@ test("Firebase token rejection stays 401 while database errors use the central s
   } finally { await app.close() }
 })
 
-test("a Firebase challenge names the account's phone for re-authentication, never for a new phone", async () => {
+async function signedInChallengeApp(options: { logLines?: string[] } = {}) {
   const auth = createAuthService()
   const signedIn = await auth.signInWithVerifiedPhone(PHONE, {
     firebaseUid: randomUUID(), acceptedTerms: { version: "test-terms-v1", locale: "tr" }
   })
-  const app = createServer({ authService: auth, firebaseAuthVerifier: {
-    async verifyIdToken() { return { uid: randomUUID(), phoneNumber: PHONE, authTime: Math.ceil(Date.now() / 1000) + 1 } }
-  } })
+  const app = createServer({
+    authService: auth,
+    firebaseAuthVerifier: {
+      async verifyIdToken() { return { uid: randomUUID(), phoneNumber: PHONE, authTime: Math.ceil(Date.now() / 1000) + 1 } }
+    },
+    ...(options.logLines
+      ? { logger: true, logDestination: { write: (line: string) => { options.logLines?.push(line) } } }
+      : {})
+  })
   const headers = { authorization: `Bearer ${signedIn.sessionToken}` }
+  const challenge = (payload: Record<string, unknown>, requestHeaders: Record<string, string> = headers) =>
+    app.inject({ method: "POST", url: "/v1/account/firebase/challenge", headers: requestHeaders, payload })
+  return { app, challenge }
+}
+
+const REAUTH_PURPOSES = ["account_deletion", "account_data_export", "phone_change_current"] as const
+
+test("a session token alone never learns the account's phone from a re-authentication challenge", async () => {
+  // One app per purpose: the route allows 5 challenges per 5 minutes.
+  for (const purpose of REAUTH_PURPOSES) {
+    const logLines: string[] = []
+    const { app, challenge } = await signedInChallengeApp({ logLines })
+    try {
+      for (const payload of [{ purpose }, { purpose, targetPhoneNumber: NEW_PHONE }]) {
+        const answer = await challenge(payload)
+        assert.equal(answer.statusCode, 200, "the challenge itself is never refused")
+        assert.equal(typeof answer.json().challengeId, "string")
+        assert.equal(answer.json().targetPhoneNumberWithheld, true)
+        assert.equal("targetPhoneNumber" in answer.json(), false)
+        assert.doesNotMatch(answer.body, /5555550123/)
+      }
+      assert.doesNotMatch(logLines.join("\n"), /5555550123/, "the account phone is never logged")
+    } finally { await app.close() }
+  }
+})
+
+test("a challenge confirms the account's phone only to a client that already holds it", async () => {
+  for (const purpose of REAUTH_PURPOSES) {
+    const { app, challenge } = await signedInChallengeApp()
+    try {
+      for (const knownPhone of [PHONE, "+1 (555) 555-0123"]) {
+        const answer = await challenge({ purpose, targetPhoneNumber: knownPhone })
+        assert.equal(answer.statusCode, 200)
+        assert.equal(answer.json().targetPhoneNumber, PHONE)
+        assert.equal("targetPhoneNumberWithheld" in answer.json(), false)
+      }
+    } finally { await app.close() }
+  }
+})
+
+test("a new-phone challenge and a signed-out request never name a phone", async () => {
+  const { app, challenge } = await signedInChallengeApp()
   try {
-    for (const purpose of ["account_deletion", "account_data_export", "phone_change_current"]) {
-      const challenge = await app.inject({ method: "POST", url: "/v1/account/firebase/challenge", headers, payload: { purpose } })
-      assert.equal(challenge.statusCode, 200)
-      assert.equal(challenge.json().targetPhoneNumber, PHONE)
-    }
-    const next = await app.inject({ method: "POST", url: "/v1/account/firebase/challenge", headers,
-      payload: { purpose: "phone_change_new", targetPhoneNumber: NEW_PHONE } })
+    const next = await challenge({ purpose: "phone_change_new", targetPhoneNumber: NEW_PHONE })
     assert.equal(next.statusCode, 200)
     assert.equal("targetPhoneNumber" in next.json(), false)
-    const signedOut = await app.inject({ method: "POST", url: "/v1/account/firebase/challenge",
-      headers: { authorization: "Bearer fake-ended-session" }, payload: { purpose: "account_deletion" } })
+    assert.equal("targetPhoneNumberWithheld" in next.json(), false)
+    const signedOut = await challenge({ purpose: "account_deletion", targetPhoneNumber: PHONE },
+      { authorization: "Bearer fake-ended-session" })
     assert.equal(signedOut.statusCode, 401)
-    assert.equal("targetPhoneNumber" in signedOut.json(), false)
+    assert.doesNotMatch(signedOut.body, /5555550123/)
+  } finally { await app.close() }
+})
+
+test("phone guesses stay rate limited at 5 challenges per 5 minutes", async () => {
+  const { app, challenge } = await signedInChallengeApp()
+  try {
+    for (let guess = 0; guess < 5; guess += 1) {
+      assert.equal((await challenge({ purpose: "account_deletion", targetPhoneNumber: `+1555555000${guess}` })).statusCode, 200)
+    }
+    const limited = await challenge({ purpose: "account_deletion", targetPhoneNumber: PHONE })
+    assert.equal(limited.statusCode, 429)
+    assert.doesNotMatch(limited.body, /5555550123/)
   } finally { await app.close() }
 })

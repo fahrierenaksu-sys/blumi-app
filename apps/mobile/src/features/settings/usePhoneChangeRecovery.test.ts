@@ -3,6 +3,7 @@ import test from "node:test"
 import { createFakeReactRuntime, loadSourceWithFakeReact } from "../../testing/hookHarness"
 import * as apiRequestError from "../network/apiRequestError"
 import * as sensitiveReauthGate from "../session/sensitiveReauthGate"
+import { getReauthSignInRequiredCopy } from "./reauthSignInRequired"
 import { createPendingPhoneChangeSessionWatcher, createPendingPhoneChangeStore } from "./pendingPhoneChangeStore"
 
 // Drives the real usePhoneChange hook through its own API. Only the Firebase
@@ -53,13 +54,26 @@ function fakeSecureStore(world: FakeWorld) {
   }
 }
 
-/** The server's challenge; it names the account's phone unless it is an older server. */
+/**
+ * The server's challenge. Like the server, it names the account's phone only
+ * back to a client that sent it (it never reveals it to a token alone); an
+ * older server names nothing.
+ */
 function fakeChallenge(world: FakeWorld) {
-  return async (_url: string, _token: string, input: { purpose: string }) => ({
-    challengeId: "fake-challenge",
-    expiresAt: new Date(Date.now() + 600_000).toISOString(),
-    ...(world.serverNamesPhone && input.purpose !== "phone_change_new" ? { targetPhoneNumber: world.accountPhone } : {})
-  })
+  return async (_url: string, _token: string, input: { purpose: string; targetPhoneNumber?: string }) => {
+    world.challenges += 1
+    const challenge = { challengeId: "fake-challenge", expiresAt: new Date(Date.now() + 600_000).toISOString() }
+    if (world.server === "older" || input.purpose === "phone_change_new") return challenge
+    return input.targetPhoneNumber === world.accountPhone
+      ? { ...challenge, targetPhoneNumber: world.accountPhone }
+      : { ...challenge, targetPhoneNumberWithheld: true }
+  }
+}
+
+/** The saved original outlives its 24 h TTL (the record stays on the device). */
+function expireSavedOriginal(world: FakeWorld): void {
+  const [key, raw] = [...world.storage.entries()][0]
+  world.storage.set(key, JSON.stringify({ ...JSON.parse(raw), expiresAtMs: Date.now() - 1 }))
 }
 
 /** Like the server: a re-authentication proof must come from the account's own phone. */
@@ -81,12 +95,14 @@ interface FakeWorld {
   storage: Map<string, string>
   proofTtlMs: number
   revokes: number
-  /** The server's challenge names the account's phone (false: an older server). */
-  serverNamesPhone: boolean
+  /** Challenge requests the server received (it rate-limits them). */
+  challenges: number
+  /** "confirms": names the account's phone to a client that sent it; "older": names none. */
+  server: "confirms" | "older"
 }
 
 function createWorld(): FakeWorld {
-  return { firebasePhone: OLD_PHONE, accountPhone: OLD_PHONE, sessionValid: true, storage: new Map(), proofTtlMs: 600_000, revokes: 0, serverNamesPhone: true }
+  return { firebasePhone: OLD_PHONE, accountPhone: OLD_PHONE, sessionValid: true, storage: new Map(), proofTtlMs: 600_000, revokes: 0, challenges: 0, server: "confirms" }
 }
 
 /** The change reached the server, but the client sees `error` instead of the answer. */
@@ -98,6 +114,8 @@ function mountPhoneChange(confirmOutcomes: ConfirmOutcome[], world: FakeWorld = 
   const runtime = createFakeReactRuntime()
   let alertButtons: Array<{ onPress?: () => void }> = []
   const calls = {
+    alerts: [] as string[],
+    signInAgain: 0,
     confirm: 0,
     firebaseConfirms: 0,
     resets: 0,
@@ -111,9 +129,9 @@ function mountPhoneChange(confirmOutcomes: ConfirmOutcome[], world: FakeWorld = 
   let verifyCount = 0
   const mod = loadSourceWithFakeReact<{ usePhoneChange: (input: unknown) => any }>(
     "features/settings/usePhoneChange.ts", runtime, {
-      real: ["./settingsPhoneChangeModel", "../session/registerFlowModel", "./accountReauthPhone"],
+      real: ["./settingsPhoneChangeModel", "../session/registerFlowModel", "./accountReauthPhone", "./reauthSignInRequired", "../session/settingsActionErrorCopy"],
       modules: {
-        "react-native": { Alert: { alert: (_t: string, _b: string, buttons: typeof alertButtons) => { alertButtons = buttons } } },
+        "react-native": { Alert: { alert: (title: string, _b: string, buttons: typeof alertButtons) => { calls.alerts.push(title); alertButtons = buttons } } },
         "../../config/env": { MOBILE_HTTP_BASE_URL: "https://fixture.invalid" },
         "../../ui/toast": { showToast: (toast: { type: string; body?: string }) => calls.toasts.push(`${toast.type}:${toast.body}`) },
         "../network/apiRequestError": apiRequestError,
@@ -159,10 +177,6 @@ function mountPhoneChange(confirmOutcomes: ConfirmOutcome[], world: FakeWorld = 
             if (outcome !== "ok") throw outcome.landedThen
           }
         },
-        "../session/settingsActionErrorCopy": {
-          getSettingsActionErrorMessageForDisplay: (_key: string, error: Error) => error.message,
-          getSettingsVerificationErrorToastForDisplay: (_key: string, error: Error) => ({ title: "verify", body: error.message })
-        }
       }
     })
   let api: any
@@ -170,6 +184,7 @@ function mountPhoneChange(confirmOutcomes: ConfirmOutcome[], world: FakeWorld = 
     sessionActor: actor,
     copy,
     locale: "en",
+    onSignInAgain: () => { calls.signInAgain += 1 },
     bindSessionReset: () => {
       calls.events.push("bind")
       return async () => { calls.resets += 1 }
@@ -192,7 +207,15 @@ function mountPhoneChange(confirmOutcomes: ConfirmOutcome[], world: FakeWorld = 
     alertButtons[1].onPress?.()
     await tick()
   }
-  return { calls, hook, startFlow, restartFlow, world, firebasePhone: () => world.firebasePhone }
+  /** Opens the flow (prompt -> "Continue") and requests the current-phone code, nothing more. */
+  async function requestCurrentPhoneCode() {
+    hook().handlePhoneChangePrompt()
+    alertButtons[1].onPress?.()
+    await tick()
+  }
+  /** Presses the sign-in-again action of the last alert, if it has one. */
+  function pressSignInAgain() { alertButtons[1]?.onPress?.() }
+  return { calls, hook, startFlow, restartFlow, requestCurrentPhoneCode, pressSignInAgain, world, firebasePhone: () => world.firebasePhone }
 }
 
 test("a transient failure while finishing keeps the new-phone proof and the retry reaches the API", async () => {
@@ -345,10 +368,10 @@ const NEW_PHONE = "+905550000002"
 /** Mounts the real deletion or export hook over the same fake world. */
 function mountAccountAction(world: FakeWorld) {
   const runtime = createFakeReactRuntime()
-  const calls = { firebaseConfirms: 0, codeRequests: [] as string[], toasts: [] as string[], deleted: 0, exported: 0, resets: 0 }
+  const calls = { firebaseConfirms: 0, codeRequests: [] as string[], toasts: [] as string[], alerts: [] as string[], signInAgain: 0, deleted: 0, exported: 0, resets: 0 }
   let alertButtons: { onPress?: () => void }[] = []
   const modules = {
-    "react-native": { Alert: { alert: (_t: string, _b: string, buttons: typeof alertButtons) => { alertButtons = buttons } } },
+    "react-native": { Alert: { alert: (title: string, _b: string, buttons: typeof alertButtons) => { calls.alerts.push(title); alertButtons = buttons } } },
     "../../config/env": { MOBILE_HTTP_BASE_URL: "https://fixture.invalid" },
     "../../ui/toast": { showToast: (toast: { type: string; body?: string }) => calls.toasts.push(`${toast.type}:${toast.body}`) },
     "./useSensitiveReauthHold": { useSensitiveReauthHold: () => ({ hold: () => undefined, release: () => undefined }) },
@@ -364,12 +387,11 @@ function mountAccountAction(world: FakeWorld) {
       deleteProductionAccount: async () => { calls.deleted += 1; return "deleted" },
       downloadAccountDataExport: async () => ({ dispose: async () => undefined })
     },
-    "../session/settingsActionErrorCopy": {
-      getSettingsActionErrorMessageForDisplay: (_key: string, error: Error) => error.message,
-      getSettingsVerificationErrorToastForDisplay: (_key: string, error: Error) => ({ title: "verify", body: error.message })
-    }
   }
-  const options = { real: ["./settingsPresentationModel", "./accountReauthPhone"], modules }
+  const options = {
+    real: ["./settingsPresentationModel", "./accountReauthPhone", "./reauthSignInRequired", "../session/settingsActionErrorCopy"],
+    modules
+  }
   const deletionModule = loadSourceWithFakeReact<{ useAccountDeletion: (input: unknown) => any }>(
     "features/settings/useAccountDeletion.ts", runtime, options)
   const exportModule = loadSourceWithFakeReact<{ useAccountDataExport: (input: unknown) => any }>(
@@ -377,13 +399,27 @@ function mountAccountAction(world: FakeWorld) {
   let deletion: any
   let dataExport: any
   runtime.render(() => {
+    const onSignInAgain = () => { calls.signInAgain += 1 }
     deletion = deletionModule.useAccountDeletion({
-      sessionActor: actor, copy, locale: "en", bindSessionReset: () => async () => { calls.resets += 1 }
+      sessionActor: actor, copy, locale: "en", onSignInAgain, bindSessionReset: () => async () => { calls.resets += 1 }
     })
-    dataExport = exportModule.useAccountDataExport({ sessionActor: actor, copy, locale: "en" })
+    dataExport = exportModule.useAccountDataExport({ sessionActor: actor, copy, locale: "en", onSignInAgain })
   })
   return {
     calls,
+    /** Prompt -> "Continue": requests the deletion code and stops there. */
+    async requestDeletionCode() {
+      deletion.handleDeleteAccountPrompt()
+      alertButtons[1].onPress?.()
+      await tick()
+    },
+    async requestExportCode() {
+      dataExport.handleDataExportPrompt()
+      alertButtons[1].onPress?.()
+      await tick()
+    },
+    /** Presses the sign-in-again action of the last alert, if it has one. */
+    pressSignInAgain() { alertButtons[1]?.onPress?.() },
     async deleteAccount() {
       deletion.handleDeleteAccountPrompt()
       alertButtons[1].onPress?.()
@@ -430,7 +466,7 @@ test("after the saved original expires, a restart still texts the account's phon
   const firstLaunch = mountPhoneChange([serverError(503, "server_unavailable")], world)
   await firstLaunch.startFlow()
   await firstLaunch.hook().verifyNewPhoneChangeCode()
-  world.storage.clear() // the 24 h record expired
+  expireSavedOriginal(world)
   assert.notEqual(world.firebasePhone, world.accountPhone)
 
   const nextLaunch = mountPhoneChange([], world)
@@ -445,7 +481,7 @@ test("after the saved original expires, a restart still texts the account's phon
 
 test("an older server that names no phone still restarts from the saved original", async () => {
   const world = createWorld()
-  world.serverNamesPhone = false
+  world.server = "older"
   const firstLaunch = mountPhoneChange([serverError(503, "server_unavailable")], world)
   await firstLaunch.startFlow()
   await firstLaunch.hook().verifyNewPhoneChangeCode()
@@ -461,7 +497,7 @@ test("account deletion and data export text the account's phone while Firebase h
   const phoneChange = mountPhoneChange([serverError(503, "server_unavailable")], world)
   await phoneChange.startFlow()
   await phoneChange.hook().verifyNewPhoneChangeCode()
-  world.storage.clear() // even with no saved original left
+  expireSavedOriginal(world) // even after the saved original expired
   assert.notEqual(world.firebasePhone, world.accountPhone)
 
   const exportFlow = mountAccountAction(world)
@@ -475,6 +511,88 @@ test("account deletion and data export text the account's phone while Firebase h
   assert.deepEqual(deletionFlow.calls.codeRequests, [OLD_PHONE])
   assert.equal(deletionFlow.calls.deleted, 1, "deletion is never blocked")
   assert.equal(deletionFlow.calls.resets, 1)
+})
+
+/** A device whose saved original is gone while Firebase holds the new phone: the server confirms none. */
+async function worldWithNoConfirmablePhone() {
+  const world = createWorld()
+  const phoneChange = mountPhoneChange([serverError(503, "server_unavailable")], world)
+  await phoneChange.startFlow()
+  await phoneChange.hook().verifyNewPhoneChangeCode()
+  world.storage.clear() // the saved original is gone (secure storage failed)
+  assert.notEqual(world.firebasePhone, world.accountPhone)
+  return world
+}
+
+const signInAgainTitle = (locale: "en" | "tr") => getReauthSignInRequiredCopy(locale).title
+
+test("deletion with no phone the server confirms texts nothing and leads to sign-in again, not a retry", async () => {
+  const world = await worldWithNoConfirmablePhone()
+  world.challenges = 0
+
+  const stale = mountAccountAction(world)
+  await stale.requestDeletionCode()
+  assert.deepEqual(stale.calls.codeRequests, [], "no code goes to a phone the server did not confirm")
+  assert.deepEqual(stale.calls.alerts.slice(-1), [signInAgainTitle("en")], "the user is told to sign in again")
+  assert.deepEqual(stale.calls.toasts, [], "no generic try-again toast")
+  assert.ok(world.challenges <= 3, "one attempt spends a bounded number of challenge requests")
+  const spent = world.challenges
+  await tick()
+  assert.equal(world.challenges, spent, "nothing retries on its own")
+
+  stale.pressSignInAgain()
+  assert.equal(stale.calls.signInAgain, 1, "the alert's action signs the user out")
+
+  world.firebasePhone = world.accountPhone // signed in again with the account's phone
+  const signedInAgain = mountAccountAction(world)
+  await signedInAgain.deleteAccount()
+  assert.deepEqual(signedInAgain.calls.codeRequests, [OLD_PHONE])
+  assert.equal(signedInAgain.calls.deleted, 1, "deletion is never blocked")
+})
+
+test("data export with no phone the server confirms leads to sign-in again, not a retry", async () => {
+  const world = await worldWithNoConfirmablePhone()
+  world.challenges = 0
+
+  const stale = mountAccountAction(world)
+  await stale.requestExportCode()
+  assert.deepEqual(stale.calls.codeRequests, [])
+  assert.deepEqual(stale.calls.alerts.slice(-1), [signInAgainTitle("en")])
+  assert.deepEqual(stale.calls.toasts, [])
+  const spent = world.challenges
+  assert.ok(spent <= 3)
+  await tick()
+  assert.equal(world.challenges, spent, "nothing retries on its own")
+  stale.pressSignInAgain()
+  assert.equal(stale.calls.signInAgain, 1)
+
+  world.firebasePhone = world.accountPhone
+  const signedInAgain = mountAccountAction(world)
+  await signedInAgain.exportData()
+  assert.deepEqual(signedInAgain.calls.codeRequests, [OLD_PHONE])
+  assert.equal(signedInAgain.calls.exported, 1)
+})
+
+test("phone change with no phone the server confirms leads to sign-in again, not a retry", async () => {
+  const world = await worldWithNoConfirmablePhone()
+  world.challenges = 0
+
+  const stale = mountPhoneChange([], world)
+  await stale.requestCurrentPhoneCode()
+  assert.deepEqual(stale.calls.codeRequests, [])
+  assert.deepEqual(stale.calls.alerts.slice(-1), [signInAgainTitle("en")])
+  assert.deepEqual(stale.calls.toasts, [])
+  const spent = world.challenges
+  assert.ok(spent <= 3)
+  await tick()
+  assert.equal(world.challenges, spent, "nothing retries on its own")
+  stale.pressSignInAgain()
+  assert.equal(stale.calls.signInAgain, 1)
+
+  world.firebasePhone = world.accountPhone
+  const signedInAgain = mountPhoneChange([], world)
+  await signedInAgain.requestCurrentPhoneCode()
+  assert.deepEqual(signedInAgain.calls.codeRequests, [OLD_PHONE], "the account's phone is texted after signing in again")
 })
 
 test("end to end: change lands but its answer is lost, app killed, restart, the user deletes the account", async () => {
