@@ -114,7 +114,9 @@ export function PrimaryButton(props: SharedButtonProps) {
           styles.primaryButton,
           !disabled ? buttonTheme.shadow.glowSubtle : null,
           pressed && !disabled ? styles.primaryButtonPressed : null,
-          disabled ? styles.primaryButtonDisabled : null,
+          // The entry disabled fill is already a muted rose that keeps its white label
+          // at 3:1; fading it as well would drop the label to about 2:1.
+          disabled && tone !== "entry" ? styles.primaryButtonDisabled : null,
           style
         ]}
         testID={testID}

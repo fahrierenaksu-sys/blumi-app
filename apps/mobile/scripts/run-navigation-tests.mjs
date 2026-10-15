@@ -132,6 +132,7 @@ try {
       "src/ui/PressableScale.test.ts",
       "src/ui/themeContrast.test.ts",
       "src/ui/styleContrastPairs.test.ts",
+      "src/ui/primaryButtonDisabled.test.ts",
       "src/ui/accessibilityAnnouncement.test.ts",
       "src/ui/MainTabPagerGestureOwnership.test.ts",
       "src/ui/animations.test.ts",

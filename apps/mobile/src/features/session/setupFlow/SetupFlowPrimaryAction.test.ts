@@ -6,6 +6,7 @@ import {
   createReanimatedStub,
   loadSourceWithFakeReact
 } from "../../../testing/hookHarness"
+import { MIN_CONTRAST, contrastRatio } from "../../../ui/themeContrast"
 
 type Element = { type: unknown; props: Record<string, any> }
 
@@ -26,7 +27,7 @@ function flattenStyle(style: unknown): Record<string, unknown> {
   return style && typeof style === "object" ? style as Record<string, unknown> : {}
 }
 
-function mountAction(label: string) {
+function mountAction(label: string, disabled = false) {
   const runtime = createFakeReactRuntime()
   const reanimated = createReanimatedStub(runtime)
   const { SetupFlowPrimaryAction } = loadSourceWithFakeReact<{
@@ -39,7 +40,7 @@ function mountAction(label: string) {
     real: ["../../../ui/theme", "../onboardingActionLayout"],
     inertUnknown: true
   })
-  runtime.render(() => SetupFlowPrimaryAction({ label, onPress: () => undefined, disabled: false, busy: false }))
+  runtime.render(() => SetupFlowPrimaryAction({ label, onPress: () => undefined, disabled, busy: false }))
   return runtime
 }
 
@@ -65,4 +66,23 @@ test("the onboarding primary action grows with its label instead of clipping it"
   }
   assert.equal(flattenStyle(button.props.style).minHeight, 58, "the designed height stays the minimum")
   runtime.unmount()
+})
+
+function readActionColors(disabled: boolean) {
+  const runtime = mountAction("Devam et", disabled)
+  const label = findElements(runtime.output, (element) => element.props.children === "Devam et")[0]
+  const surface = findElements(runtime.output, (element) => Array.isArray(element.props.colors))[0]
+  const colors = { label: flattenStyle(label.props.style).color as string, fills: surface.props.colors as string[] }
+  runtime.unmount()
+  return colors
+}
+
+test("a disabled onboarding action keeps a readable label and still looks disabled", () => {
+  const enabled = readActionColors(false)
+  const disabled = readActionColors(true)
+  for (const fill of disabled.fills) {
+    assert.ok(contrastRatio(disabled.label, fill) >= MIN_CONTRAST.disabledText,
+      `${disabled.label} on ${fill} = ${contrastRatio(disabled.label, fill).toFixed(2)}:1`)
+  }
+  assert.ok(contrastRatio(disabled.fills[0], enabled.fills[0]) > 1.5, "the disabled fill is clearly lighter than the enabled one")
 })
