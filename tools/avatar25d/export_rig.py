@@ -450,6 +450,8 @@ def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pag
     M = BLINK_MARGIN
     out = []
     for iid, it, page in items_src:
+        if it.get('slot') == 'glasses':   # their own layer over the eyes, never a baked eye copy: rims must not blink away
+            continue
         for k, part in enumerate(it.get('parts', [])):
             if part['layer'] != src_blink.get('layer'):
                 continue

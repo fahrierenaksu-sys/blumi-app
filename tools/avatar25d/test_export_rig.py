@@ -270,6 +270,40 @@ class BlinkItemCutTest(unittest.TestCase):
         self.assertTrue(cut[30, 45], 'a loose bit of the copy goes')
 
 
+class PackBlinkItemsGlassesTest(unittest.TestCase):
+    """Glasses are their own layer over the eyes, never a baked eye copy: a blink must not erase their rims."""
+
+    def _blink_patches(self, slot):
+        import numpy as np
+        from PIL import Image
+        ex = load_exporter()
+        h, w = 40, 60
+        skin, iris, lash = (250, 210, 185, 255), (150, 90, 40, 255), (30, 18, 14, 255)
+        head = np.zeros((h, w, 4), np.uint8); head[:] = skin
+        head[12:28, 24:40] = iris                                  # the open eye
+        closed = np.zeros((h, w, 4), np.uint8); closed[:] = skin
+        closed[24:26, 20:44] = lash                                # its closed lash line
+        part_art = np.zeros((h + 64, w + 64, 4), np.uint8)         # the item part, 32 px margin around the eye rect
+        part_art[32 + 12:32 + 28, 32 + 24:32 + 40] = (120, 70, 35, 255)   # eye-zone pixels (an eye copy for a hair)
+        part = {'layer': 'head', 'box': [-32, -32], 'png': data_uri(Image.fromarray(part_art, 'RGBA'))}
+        item = {'slot': slot, 'parts': [part]}
+        src_blink = {'layer': 'head', 'rect': [0, 0, w, h],
+                     'frames': {'half': data_uri(Image.fromarray(closed, 'RGBA')),
+                                'closed': data_uri(Image.fromarray(closed, 'RGBA'))}}
+        page = Image.new('RGBA', (512, 512))
+        page.paste(Image.fromarray(part_art, 'RGBA'), (0, 0))
+        taken = {0: [(0, 0, part_art.shape[1], part_art.shape[0])]}
+        rects = {'it': {'part0': [0, 0, part_art.shape[1], part_art.shape[0]]}}
+        return ex.pack_blink_items(src_blink, Image.fromarray(head, 'RGBA'), (0, 0), [('it', item, 0)],
+                                   rects, {0: page}, taken)
+
+    def test_a_hair_with_an_eye_copy_gets_a_patch(self):
+        self.assertEqual(len(self._blink_patches('hair')), 1)
+
+    def test_glasses_over_the_eyes_get_no_patch_so_their_rims_never_flicker(self):
+        self.assertEqual(self._blink_patches('glasses'), [])
+
+
 APP_RIG = HERE.parents[1] / 'apps/mobile/src/features/avatar/rigs'
 
 
