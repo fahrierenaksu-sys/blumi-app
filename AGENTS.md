@@ -26,7 +26,7 @@ Blumi is an Expo / React Native social app built around sweet 2.5D chibi avatars
   - Never take a whole file from one side (`--ours`, `--theirs`, `git checkout <branch> -- <file>`).
   - Never let a merge or a "restore" delete files the other side added. Check who added them with `git log --diff-filter=A -- <path>`.
   - Afterwards, diff the result against both parents and run typecheck plus the affected tests before you commit the merge.
-- Run `git fetch` before comparing branches, judging what is merged or picking a base, because local refs go stale. Base new branches and agent worktrees on the freshly fetched tip of the current release branch (`origin/release/2.5d-beta-N`, the newest N; `origin/main` only when no release is open) and confirm it (`git merge-base --is-ancestor <that ref> HEAD`). `develop` is stale. Worktrees have silently started from the wrong base before.
+- Run `git fetch` before comparing branches, judging what is merged or picking a base, because local refs go stale. Base new branches and agent worktrees on the freshly fetched branch the owner currently integrates into (today the newest `release/2.5d-beta-N`; check with the lead) and confirm it (`git merge-base --is-ancestor <that ref> HEAD`). Worktrees have silently started from the wrong base before.
 - Commit finished work early and often, without asking, especially before long background jobs or when you are low on budget, because the cloud container restarts and kills them.
 - Push only when the owner says so in the current conversation ("push at"), to any branch, release branches and your own work branch included. If unpushed work is at risk, say so and ask.
 
