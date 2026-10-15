@@ -46,6 +46,13 @@ try {
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )
+
+  // Consent network tests load production sources on the real PostHog core.
+  execFileSync(
+    process.execPath,
+    ["--import", "tsx", "--test", "src/analytics/analyticsConsentNetwork.test.ts"],
+    { cwd: workspaceRoot, stdio: "inherit" }
+  )
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
 }

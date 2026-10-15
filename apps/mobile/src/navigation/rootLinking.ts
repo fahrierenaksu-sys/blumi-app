@@ -1,4 +1,4 @@
-import type { LinkingOptions } from "@react-navigation/native"
+import { getStateFromPath, type LinkingOptions } from "@react-navigation/native"
 import { Linking } from "react-native"
 import { captureProductEvent } from "../analytics/productAnalytics"
 import { parseReferralCodeFromUrl } from "../features/referrals/referralModel"
@@ -6,6 +6,7 @@ import { capturePendingReferral } from "../features/referrals/referralStorage"
 import { createPendingDeepLinkStore } from "./pendingDeepLink"
 import type { RootStackParamList } from "./RootNavigator"
 import { navigationRef } from "./rootNavigationRef"
+import { createSafeGetStateFromPath } from "./rootLinkConfig"
 
 const ROOT_LINK_SCREENS = {
   Lobby: "discover",
@@ -22,7 +23,8 @@ const ROOT_LINK_SCREENS = {
 /**
  * Deep links for the root stack. Referral links are captured for later
  * attribution and never reach navigation; every other `blumi://` link routes
- * through the path config below. A link that arrives before the unrestricted
+ * through the path config below, and only path ids become params (query keys
+ * never turn into in-app commands; see rootLinkConfig). A link that arrives before the unrestricted
  * Main stack can route it is held by `pendingDeepLinks` and replayed once.
  */
 export const linking: LinkingOptions<RootStackParamList> = {
@@ -30,6 +32,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
   config: {
     screens: ROOT_LINK_SCREENS
   },
+  getStateFromPath: createSafeGetStateFromPath(getStateFromPath, ROOT_LINK_SCREENS),
   async getInitialURL() {
     const url = await Linking.getInitialURL()
     if (!url) return url

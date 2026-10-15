@@ -37,7 +37,6 @@ import {
   PROFILE_GENDERS,
   type DiscoveryGender,
   type DiscoveryPreferences,
-  type DiscoveryRadiusKm,
   type ProfileGender,
   type UserProfilePrompt,
   type UserProfilePromptId
@@ -89,9 +88,6 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
   const [discoveryGenders, setDiscoveryGenders] = useState<DiscoveryGender[]>(
     () => [...(currentDiscoveryPreferences?.genders ?? [])]
   )
-  const [radiusKm, setRadiusKm] = useState<DiscoveryRadiusKm>(
-    currentDiscoveryPreferences?.radiusKm ?? 25
-  )
   const [interestsText, setInterestsText] = useState(
     (currentInterests ?? []).join("\n")
   )
@@ -132,8 +128,8 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
         gender,
         interestsText,
         prompts,
-        discoveryGenders,
-        radiusKm
+        // No radius: discovery is global, so the stored value is kept as is.
+        discoveryGenders
       }
     }),
     [
@@ -152,7 +148,6 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
       discoveryGenders,
       interestsText,
       prompts,
-      radiusKm,
       analyzeMemoizedDraft
     ]
   )
@@ -396,27 +391,6 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                   </PressableScale>
                 )
               })}
-            </View>
-            <Text style={styles.fieldLabel}>{discoveryCopy.radius}</Text>
-            <View style={styles.segmentRow}>
-              {([25, 50, 100] as const).map((option) => (
-                <PressableScale
-                  key={option}
-                  accessibilityRole="radio"
-                  accessibilityLabel={`${option} km ${discoveryCopy.radius}`}
-                  accessibilityState={{ selected: radiusKm === option }}
-                  onPress={() => setRadiusKm(option)}
-                  style={[
-                    styles.segmentButton,
-                    radiusKm === option ? styles.segmentButtonSelected : null
-                  ]}
-                >
-                  <Text style={[
-                    styles.segmentText,
-                    radiusKm === option ? styles.segmentTextSelected : null
-                  ]}>{option} km</Text>
-                </PressableScale>
-              ))}
             </View>
           </View>
 

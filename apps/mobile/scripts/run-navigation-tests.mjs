@@ -36,6 +36,8 @@ const sourceFiles = [
   "src/navigation/linkedProfileResolutionModel.test.ts",
   "src/navigation/pendingDeepLink.ts",
   "src/navigation/pendingDeepLink.test.ts",
+  "src/navigation/rootLinkConfig.ts",
+  "src/navigation/rootLinkConfig.test.ts",
   "src/navigation/blockedPartnerChatExit.ts",
   "src/navigation/blockedPartnerChatExit.test.ts",
   "src/features/lobby/lobbyInviteAttempt.ts",
@@ -100,6 +102,7 @@ try {
       join(outputDirectory, "features/roomV2/roomOwnerLabel.test.js"),
       join(outputDirectory, "navigation/linkedProfileResolutionModel.test.js"),
       join(outputDirectory, "navigation/pendingDeepLink.test.js"),
+      join(outputDirectory, "navigation/rootLinkConfig.test.js"),
       join(outputDirectory, "navigation/blockedPartnerChatExit.test.js"),
       join(outputDirectory, "features/lobby/lobbyInviteAttempt.test.js"),
       join(outputDirectory, "features/shop/shopCatalogRuntime.test.js"),
@@ -138,7 +141,8 @@ try {
       "src/features/matches/matchMeeting.test.ts",
       "src/navigation/nativeSheets/nativeSheets.test.ts",
       "src/ui/bottomPanelEntrance.test.ts",
-      "src/navigation/useNotificationResponseRouting.test.ts"
+      "src/navigation/useNotificationResponseRouting.test.ts",
+      "src/observability/crashReportingTransport.test.ts"
     ],
     { cwd: workspaceRoot, stdio: "inherit" }
   )

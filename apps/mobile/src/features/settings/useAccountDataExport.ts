@@ -22,8 +22,9 @@ import { sanitizeVerificationCode } from "./settingsPresentationModel"
 
 /**
  * Account data export: prompt -> one-time code -> server verification ->
- * download and share. An in-flight export is aborted when the session user
- * changes or the screen unmounts.
+ * download and share. An in-flight export is aborted when the user cancels,
+ * the session user changes or the screen unmounts; an aborted export never
+ * opens the share sheet and its downloaded file is disposed.
  */
 export function useAccountDataExport(input: {
   sessionActor: SessionActor
@@ -88,6 +89,7 @@ export function useAccountDataExport(input: {
       const challengeId = exportChallengeRef.current
       if (!firebaseConfirmation || !challengeId) throw new Error("Request a verification code first.")
       const idToken = await confirmFirebasePhoneCode(firebaseConfirmation, exportCode)
+      if (controller.signal.aborted) return
       const confirmation = await verifyFirebaseAccountAction(
         MOBILE_HTTP_BASE_URL,
         sessionActor.session.sessionToken,
@@ -117,8 +119,11 @@ export function useAccountDataExport(input: {
         type: "warning"
       })
     } finally {
-      if (exportControllerRef.current === controller) exportControllerRef.current = null
-      setIsExportingAccountData(false)
+      // A cancelled run already released the busy state; never clear a newer run's.
+      if (exportControllerRef.current === controller) {
+        exportControllerRef.current = null
+        setIsExportingAccountData(false)
+      }
     }
   }, [copy, exportCode, isExportingAccountData, locale, sessionActor])
 
@@ -141,7 +146,16 @@ export function useAccountDataExport(input: {
   const changeExportCode = useCallback((value: string) => {
     setExportCode(sanitizeVerificationCode(value))
   }, [])
-  const closeExportCode = useCallback(() => setExportCodeVisible(false), [])
+  const closeExportCode = useCallback(() => {
+    const controller = exportControllerRef.current
+    exportControllerRef.current = null
+    controller?.abort()
+    exportFirebaseConfirmationRef.current = null
+    exportChallengeRef.current = null
+    setExportCodeVisible(false)
+    setExportCode("")
+    if (controller) setIsExportingAccountData(false)
+  }, [])
 
   return {
     isExportingAccountData,
