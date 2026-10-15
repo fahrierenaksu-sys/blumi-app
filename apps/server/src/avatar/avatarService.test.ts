@@ -171,13 +171,13 @@ for (const [label, catalog] of [
 // The girl's 2.5D additions (girlWardrobePreview.ts) are free and owned by every account on the boy's testing terms:
 // she saves them alone and mixed with her starter, an account made before they existed gets them by the inventory
 // self-heal, the boy cannot wear them and nobody can buy them.
-const [GIRL_WHITE_CROP, GIRL_BLACK_CROP] = GIRL_WARDROBE_PREVIEW_ITEM_IDS.top
+const [, GIRL_BLACK_CROP] = GIRL_WARDROBE_PREVIEW_ITEM_IDS.top
 const [GIRL_TROUSERS] = GIRL_WARDROBE_PREVIEW_ITEM_IDS.bottom
 const GIRL_NEW_LOOKS = [
   ...GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair.map((hairId) => ({ ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId })),
   { ...DEFAULT_FEMALE_AVATAR_LOADOUT, shoesId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes[0] },
   { ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair[0], shoesId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes[0] },
-  { ...DEFAULT_FEMALE_AVATAR_LOADOUT, topId: GIRL_WHITE_CROP },
+  ...GIRL_WARDROBE_PREVIEW_ITEM_IDS.top.map((topId) => ({ ...DEFAULT_FEMALE_AVATAR_LOADOUT, topId })),
   { ...DEFAULT_FEMALE_AVATAR_LOADOUT, bottomId: GIRL_TROUSERS },
   { ...DEFAULT_FEMALE_AVATAR_LOADOUT, topId: GIRL_BLACK_CROP, bottomId: GIRL_TROUSERS }
 ]

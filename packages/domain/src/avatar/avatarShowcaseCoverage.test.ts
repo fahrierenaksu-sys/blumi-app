@@ -22,6 +22,8 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * Reason for the girl's crop tops and black trousers (2026-10-13, branch wip/body-replacement-2): their room art is in
  * (owner-approved bare belly), but their front art is still NEEDS-FIX in the factory (crop waist stubs, trousers shape)
  * and has no owner approval, so the showcase allowlist cannot list them. Remove them as fronts land.
+ * 2026-10-14 (wip/girl-jacket): the sage ribbon knit jacket joins for the same reason; its front layer (factory
+ * girl_jacket_2130 sc/o_sage_j2) waits for the owner's yes on the front look.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
   female: [
@@ -30,6 +32,7 @@ const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = 
     "avatar_v2_top_white_cute_crop_top",
     "avatar_v2_top_black_cute_crop_top",
     "avatar_v2_bottom_black_highwaist_trousers",
+    "top_sage_ribbon_knit_jacket",
   ],
   male: [],
 };
