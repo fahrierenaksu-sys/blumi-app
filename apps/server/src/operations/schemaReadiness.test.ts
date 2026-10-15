@@ -38,7 +38,9 @@ test("only independently guarded additive features are optional for readiness", 
     "072_firebase_sms_admission.sql",
     // The observer checks this checksum before any update; missing schema
     // drops optional statistics without preventing application sign-in.
-    "073_sms_verification_outcomes.sql"
+    "073_sms_verification_outcomes.sql",
+    // An index: no query depends on it for its result.
+    "074_notification_retention_index.sql"
   ])
 })
 

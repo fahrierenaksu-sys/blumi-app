@@ -21,7 +21,9 @@ export const OPTIONAL_READINESS_MIGRATIONS: readonly string[] = Object.freeze([
   CHAT_HIDE_MIGRATION_ID,
   // SMS functions and optional outcome reporting probe their own schema.
   "072_firebase_sms_admission.sql",
-  SMS_ADMISSION_MIGRATION_ID
+  SMS_ADMISSION_MIGRATION_ID,
+  // Index only: every query returns the same rows without it, only slower.
+  "074_notification_retention_index.sql"
 ])
 
 /** Read the packaged schema manifest once at service construction, not on each probe. */
