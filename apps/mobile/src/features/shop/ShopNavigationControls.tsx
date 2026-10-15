@@ -60,7 +60,7 @@ export function ShopStatusCard(props: {
           <Ionicons
             name={props.state === "offline" ? "cloud-offline-outline" : "sparkles-outline"}
             size={22}
-            color={uiTheme.colors.primary}
+            color={uiTheme.colors.primaryDeep}
           />
         </View>
       )}

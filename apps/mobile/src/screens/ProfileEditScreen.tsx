@@ -454,7 +454,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                       <Ionicons
                         name={selected ? "checkmark" : "add"}
                         size={20}
-                        color={uiTheme.colors.primary}
+                        color={uiTheme.colors.primaryDeep}
                       />
                     </PressableScale>
                     {selected ? (
