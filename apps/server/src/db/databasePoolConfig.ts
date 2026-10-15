@@ -77,11 +77,27 @@ export const DEFAULT_DATABASE_POOL_SETTINGS: Readonly<DatabasePoolSettings> = Ob
  * locks (see withAuthorizedDelivery). Device removal, logout and account
  * deletion wait for those locks under the app's lock_timeout, so the hold
  * must end first: two thirds of lock_timeout (2 s at the 3 s default), never
- * more than the provider timeout. A send cut short is retried like any
+ * more than the provider timeout. lock_timeout below MIN_DB_LOCK_TIMEOUT_MS is
+ * refused, so the send always gets at least MIN_LOCKED_SEND_TIMEOUT_MS. A send cut short is retried like any
  * provider timeout; a removal that then wins the locks stops the retry.
  */
 export function resolveLockedSendTimeoutMs(providerTimeoutMs: number, settings: Pick<DatabasePoolSettings, "lockTimeoutMs">): number {
+  assertLockTimeoutFitsLockedSend(settings.lockTimeoutMs)
   return Math.max(1, Math.min(providerTimeoutMs, Math.floor(settings.lockTimeoutMs * 2 / 3)))
+}
+
+/**
+ * Below this a locked push send would time out (and be retried) almost every
+ * time, so a lock_timeout that cannot give it this much is refused at startup.
+ */
+export const MIN_LOCKED_SEND_TIMEOUT_MS = 500
+/** The smallest lock_timeout whose two thirds still reach the send floor. */
+export const MIN_DB_LOCK_TIMEOUT_MS = Math.ceil(MIN_LOCKED_SEND_TIMEOUT_MS * 3 / 2)
+
+function assertLockTimeoutFitsLockedSend(lockTimeoutMs: number): void {
+  if (lockTimeoutMs >= MIN_DB_LOCK_TIMEOUT_MS) return
+  throw new Error(`BLUMI_DB_LOCK_TIMEOUT_MS must be at least ${MIN_DB_LOCK_TIMEOUT_MS} ms, so a push sent under ` +
+    `row locks gets at least ${MIN_LOCKED_SEND_TIMEOUT_MS} ms and still ends before a waiting request's lock timeout.`)
 }
 
 export function resolveDatabasePoolSettings(env: NodeJS.ProcessEnv): DatabasePoolSettings {
@@ -105,6 +121,7 @@ export function resolveDatabasePoolSettings(env: NodeJS.ProcessEnv): DatabasePoo
       DEFAULT_DATABASE_POOL_SETTINGS.idleInTransactionTimeoutMs,
     queryTimeoutMs
   }
+  assertLockTimeoutFitsLockedSend(settings.lockTimeoutMs)
   const applicationName = env.BLUMI_DB_APPLICATION_NAME?.trim()
   if (applicationName) {
     if (!/^[A-Za-z0-9._-]{1,63}$/.test(applicationName)) {
