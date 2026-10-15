@@ -18,6 +18,7 @@ import {
 import type { SessionActor } from "../session/sessionModel"
 import { getSettingsActionErrorMessageForDisplay } from "../session/settingsActionErrorCopy"
 import { requestAccountReauthTarget } from "./accountReauthPhone"
+import { isReauthSignInRequiredError, reauthSignInAlertArgs } from "./reauthSignInRequired"
 import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import { sanitizeVerificationCode } from "./settingsPresentationModel"
@@ -32,8 +33,10 @@ export function useAccountDataExport(input: {
   sessionActor: SessionActor
   copy: SettingsCopy
   locale: AppLocale
+  /** Signs the user out so they can sign in again by SMS (a withheld phone). */
+  onSignInAgain?: () => void
 }) {
-  const { copy, locale, sessionActor } = input
+  const { copy, locale, onSignInAgain, sessionActor } = input
   const [isExportingAccountData, setIsExportingAccountData] = useState(false)
   const exportControllerRef = useRef<AbortController | null>(null)
   useEffect(() => () => { exportControllerRef.current?.abort() }, [sessionActor.session.userId])
@@ -67,12 +70,15 @@ export function useAccountDataExport(input: {
           { purpose: "account_data_export", ...(knownPhone ? { targetPhoneNumber: knownPhone } : {}) }
         )
       })
-      if (!accountPhoneNumber) throw new Error("Sign in again to verify your phone.")
       exportChallengeRef.current = challenge.challengeId
       exportFirebaseConfirmationRef.current = await requestFirebasePhoneCode(accountPhoneNumber)
       setExportCode("")
       setExportCodeVisible(true)
     } catch (error) {
+      if (isReauthSignInRequiredError(error)) {
+        Alert.alert(...reauthSignInAlertArgs(locale, copy.cancel, onSignInAgain))
+        return
+      }
       showToast({
         title: copy.codeNotSent,
         body: getSettingsActionErrorMessageForDisplay("requestDataExport", error, locale),
@@ -81,7 +87,7 @@ export function useAccountDataExport(input: {
     } finally {
       setIsExportingAccountData(false)
     }
-  }, [copy, isExportingAccountData, locale, sessionActor])
+  }, [copy, isExportingAccountData, locale, onSignInAgain, sessionActor])
 
   const verifyExportCode = useCallback(async () => {
     if (

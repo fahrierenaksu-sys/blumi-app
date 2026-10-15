@@ -1,12 +1,13 @@
 import type { FirebaseAccountActionChallenge } from "../session/sessionApi"
 import type { PendingPhoneChangeStore } from "./pendingPhoneChangeStore"
+import { ReauthSignInRequiredError } from "./reauthSignInRequired"
 
 const E164_PHONE_PATTERN = /^\+[1-9]\d{6,14}$/
 
 export interface AccountReauthTarget {
   challenge: FirebaseAccountActionChallenge
-  /** The phone to text, or null: sign in again (Firebase then holds it). */
-  phoneNumber: string | null
+  /** The phone to text. */
+  phoneNumber: string
 }
 
 /**
@@ -22,10 +23,11 @@ export interface AccountReauthTarget {
  * past its TTL, then Firebase's) until the server names one:
  *
  * - Named: text it, and drop a saved original that disagrees (stale).
- * - Withheld for every phone: text nothing (null); signing in again puts the
- *   account's phone in Firebase.
+ * - Withheld for every phone: text nothing and throw
+ *   ReauthSignInRequiredError; signing in again puts the account's phone in
+ *   Firebase. Callers must not retry.
  * - An older server names nothing: the in-flow phone, the saved original
- *   within its TTL, then Firebase's phone.
+ *   within its TTL, then Firebase's phone (none of them: sign in again).
  *
  * Never logs a number.
  */
@@ -52,7 +54,9 @@ export async function requestAccountReauthTarget(input: {
     if (savedOrigin && savedOrigin !== named) await pending.clear()
     return { challenge, phoneNumber: named }
   }
-  if (challenge.targetPhoneNumberWithheld) return { challenge, phoneNumber: null }
+  if (challenge.targetPhoneNumberWithheld) throw new ReauthSignInRequiredError()
   const unconfirmedOrigin = await pending.readOrigin(userId)
-  return { challenge, phoneNumber: verifiedPhone || unconfirmedOrigin || firebasePhone() }
+  const fallbackPhone = verifiedPhone || unconfirmedOrigin || firebasePhone()
+  if (!fallbackPhone) throw new ReauthSignInRequiredError()
+  return { challenge, phoneNumber: fallbackPhone }
 }

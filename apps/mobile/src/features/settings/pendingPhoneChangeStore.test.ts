@@ -173,15 +173,20 @@ test("with no phone the server confirms, none is used and nothing is guessed", a
   const pending = createPendingPhoneChangeStore(memoryStore())
   const server = fakeServer(FAKE_PHONE)
 
-  const noFirebase = await requestAccountReauthTarget({
-    userId: "user-fake-1", pending, firebasePhone: () => null, requestChallenge: server.requestChallenge
-  })
-  const wrongFirebase = await requestAccountReauthTarget({
-    userId: "user-fake-1", pending, firebasePhone: () => FAKE_NEW_PHONE, requestChallenge: server.requestChallenge
-  })
+  const isSignInRequired = (error: unknown) => (error as { code?: string }).code === "reauth_sign_in_required"
+  await assert.rejects(
+    requestAccountReauthTarget({
+      userId: "user-fake-1", pending, firebasePhone: () => null, requestChallenge: server.requestChallenge
+    }),
+    isSignInRequired
+  )
+  await assert.rejects(
+    requestAccountReauthTarget({
+      userId: "user-fake-1", pending, firebasePhone: () => FAKE_NEW_PHONE, requestChallenge: server.requestChallenge
+    }),
+    isSignInRequired
+  )
 
-  assert.equal(noFirebase.phoneNumber, null)
-  assert.equal(wrongFirebase.phoneNumber, null)
   assert.deepEqual(server.sent, [undefined, FAKE_NEW_PHONE], "only phones the device already holds are sent")
 })
 

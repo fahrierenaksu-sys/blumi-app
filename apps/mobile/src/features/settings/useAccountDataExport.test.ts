@@ -35,6 +35,7 @@ function mountExport(options: { holdCode?: boolean } = {}) {
   let buttons: { onPress?: () => void }[] = []
   const hook = loadSourceWithFakeReact<{ useAccountDataExport: (input: unknown) => ExportApi }>(
     "features/settings/useAccountDataExport.ts", runtime, {
+      real: ["./reauthSignInRequired"],
       modules: {
         "react-native": { Alert: { alert: (_title: string, _body: string, next: typeof buttons) => { buttons = next } } },
         "../../config/env": { MOBILE_HTTP_BASE_URL: "https://api.invalid" },

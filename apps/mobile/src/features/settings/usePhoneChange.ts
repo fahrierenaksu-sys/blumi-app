@@ -34,6 +34,7 @@ import {
   getSettingsVerificationErrorToastForDisplay
 } from "../session/settingsActionErrorCopy"
 import { requestAccountReauthTarget } from "./accountReauthPhone"
+import { isReauthSignInRequiredError, reauthSignInAlertArgs } from "./reauthSignInRequired"
 import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import {
@@ -115,8 +116,10 @@ export function usePhoneChange(input: {
   locale: AppLocale
   /** Returns a reset bound to the session the final request starts in. */
   bindSessionReset: () => () => Promise<void>
+  /** Signs the user out so they can sign in again by SMS (a withheld phone). */
+  onSignInAgain?: () => void
 }) {
-  const { bindSessionReset, copy, locale, sessionActor } = input
+  const { bindSessionReset, copy, locale, onSignInAgain, sessionActor } = input
   const [isChangingPhone, setIsChangingPhone] = useState(false)
   const [form, dispatch] = useReducer(phoneChangeFormReducer, INITIAL_PHONE_CHANGE_FORM_STATE)
   const {
@@ -175,12 +178,15 @@ export function usePhoneChange(input: {
           { purpose: "phone_change_current", ...(knownPhone ? { targetPhoneNumber: knownPhone } : {}) }
         )
       })
-      if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
       verifiedCurrentPhoneRef.current = currentPhoneNumber
       currentPhoneChallengeRef.current = challenge.challengeId
       currentPhoneFirebaseConfirmationRef.current = await requestFirebasePhoneCode(currentPhoneNumber)
       dispatch({ type: "opened" })
     } catch (error) {
+      if (isReauthSignInRequiredError(error)) {
+        Alert.alert(...reauthSignInAlertArgs(locale, copy.cancel, onSignInAgain))
+        return
+      }
       showToast({
         title: copy.codeNotSent,
         body: getSettingsActionErrorMessageForDisplay("requestCurrentPhoneCode", error, locale),
@@ -189,7 +195,7 @@ export function usePhoneChange(input: {
     } finally {
       setIsChangingPhone(false)
     }
-  }, [copy, isChangingPhone, locale, reauthHold, sessionActor])
+  }, [copy, isChangingPhone, locale, onSignInAgain, reauthHold, sessionActor])
 
   const verifyCurrentPhoneChangeCode = useCallback(async () => {
     if (isChangingPhone || sessionActor.session.mode !== "production") return
