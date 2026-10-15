@@ -6,7 +6,6 @@ import type { MiniRoomLeavePromptView } from "./useMiniRoomLeaveGuard"
 /** The "leave the room?" question, drawn by the room screen so it closes with it. */
 export function MiniRoomLeaveConfirmDialog({ prompt }: { prompt: MiniRoomLeavePromptView }) {
   const { confirmation } = prompt
-  const [stay, leave] = confirmation.buttons
   return (
     <Modal
       visible={prompt.visible}
@@ -20,8 +19,13 @@ export function MiniRoomLeaveConfirmDialog({ prompt }: { prompt: MiniRoomLeavePr
           <Text accessibilityRole="header" style={styles.title}>{confirmation.title}</Text>
           <Text style={styles.message}>{confirmation.message}</Text>
           <View style={styles.actions}>
-            <SecondaryButton label={stay.text} onPress={prompt.onStay} />
-            <PrimaryButton label={leave.text} onPress={prompt.onLeave} />
+            {confirmation.buttons.map((button) => {
+              // Each button acts and looks by its role, never by its position in the list.
+              const onPress = button.action === "leave" ? prompt.onLeave : prompt.onStay
+              return button.style === "destructive"
+                ? <PrimaryButton key={button.action} label={button.text} tone="destructive" onPress={onPress} />
+                : <SecondaryButton key={button.action} label={button.text} onPress={onPress} />
+            })}
           </View>
         </CardWrapper>
       </View>

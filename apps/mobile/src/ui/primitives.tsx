@@ -93,7 +93,8 @@ interface SharedButtonProps {
   style?: StyleProp<ViewStyle>
   icon?: ReactNode
   testID?: string
-  tone?: "default" | "entry"
+  /** `destructive` (primary only) draws an irreversible action such as leaving a room in the danger colour. */
+  tone?: "default" | "entry" | "destructive"
 }
 
 export function PrimaryButton(props: SharedButtonProps) {
@@ -120,6 +121,8 @@ export function PrimaryButton(props: SharedButtonProps) {
         <LinearGradient
           colors={disabled
             ? [buttonTheme.colors.primaryDisabled, buttonTheme.colors.primaryDisabled]
+            : tone === "destructive"
+              ? [uiTheme.colors.danger, uiTheme.colors.danger]
             : tone === "entry"
               ? [buttonTheme.colors.actionDark, buttonTheme.colors.actionDark]
               : buttonTheme.gradients.primary as [string, string]}
