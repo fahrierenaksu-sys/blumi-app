@@ -1,0 +1,36 @@
+# Walks profile -> avatar -> room setup when the fresh account shows it. Env: NAME, AGE, GENDER (woman|man).
+appId: com.blumi.mobile
+---
+- runFlow:
+    when:
+      visible:
+        id: "profile-setup-display-name"
+    commands:
+      - tapOn:
+          id: "profile-setup-display-name"
+      - inputText: "${NAME}"
+      - tapOn:
+          id: "profile-setup-age"
+      - inputText: "${AGE}"
+      - hideKeyboard
+      - takeScreenshot: out/onboarding_profile
+      - tapOn:
+          id: "profile-setup-submit"
+- runFlow:
+    when:
+      visible:
+        id: "avatar-gender-${GENDER}"
+    commands:
+      - tapOn:
+          id: "avatar-gender-${GENDER}"
+      - takeScreenshot: out/onboarding_avatar
+      - tapOn:
+          id: "avatar-setup-submit"
+- runFlow:
+    when:
+      visible:
+        id: "starter-bed-card"
+    commands:
+      - takeScreenshot: out/onboarding_room
+      - tapOn:
+          id: "room-setup-submit"

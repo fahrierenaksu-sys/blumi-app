@@ -1,0 +1,51 @@
+appId: com.blumi.mobile
+env:
+  SLOT: "1"
+---
+- runFlow: ../subflows/sign_in.yaml
+- tapOn:
+    text: "My Room|Odam"
+- extendedWaitUntil:
+    visible:
+      id: "my-room-production-stage"
+    timeout: 20000
+- takeScreenshot: out/05_room_before
+- tapOn:
+    text: "Edit room|Odayı düzenle"
+- extendedWaitUntil:
+    visible:
+      id: "edit-room-v1"
+    timeout: 20000
+- takeScreenshot: out/05_editor_open
+# Place the first tray item.
+- tapOn:
+    text: "Place .* in room|.* eşyasını odaya yerleştir"
+    index: 0
+- tapOn:
+    text: "Confirm room placement|Yerleşimi onayla"
+    optional: true
+- takeScreenshot: out/05_editor_placed
+# Drag it across the floor.
+- swipe:
+    start: 50%, 60%
+    end: 70%, 55%
+    duration: 600
+- takeScreenshot: out/05_editor_dragged
+- tapOn:
+    text: "Confirm room placement|Yerleşimi onayla"
+    optional: true
+- tapOn:
+    text: "Save room layout|Oda düzenini kaydet"
+- extendedWaitUntil:
+    notVisible:
+      id: "edit-room-v1"
+    timeout: 20000
+- takeScreenshot: out/05_room_saved
+# Reopen: the saved layout must still be there.
+- tapOn:
+    text: "Edit room|Odayı düzenle"
+- extendedWaitUntil:
+    visible:
+      id: "edit-room-v1"
+    timeout: 20000
+- takeScreenshot: out/05_editor_reopened

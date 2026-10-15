@@ -1,0 +1,51 @@
+appId: com.blumi.mobile
+env:
+  SLOT: "1"
+---
+- runFlow: ../subflows/sign_in.yaml
+- runFlow: ../subflows/open_wardrobe.yaml
+- takeScreenshot: out/04_wardrobe_open
+- repeat:
+    times: 4
+    commands:
+      - tapOn:
+          id: "wardrobe-category-top"
+          optional: true
+      - tapOn:
+          id: "wardrobe-item-.*"
+          index: 0
+          optional: true
+      - tapOn:
+          id: "wardrobe-category-bottom"
+          optional: true
+      - tapOn:
+          id: "wardrobe-item-.*"
+          index: 0
+          optional: true
+      - tapOn:
+          id: "wardrobe-category-shoes"
+          optional: true
+      - tapOn:
+          id: "wardrobe-item-.*"
+          index: 0
+          optional: true
+      - tapOn:
+          id: "wardrobe-category-hair"
+          optional: true
+      - tapOn:
+          id: "wardrobe-item-.*"
+          index: 0
+          optional: true
+- takeScreenshot: out/04_wardrobe_equipped
+# Front showcase view: the zoom control swaps the stage framing.
+- tapOn:
+    id: "wardrobe-zoom"
+    optional: true
+- takeScreenshot: out/04_wardrobe_front_showcase
+- tapOn:
+    id: "wardrobe-done"
+- extendedWaitUntil:
+    notVisible:
+      id: "wardrobe-done"
+    timeout: 15000
+- takeScreenshot: out/04_wardrobe_saved

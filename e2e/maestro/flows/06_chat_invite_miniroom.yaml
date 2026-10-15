@@ -1,0 +1,48 @@
+# PRECONDITION: slot 1 and slot 2 are already matched (accounts live in the in-memory server;
+# do not restart it between flows). Slot 2 sends the invite, slot 1 accepts.
+appId: com.blumi.mobile
+env:
+  SLOT: "2"
+---
+- runFlow: ../subflows/sign_in.yaml
+- tapOn:
+    text: "Chats|Sohbetler.*"
+- takeScreenshot: out/06_inbox
+- tapOn:
+    point: 50%, 25%
+- tapOn:
+    text: "Invite to Blumi Room|Blumi Room'a davet et"
+- takeScreenshot: out/06_invite_sent
+- runFlow:
+    file: ../subflows/sign_in.yaml
+    env:
+      SLOT: "1"
+- tapOn:
+    text: "Chats|Sohbetler.*"
+- tapOn:
+    point: 50%, 25%
+- tapOn:
+    text: "Accept invitation|Daveti kabul et"
+- takeScreenshot: out/06_invite_accepted
+- tapOn:
+    text: "Enter room|Odaya geç"
+- extendedWaitUntil:
+    visible:
+      id: "mini-room-floor"
+    timeout: 30000
+- takeScreenshot: out/06_mini_room
+- tapOn:
+    text: "Leave room|Odadan ayrıl"
+- assertVisible: "Leave the room\\?|Odadan ayrılmak istiyor musun\\?"
+- takeScreenshot: out/06_leave_dialog
+- tapOn:
+    text: "Stay|Kal"
+- assertVisible:
+    id: "mini-room-floor"
+- tapOn:
+    text: "Leave room|Odadan ayrıl"
+- tapOn:
+    text: "Leave room|Odadan ayrıl"
+    index: 1
+    optional: true
+- takeScreenshot: out/06_after_leave
