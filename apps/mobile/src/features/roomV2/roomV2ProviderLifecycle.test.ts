@@ -6,6 +6,7 @@ import vm from "node:vm"
 import ts from "typescript"
 import { canEditRoomV2Decor } from "./roomV2EditGate"
 import { readPersonalRoomSyncMetadata, resolvePersonalRoomHydration } from "./personalRoomDecorSyncModel"
+import { createStarterRoomWithBed } from "./roomStarterModel"
 import type { PersonalRoomDecorSnapshot, SavePersonalRoomDecorResult } from "./personalRoomDecorApi"
 import type { UserRoomDecor } from "./roomV2.types"
 import { createReconnectTransitionTracker } from "../realtime/reconnectTransitionTracker"
@@ -161,7 +162,8 @@ function providerFixture(options?: {
       }
     },
     "../personalRoomDecorSyncModel": { readPersonalRoomSyncMetadata, resolvePersonalRoomHydration },
-    "../roomV2PersistenceErrorCopy": { getRoomV2PersistenceErrorMessageForDisplay: () => "Safe failure" }
+    "../roomV2PersistenceErrorCopy": { getRoomV2PersistenceErrorMessageForDisplay: () => "Safe failure" },
+    "../roomStarterModel": { createStarterRoomWithBed }
   }
   const module = { exports: {} as any }
   vm.runInNewContext(code, {
