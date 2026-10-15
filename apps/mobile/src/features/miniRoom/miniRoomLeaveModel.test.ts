@@ -9,7 +9,8 @@ import {
   MINI_ROOM_LEAVE_EXIT_WAIT_MS,
   MINI_ROOM_LEAVE_RETRY_DELAYS_MS,
   nextMiniRoomLeavePrompt,
-  resolveMiniRoomRemoval
+  resolveMiniRoomRemoval,
+  countScreensAboveRoom
 } from "./miniRoomLeaveModel"
 
 test("room exit returns to the existing conversation without another match decision", () => {
@@ -95,4 +96,18 @@ test("the leave prompt leaves a live room once on confirm and closes on stay", (
 
   assert.deepEqual(leave, { prompt: CLOSED_MINI_ROOM_LEAVE_PROMPT, requestLeave: true })
   assert.deepEqual(stay, { prompt: CLOSED_MINI_ROOM_LEAVE_PROMPT, requestLeave: false })
+})
+
+test("a removal of the live room while another screen covers it closes that screen first and asks in the room", () => {
+  // A deep link pushed the wardrobe over the live room; a later link (blumi://room) pops back past the room.
+  assert.equal(resolveMiniRoomRemoval({ exited: false, roomFocused: false }), "revealAndConfirm")
+  const stack = [{ key: "home" }, { key: "chat" }, { key: "room" }, { key: "wardrobe" }]
+  assert.equal(countScreensAboveRoom(stack, "room"), 1)
+})
+
+test("a removal of the room on screen asks in place, and an ended room always goes", () => {
+  assert.equal(resolveMiniRoomRemoval({ exited: false, roomFocused: true }), "confirm")
+  assert.equal(resolveMiniRoomRemoval({ exited: true, roomFocused: false }), "allow")
+  assert.equal(countScreensAboveRoom([{ key: "home" }, { key: "room" }], "room"), 0)
+  assert.equal(countScreensAboveRoom([{ key: "home" }], "room"), 0)
 })

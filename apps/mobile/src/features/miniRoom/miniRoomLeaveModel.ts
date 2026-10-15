@@ -32,9 +32,25 @@ export function getMiniRoomLeaveConfirmation(copy: MiniRoomCopy): MiniRoomLeaveC
   }
 }
 
-/** Once the room has ended (left, closed by the partner or a block) the screen may go. */
-export function resolveMiniRoomRemoval(input: { exited: boolean }): "allow" | "confirm" {
-  return input.exited ? "allow" : "confirm"
+/**
+ * What happens when something tries to remove the room screen:
+ * - "allow": the room has ended (left, closed by the partner or a block), so the screen may go.
+ * - "confirm": the room is on screen; ask there.
+ * - "revealAndConfirm": another screen covers the room (a deep link opened the wardrobe over it and a later link or
+ *   navigation would pop the room too). Asking under that screen left the question hidden until Back showed it again
+ *   (Sim QA beta-6), so the screens above the room close first and the question is asked in the room.
+ */
+export type MiniRoomRemovalDecision = "allow" | "confirm" | "revealAndConfirm"
+
+export function resolveMiniRoomRemoval(input: { exited: boolean; roomFocused?: boolean }): MiniRoomRemovalDecision {
+  if (input.exited) return "allow"
+  return input.roomFocused === false ? "revealAndConfirm" : "confirm"
+}
+
+/** How many screens sit above the room in its stack (0 when the room is on top or not found). */
+export function countScreensAboveRoom(routes: readonly { key: string }[], roomRouteKey: string): number {
+  const roomIndex = routes.findIndex((route) => route.key === roomRouteKey)
+  return roomIndex === -1 ? 0 : routes.length - 1 - roomIndex
 }
 
 /**

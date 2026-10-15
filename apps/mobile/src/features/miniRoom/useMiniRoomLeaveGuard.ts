@@ -1,8 +1,15 @@
-import { usePreventRemove, type NavigationProp, type ParamListBase } from "@react-navigation/native"
+import {
+  StackActions,
+  usePreventRemove,
+  useRoute,
+  type NavigationProp,
+  type ParamListBase
+} from "@react-navigation/native"
 import { useCallback, useMemo, useState, type RefObject } from "react"
 import type { MiniRoomCopy } from "./miniRoomCopy"
 import {
   CLOSED_MINI_ROOM_LEAVE_PROMPT,
+  countScreensAboveRoom,
   getMiniRoomLeaveConfirmation,
   nextMiniRoomLeavePrompt,
   resolveMiniRoomRemoval,
@@ -24,7 +31,9 @@ export interface MiniRoomLeavePromptView {
  * usePreventRemove, the only guard native-stack forwards to the native
  * dismissal, until the room has ended (`exitedRef`). The question is drawn
  * inside the room screen (`leavePrompt`), so it goes with the screen and
- * never stays over the next one (Sim QA beta-5).
+ * never stays over the next one (Sim QA beta-5). When another screen covers
+ * the room (a deep link pushed it), those screens close first so the question
+ * is asked where it can be seen (Sim QA beta-6).
  */
 export function useMiniRoomLeaveGuard({
   copy,
@@ -35,9 +44,10 @@ export function useMiniRoomLeaveGuard({
   copy: MiniRoomCopy
   exitedRef: RefObject<boolean>
   requestLeave: () => void
-  navigation: Pick<NavigationProp<ParamListBase>, "dispatch">
+  navigation: Pick<NavigationProp<ParamListBase>, "dispatch" | "getState" | "isFocused">
 }): { confirmLeave: () => void; leavePrompt: MiniRoomLeavePromptView } {
   const [prompt, setPrompt] = useState(CLOSED_MINI_ROOM_LEAVE_PROMPT)
+  const roomRouteKey = useRoute().key
 
   const send = useCallback((event: MiniRoomLeavePromptEvent): void => {
     const next = nextMiniRoomLeavePrompt(prompt, event, exitedRef.current === true)
@@ -50,10 +60,18 @@ export function useMiniRoomLeaveGuard({
   // The room's own exit sets exitedRef before returning to chat or Inbox,
   // so that removal passes once without another confirmation.
   usePreventRemove(true, ({ data }) => {
-    if (resolveMiniRoomRemoval({ exited: exitedRef.current }) === "allow") {
+    const decision = resolveMiniRoomRemoval({
+      exited: exitedRef.current === true,
+      roomFocused: navigation.isFocused()
+    })
+    if (decision === "allow") {
       setPrompt(CLOSED_MINI_ROOM_LEAVE_PROMPT)
       navigation.dispatch(data.action)
       return
+    }
+    if (decision === "revealAndConfirm") {
+      const screensAbove = countScreensAboveRoom(navigation.getState()?.routes ?? [], roomRouteKey)
+      if (screensAbove > 0) navigation.dispatch(StackActions.pop(screensAbove))
     }
     confirmLeave()
   })
