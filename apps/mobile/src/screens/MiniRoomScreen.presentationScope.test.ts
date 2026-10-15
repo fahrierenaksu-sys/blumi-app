@@ -36,7 +36,7 @@ test("a reused room route resets recovered drafts on room/thread changes and ret
       "../features/miniRoom/miniRoomPartnerIdentity": { selectMiniRoomLivePartner: () => null, resolveMiniRoomPartnerIdentity: (partner: unknown) => partner },
       "../features/miniRoom/useMiniRoomLeave": { useMiniRoomLeave: () => ({ leaveRequested: false, requestLeave: () => undefined }) },
       "../features/miniRoom/useMiniRoomNotices": { useMiniRoomNotices: () => null },
-      "../features/miniRoom/useMiniRoomLeaveGuard": { useMiniRoomLeaveGuard: () => () => undefined }
+      "../features/miniRoom/useMiniRoomLeaveGuard": { useMiniRoomLeaveGuard: () => ({ confirmLeave: () => undefined, leavePrompt: { visible: false } }) }
     }, inertUnknown: true, globals: { setTimeout, clearTimeout }
   })
   const route = { params: { readyMiniRoom: { miniRoom: { miniRoomId: "room-one", sourceThreadId: "thread-one" }, mediaSession: {} },
