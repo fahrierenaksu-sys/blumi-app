@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "postinstall": "patch-package --error-on-fail",
-    "verify:source-hygiene": "node --test scripts/security/source-hygiene.test.mjs scripts/security/navigation-dependency.test.mjs scripts/security/legal-preflight.test.mjs apps/mobile/scripts/sentry-debug-plugin.test.mjs",
+    "verify:source-hygiene": "node --test scripts/security/source-hygiene.test.mjs scripts/security/navigation-dependency.test.mjs scripts/security/legal-preflight.test.mjs scripts/security/postgres-test-selection.test.mjs apps/mobile/scripts/sentry-debug-plugin.test.mjs",
     "verify:operations-center": "node --test tools/operations-center/build.test.mjs",
     "verify:workbench-tools": "node --test tools/workbench/archive-from-manifest.test.mjs tools/workbench/remove-archived-from-manifest.test.mjs",
     "verify:avatar-rigs": "python3 tools/avatar25d/test_export_rig.py && python3 tools/avatar25d/blink_gate.py apps/mobile/src/features/avatar/rigs/girl && python3 tools/avatar25d/blink_gate.py apps/mobile/src/features/avatar/rigs/boy && node tools/avatar25d/bake-stills.mjs --check",
