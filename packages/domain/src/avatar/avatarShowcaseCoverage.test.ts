@@ -24,6 +24,8 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * and has no owner approval, so the showcase allowlist cannot list them. Remove them as fronts land.
  * 2026-10-14 (wip/girl-jacket): the sage ribbon knit jacket joins for the same reason; its front layer (factory
  * girl_jacket_2130 sc/o_sage_j2) waits for the owner's yes on the front look.
+ * 2026-10-15 (release/2.5d-beta-5): the powder blue ribbon corset top joins for the same reason; its front layer
+ * (factory girl_corset_2130 showcase/o_corset7) waits for the owner's yes on the front look.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
   female: [
@@ -33,6 +35,7 @@ const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = 
     "avatar_v2_top_black_cute_crop_top",
     "avatar_v2_bottom_black_highwaist_trousers",
     "top_sage_ribbon_knit_jacket",
+    "top_powder_blue_ribbon_corset_top",
   ],
   male: [],
 };

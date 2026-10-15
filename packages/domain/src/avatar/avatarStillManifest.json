@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "e0615a500bb428ad7e94889a31ae3a4d6f0eef48f01a5bf6e819aa20cff70b52",
+      "rigSha256": "71484582c8b694db4eff302b2c3e50f6793bf4e4c45a6ad56ac715a632c00632",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -144,6 +144,30 @@
               "with": "avatar_v2_top_white_cute_crop_top"
             },
             {
+              "part": "torsoCardArms",
+              "with": "top_powder_blue_ribbon_corset_top"
+            },
+            {
+              "part": "torso",
+              "with": "top_powder_blue_ribbon_corset_top"
+            },
+            {
+              "part": "torsoNoArms",
+              "with": "top_powder_blue_ribbon_corset_top"
+            },
+            {
+              "part": "torsoSit",
+              "with": "top_powder_blue_ribbon_corset_top"
+            },
+            {
+              "part": "torsoUpper",
+              "with": "top_powder_blue_ribbon_corset_top"
+            },
+            {
+              "part": "torsoWalk",
+              "with": "top_powder_blue_ribbon_corset_top"
+            },
+            {
               "part": "farArm"
             },
             {
@@ -234,6 +258,31 @@
           "slot": "top",
           "rigItemId": "top_sage_ribbon_knit_jacket",
           "thumb": "top_sage_ribbon_knit_jacket"
+        },
+        "top_powder_blue_ribbon_corset_top": {
+          "slot": "top",
+          "rigItemId": "top_powder_blue_ribbon_corset_top",
+          "thumb": "top_powder_blue_ribbon_corset_top",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoSit"
+            },
+            {
+              "part": "torsoUpper"
+            },
+            {
+              "part": "torsoWalk"
+            }
+          ]
         },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
@@ -334,7 +383,7 @@
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
             "order": 0,
-            "seq": 2017,
+            "seq": 2023,
             "rect": [
               126,
               281,
@@ -899,6 +948,35 @@
             "bodyWith": "avatar_v2_top_white_cute_crop_top"
           },
           {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-top_powder_blue_ribbon_corset_top",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2018,
+            "rect": [
+              220,
+              257,
+              185,
+              344
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "top_powder_blue_ribbon_corset_top"
+          },
+          {
+            "key": "top_powder_blue_ribbon_corset_top__o3__body-torso",
+            "owner": "top_powder_blue_ribbon_corset_top",
+            "slot": "top",
+            "order": 3,
+            "seq": 3005,
+            "rect": [
+              209,
+              257,
+              199,
+              344
+            ],
+            "bodyPart": "torso"
+          },
+          {
             "key": "avatar_v2_top_white_cute_crop_top__o3__body-torso",
             "owner": "avatar_v2_top_white_cute_crop_top",
             "slot": "top",
@@ -1005,6 +1083,19 @@
             ]
           },
           {
+            "key": "top_powder_blue_ribbon_corset_top__o3p45",
+            "owner": "top_powder_blue_ribbon_corset_top",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              224,
+              271,
+              164,
+              232
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1088,7 +1179,7 @@
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
             "order": 5,
-            "seq": 2018,
+            "seq": 2024,
             "rect": [
               365,
               284,
@@ -1148,6 +1239,19 @@
               74,
               128
             ]
+          },
+          {
+            "key": "top_powder_blue_ribbon_corset_top__o5p45",
+            "owner": "top_powder_blue_ribbon_corset_top",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              365,
+              278,
+              22,
+              33
+            ]
           }
         ],
         "bust": [
@@ -1170,7 +1274,7 @@
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
             "order": 0,
-            "seq": 2017,
+            "seq": 2023,
             "rect": [
               49,
               164,
@@ -1329,6 +1433,35 @@
             "bodyWith": "avatar_v2_top_white_cute_crop_top"
           },
           {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-top_powder_blue_ribbon_corset_top",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2018,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "top_powder_blue_ribbon_corset_top"
+          },
+          {
+            "key": "top_powder_blue_ribbon_corset_top__o3__body-torso",
+            "owner": "top_powder_blue_ribbon_corset_top",
+            "slot": "top",
+            "order": 3,
+            "seq": 3005,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
+          },
+          {
             "key": "avatar_v2_top_white_cute_crop_top__o3__body-torso",
             "owner": "avatar_v2_top_white_cute_crop_top",
             "slot": "top",
@@ -1406,6 +1539,19 @@
               157,
               103,
               99
+            ]
+          },
+          {
+            "key": "top_powder_blue_ribbon_corset_top__o3p45",
+            "owner": "top_powder_blue_ribbon_corset_top",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              75,
+              158,
+              100,
+              98
             ]
           },
           {
@@ -1492,7 +1638,7 @@
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
             "order": 5,
-            "seq": 2018,
+            "seq": 2024,
             "rect": [
               161,
               166,
@@ -1551,6 +1697,19 @@
               165,
               50,
               83
+            ]
+          },
+          {
+            "key": "top_powder_blue_ribbon_corset_top__o5p45",
+            "owner": "top_powder_blue_ribbon_corset_top",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              161,
+              162,
+              18,
+              25
             ]
           }
         ]
