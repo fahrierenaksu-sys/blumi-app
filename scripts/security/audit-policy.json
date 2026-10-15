@@ -5,16 +5,16 @@
       "package": "braces",
       "scope": "Only braces 3.0.3 with patches/braces+3.0.3.patch; every installed copy must pass the bounded-recursion behaviour tests before this exception is evaluated",
       "owner": "Blumi mobile build tooling",
-      "expiresOn": "2026-10-16",
-      "reason": "No official fixed release exists. The shipped patch bounds both parsing and all public recursive AST walkers, including caller-supplied/cyclic trees. run-audit.mjs makes adversarial and Metro compatibility tests mandatory and verifies the exact installed version for every lockfile copy. The API has no direct braces consumer. Replace this patch and remove the exception when an official fixed release is available."
+      "expiresOn": "2026-10-28",
+      "reason": "No official fixed release exists. The shipped patch bounds both parsing and all public recursive AST walkers, including caller-supplied/cyclic trees. run-audit.mjs makes adversarial and Metro compatibility tests mandatory and verifies the exact installed version for every lockfile copy. The API has no direct braces consumer. Replace this patch and remove the exception when an official fixed release is available. Re-evaluated 2026-10-14: npm still lists 3.0.3 as the latest braces release and the GitHub advisory (updated 2026-10-02) has no first patched version (range <= 3.0.3). The installed copy reverse-applies the patch cleanly, the 4 braces mitigation tests pass, and an unpatched 3.0.3 copy overflows the stack on the same 4,000-deep input that the patched copy rejects with a bounded RangeError. Renewed for 14 days only; re-check upstream before expiry."
     },
     {
       "id": "GHSA-86w9-cpqp-85rv",
       "package": "node-forge",
       "scope": "Exactly node-forge 1.4.0 patched by patches/node-forge+1.4.0.patch; Expo certificate consumer resolves this single copy",
       "owner": "Blumi mobile",
-      "expiresOn": "2026-10-16",
-      "reason": "No fixed npm release exists. The installed RSA verifier now permits only OID plus absent/empty primitive NULL parameters. run-audit.mjs requires the behavioral mitigation and Expo compatibility tests to pass before evaluating this exception. Replace with an official fixed release and remove patch/exception when available."
+      "expiresOn": "2026-10-28",
+      "reason": "No fixed npm release exists. The installed RSA verifier now permits only OID plus absent/empty primitive NULL parameters. run-audit.mjs requires the behavioral mitigation and Expo compatibility tests to pass before evaluating this exception. Replace with an official fixed release and remove patch/exception when available. Re-evaluated 2026-10-14: npm still lists 1.4.0 as the latest node-forge release and the GitHub advisory (updated 2026-10-01) has no first patched version (range <= 1.4.0). The installed rsa.js reverse-applies the patch cleanly and the 8 node-forge mitigation and Expo signing tests pass (12/12 mitigation tests in total). Renewed for 14 days only; re-check upstream before expiry."
     },
     {
       "id": "GHSA-w5hq-g745-h8pq",
