@@ -5,6 +5,7 @@ import type { ChatMessage, ChatThread } from "@blumi/contracts"
 import { Pool } from "pg"
 import { CHAT_HIDE_POINT_MIGRATION_ID, createChatHidePointSchemaProbe, createChatHideSchemaProbe } from "../chat/chatHideSchema"
 import { createSchemaReadinessCheck } from "../operations/schemaReadiness"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 import { runMigrations } from "./migrate"
 import { createPostgresChatRepository } from "./postgresChatRepository"
 
@@ -30,10 +31,9 @@ function message(id: string, sentAt: string): ChatMessage {
 }
 
 test("before 075 hiding keeps 071's time rule; after it the exact point applies and older points fall back", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES === "1" ? false : "PostgreSQL contract runs in the isolated gate"
+  skip: disposablePostgresSkip().skip ? "PostgreSQL contract runs in the isolated gate" : false
 }, async () => {
-  const databaseUrl = process.env.DATABASE_URL
-  assert.ok(databaseUrl, "Use the isolated postgres-gate runner.")
+  const databaseUrl = disposablePostgresUrl(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: databaseUrl, max: 4 })
   try {
     await pool.query(ROLL_BACK_075)

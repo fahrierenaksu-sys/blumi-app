@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { Pool, type PoolClient } from "pg"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 import { createPostgresRetentionService, RETENTION_POLICIES } from "./postgresRetention"
 
 // Audit D08: migration 074's partial index serves the notification-claim
@@ -8,7 +9,7 @@ import { createPostgresRetentionService, RETENTION_POLICIES } from "./postgresRe
 // the plan must switch from a whole-table scan to the index, and the purge must
 // delete exactly the rows the unindexed predicate selects.
 
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
+const requirePostgres = disposablePostgresSkip()
 const TABLE = "blumi_notification_policy_events"
 const INDEX = "blumi_notification_policy_events_retention_idx"
 const RECENT_CLAIMS = 150_000
@@ -73,8 +74,7 @@ async function idDigest(client: PoolClient | Pool, where: string): Promise<{ cou
 }
 
 test("migration 074's partial index serves the notification retention scan and deletes the same rows", requirePostgres, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   const client = await pool.connect()
   try {
     const { rows: definition } = await client.query("SELECT indexdef FROM pg_indexes WHERE indexname = $1", [INDEX])
