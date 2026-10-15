@@ -70,6 +70,33 @@ export function coerceAvatarLoadout(
   return firstValid([base, withStarterOutfit(base, starter), cloneAvatarLoadout(starter)], rules)
 }
 
+/**
+ * A save that still carries retired item IDs (an older app build, or a look loaded before the retirement) stores what
+ * the user sees: each retired piece becomes that body's starter piece, exactly as every read draws it, and a retired
+ * accessory, dress or outerwear is taken off. Everything else is left for the strict save rules
+ * (`validateAvatarLoadout`), which still refuse unknown, unowned or ill-fitting items. A retired body is left as it is
+ * (and refused), so a save never switches the body. Inventories are untouched: retired pieces stay owned.
+ */
+export function replaceRetiredAvatarItems(
+  loadout: AvatarLoadout,
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
+): AvatarLoadout {
+  const isRetired = (itemId: string | null): boolean => itemId !== null && isAvatarItemRetired(rules, itemId)
+  const starter = starterLoadoutForBody(loadout.bodyId, rules)
+  const items = Object.fromEntries(
+    ITEM_SLOTS.map(([key]) => [key, isRetired(loadout[key]) ? starter[key] : loadout[key]])
+  ) as Record<ItemKey, string>
+  const accessoryIds = loadout.accessoryIds.filter((itemId) => !isRetired(itemId))
+  if (loadout.schemaVersion !== 2) return { ...loadout, ...items, accessoryIds }
+  return {
+    ...loadout,
+    ...items,
+    accessoryIds,
+    dressId: isRetired(loadout.dressId) ? null : loadout.dressId,
+    outerwearId: isRetired(loadout.outerwearId) ? null : loadout.outerwearId
+  }
+}
+
 /** The stored body when it is a wearable body; else the preset hint, then gender, then the girl. */
 export function resolveAvatarBodyId(
   rawBodyId: unknown,

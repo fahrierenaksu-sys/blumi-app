@@ -5,6 +5,7 @@ import {
 import {
   AVATAR_ITEM_RULES,
   createAvatarSelection,
+  replaceRetiredAvatarItems,
   validateAvatarLoadout,
   type AvatarItemRules,
   type AvatarLoadoutValidationCode
@@ -66,10 +67,14 @@ export function createAvatarService(options: AvatarServiceOptions): AvatarServic
         now
       )
       const currentLoadout = resolved.account.profile.avatar.loadout
-      const semanticLoadout = isAcceptedAvatarLoadout(input.loadout) &&
-          isAcceptedAvatarLoadout(currentLoadout)
-        ? resolveSemanticAvatarWrite(input.loadout, currentLoadout, avatarRules)
+      // An older build can still send retired pieces; they are stored as the starter piece every read draws.
+      const requestedLoadout = isAcceptedAvatarLoadout(input.loadout)
+        ? replaceRetiredAvatarItems(input.loadout, avatarRules)
         : input.loadout
+      const semanticLoadout = isAcceptedAvatarLoadout(requestedLoadout) &&
+          isAcceptedAvatarLoadout(currentLoadout)
+        ? resolveSemanticAvatarWrite(requestedLoadout, currentLoadout, avatarRules)
+        : requestedLoadout
       const validation = validateAvatarLoadout(
         semanticLoadout,
         inventory.ownedAvatarItemIds,
