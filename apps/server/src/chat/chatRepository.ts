@@ -365,7 +365,7 @@ export function createInMemoryChatRepository(
           const { readAt: lastReadAt, hiddenThrough } = cursors
           const exact = exactPointOf(cursors)
           const unreadCount = (store.messagesByThread.get(thread.threadId) ?? [])
-            .filter((message) => message.senderUserId !== userId && isUnreadUnder(cursors, exact, message)).length
+            .filter((message) => message.senderUserId !== userId && Date.parse(message.sentAt) > (lastReadAt ? Date.parse(lastReadAt) : -Infinity)).length
           return {
             ...cloneThread(thread),
             unreadCount,
@@ -587,10 +587,10 @@ export function createInMemoryChatRepository(
       const counts = new Map<string, number>()
       for (const thread of store.threads.values()) {
         if (!thread.participantUserIds.includes(userId)) continue
-        const cursors = cursorsOf(thread.threadId, userId)
-        const exact = exactPointOf(cursors)
+        const readAt = cursorsOf(thread.threadId, userId).readAt
+        const after = readAt ? Date.parse(readAt) : Number.NEGATIVE_INFINITY
         for (const message of store.messagesByThread.get(thread.threadId) ?? []) {
-          if (message.senderUserId === userId || !isUnreadUnder(cursors, exact, message)) continue
+          if (message.senderUserId === userId || Date.parse(message.sentAt) <= after) continue
           counts.set(message.senderUserId, (counts.get(message.senderUserId) ?? 0) + 1)
         }
       }
@@ -641,20 +641,6 @@ function latestTime(values: ReadonlyArray<string | undefined>): string | undefin
     if (value !== undefined && (latest === undefined || Date.parse(value) > Date.parse(latest))) latest = value
   }
   return latest
-}
-
-/**
- * Whether a partner message is unread. The unread cursor is a time, read
- * inclusively. A hide moves it to the hide point's time, so a message in that
- * same millisecond after an exact hide point (075) stays unread while the
- * cursor has not moved since the hide: it was never hidden, and never shown.
- */
-function isUnreadUnder(cursors: InMemoryParticipantCursors, exact: ChatOrderPosition | undefined, message: ChatOrderPosition): boolean {
-  if (cursors.readAt === undefined) return true
-  const readAt = Date.parse(cursors.readAt)
-  const sentAt = Date.parse(message.sentAt)
-  if (sentAt !== readAt) return sentAt > readAt
-  return exact !== undefined && Date.parse(exact.sentAt) === readAt && compareChatMessagesAscending(message, exact) > 0
 }
 
 /** The stored hide point when it is exact: written together with `hiddenThrough` and not moved since. */

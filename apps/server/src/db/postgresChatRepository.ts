@@ -70,8 +70,8 @@ export function createPostgresChatRepository(
       // After 071 a thread the viewer hid stays listed with its hide point, so
       // links, room invites and room chat still find it; the app hides the
       // row until its newest message is after that point.
-      // After 075 the row also carries the exact hide point, and a partner
-      // message in the hide point's millisecond after it stays unread.
+      // After 075 the row also carries the exact hide point. Unread counting
+      // stays a time rule: a read by id moves the cursor to a time only.
       const exactPoint = await hidePointReady()
       const hiddenColumn = await hideSchema.isReady()
         ? `p.hidden_through AS viewer_hidden_through,${exactPoint
@@ -95,8 +95,7 @@ export function createPostgresChatRepository(
             ${hiddenColumn}
             (SELECT count(*)::int FROM blumi_chat_messages AS unread
               WHERE unread.thread_id = t.thread_id AND unread.sender_user_id <> $1
-                AND (unread.sent_at > COALESCE(p.last_read_at, '-infinity'::timestamptz)
-                  ${exactPoint ? unreadAfterExactHidePoint("p", "unread") : ""})) AS unread_count
+                AND unread.sent_at > COALESCE(p.last_read_at, '-infinity'::timestamptz)) AS unread_count
            FROM blumi_chat_threads t
            JOIN blumi_chat_thread_participants p
              ON p.thread_id = t.thread_id
@@ -142,14 +141,13 @@ export function createPostgresChatRepository(
     async countUnreadMessagesBySender(userId) {
       // Same predicate as listThreadsPage's unread_count; per thread it is an
       // index range scan on blumi_chat_messages(thread_id, sent_at).
-      const exactTail = await hidePointReady() ? unreadAfterExactHidePoint("viewer", "message") : ""
       const result = await pool.query(
         `SELECT message.sender_user_id, count(*)::int AS unread_count
            FROM blumi_chat_thread_participants AS viewer
            JOIN blumi_chat_messages AS message
              ON message.thread_id = viewer.thread_id
             AND message.sender_user_id <> viewer.user_id
-            AND (message.sent_at > COALESCE(viewer.last_read_at, '-infinity'::timestamptz) ${exactTail})
+            AND message.sent_at > COALESCE(viewer.last_read_at, '-infinity'::timestamptz)
           WHERE viewer.user_id = $1
           GROUP BY message.sender_user_id`,
         [userId]
@@ -609,20 +607,6 @@ export function createPostgresChatRepository(
  */
 const EXACT_HIDE_POINT = (hide: string) => `(${hide}.hidden_through_message_id IS NOT NULL
   AND ${hide}.hidden_through_message_sent_at IS NOT DISTINCT FROM ${hide}.hidden_through)`
-
-/**
- * The unread cursor is a time, read inclusively. A hide moves it to the hide
- * point's time, so a partner message in that same millisecond after an exact
- * hide point (075) stays unread while the cursor has not moved since the
- * hide: it was never hidden, and never shown. Appended to the time predicate
- * with OR; names 075 columns, so only after 075.
- */
-function unreadAfterExactHidePoint(participant: string, message: string): string {
-  return `OR (${message}.sent_at = ${participant}.last_read_at
-      AND ${participant}.last_read_at = ${participant}.hidden_through
-      AND ${EXACT_HIDE_POINT(participant)}
-      AND ${message}.message_id > ${participant}.hidden_through_message_id)`
-}
 
 /**
  * Whether the target (`target.through`, `target.through_id`; no id for an

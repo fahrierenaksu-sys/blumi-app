@@ -138,8 +138,11 @@ case can show a message again: the new binary hides through X, then an older
 binary hides through Y, which shares X's millisecond and sorts after it. The
 older binary leaves the time unchanged, so the exact point stays at X and Y
 shows again in history. This needs both binaries live, a same-millisecond
-message and a second hide. The thread list (`hiddenThroughMessageId`), both
-unread counts and the app use the same exact point as history. Still open: a message stored with an earlier time that commits
+message and a second hide. The thread list (`hiddenThroughMessageId`) and the app use the same exact
+point as history. Unread counts are unchanged from before R15 (a time
+cursor; a read by id moves it to a time only), so a same-millisecond message
+after the hide point is not counted unread; it shows in history and the
+row. Residual for unread: none. Still open: a message stored with an earlier time that commits
 after a hide is ordered before the hide point and stays hidden; closing that
 needs a commit-ordered sequence, not this pair.
 

@@ -46,7 +46,7 @@ test("before 075 hiding keeps 071's time rule; after it the exact point applies 
     // A binary built before 075: it never names the new columns.
     const older = createPostgresChatRepository(pool, { hideSchema })
     const history = async () => (await current.listMessages(THREAD.threadId, { limit: 50, viewerUserId: ADA })).map((item) => item.body)
-    // The thread row and both unread counts must agree with the history.
+    // The thread row names the same point as history; unread counts are a time rule.
     const row = async () => {
       const listed = (await current.listThreads(ADA)).find((item) => item.threadId === THREAD.threadId)!
       const bySender = await current.countUnreadMessagesBySender(ADA)
@@ -79,8 +79,8 @@ test("before 075 hiding keeps 071's time rule; after it the exact point applies 
     for (const value of [message("b1", t2), message("b2", t2)]) await current.createMessage(value)
     await current.hideThreadForParticipant({ threadId: THREAD.threadId, userId: ADA, throughMessageId: "pre075_b1" })
     assert.deepEqual(await history(), ["b2"], "after 075 the hidden message is the point")
-    assert.deepEqual(await row(), { hiddenThroughMessageId: "pre075_b1", unreadCount: 1, unreadFromBora: 1 },
-      "the row names the point and b2 is unread")
+    assert.deepEqual(await row(), { hiddenThroughMessageId: "pre075_b1", unreadCount: 0, unreadFromBora: 0 },
+      "the row names the point; unread stays a time rule, so b2 shows but is not unread")
     const stored = await pool.query(`SELECT hidden_through_message_id AS id, hidden_through_message_sent_at = hidden_through AS exact
       FROM blumi_chat_thread_participants WHERE thread_id = $1 AND user_id = $2`, [THREAD.threadId, ADA])
     assert.deepEqual(stored.rows[0], { id: "pre075_b1", exact: true })
@@ -97,7 +97,7 @@ test("before 075 hiding keeps 071's time rule; after it the exact point applies 
     assert.deepEqual(await history(), ["d1", "d2"])
     await current.hideThreadForParticipant({ threadId: THREAD.threadId, userId: ADA, throughMessageId: "pre075_d1" })
     assert.deepEqual(await history(), ["d2"], "the next hide stores an exact point again")
-    assert.deepEqual(await row(), { hiddenThroughMessageId: "pre075_d1", unreadCount: 1, unreadFromBora: 1 })
+    assert.deepEqual(await row(), { hiddenThroughMessageId: "pre075_d1", unreadCount: 0, unreadFromBora: 0 })
     assert.deepEqual((await current.listMessages(THREAD.threadId, { limit: 50, viewerUserId: BORA })).map((item) => item.body),
       ["a1", "a2", "b1", "b2", "c1", "c2", "d1", "d2"], "the partner's history never changes")
   } finally {

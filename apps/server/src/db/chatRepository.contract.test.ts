@@ -579,7 +579,7 @@ runRepositoryContract<ChatRepository>({
       await backend.repository.createMessage(later)
       assert.deepEqual(await history(), ["later"], "a message ordered after the point shows, even in the same millisecond")
     },
-    "a same-millisecond message after the hide point is visible in history, the thread row and unread counts alike": async (backend) => {
+    "a same-millisecond message after the hide point shows in history and the row, and unread stays a time rule": async (backend) => {
       const chat = thread(backend, "same_ms_row", "2026-10-15T11:00:00.000Z")
       const [ada, bora] = chat.participantUserIds
       await backend.repository.saveThread(chat)
@@ -602,8 +602,15 @@ runRepositoryContract<ChatRepository>({
       await backend.repository.createMessage(second)
       await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada, throughMessageId: first.messageId })
       assert.deepEqual(await view(), {
-        history: ["y"], hiddenThrough: instant, hiddenThroughMessageId: first.messageId, unreadCount: 1, unreadFromBora: 1
-      }, "y is shown, listed after the point and unread everywhere")
+        history: ["y"], hiddenThrough: instant, hiddenThroughMessageId: first.messageId, unreadCount: 0, unreadFromBora: 0
+      }, "y is shown and listed after the point; the hide read the cursor to this millisecond, as before R15")
+
+      // The app reads only by id. Reading y must leave nothing unread and no badge.
+      const read = await backend.repository.advanceReadCursor({ threadId: chat.threadId, userId: ada, upToMessageId: second.messageId })
+      assert.equal(read?.readAt, instant)
+      assert.deepEqual(await view(), {
+        history: ["y"], hiddenThrough: instant, hiddenThroughMessageId: first.messageId, unreadCount: 0, unreadFromBora: 0
+      }, "after reading y by id nothing is unread, in the row or the badge total")
 
       await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada })
       assert.deepEqual(await view(), {
