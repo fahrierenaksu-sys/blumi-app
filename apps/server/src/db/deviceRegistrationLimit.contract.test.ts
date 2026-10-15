@@ -77,6 +77,32 @@ runRepositoryContract<NotificationRepository>({
       assert.ok(transferred)
       assert.notEqual(transferred.registrationId, original!.registrationId)
       assert.equal((await backend.repository.listPendingDeliveries()).some((entry) => entry.deliveryId === deliveryId), false)
+    },
+    "a full quota replaces the least recently seen device, and only the owner's sighting counts": async (backend) => {
+      const [userId, otherUser] = [backend.id("seen"), backend.id("seen-other")]
+      await backend.ensureUsers(userId, otherUser)
+      for (let index = 0; index < MAX_DEVICES_PER_ACCOUNT; index++) {
+        await backend.repository.saveDevice({ ...device(userId, backend.id(`seen-${index}`)),
+          registeredAt: new Date(Date.parse(registeredAt) + index * 1000).toISOString() })
+      }
+      const devices = await backend.repository.listDevices(userId)
+      const active = devices.find((entry) => entry.pushToken === backend.id("seen-0"))!
+      const stale = devices.find((entry) => entry.pushToken === backend.id("seen-1"))!
+      const seenAt = new Date(Date.parse(registeredAt) + 24 * 60 * 60_000)
+      // Another account cannot refresh this account's device, even with its registration id.
+      await backend.repository.markDeviceSeen({ userId: otherUser, pushToken: stale.pushToken,
+        registrationId: stale.registrationId!, seenAt })
+      await backend.repository.markDeviceSeen({ userId, pushToken: active.pushToken,
+        registrationId: active.registrationId!, seenAt })
+
+      assert.equal(await backend.repository.saveDeviceBounded(device(userId, backend.id("seen-new"))), "saved")
+
+      const tokens = (await backend.repository.listDevices(userId)).map((entry) => entry.pushToken)
+      assert.equal(tokens.length, MAX_DEVICES_PER_ACCOUNT)
+      assert.ok(tokens.includes(active.pushToken), "the device in use is kept")
+      assert.ok(!tokens.includes(stale.pushToken), "the least recently seen device is replaced")
+      assert.equal((await backend.repository.listDevices(userId))
+        .find((entry) => entry.pushToken === active.pushToken)?.registrationId, active.registrationId)
     }
   }
 })

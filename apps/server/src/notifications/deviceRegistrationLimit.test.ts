@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { createNotificationService, DeviceRegistrationLimitError } from "./notificationService"
-import { MAX_DEVICES_PER_ACCOUNT } from "./notificationRepository"
+import { createInMemoryNotificationRepository, MAX_DEVICES_PER_ACCOUNT } from "./notificationRepository"
 
 test("concurrent new device registrations keep the account at the cap and notification fanout stays bounded", async () => {
   // A full account replaces its oldest registrations instead of refusing a rotated
@@ -63,4 +63,23 @@ test("delivery selection breaks equal registration timestamps consistently acros
   assert.equal((await service.sendPushToUser("synthetic-ties", { title: "Blumi", body: "Update" })).deliveryCount, 10)
   assert.deepEqual((await service.repository.listPendingDeliveries()).map((entry) => entry.pushToken),
     Array.from({ length: 10 }, (_, index) => `tie-${String(index).padStart(2, "0")}`))
+})
+
+test("a failing last-seen refresh never fails or changes an existing device registration", async () => {
+  const repository = createInMemoryNotificationRepository()
+  const failures: unknown[] = []
+  const service = createNotificationService({
+    repository: { ...repository, async markDeviceSeen() { throw new Error("lock timeout for user synthetic-seen token seen-token") } },
+    deviceRegistrationCacheTtlMs: 0,
+    reportPushFailure: (failure) => { failures.push(failure) }
+  })
+  const first = await service.ensureDeviceRegistered("synthetic-seen", { platform: "ios", pushToken: "seen-token" },
+    new Date("2026-10-01T10:00:00.000Z"))
+  const later = await service.ensureDeviceRegistered("synthetic-seen", { platform: "ios", pushToken: "seen-token" },
+    new Date("2026-10-05T10:00:00.000Z"))
+
+  assert.equal(later.changed, false)
+  assert.equal(later.device.registrationId, first.device.registrationId)
+  assert.deepEqual(failures, [{ stage: "device_seen", errorCode: "device_seen_refresh_failed",
+    notificationType: "unknown", attempt: 1, count: 1 }], "one redacted counter, no ids")
 })

@@ -1,7 +1,7 @@
 import type { QueryResultRow } from "pg"
 import { randomUUID } from "node:crypto"
 import { discoveryWatchLockSql } from "./discoveryWatchLock"
-import { DEFAULT_NOTIFICATION_PREFERENCES, MAX_DEVICES_PER_ACCOUNT } from "../notifications/notificationRepository"
+import { DEFAULT_NOTIFICATION_PREFERENCES, DEVICE_SEEN_REFRESH_MS, MAX_DEVICES_PER_ACCOUNT } from "../notifications/notificationRepository"
 import type {
   DeviceRegistration,
   NotificationPolicyAudit,
@@ -137,7 +137,8 @@ export function createPostgresNotificationRepository(
         }
         if (!row.existing && Number(row.device_count) >= MAX_DEVICES_PER_ACCOUNT) {
           // Token rotation or reinstall at a full quota: a token that is new to
-          // every account replaces this account's oldest registrations. Another
+          // every account replaces this account's least recently seen
+          // registrations (registered_at, refreshed by markDeviceSeen). Another
           // account's token is never taken this way.
           if (row.taken_by_other) {
             await client.query("COMMIT")
@@ -165,6 +166,20 @@ export function createPostgresNotificationRepository(
         // A failed rollback must not return a connection holding locks to the pool.
         client.release(releaseError)
       }
+    },
+    async markDeviceSeen({ userId, pushToken, registrationId, seenAt }) {
+      // Ownership is the WHERE clause: only this account's current registration
+      // is refreshed, and a removed or transferred token updates nothing.
+      // A row held by a locked push send (FOR SHARE) is skipped, not waited on:
+      // the refresh is best-effort and app start must never queue behind a send.
+      await pool.query(
+        `UPDATE blumi_push_devices SET registered_at = $4
+          WHERE user_id = $1 AND push_token IN (
+            SELECT push_token FROM blumi_push_devices
+             WHERE user_id = $1 AND push_token = $2 AND registration_id = $3 AND registered_at < $5
+               FOR NO KEY UPDATE SKIP LOCKED)`,
+        [userId, pushToken, registrationId, seenAt, new Date(seenAt.getTime() - DEVICE_SEEN_REFRESH_MS)]
+      )
     },
     async removeDevice(userId, pushToken) {
       await pool.query(

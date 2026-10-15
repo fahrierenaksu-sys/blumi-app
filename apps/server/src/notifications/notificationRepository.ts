@@ -11,6 +11,12 @@ export interface DeviceRegistration {
 }
 
 export const MAX_DEVICES_PER_ACCOUNT = 10
+/**
+ * A device's registered_at doubles as "last seen": an app start that finds its
+ * token already registered refreshes it at most this often, so a full quota
+ * replaces the device the account used least recently.
+ */
+export const DEVICE_SEEN_REFRESH_MS = 60 * 60_000
 
 export interface PushDelivery {
   discoveryWatch?: { generation: string; authorization?: DiscoveryWatchAuthorization }
@@ -107,10 +113,16 @@ export interface NotificationRepository {
   /**
    * Atomic admission; existing tokens on this account remain usable above the
    * limit. At the limit a token that is new to every account replaces this
-   * account's oldest registrations (token rotation, reinstall); "limit" only when
+   * account's least recently seen registrations (token rotation, reinstall); "limit" only when
    * the token belongs to another account.
    */
   saveDeviceBounded(device: DeviceRegistration): Promise<"saved" | "limit">
+  /**
+   * Refreshes registered_at for this account's own registration (same token and
+   * registration id) when it is older than DEVICE_SEEN_REFRESH_MS. Never inserts,
+   * transfers or changes the registration id.
+   */
+  markDeviceSeen(input: { userId: string; pushToken: string; registrationId: string; seenAt: Date }): Promise<void>
   removeDevice(userId: string, pushToken: string): Promise<void>
   removeAllDevices(userId: string): Promise<void>
   getPreferences(userId: string): Promise<NotificationPreferences>
@@ -249,13 +261,13 @@ export function createInMemoryNotificationRepository(): NotificationRepository {
         if (!existing && own.length >= MAX_DEVICES_PER_ACCOUNT) {
           // A full quota must not block a rotated token (the app removes the old
           // one only after the new one registers, and a reinstall never knows it).
-          // A token that is new to every account replaces this account's oldest
-          // registrations; a token that belongs to another account is never taken
+          // A token that is new to every account replaces this account's least
+          // recently seen registrations; a token that belongs to another account is never taken
           // this way.
           const takenByOther = [...devices.values()].some((entry) =>
             entry.pushToken === device.pushToken && entry.userId !== device.userId)
           if (takenByOther) return "limit" as const
-          for (const evicted of oldestDevicesFirst(own).slice(0, own.length - MAX_DEVICES_PER_ACCOUNT + 1)) {
+          for (const evicted of leastRecentlySeenFirst(own).slice(0, own.length - MAX_DEVICES_PER_ACCOUNT + 1)) {
             devices.delete(deviceKey(evicted.userId, evicted.pushToken))
             for (const [id, delivery] of deliveries) {
               if (delivery.userId === evicted.userId && delivery.pushToken === evicted.pushToken) deliveries.delete(id)
@@ -265,6 +277,14 @@ export function createInMemoryNotificationRepository(): NotificationRepository {
         persistDevice(device)
         return "saved" as const
       }))
+    },
+    async markDeviceSeen({ userId, pushToken, registrationId, seenAt }) {
+      await deviceQueue(pushToken, async () => {
+        const existing = devices.get(deviceKey(userId, pushToken))
+        if (!existing || existing.registrationId !== registrationId) return
+        if (Date.parse(existing.registeredAt) >= seenAt.getTime() - DEVICE_SEEN_REFRESH_MS) return
+        devices.set(deviceKey(userId, pushToken), { ...existing, registeredAt: seenAt.toISOString() })
+      })
     },
     async removeDevice(userId, pushToken) {
       await deviceQueue(pushToken, async () => {
@@ -444,8 +464,8 @@ function resolvePolicyReason(input: {
   return "queued"
 }
 
-/** Registration order, oldest first; token order breaks ties (as for delivery selection). */
-function oldestDevicesFirst(devices: DeviceRegistration[]): DeviceRegistration[] {
+/** Least recently registered or seen first; token order breaks ties (as for delivery selection). */
+function leastRecentlySeenFirst(devices: DeviceRegistration[]): DeviceRegistration[] {
   return [...devices].sort((a, b) =>
     Date.parse(a.registeredAt) - Date.parse(b.registeredAt) ||
     (a.pushToken < b.pushToken ? -1 : a.pushToken > b.pushToken ? 1 : 0))

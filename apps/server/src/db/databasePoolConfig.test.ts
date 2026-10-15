@@ -6,8 +6,11 @@ import {
   createDatabasePools,
   DEFAULT_DATABASE_POOL_SETTINGS,
   LISTEN_POOL_MAX,
+  MIN_DB_LOCK_TIMEOUT_MS,
+  MIN_LOCKED_SEND_TIMEOUT_MS,
   resolveDatabaseListenUrl,
   resolveDatabasePoolSettings,
+  resolveLockedSendTimeoutMs,
   retryStatementConflictOnce,
   toPoolConfig
 } from "./databasePoolConfig"
@@ -151,4 +154,24 @@ test("the shared server pool retries statement conflicts", async () => {
   const { pool } = createDatabasePools({ databaseUrl: "postgresql://example.invalid/db", databasePool: DEFAULT_DATABASE_POOL_SETTINGS })
   assert.notEqual(pool.query, Pool.prototype.query)
   await pool.end()
+})
+
+test("a push sent under locks gets two thirds of lock_timeout, at least the floor, never more than the provider timeout", () => {
+  assert.equal(resolveLockedSendTimeoutMs(10_000, { lockTimeoutMs: 3_000 }), 2_000)
+  assert.equal(resolveLockedSendTimeoutMs(1_500, { lockTimeoutMs: 3_000 }), 1_500)
+  assert.equal(resolveLockedSendTimeoutMs(10_000, { lockTimeoutMs: MIN_DB_LOCK_TIMEOUT_MS }), MIN_LOCKED_SEND_TIMEOUT_MS)
+  for (const lockTimeoutMs of [100, 600, MIN_DB_LOCK_TIMEOUT_MS - 1]) {
+    assert.throws(() => resolveLockedSendTimeoutMs(10_000, { lockTimeoutMs }), /BLUMI_DB_LOCK_TIMEOUT_MS/, `${lockTimeoutMs}`)
+  }
+  // The floor still leaves a waiter a third of its lock budget.
+  assert.ok(MIN_LOCKED_SEND_TIMEOUT_MS <= Math.floor(MIN_DB_LOCK_TIMEOUT_MS * 2 / 3))
+})
+
+test("a lock_timeout too small for the locked push send floor stops startup and names the variable", () => {
+  for (const value of ["100", "500", String(MIN_DB_LOCK_TIMEOUT_MS - 1)]) {
+    assert.throws(() => resolveDatabasePoolSettings({ BLUMI_DB_LOCK_TIMEOUT_MS: value }), /BLUMI_DB_LOCK_TIMEOUT_MS/, value)
+    assert.throws(() => resolveServerConfig({ NODE_ENV: "test", BLUMI_DB_LOCK_TIMEOUT_MS: value }), /BLUMI_DB_LOCK_TIMEOUT_MS/, `server ${value}`)
+  }
+  assert.equal(resolveDatabasePoolSettings({ BLUMI_DB_LOCK_TIMEOUT_MS: String(MIN_DB_LOCK_TIMEOUT_MS) }).lockTimeoutMs,
+    MIN_DB_LOCK_TIMEOUT_MS)
 })

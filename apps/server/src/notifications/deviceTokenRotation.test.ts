@@ -32,10 +32,12 @@ test("a rotated token registers at a full quota by replacing the oldest device o
 
 test("a replaced token is not answered from the registration cache when it registers again", async () => {
   const service = await fullAccount("cached-user")
-  await service.ensureDeviceRegistered("cached-user", { platform: "ios", pushToken: "old-0" }) // cached as registered
-  await service.registerDevice("cached-user", { platform: "ios", pushToken: "rotated-new" })
+  // Within the seen-refresh window, so old-0 stays the least recently seen device.
+  const soon = new Date(Date.parse(registeredAt(MAX_DEVICES_PER_ACCOUNT)))
+  await service.ensureDeviceRegistered("cached-user", { platform: "ios", pushToken: "old-0" }, soon) // cached as registered
+  await service.registerDevice("cached-user", { platform: "ios", pushToken: "rotated-new" }, soon)
 
-  const again = await service.ensureDeviceRegistered("cached-user", { platform: "ios", pushToken: "old-0" })
+  const again = await service.ensureDeviceRegistered("cached-user", { platform: "ios", pushToken: "old-0" }, soon)
 
   assert.equal(again.changed, true)
   assert.ok((await tokensOf(service, "cached-user")).includes("old-0"))
@@ -63,4 +65,18 @@ test("concurrent registrations at a full quota keep the account at the cap and e
   assert.ok(results.every((result) => result.status === "fulfilled"))
   const queued = await service.sendPushToUser("busy-user", { title: "Blumi", body: "Update" })
   assert.equal(queued.deliveryCount, MAX_DEVICES_PER_ACCOUNT)
+})
+
+test("a full quota replaces the device the account used least recently, not the first one registered", async () => {
+  const service = await fullAccount("daily-user")
+  // old-0 registered first but is the phone in use: the app registers it again on every start.
+  const appStart = new Date(Date.UTC(2026, 9, 12, 9, 0, 0))
+  await service.ensureDeviceRegistered("daily-user", { platform: "ios", pushToken: "old-0" }, appStart)
+
+  await service.registerDevice("daily-user", { platform: "ios", pushToken: "rotated-new" }, appStart)
+
+  const tokens = await tokensOf(service, "daily-user")
+  assert.equal(tokens.length, MAX_DEVICES_PER_ACCOUNT)
+  assert.ok(tokens.includes("old-0"), "the device in use is kept")
+  assert.ok(!tokens.includes("old-1"), "the least recently seen device is replaced")
 })

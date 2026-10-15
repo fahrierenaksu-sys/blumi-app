@@ -2,6 +2,7 @@ import {
   createInMemoryNotificationRepository,
   isEnabled,
   isWithinQuietHours,
+  DEVICE_SEEN_REFRESH_MS,
   MAX_DEVICES_PER_ACCOUNT,
   type DeviceRegistration,
   type NotificationPreferences,
@@ -148,7 +149,7 @@ export interface CreateNotificationServiceOptions {
 }
 
 export interface SafePushFailure {
-  stage: "ticket" | "receipt"
+  stage: "ticket" | "receipt" | "device_seen"
   errorCode: string
   notificationType: string
   attempt: number
@@ -241,6 +242,22 @@ export function createNotificationService(
     }
   }
 
+  // An app start that finds its token registered counts as use, so a full
+  // quota replaces the device the account used least recently.
+  const markSeen = async (device: DeviceRegistration, now: Date): Promise<DeviceRegistration> => {
+    if (!device.registrationId || Date.parse(device.registeredAt) >= now.getTime() - DEVICE_SEEN_REFRESH_MS) return device
+    try {
+      await repository.markDeviceSeen({ userId: device.userId, pushToken: device.pushToken,
+        registrationId: device.registrationId, seenAt: now })
+    } catch {
+      // Best-effort: a registration that already exists must not fail because its
+      // sighting could not be recorded. Only a fixed code is reported, never ids.
+      reportPushFailure("device_seen", "device_seen_refresh_failed", 1)
+      return device
+    }
+    return { ...device, registeredAt: now.toISOString() }
+  }
+
   const ensureDeviceRegistered: NotificationService["ensureDeviceRegistered"] = async (userId, input, now = new Date()) => {
     const device: DeviceRegistration = {
       registrationId: randomUUID(),
@@ -256,8 +273,9 @@ export function createNotificationService(
     const readEpoch = registrationCache.epoch()
     const existing = await findCurrent()
     if (existing?.platform === device.platform) {
-      registrationCache.remember(existing, readEpoch)
-      return { device: existing, changed: false }
+      const seen = await markSeen(existing, now)
+      registrationCache.remember(seen, readEpoch)
+      return { device: seen, changed: false }
     }
     if (await repository.saveDeviceBounded(device) === "limit") {
       throw new DeviceRegistrationLimitError()
