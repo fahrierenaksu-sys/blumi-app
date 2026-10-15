@@ -60,6 +60,47 @@ const titleFromItemId = (itemId: string): string =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ")
 
+/**
+ * R1 wardrobe prices (owner yes 2026-10-15, integration/economy_0910/PRICES_TR.md). A priced piece is sold through
+ * its receipt; every other wardrobe piece (the starters) stays free and owned by default. Rows already granted while
+ * the wardrobes were free stay owned (RELEASE_PLAN section 8).
+ */
+export const R1_WARDROBE_PRICE_COINS: Readonly<Record<string, number>> = {
+  avatar_v2_hair_male_textured_twists: 300,
+  avatar_v2_top_male_black_basic_tee: 120,
+  avatar_v2_top_male_navy_knit_polo: 220,
+  avatar_v2_top_male_check_flannel_white_tee: 220,
+  avatar_v2_top_male_forest_collar_sweater: 220,
+  avatar_v2_top_male_olive_overshirt: 320,
+  avatar_v2_top_male_black_embroidered_sweatshirt: 350,
+  avatar_v2_top_male_taupe_waffle_blouson: 480,
+  avatar_v2_bottom_male_black_pocket_trousers: 120,
+  avatar_v2_bottom_male_charcoal_trousers: 120,
+  avatar_v2_bottom_male_dark_straight_jeans: 220,
+  avatar_v2_bottom_male_cream_drawstring_trousers: 220,
+  avatar_v2_bottom_male_grey_wide_jeans: 220,
+  avatar_v2_bottom_male_ecru_wide_trousers: 220,
+  avatar_v2_bottom_male_cream_pleated_trousers: 350,
+  avatar_v2_shoes_male_black_everyday_sneakers: 100,
+  avatar_v2_shoes_male_tan_loafers: 180,
+  avatar_v2_shoes_male_brown_loafers: 180,
+  avatar_v2_shoes_male_cream_chunky_sneakers: 180,
+  avatar_v2_shoes_male_green_skate_shoes: 180,
+  avatar_v2_shoes_male_sand_desert_boots: 300,
+  avatar_v2_shoes_male_dark_leather_sneakers: 300,
+  avatar_v2_shoes_white_clean_sneakers: 100,
+  hair_girl_bob: 300,
+  hair_girl_pigtails: 300,
+  avatar_v2_hair_mocha_ribbon_waves: 450
+}
+
+const wardrobePreviewItem = (itemId: string): EconomyCatalogItem => {
+  const price = R1_WARDROBE_PRICE_COINS[itemId]
+  return price === undefined
+    ? avatarItem(itemId, titleFromItemId(itemId), 0, true)
+    : avatarItem(itemId, titleFromItemId(itemId), price)
+}
+
 const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   avatarItem("avatar_v2_body_default", "Warm Base", 0, true),
   avatarItem("avatar_v2_body_male_light", "Masculine Light Base", 0, true),
@@ -403,12 +444,14 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   avatarItem("avatar_v2_top_buttercup_picnic_pinafore_dress", "Buttercup Picnic Pinafore Dress", 180, false, ["avatar_v2_bottom_buttercup_picnic_pinafore_dress"]),
   avatarItem("avatar_v2_top_lavender_garden_ribbon_dress", "Lavender Garden Ribbon Dress", 200, false, ["avatar_v2_bottom_lavender_garden_ribbon_dress"]),
 
-  // the boy's 2.5D wardrobe (boyWardrobePreview.ts), free and owned by every account during testing (owner yes,
-  // 2026-10-13): the inventory self-heal grants them, so no row write is needed up front; never sold, no receipt
-  ...BOY_WARDROBE_PREVIEW_ALL_IDS.map((itemId) => avatarItem(itemId, titleFromItemId(itemId), 0, true)),
-  // the girl's 2.5D wardrobe additions (girlWardrobePreview.ts), on the same testing terms as the boy's (owner yes for
-  // free test wardrobes, 2026-10-13): free, owned by every account, never sold, no receipt; wearable by the girl only
-  ...GIRL_WARDROBE_PREVIEW_ALL_IDS.map((itemId) => avatarItem(itemId, titleFromItemId(itemId), 0, true)),
+  // the boy's 2.5D wardrobe (boyWardrobePreview.ts): the four starters stay free and owned by every account; every
+  // other piece is sold at its R1 price through its receipt (owner price yes, 2026-10-15). Rows granted while the
+  // wardrobe was free (owner yes for free testing, 2026-10-13) stay owned.
+  ...BOY_WARDROBE_PREVIEW_ALL_IDS.map((itemId) => wardrobePreviewItem(itemId)),
+  // the girl's 2.5D wardrobe additions (girlWardrobePreview.ts), wearable by the girl only: all four are sold at their R1
+  // price through their receipt (owner price yes, 2026-10-15); her starters are the avatar_v2 girl starter set above.
+  // Rows granted while they were free (2026-10-13) stay owned.
+  ...GIRL_WARDROBE_PREVIEW_ALL_IDS.map((itemId) => wardrobePreviewItem(itemId)),
 
   // the old flat pieces are retired (legacy registry); the chair keeps its id with layered art, held until §12
   roomItem("room_v2_chair_blush", "Blush Lounge Chair", 0),

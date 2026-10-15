@@ -34,6 +34,12 @@ const { ROOM_AVATAR_CATALOG } =
 const { ROOM_V2_FURNITURE_CATALOG } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("../roomV2/roomV2Catalog") as typeof import("../roomV2/roomV2Catalog")
+const { hasAvatarItemRigArt } =
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  require("../avatar/model/avatarItemArt") as typeof import("../avatar/model/avatarItemArt")
+const { AVATAR_STILL_ASSETS } =
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  require("../avatar/stills/stillAssets") as typeof import("../avatar/stills/stillAssets")
 const {
   getAvatarItemPreviewSource,
   getShopProductThumbnailSource
@@ -72,6 +78,11 @@ function collectAvatarItemFiles(itemId: string, files: Set<string>): void {
   collectAssetFiles(AVATAR_V2_CATALOG.find((item) => item.id === itemId)?.assets, files)
   collectAssetFiles(getShopProductThumbnailSource(itemId), files)
   collectAssetFiles(getAvatarItemPreviewSource(itemId), files)
+  // every per-item 2.5D still layer ("<body>/<kind>/<itemId>" or "<body>/<kind>/<itemId>__<variant>")
+  for (const [key, source] of Object.entries(AVATAR_STILL_ASSETS)) {
+    const stillItemId = key.split("/")[2]?.split("__")[0]
+    if (stillItemId === itemId) collectAssetFiles(source, files)
+  }
   const projection = DEFAULT_AVATAR_ROOM_PROJECTION_MAP[itemId] ?? {}
   for (const [slot, value] of Object.entries(projection)) {
     if (slot === "bodyPreset") continue
@@ -155,7 +166,10 @@ test("published items are visible in the Shop and render in the Room", () => {
       assert.ok(avatarItem, `${published.itemId} has no AvatarV2 catalog entry`)
       assert.notEqual(avatarItem.hiddenFromShop, true, `${published.itemId} is hidden from the Shop`)
       assert.ok(getShopProductThumbnailSource(published.itemId), `${published.itemId} has no Shop thumbnail`)
-      assert.ok(DEFAULT_AVATAR_ROOM_PROJECTION_MAP[published.itemId], `${published.itemId} has no Room projection`)
+      assert.ok(
+        DEFAULT_AVATAR_ROOM_PROJECTION_MAP[published.itemId] || hasAvatarItemRigArt(published.itemId),
+        `${published.itemId} has no Room projection or 2.5D rig art`
+      )
     } else {
       assert.ok(
         ROOM_V2_FURNITURE_CATALOG.some((furniture) => furniture.id === published.itemId),

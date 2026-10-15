@@ -9,6 +9,9 @@
  * 2026-10-14 (wip/girl-hairs): the factory-finished bob (side clip) and pigtails (bows) join on the same terms. They are
  * new designs with no planned `avatar_v2_` ID, so they keep the item IDs their art and rig use (`hair_girl_bob`,
  * `hair_girl_pigtails`); no old ID is renamed or reused.
+ *
+ * 2026-10-15 (owner price yes): all four are listed in the Shop and sold at R1_WARDROBE_PRICE_COINS (economyCatalog.ts)
+ * through their receipts. Rows already granted while they were free stay owned.
  */
 export const GIRL_WARDROBE_PREVIEW_ITEM_IDS = {
   hair: ["avatar_v2_hair_mocha_ribbon_waves", "hair_girl_bob", "hair_girl_pigtails"],

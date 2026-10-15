@@ -6,7 +6,7 @@ import {
   isAvatarLoadoutV2,
   type AvatarLoadoutV2
 } from "@blumi/contracts"
-import { ECONOMY_CATALOG } from "../economy/economyCatalog"
+import { ECONOMY_CATALOG, R1_WARDROBE_PRICE_COINS } from "../economy/economyCatalog"
 import { isReleaseCatalogItemPublished } from "../release/releaseCatalog"
 import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "./boyWardrobePreview"
 import {
@@ -400,12 +400,25 @@ test("every economy avatar entitlement and grant has loadout metadata", () => {
   assert.equal(manifestIds.size, new Set(economyAvatarIds).size)
 })
 
-test("the boy's 2.5D wardrobe is free and owned by every account, for the male body only", () => {
+test("the boy's 2.5D wardrobe: starters free and owned, every other piece sold at its R1 price with a receipt", () => {
+  const starterIds = new Set([
+    DEFAULT_MALE_AVATAR_LOADOUT.hairId,
+    DEFAULT_MALE_AVATAR_LOADOUT.topId,
+    DEFAULT_MALE_AVATAR_LOADOUT.bottomId,
+    DEFAULT_MALE_AVATAR_LOADOUT.shoesId
+  ])
   for (const itemId of BOY_WARDROBE_PREVIEW_ALL_IDS) {
     const entry = ECONOMY_CATALOG.find((item) => item.type === "avatar" && item.itemId === itemId)
-    assert.equal(entry?.priceCoins, 0, itemId)
-    assert.equal(entry?.ownedByDefault, true, itemId)
-    assert.equal(isReleaseCatalogItemPublished(itemId), false, `${itemId} has no receipt`)
+    if (starterIds.has(itemId)) {
+      assert.equal(entry?.priceCoins, 0, itemId)
+      assert.equal(entry?.ownedByDefault, true, itemId)
+      assert.equal(isReleaseCatalogItemPublished(itemId), false, `${itemId} is a starter and needs no receipt`)
+    } else {
+      assert.equal(entry?.priceCoins, R1_WARDROBE_PRICE_COINS[itemId], itemId)
+      assert.ok((entry?.priceCoins ?? 0) > 0, itemId)
+      assert.notEqual(entry?.ownedByDefault, true, itemId)
+      assert.equal(isReleaseCatalogItemPublished(itemId), true, `${itemId} is sold through a receipt`)
+    }
     assert.equal(isAvatarLoadoutItemCompatibleWithBody(itemId, "avatar_v2_body_male_light"), true, itemId)
     assert.equal(isAvatarLoadoutItemCompatibleWithBody(itemId, DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId), false, itemId)
   }
