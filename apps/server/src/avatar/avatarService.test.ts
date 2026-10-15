@@ -1,7 +1,9 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  AVATAR_ITEM_RULES,
   BOY_WARDROBE_PREVIEW_ALL_IDS,
+  coerceAvatarLoadout,
   BOY_WARDROBE_PREVIEW_ITEM_IDS,
   GIRL_WARDROBE_PREVIEW_ALL_IDS,
   GIRL_WARDROBE_PREVIEW_ITEM_IDS,
@@ -117,7 +119,7 @@ async function signInWith(catalog: readonly EconomyCatalogItem[], repository = c
   const avatarService = createAvatarService({ authService, economyService: createEconomyService({ catalog, repository }) })
   await authService.sendCode("+905551112233")
   const verified = await authService.verifyCode("+905551112233", "482931")
-  return { avatarService, verified, repository }
+  return { avatarService, verified, repository, authService }
 }
 
 async function saveEach(
@@ -300,4 +302,107 @@ test("a save with retired pieces is still refused for any other broken item", as
   })
   assert.equal(result.kind, "invalid")
   if (result.kind === "invalid") assert.equal(result.code, "unknown_item")
+})
+
+// Data policy (lead decision 2026-10-15, never lose user data): a retired piece the user still wears stays stored.
+// Every read draws it as the body's starter piece, so the beta-5 app shows the starter and sends it back on its next
+// save; an older build sends the retired ID itself. Neither is a change of that slot, so the stored retired ID is kept.
+// Only a retired ID that is new for a slot, or one the account does not own, is stored as the starter piece, and any
+// real change of the slot replaces it.
+const OLD_BOY_SLOTS = ["hairId", "topId", "bottomId", "shoesId"] as const
+const RETIRED_OLD_BOY_SLOTS = OLD_BOY_SLOTS.filter((key) => isRetiredAvatarItemId(OLD_BOY_LOOK[key]))
+
+async function wearingTheOldBoyLook(ownedRetired: readonly string[] = OLD_BOY_PIECES) {
+  const repository = createInMemoryEconomyRepository()
+  const signedIn = await signInWith(resolveProductionEconomyCatalog(), repository)
+  const older = createDefaultEconomyInventory(signedIn.verified.account.userId)
+  await repository.saveInventory({
+    ...older,
+    ownedAvatarItemIds: [...new Set([...older.ownedAvatarItemIds, ...ownedRetired])]
+  })
+  const accountId = signedIn.verified.account.accountId
+  const seeded = await signedIn.authService.repository.updateAvatarSelection({
+    accountId,
+    expectedRevision: 0,
+    selection: { presetId: OLD_BOY_LOOK.bodyId, revision: 1, loadout: { ...OLD_BOY_LOOK, accessoryIds: [] } },
+    now: new Date()
+  })
+  assert.equal(seeded.kind, "updated")
+  const storedLoadout = async () =>
+    (await signedIn.authService.repository.findAccountById(accountId))?.profile.avatar.loadout as unknown as
+      Record<string, unknown>
+  return { ...signedIn, storedLoadout, shownLoadout: coerceAvatarLoadout(OLD_BOY_LOOK) }
+}
+
+test("a save that sends back the starter piece the app was shown keeps the retired piece the user wears", async () => {
+  const { avatarService, verified, storedLoadout, shownLoadout } = await wearingTheOldBoyLook()
+  assert.ok(RETIRED_OLD_BOY_SLOTS.length > 0, "the look really carries retired pieces")
+
+  const result = await avatarService.saveAvatar(verified.sessionToken, { loadout: shownLoadout, revision: 1 })
+
+  assert.equal(result.kind, "updated", JSON.stringify(result))
+  if (result.kind !== "updated") return
+  assert.deepEqual(result.selection.loadout, shownLoadout, "the app still draws what it showed")
+  const stored = await storedLoadout()
+  for (const key of RETIRED_OLD_BOY_SLOTS) assert.equal(stored[key], OLD_BOY_LOOK[key], key)
+})
+
+test("an older build that re-sends the retired piece it holds keeps it stored", async () => {
+  const { avatarService, verified, storedLoadout, shownLoadout } = await wearingTheOldBoyLook()
+
+  const result = await avatarService.saveAvatar(verified.sessionToken, { loadout: OLD_BOY_LOOK, revision: 1 })
+
+  assert.equal(result.kind, "updated", JSON.stringify(result))
+  if (result.kind === "updated") assert.deepEqual(result.selection.loadout, shownLoadout)
+  const stored = await storedLoadout()
+  for (const key of RETIRED_OLD_BOY_SLOTS) assert.equal(stored[key], OLD_BOY_LOOK[key], key)
+})
+
+test("a real change of one slot replaces only that slot's retired piece", async () => {
+  const changedKey = RETIRED_OLD_BOY_SLOTS[0]
+  assert.ok(changedKey)
+  const slot = changedKey.replace(/Id$/, "")
+  const replacement = AVATAR_ITEM_RULES.items.find((item) =>
+    item.slot === slot && item.supportedBodyIds.includes(OLD_BOY_LOOK.bodyId) &&
+    !isRetiredAvatarItemId(item.itemId) && item.itemId !== DEFAULT_MALE_AVATAR_LOADOUT[changedKey])
+  assert.ok(replacement, `a second wearable ${slot} exists for the boy`)
+  const { avatarService, verified, repository, storedLoadout, shownLoadout } =
+    await wearingTheOldBoyLook()
+  const inventory = await repository.getInventory(verified.account.userId)
+  assert.ok(inventory)
+  await repository.saveInventory({
+    ...inventory,
+    ownedAvatarItemIds: [...inventory.ownedAvatarItemIds, replacement.itemId]
+  })
+
+  const result = await avatarService.saveAvatar(verified.sessionToken, {
+    loadout: { ...shownLoadout, [changedKey]: replacement.itemId },
+    revision: 1
+  })
+
+  assert.equal(result.kind, "updated", JSON.stringify(result))
+  const stored = await storedLoadout()
+  assert.equal(stored[changedKey], replacement.itemId)
+  for (const key of RETIRED_OLD_BOY_SLOTS.filter((other) => other !== changedKey)) {
+    assert.equal(stored[key], OLD_BOY_LOOK[key], key)
+  }
+})
+
+test("a retired piece that is new for a slot, or not owned, is stored as the starter piece", async () => {
+  const { avatarService, verified, storedLoadout } = await wearingTheOldBoyLook([])
+  const result = await avatarService.saveAvatar(verified.sessionToken, { loadout: OLD_BOY_LOOK, revision: 1 })
+  assert.equal(result.kind, "updated", JSON.stringify(result))
+  const unowned = await storedLoadout()
+  for (const key of RETIRED_OLD_BOY_SLOTS) {
+    assert.equal(unowned[key], DEFAULT_MALE_AVATAR_LOADOUT[key], `${key}: an unowned retired piece is not kept`)
+  }
+
+  const fresh = await signInWith(resolveProductionEconomyCatalog())
+  const saved = await fresh.avatarService.saveAvatar(fresh.verified.sessionToken, { loadout: OLD_BOY_LOOK, revision: 0 })
+  assert.equal(saved.kind, "updated", JSON.stringify(saved))
+  const stored = (await fresh.authService.repository.findAccountById(fresh.verified.account.accountId))
+    ?.profile.avatar.loadout as unknown as Record<string, unknown>
+  for (const key of RETIRED_OLD_BOY_SLOTS) {
+    assert.equal(stored[key], DEFAULT_MALE_AVATAR_LOADOUT[key], `${key}: a retired piece new for the slot`)
+  }
 })

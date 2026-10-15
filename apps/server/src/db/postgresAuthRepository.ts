@@ -1022,6 +1022,21 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
       return result.rows[0] ? mapAccount(result.rows[0]) : null
     },
 
+    async getStoredAvatarLoadout(accountId) {
+      const result = await pool.query(
+        `SELECT avatar_selection, avatar_revision
+           FROM blumi_accounts
+          WHERE account_id = $1`,
+        [accountId]
+      )
+      const row = result.rows[0]
+      if (!row) return null
+      const loadout: unknown = typeof row.avatar_selection === "string"
+        ? JSON.parse(row.avatar_selection)
+        : row.avatar_selection
+      return { loadout, revision: Number(row.avatar_revision) }
+    },
+
     async updateAvatarSelection(input) {
       const result = await pool.query(
         `UPDATE blumi_accounts

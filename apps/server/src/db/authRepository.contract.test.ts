@@ -3,7 +3,7 @@ import { createHmac, randomBytes, randomInt, randomUUID } from "node:crypto"
 import test from "node:test"
 import { Pool } from "pg"
 import type { CompleteAvatarSelection } from "@blumi/contracts"
-import { DEFAULT_MALE_AVATAR_LOADOUT } from "@blumi/domain"
+import { DEFAULT_MALE_AVATAR_LOADOUT, RETIRED_AVATAR_ITEM_IDS } from "@blumi/domain"
 import { createEmptyAccountDataExporter } from "../account/accountDataExporter"
 import { createInMemoryAuthRepository, type AuthRepository } from "../auth/authRepository"
 import {
@@ -280,6 +280,18 @@ runRepositoryContract<AuthHarness>({
       assert.equal((await repository.auth.updateAvatarSelection({
         accountId: `account_${randomUUID()}`, expectedRevision: 0, selection: NEXT_AVATAR, now: new Date()
       })).kind, "missing")
+    },
+
+    "the avatar save reads the stored loadout exactly as stored, retired pieces included": async ({ repository }) => {
+      const account = await signUp(repository.auth)
+      const retiredHair = [...RETIRED_AVATAR_ITEM_IDS].find((itemId) => itemId.includes("_hair_male_"))
+      assert.ok(retiredHair)
+      const stored = { ...NEXT_AVATAR.loadout, hairId: retiredHair, accessoryIds: [] }
+      await repository.auth.updateAvatarSelection({
+        accountId: account.accountId, expectedRevision: 0, selection: { ...NEXT_AVATAR, loadout: stored }, now: new Date()
+      })
+      assert.deepEqual(await repository.auth.getStoredAvatarLoadout(account.accountId), { loadout: stored, revision: 1 })
+      assert.equal(await repository.auth.getStoredAvatarLoadout(`account_${randomUUID()}`), null)
     },
 
     "OTP sends respect the cooldown and the window cap under concurrency": async ({ repository }) => {

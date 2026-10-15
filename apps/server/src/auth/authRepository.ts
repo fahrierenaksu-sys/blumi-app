@@ -102,6 +102,12 @@ export interface AuthRepository {
     selection: CompleteAvatarSelection
     now: Date
   }): Promise<AvatarSelectionUpdateResult>
+  /**
+   * The avatar loadout exactly as stored, retired item IDs included, with its revision; null when the account is
+   * gone. Only the avatar save reads it, to keep a retired piece the user still wears (`keepWornRetiredAvatarItems`).
+   * Every other read goes through the tolerant `normalizeStoredAvatarSelection`.
+   */
+  getStoredAvatarLoadout(accountId: string): Promise<StoredAvatarLoadout | null>
   completeOnboardingStep(input: {
     accountId: string
     step: AccountOnboardingStep
@@ -228,6 +234,11 @@ export interface AccountProfileUpdate {
   interests?: string[] | null
   prompts?: UserProfile["prompts"] | null
   location?: UserProfile["location"] | null
+}
+
+export interface StoredAvatarLoadout {
+  loadout: unknown
+  revision: number
 }
 
 export type AvatarSelectionUpdateResult =
@@ -841,6 +852,14 @@ export function createInMemoryAuthRepository(
       }
       store.accountsByPhone.set(account.phoneNumber, cloneAccount(updated))
       return cloneAccount(updated)
+    },
+    async getStoredAvatarLoadout(accountId) {
+      const account = [...store.accountsByPhone.values()].find(
+        (candidate) => candidate.accountId === accountId
+      )
+      if (!account) return null
+      const { loadout, revision } = account.profile.avatar
+      return { loadout: loadout ? structuredClone(loadout) : null, revision: revision ?? 0 }
     },
     async updateAvatarSelection(input) {
       const account = [...store.accountsByPhone.values()].find(

@@ -5,6 +5,7 @@ import {
 import {
   AVATAR_ITEM_RULES,
   createAvatarSelection,
+  keepWornRetiredAvatarItems,
   replaceRetiredAvatarItems,
   validateAvatarLoadout,
   type AvatarItemRules,
@@ -67,7 +68,8 @@ export function createAvatarService(options: AvatarServiceOptions): AvatarServic
         now
       )
       const currentLoadout = resolved.account.profile.avatar.loadout
-      // An older build can still send retired pieces; they are stored as the starter piece every read draws.
+      // An older build can still send retired pieces: the strict rules check the starter piece every read draws in
+      // their place, and a retired piece the user still wears is put back before storing (keepWornRetiredAvatarItems).
       const requestedLoadout = isAcceptedAvatarLoadout(input.loadout)
         ? replaceRetiredAvatarItems(input.loadout, avatarRules)
         : input.loadout
@@ -88,8 +90,20 @@ export function createAvatarService(options: AvatarServiceOptions): AvatarServic
         }
       }
 
+      const storedAvatar = await options.authService.repository.getStoredAvatarLoadout(
+        resolved.account.accountId
+      )
+      // A stale revision conflicts below anyway; only the row this save replaces may keep its retired pieces.
+      const loadoutToStore = storedAvatar?.revision === (expectedRevision as number) && isAcceptedAvatarLoadout(input.loadout)
+        ? keepWornRetiredAvatarItems({
+          saved: validation.loadout,
+          requested: input.loadout,
+          stored: storedAvatar.loadout,
+          ownedItemIds: inventory.ownedAvatarItemIds
+        }, avatarRules)
+        : validation.loadout
       const selection = createAvatarSelection(
-        validation.loadout,
+        loadoutToStore,
         (expectedRevision as number) + 1
       )
       const update = await options.authService.repository.updateAvatarSelection({
