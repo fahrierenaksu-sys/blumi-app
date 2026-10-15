@@ -104,6 +104,57 @@ release audit reports one missing migration; that is expected. Steps,
 compatibility matrix, verification and rollback order:
 [`MIGRATION_070_RUNBOOK.md`](./MIGRATION_070_RUNBOOK.md).
 
+## Migrations 074–076 (2026-10-15) — WRITTEN, NOT APPLIED
+
+Three additive files from the 2026-10-14 release audit, each tested in the
+isolated PostgreSQL gate (first apply and rerun). All three are in
+`OPTIONAL_READINESS_MIGRATIONS`, so `/ready` stays green whichever of code and
+schema reaches production first. The preferred order is still migrate first,
+then deploy. None of them changes or deletes an existing row.
+
+The migrator applies **every** pending file in order: a plain `db:migrate`
+would also apply the still-pending 070 and 071. To apply only some files, use
+an isolated migrator directory holding just those files (as done for 073), and
+keep each step a separate owner yes with its own fresh restore-tested dump.
+
+| File | What | Optional because | Order |
+|---|---|---|---|
+| `074_notification_retention_index.sql` | Partial index `(created_at) WHERE notification_type IN ('message','like')` on `blumi_notification_policy_events` (audit D08) | Index only; every query returns the same rows without it | Any time. Builds under a SHARE lock (claim writes wait, reads do not) inside the migrator transaction, bounded by its 5 s lock timeout; not CONCURRENTLY, because the migrator runs each file in a transaction. If the lock times out, nothing changed: run it again later. |
+| `075_chat_hide_point_message.sql` | Nullable `hidden_through_message_id` and `hidden_through_message_sent_at` next to 071's `hidden_through` (audit R15) | The chat repository probes this ledger row and keeps 071's time-only rule until it exists | After or together with 071 (alone it is harmless but unused). Code before or after. |
+| `076_beta_reset_runs.sql` | Table `blumi_beta_reset_runs`, one row per applied beta reset (audit F2) | The app never touches it; the reset script refuses every apply without it | Before the next beta reset apply. Code order does not matter. |
+
+Gate evidence for 074 on 300,001 synthetic claims: the retention scan went from
+a sequential scan reading and discarding 297,000 rows (about 74 ms) to an index
+scan of the partial index discarding none (about 2 ms), and the purge deleted
+exactly the rows the unindexed predicate selects.
+
+075 compatibility: a binary that knows 075 writes the hidden message's id and
+time with `hidden_through` and reads that exact point only while its time still
+equals `hidden_through`. Rows hidden before 075, and rows whose
+`hidden_through` an older binary moved during a rolling deploy, keep 071's
+inclusive time rule, which can hide a same-millisecond message but never shows
+a hidden one. Still open: a message stored with an earlier time that commits
+after a hide is ordered before the hide point and stays hidden; closing that
+needs a commit-ordered sequence, not this pair.
+
+076 caveat: the marker table starts empty. If a beta reset was already applied
+to this database before 076, record that in `LAUNCH_CONTROL.md` and treat the
+next apply as a repeat (`--repeat-reason`).
+
+Rollback (each needs the owner's yes; take a dump first):
+
+- 074: `DROP INDEX IF EXISTS blumi_notification_policy_events_retention_idx;`
+  then delete its `blumi_migrations` row. Retention keeps working, slower.
+- 075: delete its `blumi_migrations` row first and wait at least 30 s (the
+  probe interval) so running binaries stop naming the columns; then
+  `ALTER TABLE blumi_chat_thread_participants DROP COLUMN IF EXISTS
+  hidden_through_message_id, DROP COLUMN IF EXISTS hidden_through_message_sent_at;`.
+  Hide points fall back to `hidden_through` (hides at most a same-millisecond
+  message more; nothing hidden becomes visible).
+- 076: delete its `blumi_migrations` row only. Do not drop the table after a
+  reset ran: it is the only record that the reset happened. Without the table
+  the reset script refuses every apply.
+
 ## Safe inspection
 
 From the repository root, with the exact target project ref:
@@ -195,6 +246,15 @@ Undo: after the COMMIT the only undo is restoring the step 3 dump into a new
 Supabase project and pointing Railway's `DATABASE_URL` at it, which needs the
 owner's yes and loses everything written after the dump. After Phase F, retire
 the script: a later dry run plus apply would wipe the new chats again.
+
+One-shot marker (migration 076, audit F2): every applied reset records one
+row in `blumi_beta_reset_runs` (commit, plan hash, time, reason) in the same
+transaction. Without 076 the apply refuses before it locks anything. The dry
+run prints `previous-resets=<n>`; STOP unless it is 0. A database that already
+recorded a reset applies again only with `--repeat-reason "<why>"` (12–200
+plain characters, no phone-like numbers), given with the owner's yes, and the
+reason is recorded with the run. Two concurrent applies serialize on the
+table lock; the second one sees the first one's row and refuses.
 
 ## Environments and migration order
 
