@@ -14,7 +14,8 @@ import { MIN_CONTRAST, contrastRatio } from "../ui/themeContrast"
  *   own, which is drawn on the page surface (white). Tokens meant for dark or
  *   pink fills (`textInverted`, `onPrimary`, `night*`) are left to the rules
  *   above.
- * Colours resolve from `#hex` literals, `white`/`black` and `uiTheme.colors.*`;
+ * Colours resolve from `#hex` literals, `white`/`black` and `uiTheme.colors.*` (the entry
+ * palette in files that import `blumiEntryTheme as uiTheme`);
  * anything computed at run time is left out.
  */
 
@@ -41,7 +42,7 @@ const PRESSED_SUFFIXES = ["", "Pressed"] as const
 const FILL_TEXT_TOKENS = /^(textInverted|onPrimary|night\w*)$/
 const NAMED_COLORS: Readonly<Record<string, string>> = { white: "#FFFFFF", black: "#000000" }
 
-function normaliseHex(value: string): string | undefined {
+export function normaliseHex(value: string): string | undefined {
   const named = NAMED_COLORS[value.toLowerCase()]
   if (named) return named
   const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(value)
@@ -50,15 +51,42 @@ function normaliseHex(value: string): string | undefined {
   return opaque ? `#${opaque[1]}`.toUpperCase() : undefined
 }
 
-function resolveColor(node: ts.Expression, tokens: Readonly<Record<string, string>>): { hex?: string; isPageText: boolean } {
-  if (ts.isStringLiteralLike(node)) return { hex: normaliseHex(node.text), isPageText: false }
-  const token = /^uiTheme\.colors\.(\w+)$/.exec(node.getText())
-  if (!token) return { isPageText: false }
-  const value = tokens[token[1]]
-  return { hex: value ? normaliseHex(value) : undefined, isPageText: !FILL_TEXT_TOKENS.test(token[1]) }
+/** Token tables by the identifier a file uses for them (`uiTheme`, or an import alias of the entry theme). */
+export type ThemeTables = Readonly<Record<string, Readonly<Record<string, string>>>>
+
+/**
+ * Which colour table each theme identifier means in this file: `uiTheme` is the
+ * app theme unless the file imports `blumiEntryTheme as uiTheme` (the entry
+ * flow's own palette), and an `as` alias of either keeps its own table.
+ */
+export function themeTablesFor(
+  source: ts.SourceFile,
+  appTokens: Readonly<Record<string, string>>,
+  entryTokens: Readonly<Record<string, string>> = appTokens
+): ThemeTables {
+  const tables: Record<string, Readonly<Record<string, string>>> = { uiTheme: appTokens, blumiEntryTheme: entryTokens }
+  for (const statement of source.statements) {
+    const bindings = ts.isImportDeclaration(statement) ? statement.importClause?.namedBindings : undefined
+    if (!bindings || !ts.isNamedImports(bindings)) continue
+    for (const element of bindings.elements) {
+      const imported = (element.propertyName ?? element.name).text
+      if (imported === "uiTheme") tables[element.name.text] = appTokens
+      if (imported === "blumiEntryTheme") tables[element.name.text] = entryTokens
+    }
+  }
+  return tables
 }
 
-function readStyle(object: ts.ObjectLiteralExpression, tokens: Readonly<Record<string, string>>): ResolvedStyle {
+export function resolveColor(node: ts.Expression, tables: ThemeTables): { hex?: string; isPageText: boolean } {
+  if (ts.isStringLiteralLike(node)) return { hex: normaliseHex(node.text), isPageText: false }
+  const token = /^(\w+)\.colors\.(\w+)$/.exec(node.getText())
+  const table = token ? tables[token[1]] : undefined
+  if (!token || !table) return { isPageText: false }
+  const value = table[token[2]]
+  return { hex: value ? normaliseHex(value) : undefined, isPageText: !FILL_TEXT_TOKENS.test(token[2]) }
+}
+
+function readStyle(object: ts.ObjectLiteralExpression, tokens: ThemeTables): ResolvedStyle {
   let color: string | undefined
   let backgroundColor: string | undefined
   let colorIsPageText = false
@@ -80,7 +108,7 @@ function isStyleSheetCreate(node: ts.Node): node is ts.CallExpression {
   return ts.isCallExpression(node) && node.expression.getText() === "StyleSheet.create"
 }
 
-function readStyleSheets(source: ts.SourceFile, tokens: Readonly<Record<string, string>>): Map<string, ResolvedStyle>[] {
+function readStyleSheets(source: ts.SourceFile, tokens: ThemeTables): Map<string, ResolvedStyle>[] {
   const sheets: Map<string, ResolvedStyle>[] = []
   const visit = (node: ts.Node) => {
     if (isStyleSheetCreate(node) && node.arguments[0] && ts.isObjectLiteralExpression(node.arguments[0])) {
@@ -134,8 +162,9 @@ function pairsInSheet(file: string, sheet: Map<string, ResolvedStyle>): StyleCon
 export function findStyleContrastPairs(
   file: string,
   sourceText: string,
-  tokens: Readonly<Record<string, string>>
+  tokens: Readonly<Record<string, string>>,
+  entryTokens: Readonly<Record<string, string>> = tokens
 ): StyleContrastPair[] {
   const source = ts.createSourceFile(file, sourceText, ts.ScriptTarget.Latest, true, file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-  return readStyleSheets(source, tokens).flatMap((sheet) => pairsInSheet(file, sheet))
+  return readStyleSheets(source, themeTablesFor(source, tokens, entryTokens)).flatMap((sheet) => pairsInSheet(file, sheet))
 }

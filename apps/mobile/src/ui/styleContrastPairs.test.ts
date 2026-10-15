@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join, relative } from "node:path"
 import test from "node:test"
 import { findStyleContrastPairs } from "../testing/styleContrastPairs"
-import { uiTheme } from "./theme"
+import { blumiEntryTheme, uiTheme } from "./theme"
 
 const SRC_ROOT = join(__dirname, "..")
 
@@ -73,10 +73,19 @@ test("colours computed at run time are left out rather than guessed", () => {
   assert.deepEqual(pairs, [])
 })
 
+test("a file that imports the entry theme as uiTheme is judged with the entry palette", () => {
+  const body = `import { blumiEntryTheme as uiTheme } from "../ui/theme"\n${sample(`
+    done: { backgroundColor: uiTheme.colors.primary },
+    doneText: { color: uiTheme.colors.onPrimary }`)}`
+  const [pair] = findStyleContrastPairs("x.ts", body, uiTheme.colors, blumiEntryTheme.colors)
+  assert.equal(pair.foreground, blumiEntryTheme.colors.onPrimary.toUpperCase())
+  assert.equal(pair.background, blumiEntryTheme.colors.primary.toUpperCase())
+})
+
 test("every text colour drawn on a style surface in the app is readable", () => {
   const failures = listStyleSources(SRC_ROOT).flatMap((path) => {
     const file = relative(SRC_ROOT, path)
-    return findStyleContrastPairs(file, readFileSync(path, "utf8"), uiTheme.colors)
+    return findStyleContrastPairs(file, readFileSync(path, "utf8"), uiTheme.colors, blumiEntryTheme.colors)
       .filter((pair) => pair.ratio < pair.minimum && !EXEMPTIONS[`${file}#${pair.textStyle}@${pair.surfaceStyle}`])
       .map((pair) => `${file}: ${pair.textStyle} ${pair.foreground} on ${pair.surfaceStyle} ${pair.background} = ${pair.ratio.toFixed(2)}:1 (needs ${pair.minimum})`)
   })
