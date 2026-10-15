@@ -4,7 +4,6 @@ import {
   createPostMatchChatNavigationState,
   getBottomNavKeyForRoute,
   getBottomNavRoutePresentation,
-  getChatLocale,
   getLobbyReturnStrategy,
   getReducedMotionScreenOptions,
   getOnboardingEntryRoute,
@@ -158,14 +157,6 @@ test("onboarding entry is bounded to the three resumable setup routes", () => {
   assert.equal(getOnboardingEntryRoute("RoomSetup"), "RoomSetup")
   assert.equal(getOnboardingEntryRoute("Main"), null)
   assert.equal(getOnboardingEntryRoute("Splash"), null)
-})
-
-test("chat locale collapses platform locale variants to the supported contract", () => {
-  assert.equal(getChatLocale("tr-TR"), "tr")
-  assert.equal(getChatLocale("tr"), "tr")
-  assert.equal(getChatLocale("en-US"), "en")
-  assert.equal(getChatLocale("de-DE"), "en")
-  assert.equal(getChatLocale(undefined), "en")
 })
 
 test("profile preview returns with popTo only when Lobby already exists in the stack", () => {

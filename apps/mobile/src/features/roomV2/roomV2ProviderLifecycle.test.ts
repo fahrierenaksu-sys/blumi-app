@@ -6,6 +6,7 @@ import vm from "node:vm"
 import ts from "typescript"
 import { canEditRoomV2Decor } from "./roomV2EditGate"
 import { readPersonalRoomSyncMetadata, resolvePersonalRoomHydration } from "./personalRoomDecorSyncModel"
+import { createStarterRoomWithBed, STARTER_ROOM_BED_ITEM_ID } from "./roomStarterModel"
 import type { PersonalRoomDecorSnapshot, SavePersonalRoomDecorResult } from "./personalRoomDecorApi"
 import type { UserRoomDecor } from "./roomV2.types"
 import { createReconnectTransitionTracker } from "../realtime/reconnectTransitionTracker"
@@ -161,7 +162,8 @@ function providerFixture(options?: {
       }
     },
     "../personalRoomDecorSyncModel": { readPersonalRoomSyncMetadata, resolvePersonalRoomHydration },
-    "../roomV2PersistenceErrorCopy": { getRoomV2PersistenceErrorMessageForDisplay: () => "Safe failure" }
+    "../roomV2PersistenceErrorCopy": { getRoomV2PersistenceErrorMessageForDisplay: () => "Safe failure" },
+    "../roomStarterModel": { createStarterRoomWithBed }
   }
   const module = { exports: {} as any }
   vm.runInNewContext(code, {
@@ -331,6 +333,23 @@ test("a room edit neither restarts hydration nor re-resolves the runtime config"
   assert.deepEqual(f.runtimeConfigInputs.at(-1), ["room-lamp"])
   assert.equal(f.runtimeConfigInputs.length, configs + 1)
   assert.equal(f.value().userRoomDecor.roomShellId, "edited-room")
+  f.unmount()
+})
+
+test("a signed-in account with no stored room opens the starter room with its bed exactly once", async () => {
+  const f = providerFixture({ cache: new Map(), ownedRoomItemIds: [STARTER_ROOM_BED_ITEM_ID] })
+  const serverRead = f.delayRead()
+  await f.settle()
+
+  serverRead.resolve(null)
+  await f.settle()
+  f.rerender()
+  await f.settle()
+
+  assert.equal(f.value().persistenceState, "ready")
+  const beds = f.value().userRoomDecor.placedItems
+    .filter((item: { itemId: string }) => item.itemId === STARTER_ROOM_BED_ITEM_ID)
+  assert.equal(beds.length, 1, "the starter room holds the free bed once, also after a later render")
   f.unmount()
 })
 

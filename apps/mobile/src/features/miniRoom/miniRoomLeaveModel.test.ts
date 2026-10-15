@@ -3,10 +3,12 @@ import test from "node:test"
 import { getMiniRoomCopy } from "./miniRoomCopy"
 import {
   classifyMiniRoomLeaveFailure,
+  CLOSED_MINI_ROOM_LEAVE_PROMPT,
   getMiniRoomExitDestination,
   getMiniRoomLeaveConfirmation,
   MINI_ROOM_LEAVE_EXIT_WAIT_MS,
   MINI_ROOM_LEAVE_RETRY_DELAYS_MS,
+  nextMiniRoomLeavePrompt,
   resolveMiniRoomRemoval
 } from "./miniRoomLeaveModel"
 
@@ -65,4 +67,32 @@ test("the leave flow waits briefly for the server and retries a bounded number o
   assert.ok(MINI_ROOM_LEAVE_RETRY_DELAYS_MS.length > 0 && MINI_ROOM_LEAVE_RETRY_DELAYS_MS.length <= 4)
   const total = MINI_ROOM_LEAVE_RETRY_DELAYS_MS.reduce((sum, delay) => sum + delay, 0)
   assert.ok(total <= 30_000, "background retries end within half a minute")
+})
+
+test("the leave prompt never outlives the room and never leaves a room that already ended", () => {
+  // Arrange
+  const open = nextMiniRoomLeavePrompt(CLOSED_MINI_ROOM_LEAVE_PROMPT, "ask", false).prompt
+
+  // Act
+  const ended = nextMiniRoomLeavePrompt(open, "roomEnded", false)
+  const askedAfterExit = nextMiniRoomLeavePrompt(CLOSED_MINI_ROOM_LEAVE_PROMPT, "ask", true)
+  const lateLeave = nextMiniRoomLeavePrompt(open, "leave", true)
+  const leaveWithoutPrompt = nextMiniRoomLeavePrompt(CLOSED_MINI_ROOM_LEAVE_PROMPT, "leave", false)
+
+  // Assert
+  assert.equal(open.visible, true)
+  assert.deepEqual(ended, { prompt: CLOSED_MINI_ROOM_LEAVE_PROMPT, requestLeave: false })
+  assert.equal(askedAfterExit.prompt.visible, false)
+  assert.equal(lateLeave.requestLeave, false)
+  assert.equal(leaveWithoutPrompt.requestLeave, false)
+})
+
+test("the leave prompt leaves a live room once on confirm and closes on stay", () => {
+  const open = nextMiniRoomLeavePrompt(CLOSED_MINI_ROOM_LEAVE_PROMPT, "ask", false).prompt
+
+  const leave = nextMiniRoomLeavePrompt(open, "leave", false)
+  const stay = nextMiniRoomLeavePrompt(open, "stay", false)
+
+  assert.deepEqual(leave, { prompt: CLOSED_MINI_ROOM_LEAVE_PROMPT, requestLeave: true })
+  assert.deepEqual(stay, { prompt: CLOSED_MINI_ROOM_LEAVE_PROMPT, requestLeave: false })
 })

@@ -70,6 +70,102 @@ export function coerceAvatarLoadout(
   return firstValid([base, withStarterOutfit(base, starter), cloneAvatarLoadout(starter)], rules)
 }
 
+/**
+ * A save that still carries retired item IDs (an older app build, or a look loaded before the retirement) is checked
+ * as the user sees it: each retired piece becomes that body's starter piece, exactly as every read draws it, and a
+ * retired accessory, dress or outerwear is taken off. A retired piece the user still wears is put back before storing
+ * (`keepWornRetiredAvatarItems`). Everything else is left for the strict save rules
+ * (`validateAvatarLoadout`), which still refuse unknown, unowned or ill-fitting items. A retired body is left as it is
+ * (and refused), so a save never switches the body. Inventories are untouched: retired pieces stay owned.
+ */
+export function replaceRetiredAvatarItems(
+  loadout: AvatarLoadout,
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
+): AvatarLoadout {
+  const isRetired = (itemId: string | null): boolean => itemId !== null && isAvatarItemRetired(rules, itemId)
+  const starter = starterLoadoutForBody(loadout.bodyId, rules)
+  const items = Object.fromEntries(
+    ITEM_SLOTS.map(([key]) => [key, isRetired(loadout[key]) ? starter[key] : loadout[key]])
+  ) as Record<ItemKey, string>
+  const accessoryIds = loadout.accessoryIds.filter((itemId) => !isRetired(itemId))
+  if (loadout.schemaVersion !== 2) return { ...loadout, ...items, accessoryIds }
+  return {
+    ...loadout,
+    ...items,
+    accessoryIds,
+    dressId: isRetired(loadout.dressId) ? null : loadout.dressId,
+    outerwearId: isRetired(loadout.outerwearId) ? null : loadout.outerwearId
+  }
+}
+
+export interface WornRetiredAvatarItemsInput {
+  /** The loadout the strict save rules accepted (`replaceRetiredAvatarItems` then `validateAvatarLoadout`). */
+  readonly saved: AvatarLoadout
+  /** The loadout the client sent. */
+  readonly requested: AvatarLoadout
+  /** The account's loadout exactly as stored, retired IDs included (never the coerced read). */
+  readonly stored: unknown
+  /** The account's owned avatar items, from the server inventory. */
+  readonly ownedItemIds: readonly string[]
+}
+
+/**
+ * Never lose user data (lead decision 2026-10-15): a retired piece the user still wears stays stored. Every read draws
+ * it as the body's starter piece, so the current app shows that starter and sends it back on its next save, and an
+ * older build sends the retired ID itself; neither is a change of the slot, so the stored retired ID is kept there. It
+ * is kept only when the body is unchanged, the account owns it, it fits that slot and body, and the accepted loadout
+ * holds the starter piece in that slot. Any other piece in the request is a real change and replaces it; a retired ID
+ * that is new for a slot stays the starter piece. A retired accessory stays on unless the request takes another one
+ * of its group or the list is full (the app cannot show it, so it cannot take it off; an older build that drops it is
+ * read the same way). Dress and outerwear are not kept (no retired one exists). The result always reads exactly as
+ * `saved` (`coerceAvatarLoadout`); if it would not, `saved` is returned. Ownership stays the server's: nothing here
+ * adds an item the account does not own.
+ */
+export function keepWornRetiredAvatarItems(
+  input: WornRetiredAvatarItemsInput,
+  rules: AvatarItemRules = AVATAR_ITEM_RULES
+): AvatarLoadout {
+  const { saved, requested } = input
+  const stored = isRecord(input.stored) ? input.stored : null
+  if (!stored || stored.bodyId !== saved.bodyId) return saved
+  const owned = new Set(input.ownedItemIds)
+  const starter = starterLoadoutForBody(saved.bodyId, rules)
+  const keptRetired = (value: unknown, slot: AvatarLoadoutSlot): value is string =>
+    typeof value === "string" && isAvatarItemRetired(rules, value) && owned.has(value) &&
+    findAvatarRuleItem(rules, value)?.slot === slot &&
+    (findAvatarRuleItem(rules, value)?.supportedBodyIds.includes(saved.bodyId) ?? false)
+  const items = Object.fromEntries(ITEM_SLOTS.map(([key, slot]) => {
+    const storedId = stored[key]
+    const unchanged = requested[key] === storedId || requested[key] === starter[key]
+    const keep = saved[key] === starter[key] && unchanged && keptRetired(storedId, slot)
+    return [key, keep ? storedId : saved[key]]
+  })) as Record<ItemKey, string>
+  const kept: AvatarLoadout = { ...saved, ...items, accessoryIds: withWornRetiredAccessories(saved, stored, keptRetired, rules) }
+  return readsAs(kept, saved, rules) ? kept : saved
+}
+
+function withWornRetiredAccessories(
+  saved: AvatarLoadout,
+  stored: Record<string, unknown>,
+  keptRetired: (value: unknown, slot: AvatarLoadoutSlot) => value is string,
+  rules: AvatarItemRules
+): string[] {
+  const accessoryIds = [...saved.accessoryIds]
+  const groupOf = (itemId: string) => findAvatarRuleItem(rules, itemId)?.accessoryGroup
+  const storedIds = Array.isArray(stored.accessoryIds) ? stored.accessoryIds : []
+  for (const storedId of storedIds) {
+    if (!keptRetired(storedId, "accessory") || accessoryIds.length >= MAX_ACCESSORIES) continue
+    if (accessoryIds.some((itemId) => itemId === storedId || groupOf(itemId) === groupOf(storedId))) continue
+    accessoryIds.push(storedId)
+  }
+  return accessoryIds
+}
+
+function readsAs(kept: AvatarLoadout, saved: AvatarLoadout, rules: AvatarItemRules): boolean {
+  const read = (loadout: AvatarLoadout) => JSON.stringify(coerceAvatarLoadout(loadout, {}, rules))
+  return read(kept) === read(saved)
+}
+
 /** The stored body when it is a wearable body; else the preset hint, then gender, then the girl. */
 export function resolveAvatarBodyId(
   rawBodyId: unknown,

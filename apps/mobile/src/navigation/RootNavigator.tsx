@@ -56,7 +56,6 @@ import {
   getSessionNavigatorKey
 } from "../features/session/onboardingFlowModel"
 import {
-  getChatLocale,
   getChatThreadScreenOptions,
   getDetailScreenOptions,
   getReducedMotionScreenOptions,
@@ -375,7 +374,8 @@ export function RootNavigator() {
   const sessionNavigatorKey = isAccountRestricted
     ? `restricted:${sessionActor?.profile.userId ?? "no-session"}`
     : getSessionNavigatorKey(sessionEntryRoute, sessionActor?.profile.userId)
-  const chatLocale = getChatLocale(Intl.DateTimeFormat().resolvedOptions().locale)
+  // The app language (native per-app language first), like every other surface; Intl alone reads en-US on iOS.
+  const chatLocale = getAppLocale()
   const {
     applyRealtimeThreadList,
     applyNewThread,

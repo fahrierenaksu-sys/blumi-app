@@ -12,6 +12,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { loadAccountScopedStorage } from "../../persistence/accountScopedStorage"
 import { DEFAULT_ROOM_V2_SHELL_ID } from "../roomV2Catalog"
+import { createStarterRoomWithBed } from "../roomStarterModel"
 import { useInventoryStore } from "../../inventory/inventoryStore"
 import type {
   PlacedRoomItem,
@@ -406,7 +407,7 @@ export function RoomV2Provider({
         if (obsoleteSave?.storageKey === storageKey) obsoleteSaveSnapshotRef.current = null
         const resolvedDecor = canReplayPendingDraft || preserveConflictedDraft
           ? copyRoomV2Decor(latestPendingDraft!)
-          : resolution.decor ?? createDefaultRoomV2Decor()
+          : resolution.decor ?? createStarterRoomWithBed(DEFAULT_ROOM_V2_SHELL_ID)
         if (preserveConflictedDraft) {
           conflictedDraftRef.current = { storageKey, decor: copyRoomV2Decor(resolvedDecor) }
         }

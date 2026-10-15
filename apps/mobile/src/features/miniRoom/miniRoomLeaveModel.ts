@@ -67,3 +67,28 @@ export function classifyMiniRoomLeaveFailure(status: number | null): MiniRoomLea
   }
   return "stop"
 }
+
+/**
+ * The leave confirmation drawn inside the room screen (Sim QA beta-5: a native Alert outlived the room and stayed over
+ * the room editor and chat, because iOS cannot dismiss it when the screen goes). It is open only while the room is still
+ * live, and "leave" acts only on a prompt that is open in a live room.
+ */
+export interface MiniRoomLeavePrompt {
+  readonly visible: boolean
+}
+
+export type MiniRoomLeavePromptEvent = "ask" | "stay" | "leave" | "roomEnded"
+
+export const CLOSED_MINI_ROOM_LEAVE_PROMPT: MiniRoomLeavePrompt = Object.freeze({ visible: false })
+
+export function nextMiniRoomLeavePrompt(
+  prompt: MiniRoomLeavePrompt,
+  event: MiniRoomLeavePromptEvent,
+  roomExited: boolean
+): { prompt: MiniRoomLeavePrompt; requestLeave: boolean } {
+  if (event === "ask" && !roomExited) return { prompt: { visible: true }, requestLeave: false }
+  return {
+    prompt: CLOSED_MINI_ROOM_LEAVE_PROMPT,
+    requestLeave: event === "leave" && prompt.visible && !roomExited
+  }
+}

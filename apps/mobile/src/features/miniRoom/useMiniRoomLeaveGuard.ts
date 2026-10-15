@@ -1,15 +1,30 @@
 import { usePreventRemove, type NavigationProp, type ParamListBase } from "@react-navigation/native"
-import { useCallback, type RefObject } from "react"
-import { Alert } from "react-native"
+import { useCallback, useMemo, useState, type RefObject } from "react"
 import type { MiniRoomCopy } from "./miniRoomCopy"
-import { getMiniRoomLeaveConfirmation, resolveMiniRoomRemoval } from "./miniRoomLeaveModel"
+import {
+  CLOSED_MINI_ROOM_LEAVE_PROMPT,
+  getMiniRoomLeaveConfirmation,
+  nextMiniRoomLeavePrompt,
+  resolveMiniRoomRemoval,
+  type MiniRoomLeaveConfirmation,
+  type MiniRoomLeavePromptEvent
+} from "./miniRoomLeaveModel"
+
+export interface MiniRoomLeavePromptView {
+  visible: boolean
+  confirmation: MiniRoomLeaveConfirmation
+  onStay: () => void
+  onLeave: () => void
+}
 
 /**
  * Asks before the shared room ends for both people (UX audit ROOM-08). The
  * HUD arrow and the menu call the returned `confirmLeave`; any other removal
  * of the room screen (Android back, a gesture, a reset) is held by
  * usePreventRemove, the only guard native-stack forwards to the native
- * dismissal, until the room has ended (`exitedRef`).
+ * dismissal, until the room has ended (`exitedRef`). The question is drawn
+ * inside the room screen (`leavePrompt`), so it goes with the screen and
+ * never stays over the next one (Sim QA beta-5).
  */
 export function useMiniRoomLeaveGuard({
   copy,
@@ -21,29 +36,34 @@ export function useMiniRoomLeaveGuard({
   exitedRef: RefObject<boolean>
   requestLeave: () => void
   navigation: Pick<NavigationProp<ParamListBase>, "dispatch">
-}): () => void {
-  const confirmLeave = useCallback((): void => {
-    const confirmation = getMiniRoomLeaveConfirmation(copy)
-    Alert.alert(
-      confirmation.title,
-      confirmation.message,
-      confirmation.buttons.map((button) => ({
-        text: button.text,
-        style: button.style,
-        ...(button.action === "leave" ? { onPress: requestLeave } : {})
-      }))
-    )
-  }, [copy, requestLeave])
+}): { confirmLeave: () => void; leavePrompt: MiniRoomLeavePromptView } {
+  const [prompt, setPrompt] = useState(CLOSED_MINI_ROOM_LEAVE_PROMPT)
+
+  const send = useCallback((event: MiniRoomLeavePromptEvent): void => {
+    const next = nextMiniRoomLeavePrompt(prompt, event, exitedRef.current === true)
+    setPrompt(next.prompt)
+    if (next.requestLeave) requestLeave()
+  }, [exitedRef, prompt, requestLeave])
+
+  const confirmLeave = useCallback((): void => send("ask"), [send])
 
   // The room's own exit sets exitedRef before returning to chat or Inbox,
   // so that removal passes once without another confirmation.
   usePreventRemove(true, ({ data }) => {
     if (resolveMiniRoomRemoval({ exited: exitedRef.current }) === "allow") {
+      setPrompt(CLOSED_MINI_ROOM_LEAVE_PROMPT)
       navigation.dispatch(data.action)
       return
     }
     confirmLeave()
   })
 
-  return confirmLeave
+  const leavePrompt = useMemo<MiniRoomLeavePromptView>(() => ({
+    visible: prompt.visible && exitedRef.current !== true,
+    confirmation: getMiniRoomLeaveConfirmation(copy),
+    onStay: () => send("stay"),
+    onLeave: () => send("leave")
+  }), [copy, exitedRef, prompt.visible, send])
+
+  return { confirmLeave, leavePrompt }
 }

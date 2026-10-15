@@ -1,4 +1,5 @@
 import type { ChatLocale } from "../chatRoomInviteModel"
+import { resolveUiLocale } from "../../../ui/uiLocale"
 
 export type ChatThreadCopy = {
   chat: string
@@ -139,16 +140,14 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
 }
 
 /**
- * The route may pin the chat locale; otherwise the device (ICU) locale
- * decides. The device locale is only read when the route provides none.
+ * The route may pin the chat locale; otherwise the app language registered at
+ * the root decides (an explicit locale tag argument wins over it).
  */
 export function resolveChatThreadLocale(
   routeLocale: ChatLocale | undefined,
   deviceLocale?: string
 ): ChatLocale {
-  return routeLocale ?? (
-    (deviceLocale ?? Intl.DateTimeFormat().resolvedOptions().locale).toLowerCase().startsWith("tr")
-      ? "tr"
-      : "en"
-  )
+  if (routeLocale) return routeLocale
+  // The app language registered at the root (native per-app language first), not the runtime Intl locale.
+  return resolveUiLocale(deviceLocale)
 }

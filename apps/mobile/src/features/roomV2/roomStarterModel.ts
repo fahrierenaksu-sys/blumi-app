@@ -20,6 +20,14 @@ export function createStarterRoomDecor(roomShellId: string): UserRoomDecor {
   }
 }
 
+/**
+ * The room of a signed-in account that has no stored room yet (setup skipped, or its first save never landed): the
+ * starter room, i.e. the shell with the free starter bed at its default point (OWNER_DECISIONS 2026-10-11 03:37).
+ */
+export function createStarterRoomWithBed(roomShellId: string): UserRoomDecor {
+  return placeStarterBed(createStarterRoomDecor(roomShellId), STARTER_ROOM_BED_DEFAULT_POINT)
+}
+
 export function placeStarterBed(
   decor: UserRoomDecor,
   point: RoomWorldPoint,

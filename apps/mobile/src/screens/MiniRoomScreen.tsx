@@ -27,6 +27,7 @@ import { MiniRoomScene } from "../features/miniRoom/scene/MiniRoomScene"
 import { getMiniRoomCopy } from "../features/miniRoom/miniRoomCopy"
 import { useInRoomChat } from "../features/miniRoom/useInRoomChat"
 import { useMiniRoomLeaveGuard } from "../features/miniRoom/useMiniRoomLeaveGuard"
+import { MiniRoomLeaveConfirmDialog } from "../features/miniRoom/MiniRoomLeaveConfirmDialog"
 import { useMiniRoomMedia } from "../features/miniRoom/useMiniRoomMedia"
 import { useMiniRoomNotices } from "../features/miniRoom/useMiniRoomNotices"
 import { useRoomChatHistory } from "../features/miniRoom/useRoomChatHistory"
@@ -316,7 +317,7 @@ function MiniRoomScreenView(props: MiniRoomScreenProps) {
   const roomNotice = useMiniRoomNotices({ roomMotion, copy: roomCopy,
     partnerFirstName: participants.partner.displayName.split(" ")[0] || participants.partner.displayName })
 
-  const confirmLeave = useMiniRoomLeaveGuard({
+  const { confirmLeave, leavePrompt } = useMiniRoomLeaveGuard({
     copy: roomCopy,
     exitedRef,
     requestLeave,
@@ -384,6 +385,7 @@ function MiniRoomScreenView(props: MiniRoomScreenProps) {
         notices={notices}
         typing={roomTyping}
       />
+      <MiniRoomLeaveConfirmDialog prompt={leavePrompt} />
     </View>
   )
 }
