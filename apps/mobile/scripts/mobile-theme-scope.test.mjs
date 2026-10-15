@@ -10,7 +10,10 @@ function readSource(relativePath) {
   return readFileSync(resolve(mobileRoot, relativePath), "utf8")
 }
 
-test("generic mobile theme preserves the approved Discovery palette", () => {
+// textMuted, primaryDeep and primaryPressed carry the audit D02 contrast values.
+// They are a visible change that still needs the owner's before/after review
+// before ship; no owner approval of these three values is recorded.
+test("generic mobile theme pins the Discovery palette", () => {
   const source = readSource("src/ui/theme.ts")
   const genericThemeSource = source.split("export const blumiEntryTheme =")[0]
 
