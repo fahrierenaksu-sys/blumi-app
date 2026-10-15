@@ -35,6 +35,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import sharp from "sharp"
 import { tsImport } from "tsx/esm/api"
+import { cleanThumb } from "./thumb-clean.mjs"
 
 export const BAKER_VERSION = 1
 const SS = 2
@@ -445,9 +446,13 @@ async function bakeBody(rigId, rigDir, files) {
     if (debugThumbs) debugThumbs.push({ canonical, withBody, alone, removed })
     const rect = alphaRect(alone, canvas.width, canvas.height)
     const scale = Math.min(1, THUMB_MAX_PX / Math.max(rect[2], rect[3]))
-    const thumb = await sharp(crop(alone, canvas, rect), { raw: { width: rect[2], height: rect[3], channels: 4 } })
-      .resize(Math.max(1, Math.round(rect[2] * scale)), Math.max(1, Math.round(rect[3] * scale)), { kernel: "lanczos3" })
-      .webp({ lossless: true, effort: 6 }).toBuffer()
+    const thumbW = Math.max(1, Math.round(rect[2] * scale)), thumbH = Math.max(1, Math.round(rect[3] * scale))
+    const resized = await sharp(crop(alone, canvas, rect), { raw: { width: rect[2], height: rect[3], channels: 4 } })
+      .resize(thumbW, thumbH, { kernel: "lanczos3" }).raw().toBuffer()
+    const edgeClean = THUMB_EDGE_CLEAN[canonical]
+    const finished = edgeClean ? cleanThumb(resized, thumbW, thumbH, edgeClean).rgba : resized
+    const baked = await sharp(finished, { raw: { width: thumbW, height: thumbH, channels: 4 } }).webp({ lossless: true, effort: 6 }).toBuffer()
+    const thumb = redrawnThumb(rigId, canonical) ?? baked
     files.set(`layers/${rigId}/thumb/${canonical}.webp`, thumb)
     // every body range it draws instead of the body's, in any pose: the resolver picks winners from these, as live
     const claims = [...new Map(bodyClaims(view, rigItemId)
@@ -471,6 +476,33 @@ async function bakeBody(rigId, rigDir, files) {
     },
     evidence
   }
+}
+
+/** Card thumbs that get the edge cleaner (thumb-clean.mjs: part seams, skin flecks on the outline, opt-in heel-collar
+ *  spurs), each checked at 2x in artclean_1635. Scoped per item because published thumbs are hash-locked: an entry here
+ *  changes that item's thumb bytes. `flecks: false` where the item's own light colours sit inside the skin model. */
+const SHOE_COLLAR = { spurs: true }
+const THUMB_EDGE_CLEAN = {
+  avatar_v2_top_male_white_basic_tee: {}, avatar_v2_top_male_black_basic_tee: {}, avatar_v2_top_male_navy_knit_polo: {},
+  avatar_v2_top_black_cute_crop_top: {}, avatar_v2_top_white_cute_crop_top: {}, avatar_v2_shoes_white_clean_sneakers: {},
+  avatar_v2_shoes_male_black_clean_sneakers: SHOE_COLLAR, avatar_v2_shoes_male_black_everyday_sneakers: SHOE_COLLAR,
+  avatar_v2_shoes_male_brown_loafers: SHOE_COLLAR, avatar_v2_shoes_male_cream_chunky_sneakers: { spurs: true, flecks: false },
+  avatar_v2_shoes_male_dark_leather_sneakers: SHOE_COLLAR, avatar_v2_shoes_male_green_skate_shoes: SHOE_COLLAR,
+  avatar_v2_shoes_male_sand_desert_boots: SHOE_COLLAR, avatar_v2_shoes_male_tan_loafers: SHOE_COLLAR
+}
+
+/** Card thumbs whose rig art lacks a part, redrawn by hand and pinned by sha256 in tools/avatar25d/thumb-redraws/<rig>/.
+ *  The redraw replaces the baked thumb only while its bytes match the pin, so a changed file fails the bake loudly.
+ *  white sneakers: the rig art has no closed heel, the redraw adds the heel counter and pink lining (gptfin_1615 t2 r1). */
+const THUMB_REDRAWS = {
+  female: { avatar_v2_shoes_white_clean_sneakers: "6b2e11f3e5bba4a1efc29e596877d3d938db4bf01a028307d11784b983064765" }
+}
+function redrawnThumb(rigId, canonical) {
+  const pin = THUMB_REDRAWS[rigId]?.[canonical]
+  if (!pin) return undefined
+  const bytes = readFileSync(join(ROOT, "tools/avatar25d/thumb-redraws", rigId, `${canonical}.webp`))
+  if (sha256(bytes) !== pin) throw new Error(`${rigId}/${canonical}: the redrawn thumb differs from its pin in bake-stills.mjs`)
+  return bytes
 }
 
 /** Items whose thumb is not cleaned: their own colour lies inside the body's skin model, so withoutBodyArt cuts holes

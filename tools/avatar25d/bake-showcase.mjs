@@ -30,6 +30,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const ALLOWLIST = join(ROOT, "tools/avatar25d/showcase-allowlist.json")
 const BAKED = join(ROOT, "tools/avatar25d/showcase-baked.json")
 const STILLS = join(ROOT, "apps/mobile/src/features/avatar/stills")
+/** Hand-finished showcase layers, pinned by sha256 in the allowlist: tools/avatar25d/showcase-redraws/<rig>/<key>.webp. */
+const SHOWCASE_REDRAWS = join(ROOT, "tools/avatar25d/showcase-redraws")
 const WEBP = { quality: 90, alphaQuality: 100, effort: 6, smartSubsample: false }
 const CROPS = ["card", "head", "push"]
 const RIGS = ["female", "male"]
@@ -68,6 +70,8 @@ export function validateAllowlist(list, { allowPendingOwnerApproval = false } = 
       for (const key of ["slot", "file", "sha256", "order"]) if (item[key] === undefined) throw new Error(`${rig}.${id}: missing ${key}`)
       if (!SHOWCASE_SLOTS.includes(item.slot)) throw new Error(`${rig}.${id}: unknown slot ${item.slot}`)
       if (item.backFile && !item.backSha256) throw new Error(`${rig}.${id}: backFile needs backSha256`)
+      for (const key of ["frontRedrawSha256", "backRedrawSha256"]) if (item[key] !== undefined && !/^[0-9a-f]{64}$/.test(item[key])) throw new Error(`${rig}.${id}: ${key} must be a sha256`)
+      if (item.backRedrawSha256 && !item.backFile) throw new Error(`${rig}.${id}: backRedrawSha256 needs backFile`)
       if (item.eraseFile && !item.eraseSha256) throw new Error(`${rig}.${id}: eraseFile needs eraseSha256`)
       if (item.eraseFile && !REFILL_REGIONS_OF[item.slot]) throw new Error(`${rig}.${id}: only shoes, bottoms, tops and dresses erase the body`)
       if ([item.file, item.backFile, item.eraseFile].some((path) => /candidate/i.test(path ?? ""))) throw new Error(`${rig}.${id}: a candidate path cannot enter the app`)
@@ -221,8 +225,22 @@ function windowInCanvas(window, canvas, scale) {
   return [Math.round((x - canvas.left) * scale), Math.round((y - canvas.top) * scale), Math.round(w * scale), Math.round(h * scale)]
 }
 
+/**
+ * Swaps a baked layer's bytes for its pinned hand-finished version (a cleanup done on the layer itself, after the
+ * bake, with no full-size source to re-bake from). The source still fixes the layer's rect; the redraw must have the
+ * same size and the exact pinned bytes, or the bake stops.
+ */
+async function withRedraw(rig, layer, pin, redrawRoot) {
+  if (!pin) return layer
+  const bytes = readFileSync(join(redrawRoot, rig, `${layer.key}.webp`))
+  if (sha256(bytes) !== pin) throw new Error(`${layer.key}: the redrawn layer differs from its pin in the allowlist`)
+  const { width, height } = await sharp(bytes).metadata()
+  if (width !== layer.rect[2] || height !== layer.rect[3]) throw new Error(`${layer.key}: the redrawn layer is ${width}x${height}, the baked rect is ${layer.rect[2]}x${layer.rect[3]}`)
+  return { ...layer, bytes }
+}
+
 /** One body: the base, every allowlisted item's layer (and hair back), the windows. Returns manifest data + files. */
-export async function bakeBody(rig, body, scale, pad, srcRoot) {
+export async function bakeBody(rig, body, scale, pad, srcRoot, redrawRoot = SHOWCASE_REDRAWS) {
   const at = (relative) => join(srcRoot, relative)
   const base = await loadRgba(at(body.base), body.baseSha256)
   const items = []
@@ -251,11 +269,11 @@ export async function bakeBody(rig, body, scale, pad, srcRoot) {
   files.set(baseLayer.key, baseLayer.bytes)
   const baked = {}
   for (const { id, item, front, back, erase, scaledErase } of items) {
-    const frontLayer = await encodeLayer(`${id}__front`, front, canvas, scale, false)
+    const frontLayer = await withRedraw(rig, await encodeLayer(`${id}__front`, front, canvas, scale, false), item.frontRedrawSha256, redrawRoot)
     files.set(frontLayer.key, frontLayer.bytes)
     const entry = { key: frontLayer.key, rect: frontLayer.rect, order: item.order, slot: item.slot, ...(item.tucked === true ? { tucked: true } : {}) }
     if (back) {
-      const backLayer = await encodeLayer(`${id}__back`, back, canvas, scale, false)
+      const backLayer = await withRedraw(rig, await encodeLayer(`${id}__back`, back, canvas, scale, false), item.backRedrawSha256, redrawRoot)
       files.set(backLayer.key, backLayer.bytes)
       entry.back = { key: backLayer.key, rect: backLayer.rect }
     }
