@@ -78,11 +78,13 @@ export function useShopCatalogProducts(input: {
         inventory: { ownedAvatarItemIds: JSON.parse(avatarOwnershipKey) as string[] },
         avatar,
         economyCatalog: productionEconomyCatalog,
-        publishedItemIds
+        publishedItemIds,
+        locale
       }),
     [
       avatar,
       avatarOwnershipKey,
+      locale,
       productionEconomyCatalog,
       publishedItemIds
     ]

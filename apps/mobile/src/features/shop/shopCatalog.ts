@@ -7,6 +7,8 @@ import {
   AVATAR_V2_CATALOG
 } from "../avatarV2/avatarV2Catalog"
 import { getAvatarV2ShopItemsCompatibleWithBody } from "../avatarV2/avatarBodyCompatibility"
+import { getAvatarItemDisplayName } from "../avatarV2/avatarItemDisplayNames"
+import type { AppLocale } from "../session/appLocale"
 import {
   isAvatarV2ItemEquipped,
   isAvatarV2ItemOwned
@@ -80,6 +82,8 @@ export interface BuildShopCatalogItemsInput {
   roomFurnitureCatalog?: readonly FurnitureItem[]
   /** Development-only ownership granted by an isolated QA catalog. */
   qaOwnedRoomItemIds?: readonly string[]
+  /** The app language; avatar piece names are Turkish when it is "tr". Omitted = the catalog's own names. */
+  locale?: AppLocale
 }
 
 export interface BuildAvatarShopCatalogItemInput {
@@ -87,6 +91,7 @@ export interface BuildAvatarShopCatalogItemInput {
   inventory: AvatarInventory
   avatar: UserAvatar
   economyCatalog?: readonly EconomyCatalogItem[]
+  locale?: AppLocale
 }
 
 const SHOP_AVATAR_TYPES = new Set([
@@ -109,7 +114,7 @@ export function buildShopCatalogItems(
 
 export function buildAvatarShopItems(input: Pick<
   BuildShopCatalogItemsInput,
-  "avatar" | "economyCatalog" | "publishedItemIds" | "avatarCatalog"
+  "avatar" | "economyCatalog" | "publishedItemIds" | "avatarCatalog" | "locale"
 > & { inventory: Pick<BlumiInventorySnapshot, "ownedAvatarItemIds"> }): ShopCatalogItem[] {
   const avatarInventory = {
     ownedItemIds: input.inventory.ownedAvatarItemIds
@@ -130,7 +135,8 @@ export function buildAvatarShopItems(input: Pick<
         item,
         inventory: avatarInventory,
         avatar: input.avatar,
-        economyCatalog: input.economyCatalog
+        economyCatalog: input.economyCatalog,
+        locale: input.locale
       })
     )
 }
@@ -147,7 +153,7 @@ export function buildAvatarShopCatalogItem(
   return {
     id: `avatar:${item.id}`,
     kind: "avatarWearable",
-    title: item.name,
+    title: input.locale ? getAvatarItemDisplayName(item, input.locale) : item.name,
     description: getAvatarDescription(priceCoins, isAtomicOutfit),
     priceCoins,
     owned,

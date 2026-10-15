@@ -568,3 +568,34 @@ test("every piece the 2.5D rig draws shows its baked thumb on wardrobe and Shop 
     }
   }
 });
+
+test("every avatar piece on the Turkish Shop shelf shows its Turkish name, and the English shelf keeps the catalog name", () => {
+  const { AVATAR_ITEM_NAMES_TR } =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+    require("../avatarV2/avatarItemDisplayNames") as typeof import("../avatarV2/avatarItemDisplayNames");
+  let checked = 0;
+  for (const bodyId of ["avatar_v2_body_default", "avatar_v2_body_male_light"]) {
+    const build = (locale: "tr" | "en") => buildShopCatalogItems({
+      avatar: resolveInitialAvatarV2(bodyId),
+      inventory: {
+        coins: 1_250,
+        ownedAvatarItemIds: [],
+        ownedRoomItemIds: [],
+        unlockedFeatureIds: [],
+        updatedAt: "2026-07-14T00:00:00.000Z",
+      },
+      roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
+      publishedItemIds: resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG).map((item) => item.itemId),
+      locale,
+    }).filter((product) => product.sectionId === "avatar");
+    const english = new Map(build("en").map((product) => [product.sourceItemId, product.title]));
+    for (const product of build("tr")) {
+      const turkish = AVATAR_ITEM_NAMES_TR[product.sourceItemId];
+      assert.ok(turkish, `${product.sourceItemId} has a Turkish name`);
+      assert.equal(product.title, turkish, product.sourceItemId);
+      assert.equal(english.get(product.sourceItemId), product.avatarItem?.name, product.sourceItemId);
+      checked += 1;
+    }
+  }
+  assert.ok(checked > 0, "the Turkish shelf was checked");
+});
