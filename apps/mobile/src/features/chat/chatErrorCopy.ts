@@ -1,4 +1,5 @@
 import { ChatMessageSendError } from "./chatApi"
+import { resolveUiLocale } from "../../ui/uiLocale"
 
 const SAFE_THREAD_LIST_ERROR_MESSAGES = new Set([
   "Chats need a connection.",
@@ -136,6 +137,19 @@ export function getMessageSendErrorMessageForDisplay(
   )
 }
 
+const ROOM_INVITATION_ERROR_TITLES = {
+  load: { tr: "Oda davetleri açılamadı", en: "Room invitations unavailable" },
+  action: { tr: "Oda daveti kullanılamıyor", en: "Room invitation unavailable" }
+} as const
+
+/** The toast title above a room invitation error, in the app language. */
+export function getRoomInvitationErrorTitle(
+  kind: keyof typeof ROOM_INVITATION_ERROR_TITLES,
+  locale?: ChatErrorLocale
+): string {
+  return ROOM_INVITATION_ERROR_TITLES[kind][resolveChatErrorLocale(locale)]
+}
+
 export function getRoomInvitationLoadErrorMessageForDisplay(
   errorMessage: string,
   locale?: ChatErrorLocale
@@ -186,8 +200,5 @@ function getKnownOrFallback(
 }
 
 function resolveChatErrorLocale(locale: ChatErrorLocale | undefined): ChatErrorLocale {
-  if (locale) return locale
-  return Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().startsWith("tr")
-    ? "tr"
-    : "en"
+  return locale ?? resolveUiLocale()
 }

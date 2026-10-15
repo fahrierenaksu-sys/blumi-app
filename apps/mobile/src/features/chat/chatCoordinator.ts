@@ -31,6 +31,7 @@ import {
   getMessageListErrorMessageForDisplay,
   getMessageSendErrorMessageForDisplay,
   getRoomInvitationActionErrorMessageForDisplay,
+  getRoomInvitationErrorTitle,
   getRoomInvitationLoadErrorMessageForDisplay
 } from "./chatErrorCopy"
 import { areRoomInviteListsEqual } from "./roomInviteListEquality"
@@ -497,7 +498,7 @@ export function createChatCoordinator(
         void inviteRefresh.catch((error) => {
           if (!isCurrentRequest()) return
           dependencies.showWarningToast({
-            title: "Room invitations unavailable",
+            title: getRoomInvitationErrorTitle("load"),
             body: getRoomInvitationLoadErrorMessageForDisplay(
               error instanceof Error ? error.message : ""
             )
@@ -647,7 +648,7 @@ export function createChatCoordinator(
       if (dependencies.isCurrentSession(actor) &&
         !(action.type === "create" && busyCode === "SELF_IN_ROOM")) {
         dependencies.showWarningToast({
-          title: "Room invitation unavailable",
+          title: getRoomInvitationErrorTitle("action"),
           body: getRoomInvitationActionErrorMessageForDisplay(
             error instanceof Error ? error.message : "",
             undefined,
