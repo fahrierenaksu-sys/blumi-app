@@ -194,7 +194,6 @@ export function WardrobeV2Screen(props: WardrobeV2ScreenProps) {
         <Animated.View layout={panelEntrance.layout} style={styles.heroRegion}>
           <WardrobePreviewStage
             avatar={stageAvatar}
-            catalog={catalog}
             copy={studioCopy}
             reduceMotion={reduceMotion}
             showSavingStatus={isSaving || Boolean(pendingTryOn)}

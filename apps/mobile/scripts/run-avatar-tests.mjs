@@ -17,7 +17,6 @@ const sourceFiles = [
   "src/features/avatarV2/avatarV2.types.ts",
   "src/features/avatarV2/qa/avatarQaInventory.ts",
   "src/features/avatarV2/qa/avatarQaInventory.test.ts",
-  "src/features/avatarV2/wardrobeThumbnailPresentation.ts",
   "src/features/avatarV2/wardrobeCategoryModel.test.ts",
   "src/features/avatarV2/avatarBodyCompatibility.ts",
   "src/features/avatarV2/avatarBodyCompatibility.test.ts",
@@ -27,7 +26,6 @@ const sourceFiles = [
   "src/features/avatarV2/avatarV2FeatureWardrobeAssets.test.ts",
   "src/features/avatarV2/avatarRoomCatalogMotionCoverage.test.ts",
   "src/features/avatarV2/avatarRoomCatalogRuntime.test.ts",
-  "src/features/avatarV2/maleRigThumbnailPresentation.ts",
   "src/features/avatarV2/candidateAvatarSnapshot.test.ts",
   "src/features/miniRoom/partnerAvatarSnapshot.ts",
   "src/features/miniRoom/miniRoomPartnerIdentity.ts",
@@ -138,14 +136,11 @@ try {
       resolve(workspaceRoot, "src/features/avatarV2/wardrobe/wardrobeIndicatorModel.test.ts"),
       resolve(workspaceRoot, "src/features/shop/shopListingModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarLayerRenderModel.test.ts"),
-      resolve(workspaceRoot, "src/features/avatarV2/room/components/RoomAvatarRenderer2D.test.ts"),
-      resolve(workspaceRoot, "src/features/avatarV2/room/components/RoomAvatarStill.test.ts"),
       resolve(workspaceRoot, "src/features/roomV2/components/roomAvatarBodyMotionModel.test.ts"),
       resolve(workspaceRoot, "src/features/roomV2/components/roomAvatarTapTargetModel.test.ts"),
       resolve(workspaceRoot, "src/features/roomV2/components/roomFurnitureTapTargetModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/components/avatarTryOnTransitionModel.test.ts"),
       resolve(workspaceRoot, "src/features/shop/screen/shopPurchaseFlightModel.test.ts"),
-      resolve(workspaceRoot, "src/features/avatarV2/room/roomAvatarMotionAtlas.test.ts"),
       resolve(workspaceRoot, "scripts/mobile-bundled-asset-bytes.test.mjs"),
       // 2.5D avatar (plan T1): module guards, total draw resolver, pose, motion, life and ASTC on the bundled rigs
       resolve(workspaceRoot, "src/features/avatar/avatarModuleGuards.test.ts"),
@@ -164,7 +159,6 @@ try {
       // the front (showcase) stack outside the room: whole-figure 3/4 fallback, missing assets, plan cache (Phase 3 D1)
       resolve(workspaceRoot, "src/features/avatar/model/avatarShowcaseModel.test.ts"),
       // try-on surfaces (Wardrobe, Shop, avatar setup; Phase 4 4.1): showcase figure, or the old drawing whole for old pieces
-      resolve(workspaceRoot, "src/features/avatar/model/avatarTryOnModel.test.ts"),
       resolve(workspaceRoot, "src/features/avatarV2/components/AvatarTryOnFigure.test.ts"),
       // the showcase surfaces (Discover, profile and You hero, match): 3/4 still in the old crop until front art lands
       resolve(workspaceRoot, "src/features/avatar/components/AvatarShowcase.test.ts"),

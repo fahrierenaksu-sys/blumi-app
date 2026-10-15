@@ -9,7 +9,7 @@ import Animated, {
 } from "react-native-reanimated"
 import { AvatarPreview2D } from "../components/AvatarPreview2D"
 import { AvatarTryOnTransition } from "../components/AvatarTryOnTransition"
-import type { AvatarCatalogItem, UserAvatar } from "../avatarV2.types"
+import type { UserAvatar } from "../avatarV2.types"
 import type { WardrobeStudioCopy } from "./wardrobeCopy"
 import { WardrobeGlass } from "./WardrobeGlass"
 import { getWardrobeStageLayout } from "./wardrobeStageLayout"
@@ -25,12 +25,11 @@ const ZOOM_DURATION_MS = 220
  */
 export function WardrobePreviewStage(props: {
   avatar: UserAvatar
-  catalog: AvatarCatalogItem[]
   copy: WardrobeStudioCopy
   reduceMotion: boolean
   showSavingStatus: boolean
 }) {
-  const { avatar, catalog, copy, reduceMotion, showSavingStatus } = props
+  const { avatar, copy, reduceMotion, showSavingStatus } = props
   const [heroSize, setHeroSize] = useState({ width: 0, height: 0 })
   const [zoomed, setZoomed] = useState(false)
   const zoom = useSharedValue(1)
@@ -91,7 +90,6 @@ export function WardrobePreviewStage(props: {
                   render={(look) => (
                     <AvatarPreview2D
                       avatar={look}
-                      catalog={catalog}
                       accessibilityLabel={copy.appearance}
                       showGlow={false}
                       size={layout.avatarSize}

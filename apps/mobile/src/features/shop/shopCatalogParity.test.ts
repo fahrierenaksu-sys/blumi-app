@@ -436,9 +436,9 @@ test("every 2.5D wardrobe piece of both bodies has a wardrobe card picture of it
   for (const id of [...BOY_WARDROBE_PREVIEW_ALL_IDS, ...GIRL_WARDROBE_PREVIEW_ALL_IDS]) {
     const item = AVATAR_V2_CATALOG.find((candidate) => candidate.id === id);
     assert.ok(item, `${id} is in the avatar catalog`);
-    const source = wardrobe.getAvatarItemPreviewSource(item);
-    // the test loader maps an image require to its file path
-    assert.ok(String(source).includes(`/thumb/${id}.webp`), `${id} card shows its own baked thumb`);
+    // (the test runner resolves a bundled asset to its path; Metro to a number)
+    const source: unknown = wardrobe.getAvatarItemPreviewSource(item);
+    assert.ok(typeof source === "string" && source.includes(`/thumb/${id}.webp`), `${id} card shows its own baked thumb`);
   }
 });
 
@@ -470,9 +470,6 @@ test("every piece the 2.5D rig draws shows its baked thumb on wardrobe and Shop 
     ] as const) {
       if (source === undefined) continue;
       assert.ok(String(source).endsWith(ownThumb), `${id} ${surface} shows its baked thumb, not ${String(source)}`);
-    }
-    if (shop.getShopProductThumbnailSource(id) !== undefined) {
-      assert.equal(shop.getShopProductThumbnailBounds(id), undefined, `${id} Shop card must not crop its thumb with pre-2.5D bounds`);
     }
   }
 });

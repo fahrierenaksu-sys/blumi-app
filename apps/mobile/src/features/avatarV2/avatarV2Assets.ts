@@ -1,3 +1,4 @@
+import { RETIRED_AVATAR_ART } from "./retiredAvatarArt"
 import type { AvatarLayerAssetRef } from "./avatarV2.types"
 import { femaleSweetCapsuleProfileLayerAssets } from "./femaleSweetCapsuleProfileAssets"
 
@@ -16,294 +17,294 @@ export const avatarV2LayerAssets = {
   ...femaleSweetCapsuleProfileLayerAssets,
   faceDefault: layerAsset(
     "avatar_face_soft_doll_foundation",
-    require("./assets/layers/avatar_face_soft_doll_foundation.png")
+    RETIRED_AVATAR_ART
   ),
   faceWarmPeachFoundation: layerAsset(
     "avatar_face_warm_peach_foundation",
-    require("./assets/layers/avatar_face_warm_peach_foundation.png")
+    RETIRED_AVATAR_ART
   ),
   faceRoseHeartFoundation: layerAsset(
     "avatar_face_rose_heart_foundation",
-    require("./assets/layers/avatar_face_rose_heart_foundation.png")
+    RETIRED_AVATAR_ART
   ),
   hairDefault: layerAsset(
     "avatar_hair_mocha_ribbon_blowout",
-    require("./assets/layers/avatar_hair_mocha_ribbon_blowout.png")
+    RETIRED_AVATAR_ART
   ),
   hair01: layerAsset(
     "avatar_hair_01",
-    require("./assets/layers/avatar_hair_01.png")
+    RETIRED_AVATAR_ART
   ),
   hairMochaRibbonBlowout: layerAsset(
     "avatar_hair_mocha_ribbon_blowout",
-    require("./assets/layers/avatar_hair_mocha_ribbon_blowout.png")
+    RETIRED_AVATAR_ART
   ),
   hairMidnightFrenchBob: layerAsset(
     "avatar_hair_midnight_french_bob",
-    require("./assets/layers/avatar_hair_midnight_french_bob.png")
+    RETIRED_AVATAR_ART
   ),
   hairHoneyHalfupWaves: layerAsset(
     "avatar_hair_honey_halfup_waves",
-    require("./assets/layers/avatar_hair_honey_halfup_waves.png")
+    RETIRED_AVATAR_ART
   ),
   hairCherryRibbonTwinBraids: layerAsset(
     "avatar_hair_cherry_ribbon_twin_braids",
-    require("./assets/layers/avatar_hair_cherry_ribbon_twin_braids.png")
+    RETIRED_AVATAR_ART
   ),
   hairCocoaCloudPonytail: layerAsset(
     "avatar_hair_cocoa_cloud_ponytail",
-    require("./assets/layers/avatar_hair_cocoa_cloud_ponytail.png")
+    RETIRED_AVATAR_ART
   ),
   hairEspressoSleekRibbonPony: layerAsset(
     "avatar_hair_espresso_sleek_ribbon_pony",
-    require("./assets/layers/avatar_hair_espresso_sleek_ribbon_pony.png")
+    RETIRED_AVATAR_ART
   ),
   hairRosewoodButterflyLayers: layerAsset(
     "avatar_hair_rosewood_butterfly_layers",
-    require("./assets/layers/avatar_hair_rosewood_butterfly_layers.png")
+    RETIRED_AVATAR_ART
   ),
   hairCaramelBraidedCrown: layerAsset(
     "avatar_hair_caramel_braided_crown",
-    require("./assets/layers/avatar_hair_caramel_braided_crown.png")
+    RETIRED_AVATAR_ART
   ),
   hairBerryVelvetSoftUpdo: layerAsset(
     "avatar_hair_berry_velvet_soft_updo",
-    require("./assets/layers/avatar_hair_berry_velvet_soft_updo.png")
+    RETIRED_AVATAR_ART
   ),
   hairChestnutButterflyBob: layerAsset(
     "avatar_hair_chestnut_butterfly_bob",
-    require("./assets/layers/avatar_hair_chestnut_butterfly_bob.png")
+    RETIRED_AVATAR_ART
   ),
   hairGoldenWaves: layerAsset(
     "avatar_hair_golden_waves",
-    require("./assets/layers/avatar_hair_golden_waves.png")
+    RETIRED_AVATAR_ART
   ),
   hairInkPageboyStar: layerAsset(
     "avatar_hair_ink_pageboy_star",
-    require("./assets/layers/avatar_hair_ink_pageboy_star.png")
+    RETIRED_AVATAR_ART
   ),
   hairInkTwinBraids: layerAsset(
     "avatar_hair_ink_twin_braids",
-    require("./assets/layers/avatar_hair_ink_twin_braids.png")
+    RETIRED_AVATAR_ART
   ),
   hairPaleGoldenBowBob: layerAsset(
     "avatar_hair_pale_golden_bow_bob",
-    require("./assets/layers/avatar_hair_pale_golden_bow_bob.png")
+    RETIRED_AVATAR_ART
   ),
   hairCopperBowWaves: layerAsset(
     "avatar_hair_copper_bow_waves",
-    require("./assets/layers/avatar_hair_copper_bow_waves.png")
+    RETIRED_AVATAR_ART
   ),
   eyesMochaDoe: layerAsset(
     "avatar_eyes_mocha_doe",
-    require("./assets/layers/avatar_eyes_mocha_doe.png")
+    RETIRED_AVATAR_ART
   ),
   eyesSageGlass: layerAsset(
     "avatar_eyes_sage_glass",
-    require("./assets/layers/avatar_eyes_sage_glass.png")
+    RETIRED_AVATAR_ART
   ),
   eyesTwilightPlum: layerAsset(
     "avatar_eyes_twilight_plum",
-    require("./assets/layers/avatar_eyes_twilight_plum.png")
+    RETIRED_AVATAR_ART
   ),
   eyesHazelAlmondDoe: layerAsset(
     "avatar_eyes_hazel_almond_doe",
-    require("./assets/layers/avatar_eyes_hazel_almond_doe.png")
+    RETIRED_AVATAR_ART
   ),
   eyesDeepBrownStar: layerAsset(
     "avatar_eyes_deep_brown_star",
-    require("./assets/layers/avatar_eyes_deep_brown_star.png")
+    RETIRED_AVATAR_ART
   ),
   eyesCocoaPuppy: layerAsset(
     "avatar_eyes_cocoa_puppy",
-    require("./assets/layers/avatar_eyes_cocoa_puppy.png")
+    RETIRED_AVATAR_ART
   ),
   eyesHoneyAmber: layerAsset(
     "avatar_eyes_honey_amber",
-    require("./assets/layers/avatar_eyes_honey_amber.png")
+    RETIRED_AVATAR_ART
   ),
   eyesChestnutLuminous: layerAsset(
     "avatar_eyes_chestnut_luminous",
-    require("./assets/layers/avatar_eyes_chestnut_luminous.png")
+    RETIRED_AVATAR_ART
   ),
   noseSoftButton: layerAsset(
     "avatar_nose_soft_button",
-    require("./assets/layers/avatar_nose_soft_button.png")
+    RETIRED_AVATAR_ART
   ),
   nosePetalCurve: layerAsset(
     "avatar_nose_petal_curve",
-    require("./assets/layers/avatar_nose_petal_curve.png")
+    RETIRED_AVATAR_ART
   ),
   noseGentleBridge: layerAsset(
     "avatar_nose_gentle_bridge",
-    require("./assets/layers/avatar_nose_gentle_bridge.png")
+    RETIRED_AVATAR_ART
   ),
   noseTinyUpturned: layerAsset(
     "avatar_nose_tiny_upturned",
-    require("./assets/layers/avatar_nose_tiny_upturned.png")
+    RETIRED_AVATAR_ART
   ),
   nosePetiteRounded: layerAsset(
     "avatar_nose_petite_rounded",
-    require("./assets/layers/avatar_nose_petite_rounded.png")
+    RETIRED_AVATAR_ART
   ),
   noseHeartTip: layerAsset(
     "avatar_nose_heart_tip",
-    require("./assets/layers/avatar_nose_heart_tip.png")
+    RETIRED_AVATAR_ART
   ),
   noseNarrowButton: layerAsset(
     "avatar_nose_narrow_button",
-    require("./assets/layers/avatar_nose_narrow_button.png")
+    RETIRED_AVATAR_ART
   ),
   noseSculptedDoll: layerAsset(
     "avatar_nose_sculpted_doll",
-    require("./assets/layers/avatar_nose_sculpted_doll.png")
+    RETIRED_AVATAR_ART
   ),
   mouthPeachWhisperSmile: layerAsset(
     "avatar_mouth_peach_whisper_smile",
-    require("./assets/layers/avatar_mouth_peach_whisper_smile.png")
+    RETIRED_AVATAR_ART
   ),
   mouthRoseGlossSmile: layerAsset(
     "avatar_mouth_rose_gloss_smile",
-    require("./assets/layers/avatar_mouth_rose_gloss_smile.png")
+    RETIRED_AVATAR_ART
   ),
   mouthBerrySoftKiss: layerAsset(
     "avatar_mouth_berry_soft_kiss",
-    require("./assets/layers/avatar_mouth_berry_soft_kiss.png")
+    RETIRED_AVATAR_ART
   ),
   mouthCoralBowSmile: layerAsset(
     "avatar_mouth_coral_bow_smile",
-    require("./assets/layers/avatar_mouth_coral_bow_smile.png")
+    RETIRED_AVATAR_ART
   ),
   mouthNudePinkWhisper: layerAsset(
     "avatar_mouth_nude_pink_whisper",
-    require("./assets/layers/avatar_mouth_nude_pink_whisper.png")
+    RETIRED_AVATAR_ART
   ),
   mouthCherryBalmSmile: layerAsset(
     "avatar_mouth_cherry_balm_smile",
-    require("./assets/layers/avatar_mouth_cherry_balm_smile.png")
+    RETIRED_AVATAR_ART
   ),
   mouthSoftMauveSmile: layerAsset(
     "avatar_mouth_soft_mauve_smile",
-    require("./assets/layers/avatar_mouth_soft_mauve_smile.png")
+    RETIRED_AVATAR_ART
   ),
   mouthRosewaterCupidBow: layerAsset(
     "avatar_mouth_rosewater_cupid_bow",
-    require("./assets/layers/avatar_mouth_rosewater_cupid_bow.png")
+    RETIRED_AVATAR_ART
   ),
   topDefault: layerAsset(
     "avatar_top_default",
-    require("./assets/layers/avatar_top_default.png")
+    RETIRED_AVATAR_ART
   ),
   topBlushLaceCardigan: layerAsset(
     "avatar_top_blush_lace_cardigan",
-    require("./assets/layers/avatar_top_blush_lace_cardigan.png")
+    RETIRED_AVATAR_ART
   ),
   topSageRibbonKnitJacket: layerAsset(
     "avatar_top_sage_ribbon_knit_jacket",
-    require("./assets/layers/avatar_top_sage_ribbon_knit_jacket.png")
+    RETIRED_AVATAR_ART
   ),
   topCherryHeartMilkmaidBlouse: layerAsset(
     "avatar_top_cherry_heart_milkmaid_blouse",
-    require("./assets/layers/avatar_top_cherry_heart_milkmaid_blouse.png")
+    RETIRED_AVATAR_ART
   ),
   topPowderBlueRibbonCorsetTop: layerAsset(
     "avatar_top_powder_blue_ribbon_corset_top",
-    require("./assets/layers/avatar_top_powder_blue_ribbon_corset_top.png")
+    RETIRED_AVATAR_ART
   ),
   topNoirRoseHeartCardigan: layerAsset(
     "avatar_top_noir_rose_heart_cardigan",
-    require("./assets/layers/avatar_top_noir_rose_heart_cardigan.png")
+    RETIRED_AVATAR_ART
   ),
   top01: layerAsset(
     "avatar_top_01",
-    require("./assets/layers/avatar_top_01.png")
+    RETIRED_AVATAR_ART
   ),
   bottomDefault: layerAsset(
     "avatar_bottom_default",
-    require("./assets/layers/avatar_bottom_default.png")
+    RETIRED_AVATAR_ART
   ),
   bottom01: layerAsset(
     "avatar_bottom_01",
-    require("./assets/layers/avatar_bottom_01.png")
+    RETIRED_AVATAR_ART
   ),
   shoesDefault: layerAsset(
     "avatar_shoes_milk_tea_court_sneakers",
-    require("./assets/layers/avatar_shoes_milk_tea_court_sneakers.png")
+    RETIRED_AVATAR_ART
   ),
   shoes01: layerAsset(
     "avatar_shoes_01",
-    require("./assets/layers/avatar_shoes_01.png")
+    RETIRED_AVATAR_ART
   ),
   shoesMilkTeaCourtSneakers: layerAsset(
     "avatar_shoes_milk_tea_court_sneakers",
-    require("./assets/layers/avatar_shoes_milk_tea_court_sneakers.png")
+    RETIRED_AVATAR_ART
   ),
   shoesCherrySatinBallets: layerAsset(
     "avatar_shoes_cherry_satin_ballets",
-    require("./assets/layers/avatar_shoes_cherry_satin_ballets.png")
+    RETIRED_AVATAR_ART
   ),
   shoesOnyxHeartMaryJanes: layerAsset(
     "avatar_shoes_onyx_heart_mary_janes",
-    require("./assets/layers/avatar_shoes_onyx_heart_mary_janes.png")
+    RETIRED_AVATAR_ART
   ),
   shoesRosewoodPlatformLoafers: layerAsset(
     "avatar_shoes_rosewood_platform_loafers",
-    require("./assets/layers/avatar_shoes_rosewood_platform_loafers.png")
+    RETIRED_AVATAR_ART
   ),
   shoesPearlSlingbackSandals: layerAsset(
     "avatar_shoes_pearl_slingback_sandals",
-    require("./assets/layers/avatar_shoes_pearl_slingback_sandals.png")
+    RETIRED_AVATAR_ART
   ),
   accessory01: layerAsset(
     "avatar_accessory_01",
-    require("./assets/layers/avatar_accessory_01.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryIvoryRibbonBeret: layerAsset(
     "avatar_accessory_ivory_ribbon_beret",
-    require("./assets/layers/avatar_accessory_ivory_ribbon_beret.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryCherryBowHeadband: layerAsset(
     "avatar_accessory_cherry_bow_headband",
-    require("./assets/layers/avatar_accessory_cherry_bow_headband.png")
+    RETIRED_AVATAR_ART
   ),
   accessorySageHeartGlasses: layerAsset(
     "avatar_accessory_sage_heart_glasses",
-    require("./assets/layers/avatar_accessory_sage_heart_glasses.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryRoseRoundGlasses: layerAsset(
     "avatar_accessory_rose_round_glasses",
-    require("./assets/layers/avatar_accessory_rose_round_glasses.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryLavenderPearlCatEyeGlasses: layerAsset(
     "avatar_accessory_lavender_pearl_cat_eye_glasses",
-    require("./assets/layers/avatar_accessory_lavender_pearl_cat_eye_glasses.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryMintStarOvalGlasses: layerAsset(
     "avatar_accessory_mint_star_oval_glasses",
-    require("./assets/layers/avatar_accessory_mint_star_oval_glasses.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryHoneyBlossomSquareGlasses: layerAsset(
     "avatar_accessory_honey_blossom_square_glasses",
-    require("./assets/layers/avatar_accessory_honey_blossom_square_glasses.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryPearlDropEarrings: layerAsset(
     "avatar_accessory_pearl_drop_earrings",
-    require("./assets/layers/avatar_accessory_pearl_drop_earrings.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryGoldenHeartLocket: layerAsset(
     "avatar_accessory_golden_heart_locket",
-    require("./assets/layers/avatar_accessory_golden_heart_locket.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryButtercreamNeckScarf: layerAsset(
     "avatar_accessory_buttercream_neck_scarf",
-    require("./assets/layers/avatar_accessory_buttercream_neck_scarf.png")
+    RETIRED_AVATAR_ART
   ),
   accessoryCherryMicroBag: layerAsset(
     "avatar_accessory_cherry_micro_bag",
-    require("./assets/layers/avatar_accessory_cherry_micro_bag.png")
+    RETIRED_AVATAR_ART
   ),
   accessorySunnyStarClips: layerAsset(
     "avatar_accessory_sunny_star_clips",
-    require("./assets/layers/avatar_accessory_sunny_star_clips.png")
+    RETIRED_AVATAR_ART
   )
 } as const

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import sharp from "sharp"
-import thumbnailBounds from "./shopThumbnailBounds.json"
+import { statSync } from "node:fs"
+import { RETIRED_AVATAR_ITEM_IDS } from "@blumi/domain"
 
 require.extensions[".png"] = (module, filename) => {
   module.exports = filename
@@ -9,53 +9,34 @@ require.extensions[".png"] = (module, filename) => {
 require.extensions[".webp"] = require.extensions[".png"]
 
 const {
-  SHOP_THUMBNAIL_SOURCES,
-  getShopProductThumbnailBounds,
+  getAvatarItemPreviewSource,
   getShopProductThumbnailSource
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./shopAssets") as typeof import("./shopAssets")
 const { AVATAR_V2_CATALOG } =
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("../avatarV2/avatarV2Catalog") as typeof import("../avatarV2/avatarV2Catalog")
-const { getGarmentThumbnailOverride } =
+const { getAvatarItemStillThumbnail } =
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-  require("../avatarV2/garmentThumbnailOverrides") as typeof import("../avatarV2/garmentThumbnailOverrides")
+  require("../avatar/stills/stillThumbnail") as typeof import("../avatar/stills/stillThumbnail")
 
-async function measureVisibleBounds(source: string): Promise<number[]> {
-  const { data, info } = await sharp(source).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  let left = info.width, top = info.height, right = 0, bottom = 0
-  for (let y = 0; y < info.height; y++) {
-    for (let x = 0; x < info.width; x++) {
-      if (data[(y * info.width + x) * 4 + 3] <= 8) continue
-      left = Math.min(left, x)
-      top = Math.min(top, y)
-      right = Math.max(right, x + 1)
-      bottom = Math.max(bottom, y + 1)
-    }
-  }
-  return [info.width, info.height, left, top, right - left, bottom - top]
-}
-
-test("visible thumbnail metadata stays bound to the resolved source geometry", async () => {
-  for (const [id, source] of Object.entries(SHOP_THUMBNAIL_SOURCES)) {
-    const expected = (thumbnailBounds as Record<string, number[]>)[id]
-    assert.ok(expected, `${id}: missing visible bounds`)
-    assert.deepEqual(expected, await measureVisibleBounds(source as string), `${id}: regenerate presentation bounds after changing the source`)
-  }
-
-  // Garment-only overrides replace square thumbnails that show the whole
-  // character; their bounds must match the garment layer they point at. A
-  // piece the 2.5D rig draws resolves to its tight baked still instead, which
-  // must carry no pre-2.5D bounds at all.
+test("a Shop picture is the item's baked 2.5D thumbnail, never retired pre-2.5D artwork", () => {
+  let withPicture = 0
   for (const { id } of AVATAR_V2_CATALOG) {
-    if (!getGarmentThumbnailOverride(id)) continue
-    const source = getShopProductThumbnailSource(id) as string
-    const bounds = getShopProductThumbnailBounds(id)
-    if (source.endsWith(`/thumb/${id}.webp`)) {
-      assert.equal(bounds, undefined, `${id}: a baked still must not be cropped with pre-2.5D bounds`)
-      continue
-    }
-    assert.ok(bounds, `${id}: missing visible bounds`)
-    assert.deepEqual(bounds, await measureVisibleBounds(source), `${id}: regenerate the garment override bounds`)
+    const source = getShopProductThumbnailSource(id)
+    assert.equal(source, getAvatarItemStillThumbnail(id), `${id}: the Shop shows only the 2.5D thumbnail`)
+    assert.equal(getAvatarItemPreviewSource(id), source)
+    if (source === undefined) continue
+    withPicture += 1
+    assert.match(String(source), /\/avatar\/stills\/layers\/(female|male)\/thumb\//)
+    assert.ok(statSync(String(source)).size > 1024, `${id}: thumbnail is empty`)
   }
+  assert.ok(withPicture > 0)
+})
+
+test("a retired item has no Shop picture, so the Shop cannot list it even if it were unhidden", () => {
+  for (const id of RETIRED_AVATAR_ITEM_IDS) {
+    assert.equal(getShopProductThumbnailSource(id), undefined, id)
+  }
+  assert.equal(getShopProductThumbnailSource("avatar_v2_unknown_item"), undefined)
 })

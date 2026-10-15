@@ -22,7 +22,7 @@ import {
   getAvatarStudioStageMetrics,
   type AvatarStudioCategory
 } from "../avatarSetupLayout"
-import type { AvatarCatalogItem, UserAvatar } from "../avatarV2.types"
+import type { UserAvatar } from "../avatarV2.types"
 import { AvatarPreview2D } from "./AvatarPreview2D"
 import { PressableScale } from "../../../ui/PressableScale"
 
@@ -46,7 +46,6 @@ export interface AvatarStudioCopy {
 interface AvatarSetupStudioStageProps {
   avatar: UserAvatar
   copy: AvatarStudioCopy
-  catalog: AvatarCatalogItem[]
   categories: AvatarStudioCategoryDescriptor[]
   compact: boolean
   disabled: boolean
@@ -78,7 +77,6 @@ const SPARKLES = [
 
 export function AvatarSetupStudioStage({
   avatar,
-  catalog,
   categories,
   copy,
   compact,
@@ -245,7 +243,6 @@ export function AvatarSetupStudioStage({
         <AvatarPreview2D
           accessibilityLabel={copy.accessibilityLabel}
           avatar={avatar}
-          catalog={catalog}
           showGlow={false}
           size={metrics.avatarSize}
           stageHeight={metrics.stageHeight}

@@ -19,7 +19,7 @@ import { animateSegment, animateTo, animateToAfter, resolveMotion, useMotion, ty
 import { PressableScale } from "../../ui/PressableScale"
 import { uiTheme } from "../../ui/theme"
 import type { AppLocale } from "../session/appLocale"
-import { getShopProductThumbnailBounds, getShopProductThumbnailSource } from "./shopAssets"
+import { getShopProductThumbnailSource } from "./shopAssets"
 import type { ShopCombinationItem } from "./shopCombinationSummary"
 import {
   getCombinationRowLeave,
@@ -32,9 +32,10 @@ import {
 import { getShopCopy } from "./shopCopy"
 import { formatCoins } from "./shopFormatters"
 import { shopPreviewStyles as styles } from "./shopPreviewStyles"
-import { getShopThumbnailLayout } from "./shopThumbnailLayout"
 
 /** Visual size of the X; its touch target is 44 pt (see removeButton). */
+/** A row thumbnail: the item's baked 2.5D picture, contained whole. */
+const COMBINATION_THUMB_STYLE = { width: 34, height: 34 } as const
 const REMOVE_ICON_SIZE = 16
 /** How much bigger the backdrop icon gets when a release would remove the row. */
 const ARMED_ICON_SCALE = 1.15
@@ -95,7 +96,6 @@ export const ShopCombinationRow = memo(function ShopCombinationRow(props: {
   const listMotion = reduceMotion ? REDUCED_LIST_MOTION : FULL_LIST_MOTION
   const pagerGestureRef = useMainTabPagerGestureRef()
   const source = getShopProductThumbnailSource(item.id)
-  const frame = getShopThumbnailLayout(getShopProductThumbnailBounds(item.id), 34, 34)
 
   const offset = useSharedValue(0)
   const rowOpacity = useSharedValue(1)
@@ -268,7 +268,7 @@ export const ShopCombinationRow = memo(function ShopCombinationRow(props: {
             }}
           >
             <View style={styles.combinationThumbnail}>
-              {source ? <ExpoImage source={source} contentFit="contain" cachePolicy="memory-disk" priority={selected ? "high" : "normal"} transition={0} style={frame ? { position: "absolute", ...frame } : { width: 34, height: 34 }} /> : <Ionicons name="shirt-outline" size={18} color={uiTheme.colors.primary} />}
+              {source ? <ExpoImage source={source} contentFit="contain" cachePolicy="memory-disk" priority={selected ? "high" : "normal"} transition={0} style={COMBINATION_THUMB_STYLE} /> : <Ionicons name="shirt-outline" size={18} color={uiTheme.colors.primary} />}
             </View>
             <View style={styles.combinationRowCopy}>
               <Text style={styles.combinationItemTitle} numberOfLines={1}>{title}</Text>

@@ -25,10 +25,6 @@ const {
   resolveAvatarStudioCategory
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./wardrobeCategoryModel") as typeof import("./wardrobeCategoryModel")
-const {
-  getWardrobeThumbnailPresentation
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
-} = require("./wardrobeThumbnailPresentation") as typeof import("./wardrobeThumbnailPresentation")
 
 test("wardrobe exposes both starter body bases after onboarding", () => {
   const bodyIds = getWardrobeCategoryItems(AVATAR_V2_CATALOG, "body").map(
@@ -143,57 +139,6 @@ test("switching body refits every incompatible starter slot as one loadout", () 
     shoesId: "avatar_v2_shoes_male_black_clean_sneakers",
     accessoryIds: []
   })
-})
-
-test("female wearable thumbnails use a full square frame instead of a cropped rig canvas", () => {
-  for (const type of ["top", "bottom", "shoes"] as const) {
-    assert.deepEqual(
-      getWardrobeThumbnailPresentation({
-        type,
-        isRigLayer: false,
-        isSquareAsset: true
-      }),
-      {
-        frame: "square",
-        scale: 1,
-        translateY: 0
-      },
-      `${type} thumbnails must show the complete square asset`
-    )
-  }
-})
-
-test("face feature thumbnails use a consistent head portrait crop", () => {
-  for (const type of ["face", "eyes", "nose", "mouth"] as const) {
-    assert.deepEqual(
-      getWardrobeThumbnailPresentation({
-        type,
-        isRigLayer: false,
-        isSquareAsset: true
-      }),
-      {
-        frame: "portrait",
-        scale: 1,
-        translateY: 0
-      },
-      `${type} previews must share the same head portrait framing`
-    )
-  }
-})
-
-test("canonical canvas fallbacks keep the legacy fit profile", () => {
-  assert.deepEqual(
-    getWardrobeThumbnailPresentation({
-      type: "top",
-      isRigLayer: false,
-      isSquareAsset: false
-    }),
-    {
-      frame: "legacy",
-      scale: 1,
-      translateY: 0
-    }
-  )
 })
 
 // New item kinds (WB integration/slots_2140 DESIGN §3, §9): one-piece dresses, glasses and accessories.

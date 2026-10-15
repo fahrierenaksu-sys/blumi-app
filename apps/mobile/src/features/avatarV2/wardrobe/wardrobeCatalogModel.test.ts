@@ -5,22 +5,13 @@ import { RETIRED_AVATAR_ITEM_IDS } from "@blumi/domain"
 import { runInNewContext } from "node:vm"
 import ts from "typescript"
 import { getShopThumbnailLayout } from "../../shop/shopThumbnailLayout"
-import { getWardrobeThumbnailPresentation } from "../wardrobeThumbnailPresentation"
 
-test("female and male previews centre visible pixels inside narrow and wide cards on first render", () => {
+test("default feature portraits centre their visible pixels inside narrow and wide cards on first render", () => {
   const cardSource = readFileSync(new URL("./WardrobeCatalogCard.tsx", import.meta.url), "utf8")
-  const boundsById = JSON.parse(readFileSync(new URL("../../shop/shopThumbnailBounds.json", import.meta.url), "utf8"))
   const samples = [
-    ["avatar_v2_hair_male_espresso_crop", "hair"],
-    ["avatar_v2_hair_male_cocoa_textured_quiff", "hair"],
-    ["avatar_v2_top_male_cream_basic_tee", "top"],
-    ["avatar_v2_bottom_male_navy_straight_pants", "bottom"],
-    ["avatar_v2_shoes_male_cloud_white_trainers", "shoes"],
-    ["avatar_v2_hair_ink_pageboy_star", "hair"],
     ["avatar_v2_eyes_mocha_doe", "eyes"],
     ["avatar_v2_nose_soft_button", "nose"],
-    ["avatar_v2_mouth_peach_whisper_smile", "mouth"],
-    ["avatar_v2_face_warm_peach_foundation", "face"]
+    ["avatar_v2_mouth_peach_whisper_smile", "mouth"]
   ]
   const jsx = (type: unknown, props: any) => ({ type, props })
   const flatten = (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean))
@@ -32,20 +23,11 @@ test("female and male previews centre visible pixels inside narrow and wide card
     require: () => ({
       jsx, jsxs: jsx, memo: (component: unknown) => component,
       Image: "Image", View: "View", Pressable: "Pressable", Text: "Text",
-      getShopProductThumbnailBounds: (id: string) => boundsById[id],
-      getShopThumbnailLayout, getWardrobeThumbnailPresentation,
-      getGarmentThumbnailOverride: () => undefined,
-      getStarterLayerThumbnail: () => undefined,
-      getAvatarItemPreviewImageStyle: () => ({ width: 100, height: 100 }),
-      getMaleRigLayerThumbnailPresentation: () => ({ top: 44.5, scale: 3.2 }),
-      MALE_CAPSULE_PREVIEW_SOURCES: Object.fromEntries(samples.filter(([id]) => id.includes("_male_")).map(([id]) => [id, 1])),
-      WARDROBE_SQUARE_THUMBNAIL_SOURCES: {},
-      isAvatarItemCutoutPreview: () => false,
+      getShopThumbnailLayout, getAvatarItemPreviewBounds, isAvatarItemCutoutPreview,
       getAvatarAutomationSlug: (id: string) => id,
-      WARDROBE_ART_ASPECT: 0.82, WARDROBE_THUMB_BOX: { width: 100, height: 68 },
+      WARDROBE_ART_ASPECT: 0.82,
       CATEGORY_ICONS: {}, wardrobeTheme: {},
       wardrobeV2Styles: {
-        itemPreviewRigLayer: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%" },
         itemPreviewFeaturePortrait: { position: "absolute", top: 0, width: 116, height: 116 },
         itemPreviewSquare: { width: "100%", height: "100%" }
       }
@@ -53,8 +35,10 @@ test("female and male previews centre visible pixels inside narrow and wide card
   })
   for (const width of [80, 110, 145]) {
     for (const [id, type] of samples) {
+      const bounds = getAvatarItemPreviewBounds({ id })
+      assert.ok(bounds, `${id} has measured bounds`)
       const tree = module.exports.WardrobeCatalogCard({
-        item: { id, type, name: type }, name: type, width, previewSource: 1,
+        item: { id, type, name: type }, name: type, width, previewSource: getAvatarItemPreviewSource({ id }),
         equipped: false, locked: false, previewing: false
       })
       const box = tree.props.children[0].props.children[0]
@@ -64,7 +48,7 @@ test("female and male previews centre visible pixels inside narrow and wide card
       assert.equal(image.transform, undefined, `${id} must not apply a second scale/offset`)
       assert.ok(viewport.width <= width - 3)
       assert.ok(viewport.height <= Math.round(width * 0.82) - 3)
-      const [canvasWidth, , x, y, visibleWidth, visibleHeight] = boundsById[id]
+      const [canvasWidth, , x, y, visibleWidth, visibleHeight] = bounds
       const scale = image.width / canvasWidth
       const left = image.left + x * scale
       const top = image.top + y * scale
@@ -94,7 +78,6 @@ const {
 const {
   buildWardrobeCards,
   buildWardrobeShopLink,
-  getStarterLayerThumbnail,
   getWardrobeActiveItems,
   isAvatarItemRoomPreviewSupported
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
@@ -105,7 +88,7 @@ const {
 } = require("./wardrobeCopy") as typeof import("./wardrobeCopy")
 
 const copy = AVATAR_STUDIO_COPY.en
-const { getAvatarItemPreviewSource, isAvatarItemCutoutPreview
+const { getAvatarItemPreviewBounds, getAvatarItemPreviewSource, isAvatarItemCutoutPreview
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 } = require("./wardrobePreviewSources") as typeof import("./wardrobePreviewSources")
 const { getAvatarItemDisplayName
@@ -211,17 +194,6 @@ test("body cards read as base switches", () => {
   }
 })
 
-test("starter garments previewed from their room layer are fitted by measured bounds", () => {
-  for (const id of ["avatar_v2_top_default", "avatar_v2_bottom_default"]) {
-    const fit = getStarterLayerThumbnail(id)
-    assert.ok(fit, id)
-    assert.equal(fit.bounds.length, 6)
-    assert.deepEqual(fit.bounds.slice(0, 2), [256, 384])
-    assert.ok(fit.box.width <= 100 && fit.box.height <= 68, "fits the card art box")
-  }
-  assert.equal(getStarterLayerThumbnail("avatar_v2_hair_mocha_ribbon_blowout"), undefined)
-})
-
 test("locked items the Shop sells stay visible after the owned ones (owner decision, MICRO-3)", () => {
   const owned = new Set(
     AVATAR_V2_CATALOG.filter((item) => item.ownedByDefault === true).map((item) => item.id)
@@ -323,17 +295,9 @@ function renderCardWithLivePreview(item: (typeof AVATAR_V2_CATALOG)[number], wid
     require: () => ({
       jsx, jsxs: jsx, memo: (component: unknown) => component,
       Image: "Image", View: "View", Pressable: "Pressable", Text: "Text",
-      getShopProductThumbnailBounds: () => undefined,
-      getShopThumbnailLayout, getWardrobeThumbnailPresentation,
-      getGarmentThumbnailOverride: () => undefined,
-      getStarterLayerThumbnail: () => undefined,
-      getAvatarItemPreviewImageStyle: () => ({ width: 196, height: 294, transform: [{ translateY: -130 }] }),
-      getMaleRigLayerThumbnailPresentation: () => undefined,
-      MALE_CAPSULE_PREVIEW_SOURCES: {},
-      WARDROBE_SQUARE_THUMBNAIL_SOURCES: {},
-      isAvatarItemCutoutPreview,
+      getShopThumbnailLayout, getAvatarItemPreviewBounds, isAvatarItemCutoutPreview,
       getAvatarAutomationSlug: (id: string) => id,
-      WARDROBE_ART_ASPECT: 0.82, WARDROBE_THUMB_BOX: { width: 100, height: 68 },
+      WARDROBE_ART_ASPECT: 0.82,
       CATEGORY_ICONS: {}, wardrobeTheme: {},
       wardrobeV2Styles: { itemThumbBox: {}, itemPreviewSquare: { width: "100%", height: "100%" } }
     })

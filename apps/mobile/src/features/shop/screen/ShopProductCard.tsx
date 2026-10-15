@@ -8,23 +8,16 @@ import {
   Text,
   View
 } from "react-native"
-import { getMaleRigLayerThumbnailPresentation } from "../../avatarV2/maleRigThumbnailPresentation"
 import { getAvatarAutomationSlug } from "../../avatarV2/qa/avatarQaInventory"
 import type { AppLocale } from "../../session/appLocale"
 import { PressableScale } from "../../../ui/PressableScale"
 import { useScrollSafePress } from "../../../ui/MainTabPagerGestureOwnership"
 import { uiTheme } from "../../../ui/theme"
-import {
-  getAvatarItemPreviewSource,
-  getShopProductThumbnailBounds,
-  getShopProductThumbnailSource,
-  RIG_LAYER_THUMBNAIL_ITEM_IDS
-} from "../shopAssets"
+import { getAvatarItemPreviewSource, getShopProductThumbnailSource } from "../shopAssets"
 import type { ShopCatalogItem } from "../shopCatalog"
 import { getShopCopy } from "../shopCopy"
 import { formatCoins } from "../shopFormatters"
 import { getShopProductPresentation } from "../shopProductPresentation"
-import { getShopThumbnailLayout } from "../shopThumbnailLayout"
 import type { ShopCardRemoveAction } from "../shopCardRemoveModel"
 import { ShopCardRemoveButton } from "./ShopCardRemoveButton"
 import { ShopCardSelectionRing, ShopCardViewingBadge } from "./ShopCardSelection"
@@ -92,9 +85,6 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
     ? getShopProductThumbnailSource(product.sourceItemId)
       ?? getAvatarItemPreviewSource(product.avatarItem)
     : undefined
-  const isRigLayerSource = product.avatarItem
-    ? RIG_LAYER_THUMBNAIL_ITEM_IDS.has(product.sourceItemId)
-    : false
   const roomPreviewSource = product.roomItem
     ? product.roomItem.asset.source
     : undefined
@@ -142,9 +132,6 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
             item={product.avatarItem}
             source={avatarPreviewSource}
             selected={selected}
-            isRigLayerSource={isRigLayerSource}
-            width={cardWidth - cardPadding * 2 - 2}
-            height={thumbHeight}
           />
         ) : product.roomItem ? (
           <ExpoImage
@@ -192,13 +179,8 @@ function AvatarProductThumbnail(props: {
   item: NonNullable<ShopCatalogItem["avatarItem"]>
   source: ImageSourcePropType | undefined
   selected: boolean
-  isRigLayerSource: boolean
-  width: number
-  height: number
 }) {
-  const { item, source, selected, isRigLayerSource, width, height } = props
-  const bounds = getShopProductThumbnailBounds(item.id)
-  const visibleLayout = getShopThumbnailLayout(bounds, width, height)
+  const { item, source, selected } = props
   if (!source) {
     return (
       <View
@@ -216,10 +198,6 @@ function AvatarProductThumbnail(props: {
     )
   }
 
-  const rigLayerPresentation = isRigLayerSource
-    ? getMaleRigLayerThumbnailPresentation(item.type, "shop")
-    : undefined
-
   return (
     <View style={StyleSheet.absoluteFill}>
       <ExpoImage
@@ -227,17 +205,7 @@ function AvatarProductThumbnail(props: {
         contentFit="contain"
         cachePolicy="memory-disk"
         transition={0}
-        style={[
-          isRigLayerSource
-            ? styles.productWearableRigLayer
-            : styles.productWearableImage,
-          visibleLayout ? { position: "absolute", ...visibleLayout } : rigLayerPresentation
-            ? {
-                top: rigLayerPresentation.top,
-                transform: [{ scale: rigLayerPresentation.scale }]
-              }
-            : null
-        ]}
+        style={styles.productWearableImage}
       />
     </View>
   )
