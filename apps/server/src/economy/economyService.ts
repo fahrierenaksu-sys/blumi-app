@@ -24,6 +24,7 @@ import {
   type EconomyRepository
 } from "./economyRepository"
 import { PublicRequestError } from "../errors/publicRequestError"
+import { createLegacyFreeWardrobeGrant, type AccountCreatedAtLookup } from "./legacyFreeWardrobeGrant"
 
 export interface EconomyService {
   repository: EconomyRepository
@@ -87,6 +88,11 @@ export interface CreateEconomyServiceOptions {
   catalog?: readonly EconomyCatalogItem[]
   /** Avatar item facts (retired items, body fit). Defaults to the live catalog; tests pass the fixture rules. */
   avatarRules?: AvatarItemRules
+  /**
+   * When an account was created. With it, accounts created before the R1 price launch keep the pieces that used to be
+   * free (`legacyFreeWardrobeGrant.ts`); without it nobody gets them free.
+   */
+  getAccountCreatedAt?: AccountCreatedAtLookup
 }
 
 export function createEconomyService(
@@ -98,17 +104,21 @@ export function createEconomyService(
   const isActiveRoomItemId = isActiveRoomItemIdIn(catalog)
   const project = (inventory: EconomyInventoryRecord) =>
     projectInventoryRoomItems(inventory, isActiveRoomItemId)
+  const legacyFreeWardrobeFor = createLegacyFreeWardrobeGrant({
+    catalog,
+    getAccountCreatedAt: options.getAccountCreatedAt
+  })
 
   return {
     repository,
     isActiveRoomItemId,
     async getInventory(userId, now = new Date()) {
       const existing = await repository.getInventory(userId)
+      const ownedAvatarItemIds = existing?.ownedAvatarItemIds ?? []
       const requiredAvatarItemIds = [
         ...getDefaultOwnedItemIds("avatar", catalog),
-        ...getLegacyAvatarReplacementIds(
-          existing?.ownedAvatarItemIds ?? []
-        )
+        ...getLegacyAvatarReplacementIds(ownedAvatarItemIds),
+        ...(await legacyFreeWardrobeFor(userId, ownedAvatarItemIds))
       ]
       // a retired default (the old free bed) is no longer granted; rows that hold it are read past
       const requiredRoomItemIds = getDefaultOwnedItemIds("room", catalog).filter(isActiveRoomItemId)

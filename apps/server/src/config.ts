@@ -655,7 +655,8 @@ export function createConfiguredServerServices(
       blockPolicy: safetyService
     })
     const economyService = createEconomyService({
-      repository: createPostgresEconomyRepository(pool)
+      repository: createPostgresEconomyRepository(pool),
+      getAccountCreatedAt: async (userId) => (await authService.repository.findAccountByUserId(userId))?.createdAt ?? null
     })
     const commerceService = createCommerceService({ economyService })
     const roomSnapshotService = createRoomSnapshotService({
@@ -803,7 +804,10 @@ export function createConfiguredServerServices(
   if (qaRoomGrantCatalog) {
     console.warn("QA room grant is ON: held furniture is owned by every account on this memory server.")
   }
-  const economyService = createEconomyService({ catalog: qaRoomGrantCatalog })
+  const economyService = createEconomyService({
+    catalog: qaRoomGrantCatalog,
+    getAccountCreatedAt: async (userId) => (await authService.repository.findAccountByUserId(userId))?.createdAt ?? null
+  })
   const commerceService = createCommerceService({ economyService })
   const roomSnapshotService = createRoomSnapshotService({
     isPublicByDefault: false,

@@ -181,7 +181,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     blockPolicy: safetyService,
     profileSource: (userIds) => authService.repository.findAccountsByUserIds(userIds)
   })
-  const economyService = options.economyService ?? createEconomyService()
+  const economyService = options.economyService ?? createEconomyService({
+    getAccountCreatedAt: async (userId) => (await authService.repository.findAccountByUserId(userId))?.createdAt ?? null
+  })
   const commerceService = options.commerceService ?? createCommerceService({
     economyService
   })
