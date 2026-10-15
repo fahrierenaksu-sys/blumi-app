@@ -113,3 +113,17 @@ test("the reserved primary action grows with the user's text size instead of cli
   }
   assert.ok(heights[3] >= 24 * 3.1 * 2, "the largest accessibility size reserves two full label lines")
 })
+
+test("at the largest text size the reserved action fits every line its label wraps to", () => {
+  const largest = 3.1
+  for (const width of [320, 375, 390]) {
+    for (const primaryActionLabel of ["Karakterimi hazırlayalım", "Let’s make my character"]) {
+      const { primaryActionHeight } = getSetupLayoutMetrics({ width, height: 844, fontScale: largest, primaryActionLabel })
+      assert.ok(primaryActionHeight >= 24 * largest * 3, `${width} pt, "${primaryActionLabel}": ${primaryActionHeight} pt holds three label lines`)
+    }
+  }
+  const short = getSetupLayoutMetrics({ width: 390, height: 844, fontScale: largest, primaryActionLabel: "Devam et" })
+  const long = getSetupLayoutMetrics({ width: 390, height: 844, fontScale: largest, primaryActionLabel: "Karakterimi hazırlayalım" })
+  assert.ok(short.primaryActionHeight < long.primaryActionHeight, "a short label does not reserve room for lines it never uses")
+  assert.equal(getSetupLayoutMetrics({ width: 390, height: 844, fontScale: 1, primaryActionLabel: "Karakterimi hazırlayalım" }).primaryActionHeight, 58)
+})
