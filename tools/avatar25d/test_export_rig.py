@@ -337,21 +337,34 @@ class SharedBodyDrawingTest(unittest.TestCase):
     """An item's identical body drawings (the trousers' torso fitted to each crop top) are packed once and shared."""
 
     def test_identical_pair_drawings_of_one_item_share_their_page_rect(self):
+        # pair drawings with the same pixels are packed once (one rect); a pair whose drawing really differs (the
+        # corset's arm band beside the trousers) keeps a rect of its own
+        import hashlib
+        import numpy as np
+        from PIL import Image
         rig = json.loads((APP_RIG / 'girl/rig25.json').read_text())
         shared = 0
         for view in rig['views'].values():
             for item in view['items'].values():
                 m = item['mesh']
-                uvs = {}
+                with Image.open(APP_RIG / 'girl' / view['pages'][item['page']]) as im:
+                    page = np.asarray(im.convert('RGBA'))
+                H, W = page.shape[:2]
+                by_part = {}
                 for r in m['ranges']:
                     if 'bodyWith' not in r:
                         continue
                     verts = list(dict.fromkeys(m['index'][r['start']:r['start'] + r['count']]))
-                    uvs.setdefault(r['bodyPart'], []).append(tuple(m['uv'][i * 2 + k] for i in verts for k in (0, 1)))
-                for part, sets in uvs.items():
-                    if len(sets) > 1:
-                        self.assertEqual(len(set(sets)), 1, part)
-                        shared += 1
+                    uv = tuple(m['uv'][i * 2 + k] for i in verts for k in (0, 1))
+                    xs, ys = [u * W for u in uv[0::2]], [v * H for v in uv[1::2]]
+                    crop = page[int(min(ys)):int(np.ceil(max(ys))), int(min(xs)):int(np.ceil(max(xs)))]
+                    pixels = hashlib.sha256(crop.tobytes() + str(crop.shape).encode()).hexdigest()
+                    by_part.setdefault(r['bodyPart'], {}).setdefault(pixels, set()).add(uv)
+                for part, drawings in by_part.items():
+                    for rects in drawings.values():
+                        self.assertEqual(len(rects), 1, f'{part}: identical drawings packed twice')
+                    # more pair ranges than distinct drawings: two partners share one packed drawing
+                    shared += sum(1 for r in m['ranges'] if r.get('bodyPart') == part and 'bodyWith' in r) > len(drawings)
         self.assertGreater(shared, 0, 'the girl rig has pair drawings shared by two partners')
 
 
