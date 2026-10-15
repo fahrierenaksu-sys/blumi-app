@@ -2,7 +2,16 @@
 
 **Current verdict: not ready for public release.** The Operations Center is a read-only view of this evidence snapshot, not live provider telemetry or a production admin console. External systems remain unverified until connected. Follow the [reusable release-captain workflow](./RELEASE_CAPTAIN_WORKFLOW.md); detailed infrastructure steps and evidence live in [`railway-supabase-launch.md`](./railway-supabase-launch.md).
 
-Snapshot: 2026-10-10. The OTP security update below is current for 2026-10-10; the other At a glance rows retain their own dated evidence. Recheck volatile statuses before acting.
+Snapshot: 2026-10-15. The 2026-10-15 update below is the newest status; the OTP security update is current for 2026-10-10 and the At a glance rows retain their own dated evidence. Recheck volatile statuses before acting.
+
+## Update — 2026-10-15: release branch, live build and open gates
+
+- **Tested:** latest verified commit is `452bddf7` on `release/2.5d-beta-4`. This status covers source checks only.
+- **External verified:** live TestFlight build 20 is `fc35013a`. The release audit fix branches (`fix/release-audit` and its sub-branches) are pending merge; nothing from them is live.
+- **Open (re-check before 2026-10-28):** the security exceptions for `braces` and `node-forge` were renewed to 2026-10-28. Look for an official fix or patch before that date and do not extend them only to stay green.
+- **Open:** the backup gate. The GitHub database backup job is a no-op (dump, encrypt and upload are skipped); the owner has set it aside. It is not proof of a backup, and no restore proof exists from it.
+- **Open:** native checks on a device or Simulator for this release.
+- **Implemented:** the TestFlight workflows now require a successful `Verify` run for the exact commit (the full `npm run verify`, including PostgreSQL, rig and Expo Doctor) before they build. The owner must add the read-only EAS secret `GITHUB_VERIFY_TOKEN` first; see `scripts/security/require-verify-run.mjs`.
 
 ## Update — 2026-10-11: avatar 2.5D integration, Phase 2 (room) closed
 
