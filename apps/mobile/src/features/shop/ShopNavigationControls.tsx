@@ -12,6 +12,7 @@ import { getShopStatusContent, type ShopPresentationState } from "./shopPresenta
 import type { AppLocale } from "../session/appLocale"
 import { getShopCopy } from "./shopCopy"
 import { animateTo, useMotion } from "../../ui/motion"
+import { useAccessibilityAnnouncement } from "../../ui/accessibilityAnnouncement"
 import { uiTheme } from "../../ui/theme"
 
 export type ShopMode = "avatar" | "home"
@@ -36,6 +37,7 @@ export function ShopStatusCard(props: {
   locale: AppLocale
 }) {
   const details = getShopStatusContent({ state: props.state, mode: props.mode, locale: props.locale })
+  useAccessibilityAnnouncement(`${details.title}. ${details.body}`)
   const action = details.action
   const isRetry = action?.kind === "retry"
   const isDisabled = isRetry && props.isRetrying

@@ -10,6 +10,7 @@ import Animated, {
   withSequence,
   withTiming
 } from "react-native-reanimated"
+import { useAccessibilityAnnouncement } from "../../ui/accessibilityAnnouncement"
 import { uiTheme } from "../../ui/theme"
 import {
   INBOX_SKELETON_FADE_MS,
@@ -44,6 +45,7 @@ const SKELETON_EXITING = FadeOut
  */
 export function InboxLoadingSkeleton(props: InboxLoadingSkeletonProps) {
   const { isVisible, label, reduceMotion, rowHeight, rowGap } = props
+  useAccessibilityAnnouncement(isVisible ? label : null)
   const pulse = useSharedValue(1)
 
   useEffect(() => {

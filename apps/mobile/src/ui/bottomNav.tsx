@@ -29,7 +29,7 @@ import { mainTabPagerIndicator } from "./mainTabPagerIndicator"
 import { usePublishToastBottomBarInset } from "./usePublishToastBottomBarInset"
 import { uiTheme } from "./theme"
 import { hapticSelection } from "./haptics"
-import { getAppNavigationCopy } from "../features/session/appNavigationCopy"
+import { getAppNavigationCopy, getBottomNavTabAccessibilityLabel } from "../features/session/appNavigationCopy"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
 import {
@@ -169,6 +169,7 @@ interface NavTabProps {
   indicator: SharedValue<number>
   isCurrent: boolean
   badgeCount: number | null
+  accessibilityLabel: string
   /** Stable across renders; called with this tab's key. */
   onPress: (key: BottomNavKey) => void
   ambient: boolean
@@ -184,6 +185,7 @@ const NavTab = memo(function NavTab(props: NavTabProps) {
     indicator,
     isCurrent,
     badgeCount,
+    accessibilityLabel,
     onPress,
     ambient,
     reduceMotion,
@@ -209,7 +211,7 @@ const NavTab = memo(function NavTab(props: NavTabProps) {
           selection haptic. */}
       <PressableScale
         accessibilityRole="tab"
-        accessibilityLabel={item.label}
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ selected: isCurrent }}
         style={[
           styles.bottomNavItem,
@@ -362,6 +364,7 @@ export function BottomNav(props: BottomNavProps) {
             indicator={indicator}
             isCurrent={isCurrent}
             badgeCount={item.key === "chats" ? chatCount : null}
+            accessibilityLabel={getBottomNavTabAccessibilityLabel(copy, item.label, item.key === "chats" ? chatCount : null)}
             onPress={handleTabPress}
             ambient={ambient}
             reduceMotion={reduceMotion}
