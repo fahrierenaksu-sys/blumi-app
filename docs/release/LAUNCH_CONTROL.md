@@ -6,7 +6,9 @@ Snapshot: 2026-10-15. The 2026-10-15 update below is the newest status; the OTP 
 
 ## Update — 2026-10-15: release branch, live build and open gates
 
-- **Tested:** latest verified commit is `452bddf7` on `release/2.5d-beta-4`. This status covers source checks only.
+- **Tested:** the 2026-10-14 release audit verified `fc35013a` (TestFlight build 20), including the isolated PostgreSQL gate (435/435 tests in 63 suites).
+- **Tested:** `452bddf7` (`release/2.5d-beta-4`) and the release audit fix branches have targeted tests and isolated PostgreSQL gate runs only; no full `npm run verify` or GitHub `Verify` run is recorded for them.
+- **Open:** a full `npm run verify` on the merged release candidate.
 - **External verified:** live TestFlight build 20 is `fc35013a`. The release audit fix branches (`fix/release-audit` and its sub-branches) are pending merge; nothing from them is live.
 - **Open (re-check before 2026-10-28):** the security exceptions for `braces` and `node-forge` were renewed to 2026-10-28. Look for an official fix or patch before that date and do not extend them only to stay green.
 - **Open:** the backup gate. The GitHub database backup job is a no-op (dump, encrypt and upload are skipped); the owner has set it aside. It is not proof of a backup, and no restore proof exists from it.
