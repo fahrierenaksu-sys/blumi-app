@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "bdfc2e15f95601f467a281985df75565bb62c3f78ff131bd1ea2f5c9c8dc6e7b",
+      "rigSha256": "ed6e2b2541303497106f29dae188e0739751e4f040eb6f7004c033db89f89a6a",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -845,7 +845,7 @@
             "rect": [
               220,
               257,
-              185,
+              175,
               344
             ],
             "bodyPart": "torso"
@@ -859,7 +859,7 @@
             "rect": [
               220,
               257,
-              185,
+              175,
               344
             ],
             "bodyPart": "torso",
@@ -874,7 +874,7 @@
             "rect": [
               220,
               257,
-              185,
+              175,
               344
             ],
             "bodyPart": "torso",
