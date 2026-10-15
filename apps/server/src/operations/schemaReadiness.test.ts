@@ -42,7 +42,9 @@ test("only independently guarded additive features are optional for readiness", 
     // An index: no query depends on it for its result.
     "074_notification_retention_index.sql",
     // The chat repository's own ledger probe keeps 071's time-only hide rule until it is applied.
-    "075_chat_hide_point_message.sql"
+    "075_chat_hide_point_message.sql",
+    // Only the beta reset script uses it, and that script refuses to apply without it.
+    "076_beta_reset_runs.sql"
   ])
 })
 

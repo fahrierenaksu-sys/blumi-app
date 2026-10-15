@@ -2,13 +2,15 @@ import { spawnSync } from "node:child_process"
 import { resolve } from "node:path"
 import { Pool } from "pg"
 import { applyBetaReset, planBetaReset, type BetaResetContext, type BetaResetPlan, type BetaResetSource } from "./betaReset"
+import { countBetaResetRuns, parseRepeatReason, REPEAT_REASON_FLAG } from "./betaResetRuns"
 import { assertStarterMatchesSource, describeBetaResetStarter, readBetaResetStarter } from "./betaResetStarter"
 
 /**
  * Operator entry for the beta reset (`apps/server/scripts/betaReset.ts`). Dry run is the default and runs READ ONLY.
  * `--apply` (alias `--execute`) needs the dry run's `--expect <hash>` and `--fingerprint <fp>`, the live server's
  * `--deployed-commit <sha>` (from /health), plus BLUMI_BETA_RESET_CONFIRM=reset-beta-<project-ref> typed by the
- * operator. Output is counts, catalog item IDs and commit SHAs only.
+ * operator. Output is counts, catalog item IDs and commit SHAs only. A database that recorded a reset (migration 076)
+ * applies again only with `--repeat-reason "<why>"`, which is recorded with the run.
  */
 
 const REPOSITORY_ROOT = resolve(__dirname, "../../../..")
@@ -29,7 +31,9 @@ export interface BetaResetArgs {
 }
 
 export function parseBetaResetArgs(argv: readonly string[]): BetaResetArgs {
-  const known = new Set(["--project-ref", "--apply", "--execute", "--expect", "--fingerprint", "--deployed-commit"])
+  const known = new Set([
+    "--project-ref", "--apply", "--execute", "--expect", "--fingerprint", "--deployed-commit", REPEAT_REASON_FLAG
+  ])
   const unknown = argv.filter((arg) => arg.startsWith("--") && !known.has(arg))
   if (unknown.length > 0) throw new Error(`Unknown option ${unknown[0]}; reset refused.`)
   const valueOf = (flag: string): string | null => {
@@ -95,6 +99,7 @@ export async function runBetaResetCli(
   write: (line: string) => void
 ): Promise<void> {
   const args = parseBetaResetArgs(argv)
+  const repeatReason = parseRepeatReason(argv, args.apply)
   const connectionString = assertDatabaseMatchesProjectRef(environment.DATABASE_URL, args.projectRef)
   if (args.apply) assertTypedConfirmation(environment, args.projectRef)
   const { fullCommit, ...source } = readBetaResetSource()
@@ -111,12 +116,16 @@ export async function runBetaResetCli(
       await client.query("SET LOCAL statement_timeout = '120s'")
       if (!args.apply) {
         const plan = await planBetaReset(client, context)
+        const previousResets = await countBetaResetRuns(client)
         await client.query("ROLLBACK")
         writePlan(write, "dry-run", plan, context)
+        write(previousResets === null
+          ? "previous-resets=unknown (migration 076 is not applied: apply refuses)"
+          : `previous-resets=${previousResets}${previousResets > 0 ? ` (apply needs ${REPEAT_REASON_FLAG}: STOP)` : ""}`)
         return
       }
       const { before, after } = await applyBetaReset(client, context,
-        { hash: args.expectHash!, fingerprint: args.fingerprint! })
+        { hash: args.expectHash!, fingerprint: args.fingerprint!, repeatReason })
       await client.query("COMMIT")
       writePlan(write, "applied", before, context)
       write(JSON.stringify({ mode: "post-check", counts: after.counts }))
