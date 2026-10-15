@@ -242,7 +242,7 @@ export function usePhoneChange(input: {
     }
   }, [copy, currentPhoneConfirmationToken, isChangingPhone, locale, newPhoneAnalysis.normalizedPhoneNumber, reauthHold, sessionActor])
 
-  const applyFinalisingFailure = (
+  const applyFinalisingFailure = useCallback((
     resolution: Exclude<FinalisingFailure, "check_outcome">,
     error: unknown
   ) => {
@@ -262,7 +262,7 @@ export function usePhoneChange(input: {
       body: getSettingsActionErrorMessageForDisplay("confirmPhoneChange", error, locale),
       type: "warning"
     })
-  }
+  }, [copy, currentPhoneConfirmationToken, locale, resetPhoneChangeFlow])
 
   const verifyNewPhoneChangeCode = useCallback(async () => {
     if (
@@ -365,6 +365,7 @@ export function usePhoneChange(input: {
       setIsChangingPhone(false)
     }
   }, [
+    applyFinalisingFailure,
     bindSessionReset,
     copy,
     currentPhoneConfirmationToken,
