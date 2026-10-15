@@ -36,6 +36,8 @@ export interface JsxContrastScan {
   readonly skippedForeground: number
   /** Elements whose text colour is known but whose surface is not (props, gradients, images, custom components, the page). */
   readonly skippedBackground: number
+  /** Style expressions with more variants than MAX_VARIANTS; the extra variants were not judged, so a guard must treat any as a failure. */
+  readonly truncatedStyles: number
 }
 
 const DYNAMIC = "dynamic"
@@ -50,13 +52,20 @@ interface Background { readonly value: string; readonly choices: Choices }
 const TEXT_TAG = /(^|\.)(Text|AnimatedText|TextInput)$/
 const ICON_TAG = /^(Ionicons|MaterialIcons|MaterialCommunityIcons|Feather|FontAwesome5?|AntDesign|Entypo)$/
 const CONTAINER_TAG = /^(View|Animated\.View|Pressable|PressableScale|TouchableOpacity|SafeAreaView|ScrollView|Text|Animated\.Text|AnimatedText)$/
-const MAX_VARIANTS = 16
+/**
+ * Bound on the style variants judged for one expression, so a pathological
+ * one (n independent conditionals make 2^n variants) cannot stall the scan.
+ * Hitting it is never silent: the scan reports `truncatedStyles`.
+ */
+const MAX_VARIANTS = 256
 const UNKNOWN_STYLE: StyleColors = { color: DYNAMIC, backgroundColor: DYNAMIC }
 
 interface FileContext {
   readonly tables: ThemeTables
   readonly constants: ReadonlyMap<string, string>
   readonly sheets: ReadonlyMap<string, ReadonlyMap<string, StyleColors>>
+  /** Start offsets of the style expressions whose variants were cut at MAX_VARIANTS (filled while scanning). */
+  readonly truncated: Set<number>
 }
 
 const unwrap = (node: ts.Expression): ts.Expression =>
@@ -117,11 +126,13 @@ function merge(base: StyleColors, next: StyleColors): StyleColors | undefined {
   return { color: next.color ?? base.color, backgroundColor: next.backgroundColor ?? base.backgroundColor, choices }
 }
 
-function crossMerge(lists: readonly (readonly StyleColors[])[]): StyleColors[] {
-  return lists.reduce<StyleColors[]>(
-    (merged, variants) => defined(merged.flatMap((base) => variants.map((next) => merge(base, next)))).slice(0, MAX_VARIANTS),
-    [{}]
-  )
+function crossMerge(lists: readonly (readonly StyleColors[])[], node: ts.Node, context: FileContext): StyleColors[] {
+  return lists.reduce<StyleColors[]>((merged, variants) => {
+    const all = defined(merged.flatMap((base) => variants.map((next) => merge(base, next))))
+    if (all.length <= MAX_VARIANTS) return all
+    context.truncated.add(node.getStart())
+    return all.slice(0, MAX_VARIANTS)
+  }, [{}])
 }
 
 /** Every style the expression can produce, as colour-only variants. */
@@ -129,7 +140,7 @@ function styleVariants(node: ts.Expression, context: FileContext): StyleColors[]
   const expression = unwrap(node)
   if (ts.isObjectLiteralExpression(expression)) return [readObjectStyle(expression, context)]
   if (ts.isArrayLiteralExpression(expression)) {
-    return crossMerge(expression.elements.map((element) => styleVariants(element as ts.Expression, context)))
+    return crossMerge(expression.elements.map((element) => styleVariants(element as ts.Expression, context)), expression, context)
   }
   if (ts.isConditionalExpression(expression)) {
     const condition = expression.condition.getText()
@@ -163,7 +174,7 @@ function styleVariants(node: ts.Expression, context: FileContext): StyleColors[]
 function readFileContext(source: ts.SourceFile, tables: ThemeTables): FileContext {
   const constants = new Map<string, string>()
   const sheets = new Map<string, Map<string, StyleColors>>()
-  const base: FileContext = { tables, constants, sheets }
+  const base: FileContext = { tables, constants, sheets, truncated: new Set() }
   for (const statement of source.statements) {
     if (!ts.isVariableStatement(statement)) continue
     for (const declaration of statement.declarationList.declarations) {
@@ -292,5 +303,5 @@ export function findJsxContrastPairs(
     ts.forEachChild(node, visit)
   }
   visit(source)
-  return { pairs, checkedElements, skippedForeground, skippedBackground }
+  return { pairs, checkedElements, skippedForeground, skippedBackground, truncatedStyles: context.truncated.size }
 }

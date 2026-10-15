@@ -74,17 +74,42 @@ test("colours that are props, functions or transparent are skipped and counted, 
   assert.equal(scanned.skippedForeground, 2)
 })
 
+test("a style with many conditional variants is judged in full, so a low-contrast last variant is found", () => {
+  // Five conditionals make 32 style variants; the white-on-pink ones come last in generation order.
+  const { pairs, truncatedStyles } = scan(`
+    const styles = StyleSheet.create({ dark: { backgroundColor: "#2B202A" }, pink: { backgroundColor: "#F65C9D" } })
+    const A = ({ a, b, c, d, e }) => (
+      <View style={[styles.dark, a && styles.pink, b && styles.dark, c && styles.dark, d && styles.dark, e && styles.dark]}>
+        <Text style={{ color: "#FFFFFF" }}>Go</Text>
+      </View>)`)
+  assert.equal(truncatedStyles, 0)
+  assert.ok(pairs.some((pair) => pair.background === "#F65C9D" && pair.ratio < pair.minimum))
+})
+
+test("a style with more variants than the scan's bound is reported as truncated, never silently dropped", () => {
+  const flags = Array.from({ length: 10 }, (_, index) => `f${index}`)
+  const { truncatedStyles } = scan(`
+    const styles = StyleSheet.create({ base: { backgroundColor: "#FFFFFF" } })
+    const A = ({ ${flags.join(", ")} }) => (
+      <View style={[${flags.map((flag) => `${flag} && styles.base`).join(", ")}]}>
+        <Text style={{ color: "#FFFFFF" }}>Go</Text>
+      </View>)`)
+  assert.equal(truncatedStyles, 1)
+})
+
 test("every literal or token colour drawn in JSX on a known surface is readable", () => {
   const paths = listSources(SRC_ROOT)
   let checkedElements = 0
   let skippedForeground = 0
   let skippedBackground = 0
+  const truncated: string[] = []
   const failures = paths.flatMap((path) => {
     const file = relative(SRC_ROOT, path)
     const result = scan(readFileSync(path, "utf8"), file)
     checkedElements += result.checkedElements
     skippedForeground += result.skippedForeground
     skippedBackground += result.skippedBackground
+    if (result.truncatedStyles > 0) truncated.push(`${file}: ${result.truncatedStyles} style expression(s) cut at the variant bound, so some variants were not judged`)
     return result.pairs
       .filter((pair) => pair.ratio < pair.minimum && !EXEMPTIONS[`${file}#${pair.tag}#${pair.foreground.slice(1)}@${pair.background.slice(1)}`])
       .map((pair) => `${file}:${pair.line} ${pair.tag} ${pair.foreground} on ${pair.background} = ${pair.ratio.toFixed(2)}:1 (needs ${pair.minimum})`)
@@ -92,5 +117,6 @@ test("every literal or token colour drawn in JSX on a known surface is readable"
   console.log(`jsx contrast: ${paths.length} files scanned, ${checkedElements} elements checked, skipped ${skippedForeground} with an unknown text colour and ${skippedBackground} with an unknown surface`)
   assert.ok(paths.length > 0, "the guard found no source files, so it checked nothing")
   assert.ok(checkedElements > 0, "the guard checked no JSX element, so its discovery is broken")
+  assert.deepEqual(truncated, [])
   assert.deepEqual(failures, [])
 })
