@@ -189,14 +189,15 @@ export const SHOP_THUMBNAIL_SOURCES: Partial<Record<string, ImageSourcePropType>
 }
 
 /**
- * A piece the 2.5D rig draws shows its baked thumbnail wherever the Shop has a picture for it, never its pre-2.5D
- * artwork. Whether the Shop has a picture at all (and so lists the piece) is unchanged.
+ * A piece the 2.5D rig draws shows its baked thumbnail, never its pre-2.5D artwork. Its baked thumbnail alone is a
+ * Shop picture (owner 2026-10-15: list every 2.5D item, including the free boy and girl wardrobes); a piece without a
+ * baked thumbnail keeps whatever pre-2.5D picture it has.
  */
 function preferStillThumbnail(
   itemId: string,
   legacySource: ImageSourcePropType | undefined
 ): ImageSourcePropType | undefined {
-  return legacySource === undefined ? undefined : getAvatarItemStillThumbnail(itemId) ?? legacySource
+  return getAvatarItemStillThumbnail(itemId) ?? legacySource
 }
 
 export function getAvatarItemPreviewSource(

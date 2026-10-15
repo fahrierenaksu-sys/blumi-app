@@ -93,7 +93,8 @@ const titleOf = (id: string): string =>
  * The boy's 2.5D wardrobe (domain boyWardrobePreview.ts): free and owned by every account during testing (economy
  * entry at 0 coins, ownedByDefault), so ownership arrives with the server inventory. His four starter pieces (curls +
  * basic_a, `DEFAULT_MALE_AVATAR_LOADOUT`) are also marked ownedByDefault here, like the girl's starter, so avatar setup
- * can offer them before the inventory loads. Never sold (hidden from the shop, no receipt).
+ * can offer them before the inventory loads. Listed in the Shop (owner 2026-10-15: show every item) as owned pieces the
+ * viewer can wear; no receipt, never bought, and the server inventory alone decides ownership.
  */
 const MALE_STARTER_ITEM_IDS: ReadonlySet<string> = new Set([
   DEFAULT_MALE_AVATAR_LOADOUT.hairId,
@@ -110,15 +111,15 @@ const BOY_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top", 
     sortOrder: 5 + index,
     layerOrder: AVATAR_V2_LAYER_ORDER[type],
     assets: {},
-    hiddenFromShop: true,
     ...(MALE_STARTER_ITEM_IDS.has(id) ? { ownedByDefault: true } : {}),
     compatibleBodyIds: ["avatar_v2_body_male_light"]
   })))
 
 /**
  * The girl's 2.5D wardrobe additions (domain girlWardrobePreview.ts): on the boy's testing terms, free and owned by every
- * account through the server inventory (economy entry at 0 coins, ownedByDefault), never sold (hidden from the shop,
- * no receipt). Not marked ownedByDefault here, so the client's slot fallback stays the girl's starter look.
+ * account through the server inventory (economy entry at 0 coins, ownedByDefault). Listed in the Shop as owned pieces
+ * (owner 2026-10-15), never bought, no receipt. Not marked ownedByDefault here, so the client's slot fallback stays
+ * the girl's starter look.
  */
 const GIRL_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top", "bottom", "shoes"] as const).flatMap((type) =>
   GIRL_WARDROBE_PREVIEW_ITEM_IDS[type].map((id, index) => ({
@@ -127,8 +128,7 @@ const GIRL_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top",
     name: titleOf(id),
     sortOrder: 5 + index,
     layerOrder: AVATAR_V2_LAYER_ORDER[type],
-    assets: {},
-    hiddenFromShop: true
+    assets: {}
   })))
 
 const MALE_PREMIUM_CAPSULE_AVATAR_ITEMS: AvatarCatalogItem[] = MALE_PREMIUM_CAPSULE_RUNTIME.map((item, index) => {
