@@ -167,12 +167,13 @@ export function BlumiSetupShell({
   const systemReduceMotion = useReducedMotion()
   const reduceMotion = reduceMotionOverride ?? systemReduceMotion
   const { width, height, fontScale } = useWindowDimensions()
-  const metrics = useMemo(
-    () => getSetupLayoutMetrics({ width, height, fontScale }),
-    [fontScale, height, width]
-  )
   const progress = getSetupProgress(step)
   const copy = getCurrentSetupFlowCopy().steps[step]
+  const effectiveActionLabel = primaryActionLabel ?? copy.primaryAction
+  const metrics = useMemo(
+    () => getSetupLayoutMetrics({ width, height, fontScale, primaryActionLabel: effectiveActionLabel }),
+    [effectiveActionLabel, fontScale, height, width]
+  )
 
   // Only the visible step follows the keyboard; hidden (prepared or left)
   // steps keep the open layout (ONB-08).
@@ -206,7 +207,6 @@ export function BlumiSetupShell({
 
   const effectiveTitle = title ?? copy.title
   const effectiveDescription = description ?? copy.description
-  const effectiveActionLabel = primaryActionLabel ?? copy.primaryAction
   const keyboardBottomPadding =
     metrics.primaryActionHeight + uiTheme.spacing.xl + uiTheme.spacing.md
   const openBottomPadding = scrollBottomInset ?? keyboardBottomPadding

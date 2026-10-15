@@ -5,6 +5,7 @@ import { createAuthService } from "./authService"
 import { createInMemoryAuthRepository, type AuthRepository } from "./authRepository"
 import { createAccountRecord, createBlumiBackendStore, createSessionRecord, createSessionToken } from "./authStore"
 import { createSessionCache } from "./sessionCache"
+import { disposablePostgresSkip } from "../db/disposablePostgres"
 
 async function fixture(ttlMs = 15_000) {
   const raw = createInMemoryAuthRepository(createBlumiBackendStore())
@@ -120,7 +121,7 @@ test("OTP writes keep cached sessions, and an account write drops only that acco
 // The in-memory safety store has no accounts; the ban is written by the
 // PostgreSQL safety repository. Runs through the isolated postgres gate.
 const requirePostgres = {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }
 
 test("PostgreSQL: a ban resolved by an operator stops the user's next request", requirePostgres, async () => {

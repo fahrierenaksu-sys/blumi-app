@@ -33,6 +33,9 @@ export const REALTIME_AUTHORIZATION_SWEEP_CONCURRENCY = 8
  */
 const MAX_OBSERVATION_MS = 60_000
 
+/** Fresh checks after an answer that a revocation overtook, before denying. */
+const STALE_ANSWER_RECHECKS = 1
+
 export interface RealtimeAuthorizationIdentity {
   userId: string
   sessionFamilyId: string
@@ -120,6 +123,22 @@ export function createRealtimeAuthorizationCache(input: {
     allowed.set(cacheKey(identity), { userId: identity.userId, expiresAt })
   }
 
+  // A positive answer from a check that started before a revocation may have
+  // read pre-revocation state, so it is neither stored nor returned: the
+  // check runs again from a fresh observation. Revocations are per user, so a
+  // sibling session of the same person stays allowed after the re-check. If
+  // revocations keep landing mid-check, the answer is a denial.
+  async function checkCurrent(identity: RealtimeAuthorizationIdentity, rechecksLeft: number): Promise<boolean> {
+    const observation = observe()
+    const result = await input.check({ userId: identity.userId, sessionFamilyId: identity.sessionFamilyId })
+    if (result !== true) return false
+    if (isCurrent(identity.userId, observation)) {
+      store(identity, observation)
+      return true
+    }
+    return rechecksLeft > 0 ? checkCurrent(identity, rechecksLeft - 1) : false
+  }
+
   async function checkBatch(
     batch: readonly RealtimeAuthorizationIdentity[]
   ): Promise<{ allowed: boolean; notAfter?: number }[]> {
@@ -155,15 +174,8 @@ export function createRealtimeAuthorizationCache(input: {
       const pending = inFlight.get(key)
       if (pending) return pending.promise
 
-      const observation = observe()
       const flight: InFlightCheck = { userId: identity.userId, promise: Promise.resolve(false) }
-      flight.promise = Promise.resolve()
-        .then(() => input.check({ userId: identity.userId, sessionFamilyId: identity.sessionFamilyId }))
-        .then((result) => {
-          const isAllowed = result === true
-          if (isAllowed) store(identity, observation)
-          return isAllowed
-        })
+      flight.promise = checkCurrent(identity, STALE_ANSWER_RECHECKS)
         .finally(() => {
           if (inFlight.get(key) === flight) inFlight.delete(key)
         })

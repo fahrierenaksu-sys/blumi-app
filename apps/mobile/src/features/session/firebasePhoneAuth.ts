@@ -73,6 +73,12 @@ export function getFirebaseCurrentPhoneNumber(): string | null {
   return loadFirebaseAuth()?.auth.currentUser?.phoneNumber ?? null
 }
 
+/** A fresh ID token for the phone Firebase is signed in as, or null. */
+export async function getFirebaseCurrentIdToken(): Promise<string | null> {
+  const user = loadFirebaseAuth()?.auth.currentUser
+  return user ? await user.getIdToken(true) : null
+}
+
 export function subscribeToFirebasePhoneNumber(
   listener: (phoneNumber: string | null) => void
 ): () => void {

@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     borderColor: uiTheme.colors.surface,
   },
   filterBadgeText: {
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     fontSize: 9,
     fontWeight: "900",
   },

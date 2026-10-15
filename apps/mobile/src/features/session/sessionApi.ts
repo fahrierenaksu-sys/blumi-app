@@ -1,5 +1,6 @@
 import { ACCOUNT_RECOVERY_REQUIRED_MESSAGE } from "./accountRecoveryCopy"
 import {
+  normalizeDiscoveryPreferences,
   normalizeOnboardingStatus,
   normalizeSessionActor,
   type OnboardingStatus,
@@ -8,6 +9,7 @@ import {
 } from "./sessionModel"
 import {
   type CapabilityMap,
+  isProfileGender,
   normalizeUserProfilePrompts,
   type DiscoveryPreferences,
   type ProfileGender,
@@ -23,6 +25,7 @@ import {
   type AccountModerationState
 } from "./accountModeration"
 import { requestJson } from "../network/apiClient"
+import { createApiRequestError } from "../network/apiRequestError"
 
 export class AccountAccessError extends Error {
   readonly moderation: AccountModerationState
@@ -223,12 +226,28 @@ export async function verifyFirebaseAccountAction(
   return payload as { confirmationToken: string; expiresAt: string }
 }
 
+const E164_PHONE_PATTERN = /^\+[1-9]\d{6,14}$/
+
+export interface FirebaseAccountActionChallenge {
+  challengeId: string
+  expiresAt: string
+  /**
+   * The phone the account has on the server, for re-authentication purposes.
+   * The server names it only when the request's `targetPhoneNumber` already
+   * equals it (absent for a new phone and from older servers). The code goes
+   * here, not to whatever Firebase holds.
+   */
+  targetPhoneNumber?: string
+  /** The server did not confirm the phone sent (or none was sent). */
+  targetPhoneNumberWithheld?: true
+}
+
 export async function requestFirebaseAccountActionChallenge(
   baseHttpUrl: string,
   sessionToken: string,
   input: { purpose: FirebaseAccountActionPurpose; targetPhoneNumber?: string },
   fetcher: typeof fetch = fetch
-): Promise<{ challengeId: string; expiresAt: string }> {
+): Promise<FirebaseAccountActionChallenge> {
   const { response, payload } = await requestJson(baseHttpUrl, "/v1/account/firebase/challenge", {
     method: "POST",
     headers: {
@@ -242,7 +261,15 @@ export async function requestFirebaseAccountActionChallenge(
     typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string") {
     throw new Error(getApiErrorMessage(payload, "We could not start phone verification yet."))
   }
-  return payload as { challengeId: string; expiresAt: string }
+  const { challengeId, expiresAt, targetPhoneNumber, targetPhoneNumberWithheld } = payload as Record<string, unknown>
+  return {
+    challengeId: challengeId as string,
+    expiresAt: expiresAt as string,
+    ...(typeof targetPhoneNumber === "string" && E164_PHONE_PATTERN.test(targetPhoneNumber)
+      ? { targetPhoneNumber }
+      : {}),
+    ...(targetPhoneNumberWithheld === true ? { targetPhoneNumberWithheld: true as const } : {})
+  }
 }
 
 export async function submitAccountRecoveryRequest(
@@ -290,7 +317,9 @@ export async function confirmPhoneChange(
     fetcher
   )
   if (!response.ok) {
-    throw new Error(
+    throw createApiRequestError(
+      response.status,
+      payload,
       getApiErrorMessage(payload, "We could not change your sign-in phone yet.")
     )
   }
@@ -317,6 +346,7 @@ export async function acknowledgeAccountModeration(
   )
   if (!response.ok || !moderation) {
     throw createSessionApiError(
+      response.status,
       payload,
       "We could not save that acknowledgement."
     )
@@ -453,7 +483,7 @@ export async function fetchProductionAccountSnapshot(
   }, fetcher)
 
   if (!response.ok) {
-    throw createSessionApiError(payload, "We could not refresh your profile yet.")
+    throw createSessionApiError(response.status, payload, "We could not refresh your profile yet.")
   }
   const onboarding = normalizeOnboardingStatus(
     (payload as { onboarding?: unknown } | null)?.onboarding
@@ -470,7 +500,11 @@ export async function fetchProductionAccountSnapshot(
   }
 }
 
-function createSessionApiError(payload: unknown, fallback: string): Error {
+function createSessionApiError(
+  httpStatus: number,
+  payload: unknown,
+  fallback: string
+): Error {
   const record = isRecord(payload) ? payload : null
   const code = record?.code
   const status = record?.status
@@ -490,7 +524,7 @@ function createSessionApiError(payload: unknown, fallback: string): Error {
       return new AccountAccessError(getApiErrorMessage(payload, fallback), moderation)
     }
   }
-  return new Error(getApiErrorMessage(payload, fallback))
+  return createApiRequestError(httpStatus, payload, getApiErrorMessage(payload, fallback))
 }
 
 function getApiErrorMessage(
@@ -518,10 +552,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object"
 }
 
+const UNREADABLE_PROFILE_MESSAGE = "Blumi could not read your saved profile."
+
+/**
+ * Older accounts may have no identity or discovery preferences yet; those stay
+ * undefined. A value the server did send but that fails validation is an
+ * error, so an unreadable preference never silently turns into the defaults
+ * that a later save would write back over the account.
+ */
+function normalizeProfilePreferenceFields(
+  record: Record<string, unknown>
+): Pick<UserProfile, "identityGender" | "discoveryPreferences"> {
+  const rawIdentity = record.identityGender
+  if (rawIdentity != null && !isProfileGender(rawIdentity)) {
+    throw new Error(UNREADABLE_PROFILE_MESSAGE)
+  }
+  const rawPreferences = record.discoveryPreferences
+  const discoveryPreferences = normalizeDiscoveryPreferences(rawPreferences)
+  if (rawPreferences != null && !discoveryPreferences) {
+    throw new Error(UNREADABLE_PROFILE_MESSAGE)
+  }
+  return {
+    identityGender: isProfileGender(rawIdentity) ? rawIdentity : undefined,
+    discoveryPreferences
+  }
+}
+
 function normalizeUserProfilePayload(payload: unknown): UserProfile {
   const profile = (payload as { profile?: unknown } | null)?.profile
   if (!profile || typeof profile !== "object") {
-    throw new Error("Blumi could not read your saved profile.")
+    throw new Error(UNREADABLE_PROFILE_MESSAGE)
   }
   const record = profile as Partial<UserProfile>
   const avatar = record.avatar
@@ -532,14 +592,18 @@ function normalizeUserProfilePayload(payload: unknown): UserProfile {
     (record.age !== undefined && typeof record.age !== "number") ||
     !normalizedAvatar
   ) {
-    throw new Error("Blumi could not read your saved profile.")
+    throw new Error(UNREADABLE_PROFILE_MESSAGE)
   }
+  const preferenceFields = normalizeProfilePreferenceFields(
+    profile as Record<string, unknown>
+  )
   return {
     userId: record.userId,
     displayName: record.displayName,
     age: record.age,
     bio: typeof record.bio === "string" ? record.bio : undefined,
     gender: typeof record.gender === "string" ? record.gender : undefined,
+    ...preferenceFields,
     interests: Array.isArray(record.interests)
       ? record.interests.filter((item): item is string => typeof item === "string")
       : undefined,

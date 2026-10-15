@@ -804,7 +804,7 @@ test("an ACK with a known identity and mismatched body cannot settle its timer o
 test("real global reducer before room ACK listener preserves identical sends, late ACKs and existing canonical keys", () => {
   const runtime = createFakeReactRuntime()
   const store = loadSourceWithFakeReact<typeof ChatStore>("features/chat/chatStore.ts", runtime, {
-    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState"]
+    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState", "./chatComposerDraftStore"]
   })
   const sends: Extract<ServerEvent, { type: "chat.message_received" }>["payload"][] = []
   let roomListener: ((event: ServerEvent) => void) | undefined

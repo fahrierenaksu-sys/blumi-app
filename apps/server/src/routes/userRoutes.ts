@@ -56,6 +56,38 @@ export interface UserRouteServices {
   afterResponseTasks?: AfterResponseTasks
 }
 
+/**
+ * Documents the Firebase re-authentication challenge answer in the OpenAPI
+ * catalog. additionalProperties stays open so the answer is serialized as
+ * before; only the description is new.
+ */
+const firebaseActionChallengeResponseJsonSchema = {
+  type: "object",
+  required: ["challengeId", "expiresAt"],
+  properties: {
+    challengeId: { type: "string" },
+    expiresAt: { type: "string", format: "date-time" },
+    targetPhoneNumber: {
+      type: "string",
+      description:
+        "The signed-in account's own phone (E.164), for account_deletion, account_data_export and " +
+        "phone_change_current, named only when the request's targetPhoneNumber already equals it " +
+        "(the client proves it holds the phone); never for phone_change_new. A session token alone " +
+        "never learns it. 5 requests per 5 minutes, Cache-Control: no-store, never logged. Older " +
+        "servers named it without the proof or omitted it."
+    },
+    targetPhoneNumberWithheld: {
+      type: "boolean",
+      enum: [true],
+      description:
+        "Present for account_deletion, account_data_export and phone_change_current when the request " +
+        "sent no phone or a phone that is not the account's. The challenge is still valid; the client " +
+        "may try another phone it holds, or asks the member to sign in again. Older servers omit it."
+    }
+  },
+  additionalProperties: true
+} as const
+
 const accountChallengeRouteSchema = {
   response: {
     202: successResponseJsonSchema,
@@ -102,11 +134,18 @@ export async function registerUserRoutes(
         required: ["purpose"],
         properties: {
           purpose: { type: "string", enum: ["account_deletion", "account_data_export", "phone_change_current", "phone_change_new"] },
-          targetPhoneNumber: { type: "string", minLength: 5, maxLength: 20 }
+          targetPhoneNumber: {
+            type: "string",
+            minLength: 5,
+            maxLength: 20,
+            description:
+              "phone_change_new: the new phone. Other purposes: a phone the client already holds; " +
+              "the answer names the account phone only when it matches."
+          }
         },
         additionalProperties: false
       },
-      response: { 200: successResponseJsonSchema, ...authenticatedErrorResponses }
+      response: { 200: firebaseActionChallengeResponseJsonSchema, ...authenticatedErrorResponses }
     }
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)

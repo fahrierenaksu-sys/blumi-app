@@ -180,10 +180,10 @@ export function createMatchService(
     async getDiscoveryWatch(userId, now = new Date()) {
       const watch = await repository.findDiscoveryWatch(userId)
       if (!watch) return null
-      if (new Date(watch.expiresAt).getTime() <= now.getTime()) {
-        await repository.deleteDiscoveryWatch(userId)
-        return null
-      }
+      // A read never mutates: deleting by user alone would also remove a watch
+      // activated between this read and the delete. Expired records are ignored
+      // by the worker and replaced in place by the next activation.
+      if (new Date(watch.expiresAt).getTime() <= now.getTime()) return null
       return watch
     },
     async claimNextDiscoveryWatch(now = new Date()) {

@@ -3,13 +3,15 @@ import type { PoolClient } from "pg"
 import { getDefaultOwnedItemIds, resolveProductionEconomyCatalog } from "../economy/economyCatalog"
 import { PUSH_ROUTED_TYPES } from "../notifications/pushMessagePolicy"
 import { canonicalJson, isRecord, sha256, type BetaResetStarter } from "./betaResetStarter"
+import { assertBetaResetRunsReady, assertResetMayRun, BETA_RESET_RUNS_TABLE, recordBetaResetRun } from "./betaResetRuns"
 
 /**
  * The owner-approved full beta reset (option "c", 2026-10-10; spec: release plan 13/10 §4).
  * Coins go to the starter amount, every loadout to its body's starter look, every finished room to the starter
  * room with the bed; all chats, messages, matches, mini rooms and their pending pushes are deleted.
- * Accounts, profiles, gender, sessions, blocks, money ledgers, settings and the test personas (with the likes they
- * hand out, so persona QA can still match instantly) are never written.
+ * Accounts, profiles, gender, sessions, blocks, money ledgers and settings are never written. The test personas
+ * are never written either: not their coins, look or room (scripts/seedTestPersonas.ts gives each its own), and
+ * not the likes they hand out, so persona QA can still match instantly.
  * Every count is computed, hashed and printed; IDs, phone numbers and bodies never leave this module.
  */
 
@@ -73,7 +75,9 @@ export const BETA_RESET_KEPT_TABLES = [
 
 /** Every table the reset deletes from or writes to; the postgres test proves all other tables stay byte-identical. */
 export const BETA_RESET_DELETED_TABLES: readonly string[] = DELETED_TABLES.map((entry) => entry.table)
-export const BETA_RESET_WRITTEN_TABLES = ["blumi_accounts", "blumi_economy_inventories", "blumi_personal_room_decor"] as const
+export const BETA_RESET_WRITTEN_TABLES = [
+  "blumi_accounts", "blumi_economy_inventories", "blumi_personal_room_decor", BETA_RESET_RUNS_TABLE
+] as const
 const LOCKED_KEPT_TABLES = ["blumi_accounts", "blumi_economy_inventories"] as const
 
 /**
@@ -188,14 +192,19 @@ function hashPlan(input: {
 /**
  * Applies the reset inside the caller's open transaction. Locks every written table first, so the counts that
  * matched `expected.hash` are exactly the rows changed; any difference throws and the caller rolls back.
+ * One-shot (migration 076): a database that recorded a reset needs `expected.repeatReason`; the run is recorded
+ * in the same transaction.
  */
 export async function applyBetaReset(
   client: PoolClient,
   context: BetaResetContext,
-  expected: { readonly hash: string; readonly fingerprint: string }
+  expected: { readonly hash: string; readonly fingerprint: string; readonly repeatReason?: string | null }
 ): Promise<{ readonly before: BetaResetPlan; readonly after: BetaResetPlan }> {
+  await assertBetaResetRunsReady(client)
   const lockedTables = [...new Set([...DELETED_TABLES.map((entry) => entry.table), ...BETA_RESET_WRITTEN_TABLES])]
   await client.query(`LOCK TABLE ${lockedTables.join(", ")} IN EXCLUSIVE MODE`)
+  const repeatReason = expected.repeatReason ?? null
+  await assertResetMayRun(client, repeatReason)
   const before = await planBetaReset(client, context)
   if (before.fingerprint !== expected.fingerprint) throw new Error("Database fingerprint does not match; reset refused.")
   if (before.hash !== expected.hash) {
@@ -213,6 +222,7 @@ export async function applyBetaReset(
   await resetAccountState(client, context.starter, before.counts)
   const after = await planBetaReset(client, context)
   assertResetComplete(before.counts, after.counts)
+  await recordBetaResetRun(client, { commit: context.source.commit, planHash: before.hash, repeatReason })
   return { before, after }
 }
 
@@ -255,11 +265,13 @@ function assertResetComplete(before: BetaResetCounts, after: BetaResetCounts): v
   if (changedKeep.length > 0) throw new Error(`Post-check failed: kept tables changed (${changedKeep.join(", ")}); rolled back.`)
 }
 
-const coinsOffStarter = (starter: BetaResetStarter): string => `coins <> ${Math.trunc(starter.coins)} OR coin_debt <> 0`
-const DECOR_OFF_STARTER = "decor <> $1::jsonb"
+const NOT_PERSONA = "user_id NOT IN (SELECT user_id FROM blumi_test_personas)"
+const coinsOffStarter = (starter: BetaResetStarter): string =>
+  `(coins <> ${Math.trunc(starter.coins)} OR coin_debt <> 0) AND ${NOT_PERSONA}`
+const DECOR_OFF_STARTER = `decor <> $1::jsonb AND ${NOT_PERSONA}`
 const PERSONA_LIKES = "from_user_id IN (SELECT user_id FROM blumi_test_personas)"
 // Only finished rooms get a starter row; an account still in onboarding saves its first room itself (revision 0).
-const ACCOUNTS_MISSING_DECOR = `a.onboarding_room_complete
+const ACCOUNTS_MISSING_DECOR = `a.onboarding_room_complete AND a.${NOT_PERSONA}
   AND NOT EXISTS (SELECT 1 FROM blumi_personal_room_decor d WHERE d.user_id = a.user_id)`
 
 async function countRows(client: PoolClient, table: string, where?: string, values: unknown[] = []): Promise<number> {
@@ -293,6 +305,7 @@ async function planLoadoutChanges(client: PoolClient, starter: BetaResetStarter)
     `SELECT a.account_id, a.avatar_selection, a.avatar_preset_id, COALESCE(a.identity_gender, a.gender) AS gender,
             i.owned_avatar_item_ids AS owned
        FROM blumi_accounts a LEFT JOIN blumi_economy_inventories i ON i.user_id = a.user_id
+      WHERE a.${NOT_PERSONA}
       ORDER BY a.account_id`
   )
   const defaultOwned = getDefaultOwnedItemIds("avatar", resolveProductionEconomyCatalog())

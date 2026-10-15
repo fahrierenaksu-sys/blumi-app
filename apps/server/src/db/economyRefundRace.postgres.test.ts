@@ -4,12 +4,13 @@ import test from "node:test"
 import { Pool } from "pg"
 import type { EconomyCoinTransactionInput } from "../economy/economyRepository"
 import { createPostgresEconomyRepository } from "./postgresEconomyRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
+const requirePostgres = { skip: disposablePostgresSkip().skip }
 const AT = "2026-10-01T10:00:00.000Z"
 
 function openPool(): Pool {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   return new Pool({ connectionString: process.env.DATABASE_URL, max: 5 })
 }
 

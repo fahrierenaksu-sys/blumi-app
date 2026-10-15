@@ -4,13 +4,14 @@ import { randomUUID } from "node:crypto"
 import { Pool } from "pg"
 import { createPostgresEconomyRepository } from "./postgresEconomyRepository"
 import { auditDatabaseRelease } from "../operations/databaseReleaseAudit"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 
 test("inventory constraints and atomic purchase survive concurrent requests", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  const pool = new Pool({ connectionString: databaseUrl, max: 4 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: 4 })
   const suffix = randomUUID()
   const userId = `release_integrity_${suffix}`
   const accountId = `release_integrity_account_${suffix}`
@@ -80,9 +81,9 @@ test("inventory constraints and atomic purchase survive concurrent requests", {
 })
 
 test("release audit detects catalog drift, duplicate ownership, and exposed API grants", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  const pool = new Pool({ connectionString: databaseUrl, max: 2 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: 2 })
   const suffix = randomUUID()
   const userId = `release_audit_${suffix}`
   const accountId = `release_audit_account_${suffix}`

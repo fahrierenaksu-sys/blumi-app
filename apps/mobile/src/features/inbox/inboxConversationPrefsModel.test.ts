@@ -111,3 +111,20 @@ test("a chat deleted on another device stays hidden here until a newer message a
   const { hiddenThrough: _serverPoint, ...seenHere } = newer
   assert.equal(isConversationDeletedForMe(deleteConversationForMe(prefs, seenHere), newer), true)
 })
+
+test("with the server's exact hide point a same-millisecond newer message brings the row back; without it the time decides", () => {
+  const instant = "2026-10-02T12:00:00.000Z"
+  const row = (lastId: string, extra: Partial<InboxThreadLike> = {}): InboxThreadLike => ({
+    threadId: "t_exact", createdAt: "2026-10-01T08:00:00.000Z", lastMessage: { sentAt: instant, messageId: lastId }, hiddenThrough: instant, ...extra
+  })
+  // Deleted on this phone while it had only x: the phone stored x's time.
+  const deletedHere = deleteConversationForMe(EMPTY_INBOX_CONVERSATION_PREFS, row("x"))
+  assert.equal(isConversationDeletedForMe(deletedHere, row("y", { hiddenThroughMessageId: "x" })), false,
+    "y shares x's millisecond but is after the exact point")
+  assert.equal(isConversationDeletedForMe(deletedHere, row("x", { hiddenThroughMessageId: "x" })), true, "x itself stays hidden")
+  assert.equal(isConversationDeletedForMe(EMPTY_INBOX_CONVERSATION_PREFS, row("y", { hiddenThroughMessageId: "x" })), false,
+    "another device reads the same exact point")
+  assert.equal(isConversationDeletedForMe(deletedHere, row("y")), true, "an older server sends no id: the time rule hides y")
+  assert.equal(isConversationDeletedForMe(deletedHere, row("y", { hiddenThroughMessageId: "x", hiddenThrough: undefined })), true,
+    "an id without the server time never overrides the on-device time")
+})

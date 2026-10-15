@@ -22,7 +22,7 @@ const threadId = "history-room-thread"
 function mount() {
   const runtime = createFakeReactRuntime()
   const store = loadSourceWithFakeReact<typeof ChatStore>("features/chat/chatStore.ts", runtime, {
-    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState"]
+    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState", "./chatComposerDraftStore"]
   })
   const history = loadSourceWithFakeReact<typeof RoomHistory>("features/miniRoom/useRoomChatHistory.ts", runtime, {
     real: ["../chat/chatMessageRenderKeys"],
@@ -160,7 +160,7 @@ test("history reuses its presentation for store changes outside its visible wind
 test("MiniRoom live chat ignores other threads and preserves entry replay, request, and cleanup behavior", () => {
   const runtime = createFakeReactRuntime()
   const chatStore = loadSourceWithFakeReact<typeof ChatStore>("features/chat/chatStore.ts", runtime, {
-    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState"]
+    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState", "./chatComposerDraftStore"]
   })
   const connectionStatus: RealtimeConnectionStatus = "connected"
   const realtimeSends: unknown[] = []

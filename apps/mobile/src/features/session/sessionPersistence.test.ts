@@ -506,3 +506,65 @@ test("persistence refuses to save a demo session when demo sessions are disabled
   )
   assert.equal(asyncStore.values.has(DEMO_SESSION_ACTOR_STORAGE_KEY), false)
 })
+
+test("a migration interrupted between the secure write and the legacy delete is finished on the next launch", async () => {
+  const legacyJson = JSON.stringify(createProductionActor())
+  const secureStore = createMemoryStore()
+  const asyncStore = createMemoryStore({ [SESSION_ACTOR_STORAGE_KEY]: legacyJson })
+  const removeLegacy = asyncStore.removeItem
+  asyncStore.removeItem = async () => {
+    throw new Error("app killed before the legacy copy was removed")
+  }
+  const firstLaunch = createSessionPersistence({ platform: "native", secureStore, asyncStore })
+  await assert.rejects(firstLaunch.load(), /app killed/)
+  assert.ok(secureStore.values.has(SESSION_ACTOR_STORAGE_KEY), "the secure copy was written")
+  assert.ok(asyncStore.values.has(SESSION_ACTOR_STORAGE_KEY), "the plaintext copy survived the kill")
+
+  asyncStore.removeItem = removeLegacy
+  const nextLaunch = createSessionPersistence({ platform: "native", secureStore, asyncStore })
+  const restored = await nextLaunch.load()
+
+  assert.equal(restored?.session.userId, "user-1")
+  assert.equal(asyncStore.values.has(SESSION_ACTOR_STORAGE_KEY), false)
+  assert.ok(secureStore.values.has(SESSION_ACTOR_STORAGE_KEY))
+})
+
+test("a legacy plaintext copy is removed whenever a valid secure session loads", async () => {
+  const json = JSON.stringify(createProductionActor())
+  const secureStore = createMemoryStore({ [SESSION_ACTOR_STORAGE_KEY]: json })
+  const asyncStore = createMemoryStore({ [SESSION_ACTOR_STORAGE_KEY]: json })
+  const persistence = createSessionPersistence({ platform: "native", secureStore, asyncStore })
+
+  const restored = await persistence.load()
+
+  assert.equal(restored?.session.sessionToken, "production-token")
+  assert.equal(asyncStore.values.has(SESSION_ACTOR_STORAGE_KEY), false)
+})
+
+test("a failed legacy delete keeps the secure session signed in and is retried on the next load", async () => {
+  const json = JSON.stringify(createProductionActor())
+  const secureStore = createMemoryStore({ [SESSION_ACTOR_STORAGE_KEY]: json })
+  const asyncStore = createMemoryStore({ [SESSION_ACTOR_STORAGE_KEY]: json })
+  const removeLegacy = asyncStore.removeItem
+  asyncStore.removeItem = async () => {
+    throw new Error("storage I/O error")
+  }
+  const warnings: unknown[][] = []
+  const originalWarn = console.warn
+  console.warn = (...args: unknown[]) => { warnings.push(args) }
+  try {
+    const firstLoad = await createSessionPersistence({ platform: "native", secureStore, asyncStore }).load()
+    assert.equal(firstLoad?.session.userId, "user-1", "the secure session still loads")
+  } finally {
+    console.warn = originalWarn
+  }
+  assert.ok(asyncStore.values.has(SESSION_ACTOR_STORAGE_KEY), "the plaintext copy waits for a later retry")
+  const logged = JSON.stringify(warnings.map((args) => args.map(String)))
+  assert.doesNotMatch(logged, /production-token|user-1|account-1|session-1|storage I\/O/)
+
+  asyncStore.removeItem = removeLegacy
+  const nextLoad = await createSessionPersistence({ platform: "native", secureStore, asyncStore }).load()
+
+  assert.equal(nextLoad?.session.userId, "user-1")
+  assert.equal(asyncStore.values.has(SESSION_ACTOR_STORAGE_KEY), false, "the retry removes the plaintext copy")
+})

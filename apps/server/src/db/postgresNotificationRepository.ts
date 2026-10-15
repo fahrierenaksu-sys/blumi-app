@@ -1,7 +1,7 @@
 import type { QueryResultRow } from "pg"
 import { randomUUID } from "node:crypto"
 import { discoveryWatchLockSql } from "./discoveryWatchLock"
-import { DEFAULT_NOTIFICATION_PREFERENCES, MAX_DEVICES_PER_ACCOUNT } from "../notifications/notificationRepository"
+import { DEFAULT_NOTIFICATION_PREFERENCES, DEVICE_SEEN_REFRESH_MS, MAX_DEVICES_PER_ACCOUNT } from "../notifications/notificationRepository"
 import type {
   DeviceRegistration,
   NotificationPolicyAudit,
@@ -32,6 +32,9 @@ export function createPostgresNotificationRepository(
     async withAuthorizedDelivery(delivery, now, send) {
       if (!pool.connect) throw new Error("Dispatch authorization requires a dedicated database connection.")
       const client = await pool.connect()
+      // A connection whose ROLLBACK failed may still hold the watch and outbox
+      // locks: release(error) makes node-postgres destroy it instead of reusing it.
+      let broken: Error | undefined
       try {
         await client.query("BEGIN")
         if (delivery.notification.data?.type === "discovery.watch_match" && !delivery.discoveryWatch) {
@@ -57,9 +60,11 @@ export function createPostgresNotificationRepository(
         await client.query("COMMIT")
         return { authorized: true, value }
       } catch (error) {
-        await client.query("ROLLBACK")
+        await client.query("ROLLBACK").catch((rollbackError: unknown) => {
+          broken = rollbackError instanceof Error ? rollbackError : new Error("ROLLBACK failed.")
+        })
         throw error
-      } finally { client.release() }
+      } finally { client.release(broken) }
     },
     async claimDueReceipts({ now, limit, leaseMs }) {
       const result = await pool.query(`WITH due AS (
@@ -123,6 +128,7 @@ export function createPostgresNotificationRepository(
           [`blumi:push-device-token:${device.pushToken}`])
         const admitted = await client.query(`SELECT
           EXISTS (SELECT 1 FROM blumi_push_devices WHERE user_id = $1 AND push_token = $2) AS existing,
+          EXISTS (SELECT 1 FROM blumi_push_devices WHERE user_id <> $1 AND push_token = $2) AS taken_by_other,
           (SELECT count(*)::integer FROM blumi_push_devices WHERE user_id = $1) AS device_count`,
         [device.userId, device.pushToken])
         const row = admitted.rows[0]
@@ -130,8 +136,23 @@ export function createPostgresNotificationRepository(
           throw new Error("Device admission state is unavailable.")
         }
         if (!row.existing && Number(row.device_count) >= MAX_DEVICES_PER_ACCOUNT) {
-          await client.query("COMMIT")
-          return "limit"
+          // Token rotation or reinstall at a full quota: a token that is new to
+          // every account replaces this account's least recently seen
+          // registrations (registered_at, refreshed by markDeviceSeen). Another
+          // account's token is never taken this way.
+          if (row.taken_by_other) {
+            await client.query("COMMIT")
+            return "limit"
+          }
+          await client.query(`WITH evicted AS (
+              DELETE FROM blumi_push_devices
+               WHERE user_id = $1 AND push_token IN (
+                 SELECT push_token FROM blumi_push_devices WHERE user_id = $1
+                  ORDER BY registered_at ASC, push_token ASC LIMIT $2)
+              RETURNING push_token
+            ) DELETE FROM blumi_push_delivery_outbox
+               WHERE user_id = $1 AND push_token IN (SELECT push_token FROM evicted)`,
+          [device.userId, Number(row.device_count) - MAX_DEVICES_PER_ACCOUNT + 1])
         }
         await persistDevice(client, device)
         await client.query("COMMIT")
@@ -145,6 +166,20 @@ export function createPostgresNotificationRepository(
         // A failed rollback must not return a connection holding locks to the pool.
         client.release(releaseError)
       }
+    },
+    async markDeviceSeen({ userId, pushToken, registrationId, seenAt }) {
+      // Ownership is the WHERE clause: only this account's current registration
+      // is refreshed, and a removed or transferred token updates nothing.
+      // A row held by a locked push send (FOR SHARE) is skipped, not waited on:
+      // the refresh is best-effort and app start must never queue behind a send.
+      await pool.query(
+        `UPDATE blumi_push_devices SET registered_at = $4
+          WHERE user_id = $1 AND push_token IN (
+            SELECT push_token FROM blumi_push_devices
+             WHERE user_id = $1 AND push_token = $2 AND registration_id = $3 AND registered_at < $5
+               FOR NO KEY UPDATE SKIP LOCKED)`,
+        [userId, pushToken, registrationId, seenAt, new Date(seenAt.getTime() - DEVICE_SEEN_REFRESH_MS)]
+      )
     },
     async removeDevice(userId, pushToken) {
       await pool.query(

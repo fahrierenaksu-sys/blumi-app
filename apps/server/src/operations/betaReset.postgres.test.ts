@@ -72,7 +72,8 @@ test("the beta reset counts, applies once, keeps protected data and refuses wron
       blumi_mini_room_invites: 1, blumi_reactions: 1, blumi_push_delivery_outbox: 3, blumi_room_presence: 1,
       blumi_realtime_payload_refs: 1, blumi_room_showcase_snapshots: 1
     })
-    assert.deepEqual(plan.counts.reset, { coinBalances: 2, avatarLoadouts: 4, roomDecorUpdates: 2, roomDecorInserts: 2 })
+    // The test persona's look and room are never written (seedTestPersonas.ts gives it its own).
+    assert.deepEqual(plan.counts.reset, { coinBalances: 2, avatarLoadouts: 3, roomDecorUpdates: 2, roomDecorInserts: 1 })
     assert.equal(plan.counts.keep.blumi_accounts, 5)
     assert.equal(plan.counts.keep["test persona likes"], 1)
     assert.deepEqual(plan.activity, { liveConnections: 0, livePresence: 0 })
@@ -115,6 +116,8 @@ test("the beta reset counts, applies once, keeps protected data and refuses wron
       assert.match(refusal.stderr, /refused|mismatch|needs/)
     }
     assert.match(refusals[3]!.stderr, /not the deployed commit/)
+    assert.deepEqual(await recordedRuns(client), [], "a refused run records no reset")
+    assert.match(dryRun.stdout, /^previous-resets=0$/m)
     assert.deepEqual(await protectedState(client), untouched, "a refused run writes nothing")
     assert.equal(await deletableTotal(client), deletable, "a refused run deletes nothing")
 
@@ -140,12 +143,24 @@ test("the beta reset counts, applies once, keeps protected data and refuses wron
     const secondPlan = readPlan(second.stdout)
     assert.ok(Object.values(secondPlan.counts.delete).every((count) => count === 0))
     assert.deepEqual(secondPlan.counts.reset, { coinBalances: 0, avatarLoadouts: 0, roomDecorUpdates: 0, roomDecorInserts: 0 })
+    assert.match(second.stdout, /^previous-resets=1 \(apply needs --repeat-reason: STOP\)$/m)
+    assert.deepEqual(await recordedRuns(client), [{ source_commit: fullCommit.slice(0, 12), plan_hash: plan.expect, repeat_reason: null }],
+      "the apply recorded exactly one run, with no reason")
     const afterFirst = await resetState(client)
-    const secondApply = run(["--project-ref", PROJECT_REF, "--apply", "--expect", secondPlan.expect,
-      "--fingerprint", secondPlan.fingerprint, "--deployed-commit", fullCommit], confirm)
+    const secondArgs = ["--project-ref", PROJECT_REF, "--apply", "--expect", secondPlan.expect,
+      "--fingerprint", secondPlan.fingerprint, "--deployed-commit", fullCommit]
+    // One-shot (audit F2): a database that recorded a reset refuses a second apply without a typed reason.
+    const unreasoned = run(secondArgs, confirm)
+    assert.notEqual(unreasoned.status, 0)
+    assert.match(unreasoned.stderr, /already applied to this database \(1 recorded\).*--repeat-reason.*refused/)
+    assert.match(run([...secondArgs, "--repeat-reason", "call me at 0555 123 4567"], confirm).stderr, /phone-like.*refused/)
+    assert.equal((await recordedRuns(client)).length, 1, "a refused apply records nothing")
+    const reason = "owner asked for a second reset after QA"
+    const secondApply = run([...secondArgs, "--repeat-reason", reason], confirm)
     assert.equal(secondApply.status, 0, secondApply.stderr)
     assert.deepEqual(await resetState(client), afterFirst, "a second apply is a no-op")
     assert.deepEqual(await protectedState(client), untouchedAtApply, "a second apply keeps every kept row")
+    assert.deepEqual((await recordedRuns(client)).map((row) => row.repeat_reason), [null, reason], "the repeat and its reason are recorded")
 
     const printed = outputs.join("\n")
     for (const account of Object.values(accounts)) {
@@ -241,7 +256,7 @@ async function assertResetState(client: PoolClient, accounts: Accounts, untouche
   assert.ok(coins.rows.every((row) => row.coins === 1250 && row.coin_debt === 0))
 
   const expected = { girl: DEFAULT_FEMALE_AVATAR_LOADOUT, boy: DEFAULT_MALE_AVATAR_LOADOUT,
-    legacy: DEFAULT_MALE_AVATAR_LOADOUT, fresh: DEFAULT_FEMALE_AVATAR_LOADOUT, persona: DEFAULT_FEMALE_AVATAR_LOADOUT }
+    legacy: DEFAULT_MALE_AVATAR_LOADOUT, fresh: DEFAULT_FEMALE_AVATAR_LOADOUT }
   const defaultsOwned = getDefaultOwnedItemIds("avatar")
   for (const [name, loadout] of Object.entries(expected)) {
     const { rows } = await client.query<{ avatar_selection: unknown; avatar_preset_id: string; avatar_revision: number }>(
@@ -263,10 +278,16 @@ async function assertResetState(client: PoolClient, accounts: Accounts, untouche
     repository: createPostgresPersonalRoomDecorRepository(client),
     getOwnedRoomItemIds: async () => getDefaultOwnedItemIds("room")
   })
-  for (const name of ["girl", "boy", "legacy", "persona"] as const) {
+  for (const name of ["girl", "boy", "legacy"] as const) {
     const room = await rooms.get(accounts[name].userId)
     assert.deepEqual(room?.decor.placedItems.map((item) => item.itemId), [STARTER_ROOM_BED_ID], `${name} gets the starter room`)
   }
+  const persona = await client.query<{ avatar_selection: unknown; avatar_revision: number }>(
+    "SELECT avatar_selection, avatar_revision FROM blumi_accounts WHERE account_id = $1", [accounts.persona.accountId])
+  assert.deepEqual(persona.rows[0]?.avatar_selection, { ...DEFAULT_FEMALE_AVATAR_LOADOUT, topId: "avatar_v2_top_retired_tee" },
+    "the test persona keeps its seeded look")
+  assert.equal(persona.rows[0]?.avatar_revision, 0)
+  assert.equal(await rooms.get(accounts.persona.userId), null, "the test persona's room is never written")
   assert.equal(await rooms.get(accounts.fresh.userId), null, "an account still in onboarding saves its own first room")
 }
 
@@ -317,6 +338,12 @@ async function deletableTotal(client: PoolClient): Promise<number> {
     (SELECT count(*) FROM blumi_active_mini_room_participants)
   )::text AS total`)
   return Number(rows[0]?.total)
+}
+
+async function recordedRuns(client: PoolClient) {
+  const { rows } = await client.query<{ source_commit: string; plan_hash: string; repeat_reason: string | null }>(
+    "SELECT source_commit, plan_hash, repeat_reason FROM blumi_beta_reset_runs ORDER BY applied_at, run_id")
+  return rows
 }
 
 async function resetState(client: PoolClient): Promise<string> {

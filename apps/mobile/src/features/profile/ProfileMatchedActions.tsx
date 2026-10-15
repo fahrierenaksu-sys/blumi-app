@@ -43,7 +43,7 @@ export function ProfileMatchedActions(props: {
             end={{ x: 1, y: 0 }}
             style={StyleSheet.absoluteFill}
           />
-          <Ionicons accessible={false} name="home" size={18} color="#FFFFFF" />
+          <Ionicons accessible={false} name="home" size={18} color={uiTheme.colors.onPrimary} />
           <Text style={styles.primaryText} numberOfLines={2}>{copy.inviteToRoom}</Text>
         </PressableScale>
       ) : null}
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     ...uiTheme.font.bodyBold,
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     flexShrink: 1
   }
 })

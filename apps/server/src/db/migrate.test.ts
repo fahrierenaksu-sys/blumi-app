@@ -118,6 +118,68 @@ test("connection wait is bounded separately from the lock timeout", async () => 
   }
 })
 
+test("the lock timeout bounds the ledger DDL and the advisory-lock wait, then is reset before the client is released", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "blumi-migration-session-timeout-"))
+  await writeFile(join(directory, "001_first.sql"), "SELECT 1")
+  const client = createFakeMigrationClient()
+  const release = client.release.bind(client)
+  client.release = () => {
+    client.executedSql.push("<release>")
+    release()
+  }
+
+  await runMigrationsWithClient(client as never, directory, { lockTimeoutMs: 321 })
+
+  const sql = client.executedSql
+  // The session budget (statement, lock and idle limits all off) runs first;
+  // the session lock limit is its own statement after it.
+  const setTimeout = sql.findIndex((statement) => statement.trim() === "SELECT set_config('lock_timeout', $1, false)")
+  const budget = sql.findIndex((statement) => statement.includes("set_config('statement_timeout'"))
+  assert.ok(budget >= 0 && budget < setTimeout, "the session budget must not override the lock limit")
+  const ledger = sql.findIndex((statement) => statement.includes("CREATE TABLE IF NOT EXISTS blumi_migrations"))
+  const advisoryLock = sql.findIndex((statement) => statement.includes("pg_advisory_lock"))
+  assert.ok(setTimeout >= 0, "a session-level lock_timeout must be set")
+  assert.deepEqual(client.executedValues[setTimeout], ["321ms"])
+  assert.ok(setTimeout < ledger, "the timeout must apply to the ledger DDL")
+  assert.ok(setTimeout < advisoryLock, "the timeout must apply to the advisory-lock wait")
+  assert.deepEqual(sql.slice(-3).map((statement) => statement.replace(/\s+/g, " ")), [
+    "SELECT pg_advisory_unlock(hashtextextended('blumi:migrations', 0))",
+    "RESET lock_timeout",
+    "<release>"
+  ])
+})
+
+test("a connection that cannot reset its lock timeout is destroyed, not reused", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "blumi-migration-reset-failure-"))
+  const client = createFakeMigrationClient()
+  const resetError = new Error("connection lost")
+  const query = client.query.bind(client)
+  client.query = async (sql: string, values?: unknown[]) => {
+    if (sql.trim() === "RESET lock_timeout") throw resetError
+    return query(sql, values)
+  }
+  const released: unknown[] = []
+  client.release = (error?: unknown) => { released.push(error) }
+
+  await runMigrationsWithClient(client as never, directory)
+
+  assert.deepEqual(released, [resetError])
+})
+
+test("the migrator sets its own session limits before any other statement", async () => {
+  // A pooled server connection may still carry the app's 10 s statement and
+  // 3 s lock budget; a migration must never inherit it.
+  const directory = await mkdtemp(join(tmpdir(), "blumi-migration-session-"))
+  await writeFile(join(directory, "001_first.sql"), "SELECT 1")
+  const client = createFakeMigrationClient()
+
+  await runMigrationsWithClient(client as never, directory)
+  assert.match(client.executedSql[0] ?? "", /set_config\('statement_timeout', \$1, false\)/)
+  assert.match(client.executedSql[0] ?? "", /set_config\('lock_timeout', \$2, false\)/)
+  assert.match(client.executedSql[0] ?? "", /set_config\('idle_in_transaction_session_timeout', \$3, false\)/)
+  assert.deepEqual(client.executedValues[0], ["0ms", "0ms", "0ms"])
+})
+
 function createFakeMigrationClient() {
   const applied = new Map<string, string | null>()
   return {

@@ -19,8 +19,12 @@ import {
   getSettingsActionErrorMessageForDisplay,
   getSettingsVerificationErrorToastForDisplay
 } from "../session/settingsActionErrorCopy"
+import { requestAccountReauthTarget } from "./accountReauthPhone"
+import { isReauthSignInRequiredError, reauthSignInAlertArgs } from "./reauthSignInRequired"
+import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import { sanitizeVerificationCode } from "./settingsPresentationModel"
+import { useSensitiveReauthHold } from "./useSensitiveReauthHold"
 
 /**
  * Account deletion: prompt -> one-time code to the sign-in phone -> server
@@ -30,18 +34,23 @@ export function useAccountDeletion(input: {
   sessionActor: SessionActor
   copy: SettingsCopy
   locale: AppLocale
-  onResetSession: () => Promise<void>
+  /** Returns a reset bound to the session the final request starts in. */
+  bindSessionReset: () => () => Promise<void>
+  /** Signs the user out so they can sign in again by SMS (a withheld phone). */
+  onSignInAgain?: () => void
 }) {
-  const { copy, locale, onResetSession, sessionActor } = input
+  const { bindSessionReset, copy, locale, onSignInAgain, sessionActor } = input
   const [isDeletingAccount, setIsDeletingAccount] = useState(false)
   const [deletionCode, setDeletionCode] = useState("")
   const [deletionCodeVisible, setDeletionCodeVisible] = useState(false)
   const deletionFirebaseConfirmationRef = useRef<FirebasePhoneConfirmation | null>(null)
   const deletionChallengeRef = useRef<string | null>(null)
+  const reauthHold = useSensitiveReauthHold()
 
   const deleteAccount = useCallback(async (confirmationToken: string): Promise<void> => {
     if (isDeletingAccount) return
     setIsDeletingAccount(true)
+    const resetDeletedSession = bindSessionReset()
     try {
       let deletionStatus: "deleted" | "pending_firebase_deletion" = "deleted"
       if (sessionActor.session.mode === "production") {
@@ -51,7 +60,7 @@ export function useAccountDeletion(input: {
           confirmationToken
         )
       }
-      await onResetSession()
+      await resetDeletedSession()
       showToast({
         title: deletionStatus === "deleted" ? copy.deletedTitle : copy.deletionPendingTitle,
         body: deletionStatus === "deleted" ? copy.deletedBody : copy.deletionPendingBody,
@@ -66,7 +75,7 @@ export function useAccountDeletion(input: {
     } finally {
       setIsDeletingAccount(false)
     }
-  }, [copy, isDeletingAccount, locale, onResetSession, sessionActor])
+  }, [bindSessionReset, copy, isDeletingAccount, locale, sessionActor])
 
   const requestDeletionCode = useCallback(async () => {
     if (isDeletingAccount || sessionActor.session.mode !== "production") {
@@ -75,15 +84,27 @@ export function useAccountDeletion(input: {
     }
     setIsDeletingAccount(true)
     try {
-      const currentPhoneNumber = getFirebaseCurrentPhoneNumber()
-      if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
-      deletionChallengeRef.current = (await requestFirebaseAccountActionChallenge(
-        MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "account_deletion" }
-      )).challengeId
-      deletionFirebaseConfirmationRef.current = await requestFirebasePhoneCode(currentPhoneNumber)
+      reauthHold.hold()
+      // The account's phone, not Firebase's: an interrupted phone change must
+      // never block deletion.
+      const { challenge, phoneNumber: accountPhoneNumber } = await requestAccountReauthTarget({
+        userId: sessionActor.session.userId,
+        pending: pendingPhoneChange,
+        firebasePhone: getFirebaseCurrentPhoneNumber,
+        requestChallenge: (knownPhone) => requestFirebaseAccountActionChallenge(
+          MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken,
+          { purpose: "account_deletion", ...(knownPhone ? { targetPhoneNumber: knownPhone } : {}) }
+        )
+      })
+      deletionChallengeRef.current = challenge.challengeId
+      deletionFirebaseConfirmationRef.current = await requestFirebasePhoneCode(accountPhoneNumber)
       setDeletionCode("")
       setDeletionCodeVisible(true)
     } catch (error) {
+      if (isReauthSignInRequiredError(error)) {
+        Alert.alert(...reauthSignInAlertArgs(locale, copy.cancel, onSignInAgain))
+        return
+      }
       showToast({
         title: copy.codeNotSent,
         body: getSettingsActionErrorMessageForDisplay("requestDeletionCode", error, locale),
@@ -92,7 +113,7 @@ export function useAccountDeletion(input: {
     } finally {
       setIsDeletingAccount(false)
     }
-  }, [copy, isDeletingAccount, locale, sessionActor])
+  }, [copy, isDeletingAccount, locale, onSignInAgain, reauthHold, sessionActor])
 
   const verifyDeletionCode = useCallback(async () => {
     if (isDeletingAccount || sessionActor.session.mode !== "production") return
@@ -109,6 +130,7 @@ export function useAccountDeletion(input: {
       )
       deletionFirebaseConfirmationRef.current = null
       deletionChallengeRef.current = null
+      reauthHold.release()
       setDeletionCodeVisible(false)
       Alert.alert(
         copy.deletePermanentlyTitle,
@@ -126,7 +148,7 @@ export function useAccountDeletion(input: {
     } finally {
       setIsDeletingAccount(false)
     }
-  }, [copy, deleteAccount, deletionCode, isDeletingAccount, locale, sessionActor])
+  }, [copy, deleteAccount, deletionCode, isDeletingAccount, locale, reauthHold, sessionActor])
 
   const handleDeleteAccountPrompt = useCallback(() => {
     Alert.alert(
@@ -148,7 +170,10 @@ export function useAccountDeletion(input: {
   const changeDeletionCode = useCallback((value: string) => {
     setDeletionCode(sanitizeVerificationCode(value))
   }, [])
-  const closeDeletionCode = useCallback(() => setDeletionCodeVisible(false), [])
+  const closeDeletionCode = useCallback(() => {
+    reauthHold.release()
+    setDeletionCodeVisible(false)
+  }, [reauthHold])
 
   return {
     isDeletingAccount,

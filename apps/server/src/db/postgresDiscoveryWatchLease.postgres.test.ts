@@ -3,11 +3,12 @@ import test from "node:test"
 import { randomUUID } from "node:crypto"
 import { Pool } from "pg"
 import { createPostgresMatchRepository } from "./postgresMatchRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 test("F45 stale discovery-watch claims cannot resurrect cancellation or overwrite new preferences", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
   const repository = createPostgresMatchRepository(pool)
   const userId = `watch_${randomUUID()}`
@@ -57,9 +58,9 @@ test("F45 stale discovery-watch claims cannot resurrect cancellation or overwrit
 })
 
 test("a watch restored with a cooldown is not claimed again until it lapses, and new preferences lift it", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
   const repository = createPostgresMatchRepository(pool)
   const userId = `watch_${randomUUID()}`

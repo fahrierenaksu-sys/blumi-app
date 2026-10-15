@@ -34,20 +34,37 @@ export type ProductEventName =
   | "referral_share_sheet_resolved"
   | "referral_attribution_submitted"
 
-const client = BLUMI_POSTHOG_API_KEY
-  ? new PostHog(BLUMI_POSTHOG_API_KEY, {
-      host: BLUMI_POSTHOG_HOST,
-      defaultOptIn: false,
-      captureAppLifecycleEvents: false,
-      enableSessionReplay: false,
-      setDefaultPersonProperties: false,
-      errorTracking: { autocapture: false }
-    })
-  : null
-
+let client: PostHog | null = null
 let captureEnabled = false
 
+/**
+ * The SDK is created only once the user grants consent, so first launch and a
+ * refusal make no telemetry request at all. Remote feature flags are never
+ * loaded (the app uses none): reset() after a withdrawal would otherwise
+ * request /flags.
+ */
+function createProductAnalyticsClient(): PostHog | null {
+  if (!BLUMI_POSTHOG_API_KEY) return null
+  return new PostHog(BLUMI_POSTHOG_API_KEY, {
+    host: BLUMI_POSTHOG_HOST,
+    defaultOptIn: false,
+    captureAppLifecycleEvents: false,
+    enableSessionReplay: false,
+    setDefaultPersonProperties: false,
+    disableRemoteFeatureFlags: true,
+    preloadFeatureFlags: false,
+    errorTracking: { autocapture: false }
+  })
+}
+
+/** The client if consent ever created one; never creates it. */
 export function getProductAnalyticsClient(): PostHog | null {
+  return client
+}
+
+/** Creates the client on first consent grant. */
+export function ensureProductAnalyticsClient(): PostHog | null {
+  if (!client) client = createProductAnalyticsClient()
   return client
 }
 

@@ -3,11 +3,12 @@ import test from "node:test"
 import { Pool } from "pg"
 import { randomUUID } from "node:crypto"
 import { createPostgresPersonalRoomDecorRepository } from "./postgresPersonalRoomDecorRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 test("F49 saved decor advances and two PostgreSQL clients cannot overwrite the same revision", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use isolated postgres-gate")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const first = await pool.connect()
   const second = await pool.connect()

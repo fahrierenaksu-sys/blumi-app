@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     ...uiTheme.font.bodyBold
   },
   primaryCtaText: {
-    color: uiTheme.colors.textInverted
+    color: uiTheme.colors.onPrimary
   },
   secondaryCtaText: {
     color: uiTheme.colors.textPrimary

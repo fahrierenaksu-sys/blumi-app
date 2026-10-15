@@ -960,7 +960,8 @@ export async function registerThreadRoutes(
         userId,
         threadId,
         hiddenThrough: hidden.hiddenThrough,
-        readAt: hidden.readAt
+        readAt: hidden.readAt,
+        ...(hidden.hiddenThroughMessageId ? { hiddenThroughMessageId: hidden.hiddenThroughMessageId } : {})
       })
     } catch (error) {
       if (!isPublicRequestError(error)) throw error

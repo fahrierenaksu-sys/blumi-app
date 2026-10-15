@@ -94,6 +94,8 @@ export interface SettingsCopy {
   dataExportPromptBody: string
   sendExportCode: string
   phoneChangePromptBody: string
+  phoneChangeExpired: string
+  phoneChangeUnconfirmed: string
   sendSecurityCode: string
   signOutTitle: string
   signOutBody: string
@@ -148,6 +150,7 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     deleteAccountPromptBody: "We’ll send a one-time code to your sign-in phone. After you enter it, you’ll make one final permanent-delete confirmation.", sending: "Sending…", sendDeletionCode: "Send deletion code",
     dataExportPromptBody: "We’ll send a one-time code to your sign-in phone, then prepare a JSON export of your account, activity, inventory, and messages you wrote for sharing.", sendExportCode: "Send export code",
     phoneChangePromptBody: "We’ll verify your current phone first, then the new one. When the change is complete, this device will be signed out.", sendSecurityCode: "Send security code",
+    phoneChangeExpired: "Your codes expired and your number was not changed. Start the phone change again.", phoneChangeUnconfirmed: "We couldn’t confirm whether your number changed. Sign in again to check.",
     signOutTitle: "Sign out of Blumi?", signOutBody: "You can sign back in with your phone number anytime.",
     showAgainTitle: "Show this person again?", showAgainBody: "They can appear in Blumi spaces again after this.", showAgain: "Show again", personVisibleAgain: "They can appear again",
     deletionCodeTitle: "Confirm with your code", deletionCodeBody: "Enter the 6-digit code sent to your sign-in phone. It expires in 5 minutes.", deletionCode: "Account deletion code", cancelDeletion: "Cancel account deletion", verifyDeletion: "Verify account deletion code",
@@ -194,6 +197,7 @@ const COPY: Record<AppLocale, SettingsCopy> = {
     deleteAccountPromptBody: "Giriş telefonuna tek kullanımlık bir kod göndereceğiz. Kodu girdikten sonra son bir kalıcı silme onayı vereceksin.", sending: "Gönderiliyor…", sendDeletionCode: "Silme kodu gönder",
     dataExportPromptBody: "Giriş telefonuna tek kullanımlık bir kod göndereceğiz; ardından hesabının, etkinliklerinin, envanterinin ve yazdığın mesajların JSON dışa aktarımını hazırlayacağız.", sendExportCode: "Dışa aktarım kodu gönder",
     phoneChangePromptBody: "Önce mevcut telefonunu, sonra yenisini doğrulayacağız. İşlem tamamlandığında bu cihazın oturumu kapatılır.", sendSecurityCode: "Güvenlik kodu gönder",
+    phoneChangeExpired: "Kodların süresi doldu ve numaran değişmedi. Telefon değişikliğini yeniden başlat.", phoneChangeUnconfirmed: "Numaranın değişip değişmediğini doğrulayamadık. Kontrol etmek için yeniden giriş yap.",
     signOutTitle: "Blumi’den çıkış yapılsın mı?", signOutBody: "Telefon numaranla dilediğin zaman yeniden giriş yapabilirsin.",
     showAgainTitle: "Bu kişi yeniden gösterilsin mi?", showAgainBody: "Bu işlemden sonra Blumi alanlarında yeniden görünebilir.", showAgain: "Yeniden göster", personVisibleAgain: "Bu kişi yeniden görünebilir",
     deletionCodeTitle: "Kodunla onayla", deletionCodeBody: "Giriş telefonuna gönderilen 6 haneli kodu gir. Kod 5 dakika içinde geçerliliğini yitirir.", deletionCode: "Hesap silme kodu", cancelDeletion: "Hesap silmeyi iptal et", verifyDeletion: "Hesap silme kodunu doğrula",

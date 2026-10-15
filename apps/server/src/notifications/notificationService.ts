@@ -1,5 +1,8 @@
 import {
   createInMemoryNotificationRepository,
+  isEnabled,
+  isWithinQuietHours,
+  DEVICE_SEEN_REFRESH_MS,
   MAX_DEVICES_PER_ACCOUNT,
   type DeviceRegistration,
   type NotificationPreferences,
@@ -89,12 +92,22 @@ export interface NotificationService {
   onDeliveriesQueued?(listener: () => void): () => void
 }
 
+/** Default limit for one push provider call (send, receipt lookup). */
+export const DEFAULT_PUSH_PROVIDER_TIMEOUT_MS = 10_000
+
 export interface CreateNotificationServiceOptions {
   repository?: NotificationRepository
   pushProvider?: PushProvider
   now?: () => Date
   deliveryIdFactory?: () => string
   providerTimeoutMs?: number
+  /**
+   * Limit for the push send made while the dispatch holds row and advisory
+   * locks (withAuthorizedDelivery). Defaults to providerTimeoutMs and never
+   * exceeds it. The PostgreSQL server sets it below its lock_timeout so
+   * device removal and account deletion never time out behind a slow send.
+   */
+  lockedSendTimeoutMs?: number
   reportPushFailure?: (failure: SafePushFailure) => void
   /** The recipient's app language when the server knows it; English otherwise. */
   resolveRecipientLocale?: (userId: string) => Promise<PushLocale | undefined>
@@ -136,7 +149,7 @@ export interface CreateNotificationServiceOptions {
 }
 
 export interface SafePushFailure {
-  stage: "ticket" | "receipt"
+  stage: "ticket" | "receipt" | "device_seen"
   errorCode: string
   notificationType: string
   attempt: number
@@ -154,7 +167,8 @@ export function createNotificationService(
   const pushProvider = options.pushProvider ?? createDevelopmentPushProvider()
   const now = options.now ?? (() => new Date())
   const deliveryIdFactory = options.deliveryIdFactory ?? createDeliveryId
-  const providerTimeoutMs = options.providerTimeoutMs ?? 10_000
+  const providerTimeoutMs = options.providerTimeoutMs ?? DEFAULT_PUSH_PROVIDER_TIMEOUT_MS
+  const lockedSendTimeoutMs = Math.min(options.lockedSendTimeoutMs ?? providerTimeoutMs, providerTimeoutMs)
   const reportPushFailure = (stage: SafePushFailure["stage"], errorCode: string, attempt: number, type?: string) => {
     const notificationType = ["chat.message", "chat.room_invite", "discovery.match", "discovery.like", "discovery.watch_match"].includes(type ?? "")
       ? type! : "unknown"
@@ -182,6 +196,9 @@ export function createNotificationService(
   }
   if (!Number.isSafeInteger(providerTimeoutMs) || providerTimeoutMs < 1 || providerTimeoutMs >= DELIVERY_LEASE_MS) {
     throw new Error("Provider timeout must be shorter than the delivery lease.")
+  }
+  if (!Number.isSafeInteger(lockedSendTimeoutMs) || lockedSendTimeoutMs < 1) {
+    throw new Error("Locked push send timeout must be a positive integer.")
   }
   const queuedListeners = new Set<() => void>()
   const announceQueued = () => {
@@ -225,6 +242,22 @@ export function createNotificationService(
     }
   }
 
+  // An app start that finds its token registered counts as use, so a full
+  // quota replaces the device the account used least recently.
+  const markSeen = async (device: DeviceRegistration, now: Date): Promise<DeviceRegistration> => {
+    if (!device.registrationId || Date.parse(device.registeredAt) >= now.getTime() - DEVICE_SEEN_REFRESH_MS) return device
+    try {
+      await repository.markDeviceSeen({ userId: device.userId, pushToken: device.pushToken,
+        registrationId: device.registrationId, seenAt: now })
+    } catch {
+      // Best-effort: a registration that already exists must not fail because its
+      // sighting could not be recorded. Only a fixed code is reported, never ids.
+      reportPushFailure("device_seen", "device_seen_refresh_failed", 1)
+      return device
+    }
+    return { ...device, registeredAt: now.toISOString() }
+  }
+
   const ensureDeviceRegistered: NotificationService["ensureDeviceRegistered"] = async (userId, input, now = new Date()) => {
     const device: DeviceRegistration = {
       registrationId: randomUUID(),
@@ -240,8 +273,9 @@ export function createNotificationService(
     const readEpoch = registrationCache.epoch()
     const existing = await findCurrent()
     if (existing?.platform === device.platform) {
-      registrationCache.remember(existing, readEpoch)
-      return { device: existing, changed: false }
+      const seen = await markSeen(existing, now)
+      registrationCache.remember(seen, readEpoch)
+      return { device: seen, changed: false }
     }
     if (await repository.saveDeviceBounded(device) === "limit") {
       throw new DeviceRegistrationLimitError()
@@ -397,6 +431,32 @@ export function createNotificationService(
           return
         }
       }
+      // The recipient may have changed preferences since this was queued (or
+      // since the last failed attempt). Policy: a category turned off drops the
+      // push, and so does quiet hours beginning before it is sent. Quiet hours
+      // drop rather than defer, matching the enqueue-time decision, so a push
+      // never arrives later as a stale surprise. The hourly cap and duplicate
+      // checks were claimed at enqueue and are not repeated.
+      const policyType = resolveNotificationPolicy(delivery.notification, dispatchAt)?.type
+      if (policyType) {
+        let preferences: NotificationPreferences
+        try {
+          preferences = await repository.getPreferences(delivery.userId)
+        } catch {
+          await scheduleRetryOrFail(delivery, attempt, dispatchAt, "preference_check_failed")
+          return
+        }
+        const droppedFor = !isEnabled(preferences, policyType) ? "preference_disabled"
+          : isWithinQuietHours(dispatchAt, preferences) ? "quiet_hours"
+          : undefined
+        if (droppedFor) {
+          if (delivery.leaseToken) await repository.markDeliveryFailed({
+            deliveryId: delivery.deliveryId, leaseToken: delivery.leaseToken, attempt,
+            now: dispatchAt, errorCode: droppedFor
+          })
+          return
+        }
+      }
       // Read before the authorized send, which holds a database connection.
       const [badge, presentation] = await Promise.all([
         resolveBadge(delivery.userId),
@@ -416,7 +476,7 @@ export function createNotificationService(
             timer = setTimeout(() => {
               controller.abort()
               reject(new Error("provider unavailable: timeout"))
-            }, providerTimeoutMs)
+            }, lockedSendTimeoutMs)
           })
         ]))
         if (!admitted.authorized) {

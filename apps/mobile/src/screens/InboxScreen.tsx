@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...uiTheme.font.overline,
-    color: uiTheme.colors.primary
+    color: uiTheme.colors.primaryDeep
   },
   headerCount: {
     ...uiTheme.font.caption,
@@ -598,7 +598,7 @@ const emptyStyles = StyleSheet.create({
     justifyContent: "center"
   },
   ctaText: {
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     ...uiTheme.font.bodySmall,
     fontWeight: "800"
   }

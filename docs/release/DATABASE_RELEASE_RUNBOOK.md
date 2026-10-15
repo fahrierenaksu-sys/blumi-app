@@ -104,6 +104,142 @@ release audit reports one missing migration; that is expected. Steps,
 compatibility matrix, verification and rollback order:
 [`MIGRATION_070_RUNBOOK.md`](./MIGRATION_070_RUNBOOK.md).
 
+## Migrations 074–076 (2026-10-15) — WRITTEN, NOT APPLIED
+
+Three additive files from the 2026-10-14 release audit, each tested in the
+isolated PostgreSQL gate (first apply and rerun). All three are in
+`OPTIONAL_READINESS_MIGRATIONS`, so `/ready` stays green whichever of code and
+schema reaches production first. The preferred order is still migrate first,
+then deploy. None of them changes or deletes an existing row.
+
+The migrator applies **every** pending file in order: a plain `db:migrate`
+would also apply the still-pending 070 and 071. To apply only some files, use
+an isolated migrator directory holding just those files (as done for 073), and
+keep each step a separate owner yes with its own fresh restore-tested dump.
+The exact procedure is "Applying 074–076 through an isolated directory" below.
+
+| File | What | Optional because | Order |
+|---|---|---|---|
+| `074_notification_retention_index.sql` | Partial index `(created_at) WHERE notification_type IN ('message','like')` on `blumi_notification_policy_events` (audit D08) | Index only; every query returns the same rows without it | Any time. Builds under a SHARE lock (claim writes wait, reads do not) inside the migrator transaction, bounded by its 5 s lock timeout; not CONCURRENTLY, because the migrator runs each file in a transaction. If the lock times out, nothing changed: run it again later. |
+| `075_chat_hide_point_message.sql` | Nullable `hidden_through_message_id` and `hidden_through_message_sent_at` next to 071's `hidden_through` (audit R15) | The chat repository probes this ledger row and keeps 071's time-only rule until it exists | After or together with 071 (alone it is harmless but unused). Code before or after. |
+| `076_beta_reset_runs.sql` | Table `blumi_beta_reset_runs`, one row per applied beta reset (audit F2) | The app never touches it; the reset script refuses every apply without it | Before the next beta reset apply. Code order does not matter. |
+
+Gate evidence for 074 on 300,001 synthetic claims: the retention scan went from
+a sequential scan reading and discarding 297,000 rows (about 74 ms) to an index
+scan of the partial index discarding none (about 2 ms), and the purge deleted
+exactly the rows the unindexed predicate selects.
+
+075 compatibility: a binary that knows 075 writes the hidden message's id and
+time with `hidden_through` and reads that exact point only while its time still
+equals `hidden_through`. Rows hidden before 075, and rows whose
+`hidden_through` an older binary moved during a rolling deploy, keep 071's
+inclusive time rule, which can hide a same-millisecond message. One rolling-deploy
+case can show a message again: the new binary hides through X, then an older
+binary hides through Y, which shares X's millisecond and sorts after it. The
+older binary leaves the time unchanged, so the exact point stays at X and Y
+shows again in history. This needs both binaries live, a same-millisecond
+message and a second hide. The thread list (`hiddenThroughMessageId`) and the app use the same exact
+point as history. Unread counts are unchanged from before R15 (a time
+cursor; a read by id moves it to a time only), so a same-millisecond message
+after the hide point is not counted unread; it shows in history and the
+row. Residual for unread: none. Still open: a message stored with an earlier time that commits
+after a hide is ordered before the hide point and stays hidden; closing that
+needs a commit-ordered sequence, not this pair.
+
+076 caveat: the marker table starts empty. If a beta reset was already applied
+to this database before 076, record that in `LAUNCH_CONTROL.md` and treat the
+next apply as a repeat (`--repeat-reason`).
+
+075 locking: the ADD COLUMN takes a brief ACCESS EXCLUSIVE lock on
+`blumi_chat_thread_participants`. While it waits (at most the 5 s lock
+timeout) it also blocks reads of that table: thread list, send and history.
+Apply it at a quiet moment.
+
+Rollback (each needs the owner's yes; take a dump first). Run every statement
+inside `BEGIN; SET LOCAL lock_timeout = '5s'; <statement>; COMMIT;` so a busy
+table makes it fail instead of queueing the app behind it:
+
+- 074: `DROP INDEX IF EXISTS blumi_notification_policy_events_retention_idx;`
+  then delete its `blumi_migrations` row. Retention keeps working, slower.
+- 075: delete its `blumi_migrations` row first and wait at least 30 s (the
+  probe interval) so running binaries stop naming the columns; then
+  `ALTER TABLE blumi_chat_thread_participants DROP COLUMN IF EXISTS
+  hidden_through_message_id, DROP COLUMN IF EXISTS hidden_through_message_sent_at;`.
+  Hide points fall back to `hidden_through` (hides at most a same-millisecond
+  message more; nothing hidden becomes visible).
+- 076: delete its `blumi_migrations` row only. Do not drop the table after a
+  reset ran: it is the only record that the reset happened. Without the table
+  the reset script refuses every apply.
+
+### Applying 074–076 through an isolated directory
+
+Nothing here has been run against a real database. Every step that writes
+needs the owner's yes in the current conversation. Run on the owner's Mac from
+the repository root, at the commit that holds the files, one command at a time;
+stop at the first STOP. Live ledger when written: 001–069, 072 and 073 applied;
+**070 and 071 pending**. The owner chooses one path before step 1:
+
+- **Path A, only 074–076:** 070 and 071 stay pending. 075 is then stored but
+  unused (it needs 071), which is harmless.
+- **Path B, 070, 071 and 074–076 together:** also follow
+  [`MIGRATION_070_RUNBOOK.md`](./MIGRATION_070_RUNBOOK.md) for 070's checks.
+  The isolated directory then holds all five files, which is what a plain
+  `db:migrate` would apply, but the set is written down and checked.
+
+1. Clean checkout: `git status --short` prints nothing. STOP otherwise.
+2. Make the isolated directory (this prints its path; use it as `$ONLY` below,
+   in the same terminal):
+   `ONLY=$(mktemp -d /tmp/blumi-migrate.XXXXXX) && echo "$ONLY"`
+3. Copy exactly the chosen files.
+   - Path A: `cp apps/server/db/migrations/07[456]_*.sql "$ONLY"/ && ls "$ONLY"`
+     → exactly `074_notification_retention_index.sql`,
+     `075_chat_hide_point_message.sql`, `076_beta_reset_runs.sql`.
+   - Path B: `cp apps/server/db/migrations/07[01456]_*.sql "$ONLY"/ && ls "$ONLY"`
+     → those three plus `070_chat_delivery_receipts.sql` and
+     `071_chat_hide_for_me_and_advisor_fixes.sql`.
+   STOP if the list differs.
+4. Prove each copy is byte-identical to the repository file. The ledger
+   checksum is the SHA-256 of the file, and `/ready` fails on an optional row
+   whose checksum differs, so one changed byte (CRLF, an editor save) would take
+   the API down:
+   `for f in "$ONLY"/*.sql; do n=$(basename "$f"); a=$(shasum -a 256 "$f" | cut -d' ' -f1); b=$(shasum -a 256 "apps/server/db/migrations/$n" | cut -d' ' -f1); if [ "$a" = "$b" ]; then echo "OK $n $a"; else echo "STOP $n"; fi; done`
+   → one `OK` line per file. Keep these checksums for steps 8 and 9.
+5. Fresh PostgreSQL 17 dump of the live database, right before the apply:
+   `PATH=/opt/homebrew/opt/postgresql@17/bin:$PATH node --env-file-if-exists=.env.local scripts/automation/local-backup.mjs`
+   → note the archive path and SHA-256. STOP if it fails.
+6. Rehearse exactly this file set on that dump. The gate restores into a
+   throwaway PostgreSQL 17 cluster and never reads `DATABASE_URL`; with
+   `BLUMI_MIGRATIONS_ONLY_DIRECTORY` it applies only the isolated files, refuses
+   any copy that differs from the repository, and lists what stays pending:
+   `LC_ALL=en_US.UTF-8 BLUMI_MIGRATIONS_ONLY_DIRECTORY="$ONLY" node scripts/security/restore-upgrade-gate.mjs /absolute/path/to/fresh.dump`
+   → `archiveSha256` equals step 5, `rerunApplied` is 0, `accounts` and
+   `inventories` match the read-only audit (step 7), and:
+   - Path A: `appliedFiles` is the three files and `stillPending` is
+     `["070_chat_delivery_receipts.sql","071_chat_hide_for_me_and_advisor_fixes.sql"]`.
+   - Path B: `appliedFiles` is the five files and `stillPending` is `[]`.
+   STOP on any error or difference.
+7. Confirm the target is the release database (read-only):
+   `node --env-file-if-exists=.env.local --import tsx apps/server/scripts/auditDatabaseRelease.ts --project-ref nkqcbxufbhfibrgvajim`
+   → the project ref matches; the missing migrations are exactly the files you
+   are about to apply (Path A also leaves 070/071 missing). STOP otherwise.
+8. Apply (owner's yes for this step, in the current conversation). Only the
+   files in `$ONLY` are read; each file runs in its own transaction with the
+   5 s lock timeout:
+   `ONLY="$ONLY" node --env-file-if-exists=.env.local --import tsx --input-type=module -e "import m from './apps/server/src/db/migrate.ts'; const r = await m.runMigrations({ databaseUrl: process.env.DATABASE_URL, migrationsDirectory: process.env.ONLY, ...m.parseMigrationTimeouts(process.env) }); console.log('applied', JSON.stringify(r.applied), 'skipped', r.skipped.length)"`
+   → `applied` lists exactly the files of step 3. A lock timeout rolls back
+   only the file it hit: run step 9, then step 8 again later; files already
+   applied are skipped.
+9. Read the ledger back (read-only transaction):
+   `node --env-file-if-exists=.env.local --input-type=module -e "import pg from 'pg'; const c = new pg.Client({ connectionString: process.env.DATABASE_URL }); await c.connect(); try { await c.query('BEGIN READ ONLY'); const r = await c.query(\"SELECT id, checksum FROM blumi_migrations WHERE id >= '070' ORDER BY id\"); for (const row of r.rows) console.log(row.id, row.checksum); await c.query('ROLLBACK') } finally { await c.end() }"`
+   → each applied file with the checksum from step 4, 072 and 073 unchanged,
+   and (Path A) no 070/071 row. Then `curl -s https://<api-host>/ready` is
+   ready. STOP and use the rollback above if either fails.
+10. Record it: add each applied file and its checksum from step 9 to
+    `apps/server/db/migrations.applied.json`, update the ledger line at the top
+    of this file and `LAUNCH_CONTROL.md` (date, dump SHA-256, path A or B),
+    run `node --import tsx --test apps/server/src/db/migrationLedger.test.ts`
+    and commit. Then `rm -r "$ONLY"`.
+
 ## Safe inspection
 
 From the repository root, with the exact target project ref:
@@ -125,12 +261,13 @@ project and environment have not been independently confirmed.
 
 `apps/server/scripts/betaReset.ts` is the only way to run it; never ad-hoc SQL.
 It sets coins to 1,250, every loadout to its body's starter look, every finished
-room to the starter room with the bed, and deletes all chats, messages, matches,
+room to the starter room with the bed (all three skip the test personas, which
+keep their seeded coins, looks and rooms), and deletes all chats, messages, matches,
 discovery decisions (except the likes the test personas hand out), mini rooms,
 invites, reactions, pending pushes about them, room presence, realtime payloads
 and old room renders. It never writes profile columns, sessions, push devices,
-settings, blocks, reports, bans, money ledgers, owned items, test personas or
-`blumi_migrations`. Deleting a mini room queues a LiveKit media revocation per
+settings, blocks, reports, bans, money ledgers, owned items, test personas (their
+rows, coins, looks or rooms) or `blumi_migrations`. Deleting a mini room queues a LiveKit media revocation per
 participant (database trigger, as when the app ends a room; voice is off).
 Output is counts, catalog item IDs and commit SHAs only.
 
@@ -178,7 +315,10 @@ command; stop at the first STOP.
    each user gets, what is kept. The reset is pre-approved; this is a notice.
 6. Apply: the same command plus `--apply --expect <sha256> --fingerprint <fp>
    --deployed-commit <step 1 commit>`, with `BLUMI_BETA_RESET_CONFIRM=reset-beta-<ref>`
-   set for that one command. It locks the tables it writes, refuses on a hash,
+   set for that one command. It refuses before connecting when the checkout has
+   uncommitted changes to tracked files or when the typed commit (12 characters
+   or more, every one compared) is not the checkout's HEAD. It locks the tables
+   it writes, refuses on a hash,
    fingerprint or commit mismatch or when a live connection or room presence
    exists, and rolls back unless the post-check finds nothing left to reset, the
    accounts, inventories and persona likes at their old counts. `hash mismatch`
@@ -195,6 +335,15 @@ Undo: after the COMMIT the only undo is restoring the step 3 dump into a new
 Supabase project and pointing Railway's `DATABASE_URL` at it, which needs the
 owner's yes and loses everything written after the dump. After Phase F, retire
 the script: a later dry run plus apply would wipe the new chats again.
+
+One-shot marker (migration 076, audit F2): every applied reset records one
+row in `blumi_beta_reset_runs` (commit, plan hash, time, reason) in the same
+transaction. Without 076 the apply refuses before it locks anything. The dry
+run prints `previous-resets=<n>`; STOP unless it is 0. A database that already
+recorded a reset applies again only with `--repeat-reason "<why>"` (12–200
+plain characters, no phone-like numbers), given with the owner's yes, and the
+reason is recorded with the run. Two concurrent applies serialize on the
+table lock; the second one sees the first one's row and refuses.
 
 ## Environments and migration order
 
@@ -220,6 +369,22 @@ above. A separate staging Supabase project is recommended and still open
    ledger test (`apps/server/src/db/migrationLedger.test.ts`) then fails if
    that file ever changes, and holds every file not yet listed to the
    additive, RLS-and-revoke policy.
+
+### Pre-deploy checklist: Railway variables
+
+Before every API deploy, check the variable names in Railway → project →
+service `blumi-app` → Variables. Look only at whether each name is set and to
+which allowed word; never copy, print or paste a secret value.
+
+- [ ] check Railway variables: `BLUMI_RATE_BUDGET_STORE` must be unset or
+  `postgres`. The server refuses to start in production with `memory` (audit
+  D09), so the deploy would crash-loop. Fix: delete the variable or set it to
+  `postgres`.
+- [ ] `BLUMI_TRUST_PROXY` is set (`100.64.0.0/10` on Railway); production
+  refuses to start without it.
+- [ ] `BLUMI_DB_STATEMENT_TIMEOUT_MS`, `BLUMI_DB_LOCK_TIMEOUT_MS` and
+  `BLUMI_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` are unset unless the owner chose
+  other limits (defaults 10 s, 3 s, 30 s; see `databasePoolConfig.ts`).
 
 Until staging exists, rehearse each migration on the fresh dump instead: run
 `node scripts/security/restore-upgrade-gate.mjs /absolute/path/to/fresh.dump`

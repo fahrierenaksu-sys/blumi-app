@@ -26,9 +26,9 @@ Blumi is an Expo / React Native social app built around sweet 2.5D chibi avatars
   - Never take a whole file from one side (`--ours`, `--theirs`, `git checkout <branch> -- <file>`).
   - Never let a merge or a "restore" delete files the other side added. Check who added them with `git log --diff-filter=A -- <path>`.
   - Afterwards, diff the result against both parents and run typecheck plus the affected tests before you commit the merge.
-- Run `git fetch` before comparing branches, judging what is merged or picking a base, because local refs go stale. Base new branches and agent worktrees on a freshly fetched `origin/develop` and confirm it (`git merge-base --is-ancestor origin/develop HEAD`). Worktrees have silently started from `main` before.
+- Run `git fetch` before comparing branches, judging what is merged or picking a base, because local refs go stale. Base new branches and agent worktrees on the freshly fetched branch the owner currently integrates into (today the newest `release/2.5d-beta-N`; check with the lead) and confirm it (`git merge-base --is-ancestor <that ref> HEAD`). Worktrees have silently started from the wrong base before.
 - Commit finished work early and often, without asking, especially before long background jobs or when you are low on budget, because the cloud container restarts and kills them.
-- Push only when the owner says so in the current conversation ("push at"), to any branch, `develop` and your own work branch included. If unpushed work is at risk, say so and ask.
+- Push only when the owner says so in the current conversation ("push at"), to any branch, release branches and your own work branch included. If unpushed work is at risk, say so and ask.
 
 ## Strict: production, money and data
 
@@ -75,8 +75,8 @@ These rules protect the data:
 
 Branches and release:
 
-- `develop` is the integration branch that every agent merges into, and `main` is the release branch.
-  - CI (`verify.yml`) runs on pushes to `main` and on PRs.
+- Releases are cut from `release/2.5d-beta-N` branches, which agent work branches merge into; a release branch goes to `main` by PR. `main` is the release branch. `develop` is an old integration branch, far behind `main`; do not use it.
+  - CI (`verify.yml`) runs on pushes to `main` and `release/**` and on PRs. The EAS release checks also require a successful `Verify` run for the exact commit.
   - Railway builds the API from `main` but has not reliably auto-deployed, so check which commit is actually live.
   - TestFlight (`apps/mobile/.eas/workflows/testflight.yml`) starts by hand only.
 - Codex works on the owner's Mac (`codex/*` branches; it has the iOS Simulator and the art Workbench). Claude works in a Linux cloud container (`claude/*` and `worktree-*` branches) with no Simulator. Native visual checks happen on the Mac or the owner's phone. Until then, report them as Open.

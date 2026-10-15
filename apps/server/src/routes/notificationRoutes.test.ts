@@ -41,20 +41,24 @@ test("device API rejects malformed tokens without writes and accepts both Expo p
   } finally { await app.close() }
 })
 
-test("device API refuses parallel registrations above the cap with a safe 429 and preserves repeats", async () => {
+test("device API keeps parallel registrations at the cap, refuses another account's token with a safe 429 and preserves repeats", async () => {
   const { app, notificationService, userId, headers } = await harness()
   try {
     const results = await Promise.all(Array.from({ length: 20 }, (_, index) => app.inject({
       method: "POST", url: "/v1/devices", headers,
       payload: { platform: "ios", pushToken: `ExpoPushToken[parallel-${index}]` }
     })))
-    assert.equal(results.filter((result) => result.statusCode === 201).length, MAX_DEVICES_PER_ACCOUNT)
-    for (const result of results.filter((response) => response.statusCode !== 201)) {
-      assert.equal(result.statusCode, 429)
-      assert.equal(result.json().code, "DEVICE_REGISTRATION_LIMIT")
-      assert.equal(result.body.includes(userId), false)
-      assert.equal(result.body.includes("parallel-"), false)
-    }
+    // A full account replaces its oldest registrations, so rotated tokens register.
+    for (const result of results) assert.equal(result.statusCode, 201)
+    assert.equal((await notificationService.repository.listDevices(userId)).length, MAX_DEVICES_PER_ACCOUNT)
+    await notificationService.repository.saveDevice({ userId: "synthetic-other-account", platform: "ios",
+      pushToken: "ExpoPushToken[other-owner]", registeredAt: new Date().toISOString() })
+    const foreign = await app.inject({ method: "POST", url: "/v1/devices", headers,
+      payload: { platform: "ios", pushToken: "ExpoPushToken[other-owner]" } })
+    assert.equal(foreign.statusCode, 429)
+    assert.equal(foreign.json().code, "DEVICE_REGISTRATION_LIMIT")
+    assert.equal(foreign.body.includes(userId), false)
+    assert.equal(foreign.body.includes("other-owner"), false)
     const [existing] = await notificationService.repository.listDevices(userId)
     const repeat = await app.inject({ method: "POST", url: "/v1/devices", headers,
       payload: { platform: "ios", pushToken: existing!.pushToken } })

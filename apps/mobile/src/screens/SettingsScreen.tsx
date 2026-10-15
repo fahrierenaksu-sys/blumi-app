@@ -53,6 +53,8 @@ type SettingsScreenProps = NativeStackScreenProps<
 > & {
   sessionActor: SessionActor
   onResetSession: () => Promise<void>
+  /** Binds an account-ending reset to the session it started in. */
+  bindSessionReset: () => () => Promise<void>
   onUpdateProfile: (input: UpdateSessionProfileInput) => Promise<void>
   pushPermissionStatus: "unknown" | "undetermined" | "granted" | "denied"
   isRequestingPushPermission: boolean
@@ -70,6 +72,7 @@ type SettingsScreenProps = NativeStackScreenProps<
  */
 export function SettingsScreen(props: SettingsScreenProps) {
   const {
+    bindSessionReset,
     navigation,
     onRequestPushPermission,
     onResetSession,
@@ -87,9 +90,12 @@ export function SettingsScreen(props: SettingsScreenProps) {
     sessionActor.profile.userId,
     sessionActor.session.mode === "production"
   )
-  const deletion = useAccountDeletion({ sessionActor, copy, locale, onResetSession })
-  const dataExport = useAccountDataExport({ sessionActor, copy, locale })
-  const phoneChange = usePhoneChange({ sessionActor, copy, locale, onResetSession })
+  // A re-auth step the server could not tie to a phone ends here: sign out,
+  // then sign in by SMS (the Alert that offers this explains which number).
+  const onSignInAgain = useCallback(() => { void onResetSession() }, [onResetSession])
+  const deletion = useAccountDeletion({ sessionActor, copy, locale, bindSessionReset, onSignInAgain })
+  const dataExport = useAccountDataExport({ sessionActor, copy, locale, onSignInAgain })
+  const phoneChange = usePhoneChange({ sessionActor, copy, locale, bindSessionReset, onSignInAgain })
   const analyticsConsent = useAnalyticsConsent()
   const matching = useMatchingPreferences(sessionActor, onUpdateProfile)
   const myReports = useMyReports(sessionActor)

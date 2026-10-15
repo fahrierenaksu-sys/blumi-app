@@ -1,7 +1,7 @@
-import { execFileSync } from "node:child_process"
+import { execFileSync, spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
-import { evaluateAudit } from "./audit-policy.mjs"
+import { evaluateAuditRun } from "./audit-policy.mjs"
 
 const policy = JSON.parse(readFileSync(new URL("./audit-policy.json", import.meta.url), "utf8"))
 // npm audit cannot see patch-package fixes. Exercise the installed mitigations
@@ -14,13 +14,14 @@ execFileSync(process.execPath, ["--test",
   stdio: "inherit",
   timeout: 30_000
 })
-let report
-try {
-  report = JSON.parse(execFileSync("npm", ["audit", "--omit=dev", "--json"], { encoding: "utf8" }))
-} catch (error) {
-  report = JSON.parse(error.stdout)
-}
-const failures = evaluateAudit(report.vulnerabilities, policy)
+// spawnSync keeps the exit status and stdout together; evaluateAuditRun refuses
+// npm error JSON, missing or malformed reports and abnormal exits.
+const audit = spawnSync("npm", ["audit", "--omit=dev", "--json"], {
+  encoding: "utf8",
+  maxBuffer: 64 * 1024 * 1024,
+  timeout: 120_000
+})
+const failures = evaluateAuditRun(audit, policy)
 if (failures.length > 0) {
   console.error(JSON.stringify(failures, null, 2))
   process.exit(1)

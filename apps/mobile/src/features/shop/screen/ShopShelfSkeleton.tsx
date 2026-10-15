@@ -5,6 +5,7 @@ import type { AppLocale } from "../../session/appLocale"
 import { getShopCopy } from "../shopCopy"
 import type { ShopLayoutMetrics } from "../shopLayoutMetrics"
 import { shopScreenStyles } from "./shopScreenStyles"
+import { useAccessibilityAnnouncement } from "../../../ui/accessibilityAnnouncement"
 
 const SKELETON_RAIL_CHIPS = 4
 const SKELETON_CARDS = 4
@@ -16,6 +17,7 @@ const SKELETON_CARDS = 4
  */
 export function ShopShelfSkeleton(props: { layoutMetrics: ShopLayoutMetrics; locale: AppLocale }) {
   const copy = getShopCopy(props.locale)
+  useAccessibilityAnnouncement(`${copy.loading.title}. ${copy.loading.body}`)
   const { catalog, preview } = props.layoutMetrics
   return (
     <View

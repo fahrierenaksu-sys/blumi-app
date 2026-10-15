@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import {
+  ensureProductAnalyticsClient,
   getProductAnalyticsClient,
   setProductAnalyticsCaptureEnabled
 } from "./productAnalytics"
@@ -20,12 +21,13 @@ function notify(): void {
 }
 
 async function applyConsent(nextConsent: AnalyticsConsent): Promise<void> {
-  const client = getProductAnalyticsClient()
   if (nextConsent === "granted") {
-    await client?.optIn()
+    await ensureProductAnalyticsClient()?.optIn()
     setProductAnalyticsCaptureEnabled(true)
     return
   }
+  // Without consent no client is created; an existing one is opted out.
+  const client = getProductAnalyticsClient()
   setProductAnalyticsCaptureEnabled(false)
   await client?.optOut()
   client?.reset()

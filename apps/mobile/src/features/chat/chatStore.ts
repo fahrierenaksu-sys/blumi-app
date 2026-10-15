@@ -28,6 +28,7 @@ import {
 } from "./chatErrorCopy"
 import { applyReceiptEvent, applyReceiptSnapshot } from "./chatReceiptModel"
 import { keepLocalRenderKey, resetMessageRenderKeys } from "./chatMessageRenderKeys"
+import { clearChatComposerDrafts, keepOnlyChatComposerDrafts, resetChatComposerDrafts } from "./chatComposerDraftStore"
 import { forgetPartnerReceipts, getPartnerReceipts, resetPartnerReceipts, setPartnerReceipts } from "./chatPartnerReceiptsState"
 import { compareMessageOrder, forgetReadHere, getReadHereThrough, noteReadHere, resetReadHere } from "./chatReadHere"
 export { getPartnerReceipts } from "./chatPartnerReceiptsState"
@@ -235,6 +236,8 @@ export function applyChatThreadListed(
   }
   if (!payload.append) {
     unreadCounts = new Map([...unreadCounts].filter(([threadId]) => merged.has(threadId)))
+    // Only a complete list proves a conversation is gone; a first page does not.
+    if (!payload.nextCursor) keepOnlyChatComposerDrafts(new Set(merged.keys()), activeThreadId)
     participantUpdatesByUserId = new Map([...participantUpdatesByUserId]
       .filter(([, update]) => update.sequence > lastAppliedListRequestSequence))
   }
@@ -353,6 +356,7 @@ export function removeChatThreadsWithPartner(partnerUserId: string): string[] {
   summaryLastMessageByThread = new Map([...summaryLastMessageByThread].filter(([threadId]) => !removed.has(threadId)))
   forgetPartnerReceipts(removed)
   forgetReadHere(removed)
+  clearChatComposerDrafts(removedIds)
   participantUpdatesByUserId = new Map([...participantUpdatesByUserId].filter(([userId]) => userId !== partnerUserId))
   if (activeThreadId && removed.has(activeThreadId)) activeThreadId = null
   notify()
@@ -663,6 +667,7 @@ export function resetChatStore(): void {
   summaryLastMessageByThread = new Map()
   resetPartnerReceipts()
   resetReadHere()
+  resetChatComposerDrafts()
   activeThreadId = null
   learnedSequenceByThreadId = new Map()
   removedSequenceByThreadId = new Map()
@@ -694,14 +699,20 @@ export function getActiveChatThreadId(): string | null { return activeThreadId }
  * The server hid the conversation for this account through `hiddenThrough`
  * ("delete chat for me", migration 071). Cached messages at or before it are
  * dropped so a conversation brought back by a newer message shows only what
- * came after, as the server's history does. Unsent bubbles stay.
+ * came after, as the server's history does. With `hiddenThroughMessageId`
+ * (075) the point is that message: one in the same millisecond with a later
+ * id stays. Unsent bubbles stay.
  */
-export function applyChatThreadHiddenForMe(threadId: string, hiddenThrough: string): void {
+export function applyChatThreadHiddenForMe(threadId: string, hiddenThrough: string, hiddenThroughMessageId?: string): void {
   const through = Date.parse(hiddenThrough)
   if (!Number.isFinite(through)) return
   const cached = messageCache.get(threadId)
   if (!cached) return
-  const kept = cached.filter((message) => pendingLocalIds.has(message.messageId) || Date.parse(message.sentAt) > through)
+  const isAfterPoint = (message: ChatMessage) => {
+    const sentAt = Date.parse(message.sentAt)
+    return sentAt > through || (sentAt === through && hiddenThroughMessageId !== undefined && message.messageId.localeCompare(hiddenThroughMessageId) > 0)
+  }
+  const kept = cached.filter((message) => pendingLocalIds.has(message.messageId) || isAfterPoint(message))
   if (kept.length === cached.length) return
   messageCache = new Map(messageCache)
   messageCache.set(threadId, kept)
@@ -922,6 +933,7 @@ function reuseThread(previous: ChatThread | undefined, next: ChatThread): ChatTh
   if (previous.threadId === next.threadId && previous.miniRoomId === next.miniRoomId &&
     previous.createdAt === next.createdAt && previous.unreadCount === next.unreadCount &&
     previous.lastReadAt === next.lastReadAt && previous.hiddenThrough === next.hiddenThrough &&
+    previous.hiddenThroughMessageId === next.hiddenThroughMessageId &&
     previous.lastMessage === lastMessage && previous.partnerReceipts === partnerReceipts && sameIds && samePeople) return previous
   return { ...next, participants: samePeople ? previous.participants : participants,
     participantUserIds: sameIds ? previous.participantUserIds : next.participantUserIds, lastMessage, partnerReceipts }

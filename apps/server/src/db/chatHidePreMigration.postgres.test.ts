@@ -8,6 +8,7 @@ import { ChatHideUnavailableError, createChatService } from "../chat/chatService
 import { createSchemaReadinessCheck } from "../operations/schemaReadiness"
 import { runMigrations } from "./migrate"
 import { createPostgresChatRepository } from "./postgresChatRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 // The column rollback documented in docs/release/MIGRATION_071_RUNBOOK.md.
 // The gate database is disposable and has every migration; removing 071's
@@ -17,10 +18,10 @@ const ROLL_BACK_071_COLUMN =
   "ALTER TABLE blumi_chat_thread_participants DROP COLUMN IF EXISTS hidden_through"
 
 test("before 071 chat and /ready work on PostgreSQL with server hide off; applying 071 turns it on without a restart", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES === "1" ? false : "PostgreSQL contract runs in the isolated gate"
+  skip: disposablePostgresSkip().skip ? "PostgreSQL contract runs in the isolated gate" : false
 }, async () => {
   const databaseUrl = process.env.DATABASE_URL
-  assert.ok(databaseUrl, "Use the isolated postgres-gate runner.")
+  assertDisposablePostgresDatabase(databaseUrl)
   const pool = new Pool({ connectionString: databaseUrl, max: 4 })
   try {
     await pool.query(ROLL_BACK_071_COLUMN)

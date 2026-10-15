@@ -14,12 +14,13 @@ import { createPostgresChatRepository } from "./postgresChatRepository"
 import { createPostgresMatchRepository } from "./postgresMatchRepository"
 import { createPostgresMiniRoomRepository } from "./postgresMiniRoomRepository"
 import { createPostgresSafetyRepository } from "./postgresSafetyRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 // Adversarial PostgreSQL proofs for the social loop. Concurrency and storage
 // errors (for example NUL bytes, which PostgreSQL text rejects) only show up
 // against the real database, so these run through the disposable gate.
 
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
+const requirePostgres = { skip: disposablePostgresSkip().skip }
 const filters = { ageMin: 18, ageMax: 99, genders: [], vibes: [] }
 const avatar = {
   schemaVersion: 1, bodyId: "avatar_v2_body_default", faceId: "avatar_v2_face_default",
@@ -30,7 +31,7 @@ const avatar = {
 }
 
 function openPool(): Pool {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   return new Pool({ connectionString: process.env.DATABASE_URL, max: 25 })
 }
 

@@ -103,10 +103,7 @@ test("deferred auth destinations render the real screen on their first frame", (
   const runtime = createFirstFrameRuntime()
   const { createDeferredScreen } = loadSourceWithFakeReact<{
     createDeferredScreen: (loader: () => unknown) => { DeferredScreen: (props: unknown) => Element; preload: () => unknown }
-  }>("navigation/deferredScreenBundles.tsx", runtime, {
-    modules: { "../screens/MyRoomScreen": {} },
-    inertUnknown: true
-  })
+  }>("navigation/deferredScreen.tsx", runtime, { inertUnknown: true })
   let loads = 0
   const RealScreen = () => null
   const bundle = createDeferredScreen(() => { loads += 1; return RealScreen })

@@ -370,8 +370,6 @@ function SheetButton(props: {
       ]}
     >
       <Text
-        maxFontSizeMultiplier={1.4}
-        numberOfLines={2}
         style={[styles.buttonText, primary ? styles.buttonTextPrimary : null]}
       >
         {props.label}
@@ -566,7 +564,7 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   buttonTextPrimary: {
-    color: "#FFFFFF"
+    color: uiTheme.colors.onPrimary
   },
   disabled: {
     opacity: uiTheme.opacity.disabled

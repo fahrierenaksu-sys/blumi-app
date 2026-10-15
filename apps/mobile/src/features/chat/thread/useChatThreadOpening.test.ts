@@ -50,7 +50,7 @@ function setup() {
     real: ["./chatRoomInviteModel", "./chatRoomInviteApi", "./chatErrorCopy", "./chatHistoryPolicy", "./roomInviteListEquality"]
   })
   const store = loadSourceWithFakeReact<typeof ChatStore>("features/chat/chatStore.ts", runtime, {
-    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState"]
+    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState", "./chatComposerDraftStore"]
   })
   const timers = new Map<number, { run: () => void; ms: number }>()
   let nextTimer = 0

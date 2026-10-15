@@ -228,7 +228,7 @@ export function useRootChatSync({
       ...(throughMessageId ? { throughMessageId } : {}),
       expectedUserId: actor.profile.userId
     }).then((result) => {
-      if (result.hidden && isCurrentSession(actor)) applyChatThreadHiddenForMe(threadId, result.hiddenThrough)
+      if (result.hidden && isCurrentSession(actor)) applyChatThreadHiddenForMe(threadId, result.hiddenThrough, result.hiddenThroughMessageId)
     }).catch(() => { /* The on-device hide already applies. */ })
   }, [isCurrentSession, latestSessionActorRef])
 

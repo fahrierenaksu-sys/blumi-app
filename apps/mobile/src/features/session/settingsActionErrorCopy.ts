@@ -1,4 +1,5 @@
 import type { AppLocale } from "./appLocale"
+import { getReauthSignInRequiredCopy, isReauthSignInRequiredError } from "../settings/reauthSignInRequired"
 export type SettingsActionErrorKind =
   | "refreshHiddenList"
   | "unblockPerson"
@@ -92,6 +93,8 @@ export function getSettingsActionErrorMessageForDisplay(
   error: unknown,
   locale: AppLocale = "en"
 ): string {
+  // Retrying cannot fix a withheld phone: say to sign in again, whatever the action.
+  if (isReauthSignInRequiredError(error)) return getReauthSignInRequiredCopy(locale).body
   const copy = SETTINGS_ACTION_ERROR_COPY[locale][kind]
   return copy.invalidCode && isExpectedVerificationCodeFailure(error)
     ? copy.invalidCode

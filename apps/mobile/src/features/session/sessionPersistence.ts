@@ -96,7 +96,14 @@ export function createSessionPersistence(
               now,
               secureStore
             )
-            if (secureActor) return secureActor
+            if (secureActor) {
+              // The verified secure record wins. A plaintext copy left by an
+              // interrupted migration or an older build must not linger.
+              if (legacyValue) {
+                await removeLegacyCopyBestEffort(dependencies.asyncStore)
+              }
+              return secureActor
+            }
           }
         } catch (error) {
           if (!isCredentialStoreUnavailable(error)) throw error
@@ -239,6 +246,19 @@ export function createSessionPersistence(
       await dependencies.asyncStore.removeItem(DEMO_SESSION_ACTOR_STORAGE_KEY)
       await dependencies.asyncStore.removeItem(NATIVE_SESSION_CLEARED_STORAGE_KEY)
     }
+  }
+}
+
+/**
+ * Cleanup of the plaintext copy must never cost the user a valid secure
+ * session. A failed delete is retried on the next load, which finds the copy
+ * again. Only a fixed flag is logged: no token, ID or storage error text.
+ */
+async function removeLegacyCopyBestEffort(asyncStore: SessionKeyValueStore): Promise<void> {
+  try {
+    await asyncStore.removeItem(SESSION_ACTOR_STORAGE_KEY)
+  } catch {
+    console.warn("[Blumi] Legacy session cleanup deferred to the next launch.")
   }
 }
 

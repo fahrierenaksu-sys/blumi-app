@@ -11,6 +11,7 @@ import {
 } from "../matches/matchRepository"
 import { createPostgresMatchRepository } from "./postgresMatchRepository"
 import { runRepositoryContract, type RepositoryContractBackend } from "./repositoryContract"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 type Backend = RepositoryContractBackend<MatchRepository>
 
@@ -149,7 +150,7 @@ runRepositoryContract<MatchRepository>({
 // Discovery eligibility lives in SQL (onboarding flags, name length, identity
 // gender, the target's discovery genders), so it is proven on PostgreSQL.
 const requirePostgres = {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }
 
 interface SeedAccount {
@@ -199,7 +200,7 @@ async function seedAccount(pool: Pool, account: SeedAccount): Promise<void> {
 const OPEN_FILTERS: DiscoveryFilters = { ageMin: 18, ageMax: 99, genders: [], vibes: [] }
 
 test("PostgreSQL discovery never shows an incomplete, unnamed or ungendered account", requirePostgres, async () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   const scope = randomUUID().slice(0, 8)
   const viewer = `viewer_${scope}`
   const eligible = `eligible_${scope}`
@@ -232,7 +233,7 @@ test("PostgreSQL discovery never shows an incomplete, unnamed or ungendered acco
 })
 
 test("PostgreSQL linked-profile eligibility honors the target's discovery genders and the viewer's age window", requirePostgres, async () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   const scope = randomUUID().slice(0, 8)
   const [womanViewer, manViewer, target] = [`woman_${scope}`, `man_${scope}`, `target_${scope}`]
   try {
@@ -257,7 +258,7 @@ test("PostgreSQL linked-profile eligibility honors the target's discovery gender
 })
 
 test("PostgreSQL: saved vibes never narrow the deck or linked-profile eligibility", requirePostgres, async () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   const scope = randomUUID().slice(0, 8)
   const [viewer, sharedVibe, otherVibe, noVibe] = [`viewer_${scope}`, `shared_${scope}`, `other_${scope}`, `none_${scope}`]
   try {

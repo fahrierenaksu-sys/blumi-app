@@ -4,11 +4,12 @@ import test from "node:test"
 import { Pool } from "pg"
 import { createMatchService } from "../matches/matchService"
 import { createPostgresMatchRepository } from "./postgresMatchRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 // Mutual-match atomicity against the real database. READ COMMITTED snapshot
 // races only show up here, so these run through the disposable gate.
 
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
+const requirePostgres = { skip: disposablePostgresSkip().skip }
 const filters = { ageMin: 18, ageMax: 99, genders: [], vibes: [] }
 const avatar = {
   schemaVersion: 1, bodyId: "avatar_v2_body_default", faceId: "avatar_v2_face_default",
@@ -19,7 +20,7 @@ const avatar = {
 }
 
 function openPool(): Pool {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   return new Pool({ connectionString: process.env.DATABASE_URL, max: 25 })
 }
 

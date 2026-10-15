@@ -17,20 +17,26 @@ import {
 } from "../session/sessionApi"
 import type { SessionActor } from "../session/sessionModel"
 import { getSettingsActionErrorMessageForDisplay } from "../session/settingsActionErrorCopy"
+import { requestAccountReauthTarget } from "./accountReauthPhone"
+import { isReauthSignInRequiredError, reauthSignInAlertArgs } from "./reauthSignInRequired"
+import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import { sanitizeVerificationCode } from "./settingsPresentationModel"
 
 /**
  * Account data export: prompt -> one-time code -> server verification ->
- * download and share. An in-flight export is aborted when the session user
- * changes or the screen unmounts.
+ * download and share. An in-flight export is aborted when the user cancels,
+ * the session user changes or the screen unmounts; an aborted export never
+ * opens the share sheet and its downloaded file is disposed.
  */
 export function useAccountDataExport(input: {
   sessionActor: SessionActor
   copy: SettingsCopy
   locale: AppLocale
+  /** Signs the user out so they can sign in again by SMS (a withheld phone). */
+  onSignInAgain?: () => void
 }) {
-  const { copy, locale, sessionActor } = input
+  const { copy, locale, onSignInAgain, sessionActor } = input
   const [isExportingAccountData, setIsExportingAccountData] = useState(false)
   const exportControllerRef = useRef<AbortController | null>(null)
   useEffect(() => () => { exportControllerRef.current?.abort() }, [sessionActor.session.userId])
@@ -53,15 +59,26 @@ export function useAccountDataExport(input: {
     }
     setIsExportingAccountData(true)
     try {
-      const currentPhoneNumber = getFirebaseCurrentPhoneNumber()
-      if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
-      exportChallengeRef.current = (await requestFirebaseAccountActionChallenge(
-        MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "account_data_export" }
-      )).challengeId
-      exportFirebaseConfirmationRef.current = await requestFirebasePhoneCode(currentPhoneNumber)
+      // The account's phone, not Firebase's: an interrupted phone change must
+      // never block the export.
+      const { challenge, phoneNumber: accountPhoneNumber } = await requestAccountReauthTarget({
+        userId: sessionActor.session.userId,
+        pending: pendingPhoneChange,
+        firebasePhone: getFirebaseCurrentPhoneNumber,
+        requestChallenge: (knownPhone) => requestFirebaseAccountActionChallenge(
+          MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken,
+          { purpose: "account_data_export", ...(knownPhone ? { targetPhoneNumber: knownPhone } : {}) }
+        )
+      })
+      exportChallengeRef.current = challenge.challengeId
+      exportFirebaseConfirmationRef.current = await requestFirebasePhoneCode(accountPhoneNumber)
       setExportCode("")
       setExportCodeVisible(true)
     } catch (error) {
+      if (isReauthSignInRequiredError(error)) {
+        Alert.alert(...reauthSignInAlertArgs(locale, copy.cancel, onSignInAgain))
+        return
+      }
       showToast({
         title: copy.codeNotSent,
         body: getSettingsActionErrorMessageForDisplay("requestDataExport", error, locale),
@@ -70,7 +87,7 @@ export function useAccountDataExport(input: {
     } finally {
       setIsExportingAccountData(false)
     }
-  }, [copy, isExportingAccountData, locale, sessionActor])
+  }, [copy, isExportingAccountData, locale, onSignInAgain, sessionActor])
 
   const verifyExportCode = useCallback(async () => {
     if (
@@ -88,6 +105,7 @@ export function useAccountDataExport(input: {
       const challengeId = exportChallengeRef.current
       if (!firebaseConfirmation || !challengeId) throw new Error("Request a verification code first.")
       const idToken = await confirmFirebasePhoneCode(firebaseConfirmation, exportCode)
+      if (controller.signal.aborted) return
       const confirmation = await verifyFirebaseAccountAction(
         MOBILE_HTTP_BASE_URL,
         sessionActor.session.sessionToken,
@@ -117,8 +135,11 @@ export function useAccountDataExport(input: {
         type: "warning"
       })
     } finally {
-      if (exportControllerRef.current === controller) exportControllerRef.current = null
-      setIsExportingAccountData(false)
+      // A cancelled run already released the busy state; never clear a newer run's.
+      if (exportControllerRef.current === controller) {
+        exportControllerRef.current = null
+        setIsExportingAccountData(false)
+      }
     }
   }, [copy, exportCode, isExportingAccountData, locale, sessionActor])
 
@@ -141,7 +162,16 @@ export function useAccountDataExport(input: {
   const changeExportCode = useCallback((value: string) => {
     setExportCode(sanitizeVerificationCode(value))
   }, [])
-  const closeExportCode = useCallback(() => setExportCodeVisible(false), [])
+  const closeExportCode = useCallback(() => {
+    const controller = exportControllerRef.current
+    exportControllerRef.current = null
+    controller?.abort()
+    exportFirebaseConfirmationRef.current = null
+    exportChallengeRef.current = null
+    setExportCodeVisible(false)
+    setExportCode("")
+    if (controller) setIsExportingAccountData(false)
+  }, [])
 
   return {
     isExportingAccountData,

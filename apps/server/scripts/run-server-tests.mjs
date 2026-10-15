@@ -21,6 +21,11 @@ execFileSync("npm", ["run", "build"], {
   stdio: "inherit"
 })
 
+// A shell-exported DATABASE_URL must never reach a plain test run. Only the
+// isolated PostgreSQL gate may hand a database to the tests.
+const { sanitizeTestDatabaseEnvironment } = await import(join(distDirectory, "db/disposablePostgres.js"))
+const testEnvironment = sanitizeTestDatabaseEnvironment(process.env)
+
 const testFiles = findTestFiles(distDirectory)
 if (testFiles.length === 0) {
   throw new Error("No server test files found in dist.")
@@ -31,11 +36,13 @@ if (testFiles.length === 0) {
 const loadTestFile = join(distDirectory, "e2e/socialLoopLoad.e2e.test.js")
 execFileSync(process.execPath, ["--test", ...testFiles.filter((file) => file !== loadTestFile)], {
   cwd: workspaceRoot,
+  env: testEnvironment,
   stdio: "inherit"
 })
 
 execFileSync(process.execPath, ["--test", loadTestFile], {
   cwd: workspaceRoot,
+  env: testEnvironment,
   stdio: "inherit"
 })
 
@@ -48,6 +55,7 @@ execFileSync(process.execPath, [
   "apps/mobile/src/features/legal/legalDocumentModel.test.ts"
 ], {
   cwd: repositoryRoot,
+  env: testEnvironment,
   stdio: "inherit"
 })
 
