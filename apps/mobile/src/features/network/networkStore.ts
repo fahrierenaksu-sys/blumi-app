@@ -1,5 +1,6 @@
 import NetInfo, { type NetInfoState } from "@react-native-community/netinfo"
 import { useSyncExternalStore } from "react"
+import { isNetworkLinkConnected } from "./networkReachability"
 
 type NetworkListener = (isConnected: boolean) => void
 
@@ -8,7 +9,7 @@ let stopMonitoring: (() => void) | null = null
 const listeners = new Set<NetworkListener>()
 
 function readConnection(state: NetInfoState): boolean {
-  return state.isConnected !== false && state.isInternetReachable !== false
+  return isNetworkLinkConnected(state)
 }
 
 function ensureMonitoring(): void {

@@ -94,7 +94,8 @@ try {
   execFileSync(process.execPath, [
     "--import", "tsx", "--test",
     "src/features/miniRoom/roomChatHistoryModel.test.ts",
-    "src/features/miniRoom/useRoomChatHistory.test.ts"
+    "src/features/miniRoom/useRoomChatHistory.test.ts",
+    "src/features/network/networkReachability.test.ts"
   ], { cwd: workspaceRoot, stdio: "inherit" })
 } finally {
   rmSync(outputDirectory, { recursive: true, force: true })
