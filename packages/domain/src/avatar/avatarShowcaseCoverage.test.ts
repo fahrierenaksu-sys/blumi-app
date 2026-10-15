@@ -30,9 +30,11 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * trousers, jacket and corset, conditional on the audit fixes. Six are allowlisted and baked, so their entries are gone.
  * The black trousers stay: with the polo, jacket or corset, fragments of the coral pants baked under those tops' hems
  * show at the hips (audit F2), and that fix is still open (Workbench integration/beta5_fix_1030/REPORT.md).
+ * 2026-10-15 19:37 (OWNER_DECISIONS): the hip fix landed (trousers front v2 + erase v2, Workbench integration/gpt3_1745)
+ * and the owner approved polo front v7, so the black trousers are allowlisted and baked and their entry is gone.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: ["avatar_v2_bottom_black_highwaist_trousers"],
+  female: [],
   male: [],
 };
 

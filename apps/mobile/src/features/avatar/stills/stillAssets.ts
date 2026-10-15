@@ -93,6 +93,8 @@ export const AVATAR_STILL_ASSETS: Readonly<Record<string, number>> = {
   "female/full/top_sage_ribbon_knit_jacket__o0p45": require("./layers/female/full/top_sage_ribbon_knit_jacket__o0p45.webp"),
   "female/full/top_sage_ribbon_knit_jacket__o3p45": require("./layers/female/full/top_sage_ribbon_knit_jacket__o3p45.webp"),
   "female/full/top_sage_ribbon_knit_jacket__o5p45": require("./layers/female/full/top_sage_ribbon_knit_jacket__o5p45.webp"),
+  "female/showcase/avatar_v2_bottom_black_highwaist_trousers__front": require("./layers/female/showcase/avatar_v2_bottom_black_highwaist_trousers__front.webp"),
+  "female/showcase/avatar_v2_bottom_black_highwaist_trousers__under": require("./layers/female/showcase/avatar_v2_bottom_black_highwaist_trousers__under.webp"),
   "female/showcase/avatar_v2_bottom_coral_wave_pants__front": require("./layers/female/showcase/avatar_v2_bottom_coral_wave_pants__front.webp"),
   "female/showcase/avatar_v2_bottom_coral_wave_pants__under": require("./layers/female/showcase/avatar_v2_bottom_coral_wave_pants__under.webp"),
   "female/showcase/avatar_v2_hair_ink_pageboy_star__back": require("./layers/female/showcase/avatar_v2_hair_ink_pageboy_star__back.webp"),
