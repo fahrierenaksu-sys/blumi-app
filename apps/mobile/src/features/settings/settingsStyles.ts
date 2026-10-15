@@ -21,7 +21,7 @@ export const settingsStyles = StyleSheet.create({
   },
   sectionOverline: {
     ...uiTheme.font.overline,
-    color: uiTheme.colors.primary,
+    color: uiTheme.colors.primaryDeep,
     paddingLeft: uiTheme.spacing.xxs,
     marginBottom: 2
   },
@@ -81,7 +81,7 @@ export const settingsStyles = StyleSheet.create({
   },
   myReportRetry: {
     ...uiTheme.font.subheading,
-    color: uiTheme.colors.primary
+    color: uiTheme.colors.primaryDeep
   },
   deletionModalBackdrop: {
     flex: 1,

@@ -30,7 +30,7 @@ export const shopPreviewStyles = StyleSheet.create({
   },
   previewEyebrow: {
     ...uiTheme.font.overline,
-    color: uiTheme.colors.primary,
+    color: uiTheme.colors.primaryDeep,
     letterSpacing: 1.8
   },
   previewTitle: {
@@ -87,7 +87,7 @@ export const shopPreviewStyles = StyleSheet.create({
   pricePillText: {
     ...uiTheme.font.bodyBold,
     fontSize: 17,
-    color: uiTheme.colors.primary,
+    color: uiTheme.colors.primaryDeep,
     fontVariant: ["tabular-nums"]
   },
   pricePillTextOwned: {
@@ -111,7 +111,7 @@ export const shopPreviewStyles = StyleSheet.create({
   },
   livePillText: {
     ...uiTheme.font.captionBold,
-    color: uiTheme.colors.primary
+    color: uiTheme.colors.primaryDeep
   },
   previewStage: {
     minWidth: 148,
@@ -220,7 +220,7 @@ export const shopPreviewStyles = StyleSheet.create({
   },
   roomHeroEyebrow: {
     ...uiTheme.font.micro,
-    color: uiTheme.colors.primary,
+    color: uiTheme.colors.primaryDeep,
     fontWeight: "900",
     letterSpacing: 0.5,
     fontSize: 9
@@ -294,7 +294,7 @@ export const shopPreviewStyles = StyleSheet.create({
   combinationPager: { height: 44, flexDirection: "row", alignItems: "center", alignSelf: "stretch", flexShrink: 0 },
   combinationPageButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   combinationPageLabel: { flex: 1, textAlign: "center" },
-  combinationHeading: { ...uiTheme.font.captionBold, fontSize: 11, lineHeight: 16, color: uiTheme.colors.primary },
+  combinationHeading: { ...uiTheme.font.captionBold, fontSize: 11, lineHeight: 16, color: uiTheme.colors.primaryDeep },
   combinationList: { flexGrow: 0, flexShrink: 1, alignSelf: "stretch" },
   combinationRowSelected: { backgroundColor: "#FAD8EA" },
   combinationRows: { gap: 3, alignSelf: "stretch" },
@@ -302,7 +302,7 @@ export const shopPreviewStyles = StyleSheet.create({
   combinationThumbnail: { width: 34, height: 34, overflow: "hidden", alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#FCE8F2" },
   combinationRowCopy: { flex: 1, minWidth: 0 },
   combinationItemTitle: { ...uiTheme.font.captionBold, fontSize: 10, lineHeight: 13, color: uiTheme.colors.textPrimary },
-  combinationItemPrice: { ...uiTheme.font.micro, fontSize: 10, lineHeight: 13, color: uiTheme.colors.primary },
+  combinationItemPrice: { ...uiTheme.font.micro, fontSize: 10, lineHeight: 13, color: uiTheme.colors.primaryDeep },
   combinationAction: { height: 44, flexShrink: 0, borderRadius: 14 },
   roomHeroAction: {
     position: "absolute",
@@ -315,14 +315,14 @@ export const shopPreviewStyles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 14,
     borderRadius: uiTheme.radius.full,
-    backgroundColor: "#F93696",
+    backgroundColor: uiTheme.colors.primary,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.48)",
     ...uiTheme.shadow.glow
   },
   roomHeroActionText: {
     ...uiTheme.font.bodyBold,
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     fontSize: 16,
     lineHeight: 19,
     textAlign: "center"
@@ -352,7 +352,7 @@ export const shopPreviewStyles = StyleSheet.create({
   },
   avatarHeroActionText: {
     ...uiTheme.font.bodyBold,
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     fontSize: 13,
     lineHeight: 20,
     textAlign: "center"
@@ -385,7 +385,7 @@ export const shopPreviewStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: uiTheme.radius.full,
-    backgroundColor: "#F93696",
+    backgroundColor: uiTheme.colors.primary,
     ...uiTheme.shadow.glow
   },
   primaryActionCompact: {
@@ -405,7 +405,7 @@ export const shopPreviewStyles = StyleSheet.create({
   },
   primaryActionText: {
     ...uiTheme.font.bodyBold,
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     textAlign: "center"
   },
   previewFootnote: {

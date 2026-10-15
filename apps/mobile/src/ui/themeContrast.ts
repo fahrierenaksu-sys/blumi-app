@@ -4,7 +4,9 @@
  * `themeTextPairs` lists every text/background token pairing the UI draws:
  * body copy on surfaces, labels on pink actions, ink on soft status fills.
  * The guard test computes each ratio from the theme source, so a token change
- * that makes any themed text unreadable fails before it ships.
+ * that makes any themed text unreadable fails before it ships. Pairs drawn in
+ * style sources (including hard-coded colours) are found by
+ * `testing/styleContrastPairs.ts` and checked by `styleContrastPairs.test.ts`.
  */
 
 /** Minimum ratios: WCAG 1.4.3 for text, and a legibility floor for disabled labels. */
