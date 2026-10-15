@@ -7,6 +7,7 @@ import {
   GIRL_WARDROBE_PREVIEW_ITEM_IDS,
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT,
+  R1_WARDROBE_PRICE_COINS,
   TEST_AVATAR_ITEM,
   TEST_AVATAR_ITEM_RULES
 } from "@blumi/domain"
@@ -93,9 +94,11 @@ test("avatar save rejects invalid revisions before touching session state", asyn
   }
 })
 
-// The boy's 2.5D wardrobe is free and owned by every account during testing (owner yes, 2026-10-13): the server
-// accepts each of his outfits and a mixed look for a new account and for an account made before the items existed,
-// with both the development catalog and the production (receipt-filtered) one. The girl's looks are unchanged.
+// The 2.5D wardrobes (boyWardrobePreview.ts, girlWardrobePreview.ts) follow the owner-approved R1 prices
+// (2026-10-15): the starters stay free and owned; every other piece is sold at its price through its receipt, for its
+// own body only, and a new account wears it only after buying it. Pieces granted while the wardrobes were free
+// (owner yes for free testing, 2026-10-13) stay owned: an account that holds them keeps every look without a reset or a
+// charge. Checked with the development catalog and the production (receipt-filtered) one.
 const BOY_OUTFITS = BOY_WARDROBE_PREVIEW_ITEM_IDS.top.map((topId, index) => ({
   ...DEFAULT_MALE_AVATAR_LOADOUT,
   hairId: BOY_WARDROBE_PREVIEW_ITEM_IDS.hair[index % BOY_WARDROBE_PREVIEW_ITEM_IDS.hair.length]!,
@@ -110,13 +113,19 @@ const BOY_MIXED_LOOK = {
   bottomId: BOY_WARDROBE_PREVIEW_ITEM_IDS.bottom[5],
   shoesId: BOY_WARDROBE_PREVIEW_ITEM_IDS.shoes[0]
 }
+const starterIdsOf = (loadout: typeof DEFAULT_MALE_AVATAR_LOADOUT): ReadonlySet<string> =>
+  new Set([loadout.hairId, loadout.topId, loadout.bottomId, loadout.shoesId])
+const BOY_STARTER_IDS = starterIdsOf(DEFAULT_MALE_AVATAR_LOADOUT)
+const FIRST_PRICED_BOY_TOP_ID = BOY_WARDROBE_PREVIEW_ITEM_IDS.top.find((itemId) => !BOY_STARTER_IDS.has(itemId))!
+const ENOUGH_COINS_FOR_EVERY_PIECE = 10_000
 
 async function signInWith(catalog: readonly EconomyCatalogItem[], repository = createInMemoryEconomyRepository()) {
   const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => "482931" })
-  const avatarService = createAvatarService({ authService, economyService: createEconomyService({ catalog, repository }) })
+  const economyService = createEconomyService({ catalog, repository })
+  const avatarService = createAvatarService({ authService, economyService })
   await authService.sendCode("+905551112233")
   const verified = await authService.verifyCode("+905551112233", "482931")
-  return { avatarService, verified, repository }
+  return { avatarService, economyService, verified, repository }
 }
 
 async function saveEach(
@@ -132,29 +141,50 @@ async function saveEach(
   }
 }
 
+/** An inventory as it stands after the free testing grant: the default rows plus the wardrobe pieces it received. */
+async function holdGrantedPieces(
+  repository: ReturnType<typeof createInMemoryEconomyRepository>,
+  userId: string,
+  grantedIds: readonly string[],
+  coins: number
+): Promise<void> {
+  const inventory = createDefaultEconomyInventory(userId)
+  await repository.saveInventory({
+    ...inventory,
+    coins,
+    ownedAvatarItemIds: [...new Set([...inventory.ownedAvatarItemIds, ...grantedIds])]
+  })
+}
+
 for (const [label, catalog] of [
   ["development", ECONOMY_CATALOG],
   ["production", resolveProductionEconomyCatalog()]
 ] as const) {
-  test(`a new account saves every boy outfit and a mixed look (${label} catalog)`, async () => {
-    const { avatarService, verified } = await signInWith(catalog)
-    await saveEach(avatarService, verified.sessionToken, [...BOY_OUTFITS, BOY_MIXED_LOOK])
+  test(`a new account wears the boy starters free and a priced piece only after buying it (${label} catalog)`, async () => {
+    const { avatarService, economyService, verified } = await signInWith(catalog)
+    await saveEach(avatarService, verified.sessionToken, [DEFAULT_MALE_AVATAR_LOADOUT])
+    const look = { ...DEFAULT_MALE_AVATAR_LOADOUT, topId: FIRST_PRICED_BOY_TOP_ID }
+    const refused = await avatarService.saveAvatar(verified.sessionToken, { loadout: look, revision: 1 })
+    assert.equal(refused.kind, "invalid")
+
+    const bought = await economyService.purchaseItem(verified.account.userId, {
+      type: "avatar",
+      itemId: FIRST_PRICED_BOY_TOP_ID,
+      avatarBodyId: DEFAULT_MALE_AVATAR_LOADOUT.bodyId
+    })
+    assert.equal(bought.inventory.coins, STARTER_COIN_BALANCE - R1_WARDROBE_PRICE_COINS[FIRST_PRICED_BOY_TOP_ID]!)
+    const saved = await avatarService.saveAvatar(verified.sessionToken, { loadout: look, revision: 1 })
+    assert.equal(saved.kind, "updated")
   })
 
-  test(`an account made before the boy wardrobe existed saves his looks without a reset (${label} catalog)`, async () => {
+  test(`an account that holds the boy pieces from the free testing grant keeps every look without a reset (${label} catalog)`, async () => {
     const repository = createInMemoryEconomyRepository()
     const { avatarService, verified } = await signInWith(catalog, repository)
-    const boyIds = new Set(BOY_WARDROBE_PREVIEW_ALL_IDS)
-    const older = createDefaultEconomyInventory(verified.account.userId)
-    await repository.saveInventory({
-      ...older,
-      coins: 640,
-      ownedAvatarItemIds: older.ownedAvatarItemIds.filter((itemId) => !boyIds.has(itemId))
-    })
+    await holdGrantedPieces(repository, verified.account.userId, BOY_WARDROBE_PREVIEW_ALL_IDS, 640)
     await saveEach(avatarService, verified.sessionToken, [BOY_MIXED_LOOK, ...BOY_OUTFITS])
-    const healed = await repository.getInventory(verified.account.userId)
-    assert.equal(healed?.coins, 640)
-    assert.ok(BOY_WARDROBE_PREVIEW_ALL_IDS.every((itemId) => healed?.ownedAvatarItemIds.includes(itemId)))
+    const kept = await repository.getInventory(verified.account.userId)
+    assert.equal(kept?.coins, 640)
+    assert.ok(BOY_WARDROBE_PREVIEW_ALL_IDS.every((itemId) => kept?.ownedAvatarItemIds.includes(itemId)))
   })
 
   test(`girl looks are unchanged and cannot wear the boy's pieces (${label} catalog)`, async () => {
@@ -168,9 +198,8 @@ for (const [label, catalog] of [
   })
 }
 
-// The girl's 2.5D additions (girlWardrobePreview.ts) are free and owned by every account on the boy's testing terms:
-// she saves them alone and mixed with her starter, an account made before they existed gets them by the inventory
-// self-heal, the boy cannot wear them and nobody can buy them.
+// The girl's 2.5D additions are all priced: a new account buys them first, an account that holds them from the free
+// testing grant keeps them, and the boy cannot wear them.
 const GIRL_NEW_LOOKS = [
   ...GIRL_WARDROBE_PREVIEW_ITEM_IDS.hair.map((hairId) => ({ ...DEFAULT_FEMALE_AVATAR_LOADOUT, hairId })),
   { ...DEFAULT_FEMALE_AVATAR_LOADOUT, shoesId: GIRL_WARDROBE_PREVIEW_ITEM_IDS.shoes[0] },
@@ -181,20 +210,23 @@ for (const [label, catalog] of [
   ["development", ECONOMY_CATALOG],
   ["production", resolveProductionEconomyCatalog()]
 ] as const) {
-  test(`a girl account made before her new pieces existed saves them without a reset (${label} catalog)`, async () => {
+  test(`a new girl account cannot wear her priced pieces before buying them (${label} catalog)`, async () => {
+    const { avatarService, verified } = await signInWith(catalog)
+    await saveEach(avatarService, verified.sessionToken, [DEFAULT_FEMALE_AVATAR_LOADOUT])
+    for (const loadout of GIRL_NEW_LOOKS) {
+      const result = await avatarService.saveAvatar(verified.sessionToken, { loadout, revision: 1 })
+      assert.equal(result.kind, "invalid", JSON.stringify(loadout))
+    }
+  })
+
+  test(`a girl account that holds her new pieces from the free testing grant keeps them without a reset (${label} catalog)`, async () => {
     const repository = createInMemoryEconomyRepository()
     const { avatarService, verified } = await signInWith(catalog, repository)
-    const girlIds = new Set(GIRL_WARDROBE_PREVIEW_ALL_IDS)
-    const older = createDefaultEconomyInventory(verified.account.userId)
-    await repository.saveInventory({
-      ...older,
-      coins: 640,
-      ownedAvatarItemIds: older.ownedAvatarItemIds.filter((itemId) => !girlIds.has(itemId))
-    })
+    await holdGrantedPieces(repository, verified.account.userId, GIRL_WARDROBE_PREVIEW_ALL_IDS, 640)
     await saveEach(avatarService, verified.sessionToken, GIRL_NEW_LOOKS)
-    const healed = await repository.getInventory(verified.account.userId)
-    assert.equal(healed?.coins, 640)
-    assert.ok(GIRL_WARDROBE_PREVIEW_ALL_IDS.every((itemId) => healed?.ownedAvatarItemIds.includes(itemId)))
+    const kept = await repository.getInventory(verified.account.userId)
+    assert.equal(kept?.coins, 640)
+    assert.ok(GIRL_WARDROBE_PREVIEW_ALL_IDS.every((itemId) => kept?.ownedAvatarItemIds.includes(itemId)))
   })
 
   test(`the boy cannot wear the girl's new pieces (${label} catalog)`, async () => {
@@ -212,24 +244,41 @@ for (const [label, catalog] of [
   })
 }
 
-test("the girl's new pieces are never sold", async () => {
-  const service = createEconomyService({ catalog: resolveProductionEconomyCatalog() })
-  for (const itemId of GIRL_WARDROBE_PREVIEW_ALL_IDS) {
-    await assert.rejects(
-      () => service.purchaseItem("girl_user", { type: "avatar", itemId, avatarBodyId: "avatar_v2_body_default" }),
-      itemId
-    )
+for (const wardrobe of [
+  {
+    label: "boy",
+    ids: BOY_WARDROBE_PREVIEW_ALL_IDS,
+    starterIds: BOY_STARTER_IDS,
+    bodyId: DEFAULT_MALE_AVATAR_LOADOUT.bodyId,
+    otherBodyId: DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId
+  },
+  {
+    label: "girl",
+    ids: [...GIRL_WARDROBE_PREVIEW_ALL_IDS, ...starterIdsOf(DEFAULT_FEMALE_AVATAR_LOADOUT)],
+    starterIds: starterIdsOf(DEFAULT_FEMALE_AVATAR_LOADOUT),
+    bodyId: DEFAULT_FEMALE_AVATAR_LOADOUT.bodyId,
+    otherBodyId: DEFAULT_MALE_AVATAR_LOADOUT.bodyId
   }
-  assert.equal((await service.getInventory("girl_user")).coins, STARTER_COIN_BALANCE)
-})
-
-test("the boy's pieces are never sold", async () => {
-  const service = createEconomyService({ catalog: resolveProductionEconomyCatalog() })
-  for (const itemId of BOY_WARDROBE_PREVIEW_ALL_IDS) {
-    await assert.rejects(
-      () => service.purchaseItem("boy_user", { type: "avatar", itemId, avatarBodyId: "avatar_v2_body_male_light" }),
-      itemId
-    )
-  }
-  assert.equal((await service.getInventory("boy_user")).coins, STARTER_COIN_BALANCE)
-})
+]) {
+  test(`production sells each priced ${wardrobe.label} piece at its R1 price for its own body only and never charges for a starter`, async () => {
+    const repository = createInMemoryEconomyRepository()
+    const service = createEconomyService({ catalog: resolveProductionEconomyCatalog(), repository })
+    const userId = `${wardrobe.label}_user`
+    await holdGrantedPieces(repository, userId, [], ENOUGH_COINS_FOR_EVERY_PIECE)
+    for (const itemId of wardrobe.ids) {
+      const before = (await service.getInventory(userId)).coins
+      if (wardrobe.starterIds.has(itemId)) {
+        await assert.rejects(() => service.purchaseItem(userId, { type: "avatar", itemId, avatarBodyId: wardrobe.bodyId }), itemId)
+        assert.equal((await service.getInventory(userId)).coins, before, itemId)
+        continue
+      }
+      await assert.rejects(
+        () => service.purchaseItem(userId, { type: "avatar", itemId, avatarBodyId: wardrobe.otherBodyId }),
+        itemId
+      )
+      const bought = await service.purchaseItem(userId, { type: "avatar", itemId, avatarBodyId: wardrobe.bodyId })
+      assert.equal(bought.inventory.coins, before - R1_WARDROBE_PRICE_COINS[itemId]!, itemId)
+      assert.ok(bought.inventory.ownedAvatarItemIds.includes(itemId), itemId)
+    }
+  })
+}
