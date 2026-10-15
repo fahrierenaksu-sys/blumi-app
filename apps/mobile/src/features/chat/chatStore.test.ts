@@ -951,6 +951,26 @@ test("a server hide drops cached messages up to the hide point and keeps newer o
   }
 })
 
+test("a server hide with an exact point keeps a cached message in the same millisecond after it", () => {
+  resetChatStore()
+  try {
+    const instant = "2026-10-02T10:05:00.000Z"
+    const listed = (ids: string[]) => applyChatMessageListed({
+      userId: "user_one",
+      threadId: "thread_exact",
+      messages: ids.map((id) => ({ messageId: id, threadId: "thread_exact", senderUserId: "user_two", body: id, sentAt: instant }))
+    })
+    listed(["mx", "my"])
+    applyChatThreadHiddenForMe("thread_exact", instant, "mx")
+    assert.deepEqual(getMessages("thread_exact").map((entry) => entry.messageId), ["my"])
+    // An older server sends no id: everything in that millisecond is hidden.
+    applyChatThreadHiddenForMe("thread_exact", instant)
+    assert.deepEqual(getMessages("thread_exact").map((entry) => entry.messageId), [])
+  } finally {
+    resetChatStore()
+  }
+})
+
 test("reading the threads is cheap between list changes: unread and active-thread updates reuse the snapshot", () => {
   resetChatStore()
   try {

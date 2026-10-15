@@ -501,7 +501,7 @@ runRepositoryContract<ChatRepository>({
       assert.equal((await listed(bora))[0]?.unreadCount, 1)
 
       const hidden = await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: bora })
-      assert.deepEqual(hidden, { hiddenThrough: two.sentAt, readAt: two.sentAt })
+      assert.deepEqual(hidden, { hiddenThrough: two.sentAt, readAt: two.sentAt, hiddenThroughMessageId: two.messageId })
       const marked = await listed(bora)
       assert.equal(marked.length, 1, "still listed, so links, invites and room chat find it")
       assert.equal(marked[0]?.hiddenThrough, two.sentAt, "the app hides the row through this point")
@@ -548,7 +548,7 @@ runRepositoryContract<ChatRepository>({
       assert.deepEqual((await backend.repository.listMessages(chat.threadId, { limit: 50, viewerUserId: ada })).map((item) => item.body), ["two"])
       await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada, throughMessageId: two.messageId })
       const back = await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada, throughMessageId: one.messageId })
-      assert.deepEqual(back, { hiddenThrough: two.sentAt, readAt: two.sentAt }, "neither cursor moves back")
+      assert.deepEqual(back, { hiddenThrough: two.sentAt, readAt: two.sentAt, hiddenThroughMessageId: two.messageId }, "neither cursor moves back")
       assert.deepEqual(await backend.repository.listMessages(chat.threadId, { limit: 50, viewerUserId: ada }), [])
       assert.deepEqual((await backend.repository.listMessages(other.threadId, { limit: 50, viewerUserId: ada })).map((item) => item.body),
         ["elsewhere"], "a hide is per thread")
@@ -566,7 +566,7 @@ runRepositoryContract<ChatRepository>({
           .map((item) => item.body)
 
       const hidden = await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada, throughMessageId: first.messageId })
-      assert.deepEqual(hidden, { hiddenThrough: instant, readAt: instant })
+      assert.deepEqual(hidden, { hiddenThrough: instant, readAt: instant, hiddenThroughMessageId: first.messageId })
       assert.deepEqual(await history(), ["second"], "one message stays visible, not zero")
       assert.deepEqual(await history(second.messageId), [], "the page before it holds only hidden messages")
       assert.deepEqual(await history(), ["second"], "reading the history does not move the point")
@@ -578,6 +578,39 @@ runRepositoryContract<ChatRepository>({
       const later = message(chat, "s3", instant, "later", ada)
       await backend.repository.createMessage(later)
       assert.deepEqual(await history(), ["later"], "a message ordered after the point shows, even in the same millisecond")
+    },
+    "a same-millisecond message after the hide point is visible in history, the thread row and unread counts alike": async (backend) => {
+      const chat = thread(backend, "same_ms_row", "2026-10-15T11:00:00.000Z")
+      const [ada, bora] = chat.participantUserIds
+      await backend.repository.saveThread(chat)
+      const instant = "2026-10-15T11:01:00.000Z"
+      const first = message(chat, "x", instant, "x", bora)
+      const second = message(chat, "y", instant, "y", bora)
+      const view = async () => {
+        const row = (await backend.repository.listThreads(ada)).find((item) => item.threadId === chat.threadId)!
+        const bySender = await backend.repository.countUnreadMessagesBySender(ada)
+        return {
+          history: (await backend.repository.listMessages(chat.threadId, { limit: 50, viewerUserId: ada })).map((item) => item.body),
+          hiddenThrough: row.hiddenThrough,
+          hiddenThroughMessageId: row.hiddenThroughMessageId,
+          unreadCount: row.unreadCount,
+          unreadFromBora: bySender.find((item) => item.senderUserId === bora)?.unreadCount ?? 0
+        }
+      }
+      // Ada's phone had only x when she hid through it; y shares its millisecond.
+      await backend.repository.createMessage(first)
+      await backend.repository.createMessage(second)
+      await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada, throughMessageId: first.messageId })
+      assert.deepEqual(await view(), {
+        history: ["y"], hiddenThrough: instant, hiddenThroughMessageId: first.messageId, unreadCount: 1, unreadFromBora: 1
+      }, "y is shown, listed after the point and unread everywhere")
+
+      await backend.repository.hideThreadForParticipant({ threadId: chat.threadId, userId: ada })
+      assert.deepEqual(await view(), {
+        history: [], hiddenThrough: instant, hiddenThroughMessageId: second.messageId, unreadCount: 0, unreadFromBora: 0
+      }, "hiding through y hides and reads both")
+      assert.deepEqual((await backend.repository.listThreads(bora)).find((item) => item.threadId === chat.threadId)?.hiddenThroughMessageId,
+        undefined, "the partner's row carries no hide point")
     },
     "the hide result depends on history order, not on the order messages were stored": async (backend) => {
       const instant = "2026-10-15T10:01:00.000Z"

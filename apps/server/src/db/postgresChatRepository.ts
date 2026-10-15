@@ -70,8 +70,13 @@ export function createPostgresChatRepository(
       // After 071 a thread the viewer hid stays listed with its hide point, so
       // links, room invites and room chat still find it; the app hides the
       // row until its newest message is after that point.
+      // After 075 the row also carries the exact hide point, and a partner
+      // message in the hide point's millisecond after it stays unread.
+      const exactPoint = await hidePointReady()
       const hiddenColumn = await hideSchema.isReady()
-        ? "p.hidden_through AS viewer_hidden_through,"
+        ? `p.hidden_through AS viewer_hidden_through,${exactPoint
+          ? ` CASE WHEN ${EXACT_HIDE_POINT("p")} THEN p.hidden_through_message_id END AS viewer_hidden_through_message_id,`
+          : ""}`
         : ""
       const result = await pool.query(
         `SELECT
@@ -90,7 +95,8 @@ export function createPostgresChatRepository(
             ${hiddenColumn}
             (SELECT count(*)::int FROM blumi_chat_messages AS unread
               WHERE unread.thread_id = t.thread_id AND unread.sender_user_id <> $1
-                AND unread.sent_at > COALESCE(p.last_read_at, '-infinity'::timestamptz)) AS unread_count
+                AND (unread.sent_at > COALESCE(p.last_read_at, '-infinity'::timestamptz)
+                  ${exactPoint ? unreadAfterExactHidePoint("p", "unread") : ""})) AS unread_count
            FROM blumi_chat_threads t
            JOIN blumi_chat_thread_participants p
              ON p.thread_id = t.thread_id
@@ -126,7 +132,8 @@ export function createPostgresChatRepository(
         return { ...await mapThread(pool, row, [participants[0]!, participants[1]!]),
           unreadCount: Number(row.unread_count ?? 0),
           ...(row.viewer_last_read_at ? { lastReadAt: new Date(row.viewer_last_read_at).toISOString() } : {}),
-          ...(row.viewer_hidden_through ? { hiddenThrough: new Date(row.viewer_hidden_through).toISOString() } : {}) }
+          ...(row.viewer_hidden_through ? { hiddenThrough: new Date(row.viewer_hidden_through).toISOString() } : {}),
+          ...(row.viewer_hidden_through_message_id ? { hiddenThroughMessageId: String(row.viewer_hidden_through_message_id) } : {}) }
       }))
       const last = threads.at(-1)!
       return { threads, nextCursor: result.rows.length > limit ? encodeThreadCursor({ userId, threadId: last.threadId, createdAt: String(rows.at(-1)?.cursor_created_at ?? last.createdAt) }) : null }
@@ -135,13 +142,14 @@ export function createPostgresChatRepository(
     async countUnreadMessagesBySender(userId) {
       // Same predicate as listThreadsPage's unread_count; per thread it is an
       // index range scan on blumi_chat_messages(thread_id, sent_at).
+      const exactTail = await hidePointReady() ? unreadAfterExactHidePoint("viewer", "message") : ""
       const result = await pool.query(
         `SELECT message.sender_user_id, count(*)::int AS unread_count
            FROM blumi_chat_thread_participants AS viewer
            JOIN blumi_chat_messages AS message
              ON message.thread_id = viewer.thread_id
             AND message.sender_user_id <> viewer.user_id
-            AND message.sent_at > COALESCE(viewer.last_read_at, '-infinity'::timestamptz)
+            AND (message.sent_at > COALESCE(viewer.last_read_at, '-infinity'::timestamptz) ${exactTail})
           WHERE viewer.user_id = $1
           GROUP BY message.sender_user_id`,
         [userId]
@@ -603,6 +611,20 @@ const EXACT_HIDE_POINT = (hide: string) => `(${hide}.hidden_through_message_id I
   AND ${hide}.hidden_through_message_sent_at IS NOT DISTINCT FROM ${hide}.hidden_through)`
 
 /**
+ * The unread cursor is a time, read inclusively. A hide moves it to the hide
+ * point's time, so a partner message in that same millisecond after an exact
+ * hide point (075) stays unread while the cursor has not moved since the
+ * hide: it was never hidden, and never shown. Appended to the time predicate
+ * with OR; names 075 columns, so only after 075.
+ */
+function unreadAfterExactHidePoint(participant: string, message: string): string {
+  return `OR (${message}.sent_at = ${participant}.last_read_at
+      AND ${participant}.last_read_at = ${participant}.hidden_through
+      AND ${EXACT_HIDE_POINT(participant)}
+      AND ${message}.message_id > ${participant}.hidden_through_message_id)`
+}
+
+/**
  * Whether the target (`target.through`, `target.through_id`; no id for an
  * empty thread, which hides everything at that time) is after the
  * participant's stored hide point. A time-only point already hides everything
@@ -651,12 +673,18 @@ async function hideThroughExactPoint(
             last_read_at = GREATEST(participant.last_read_at, target.through)
        FROM target
       WHERE participant.thread_id = $1 AND participant.user_id = $2 AND target.through IS NOT NULL
-     RETURNING participant.hidden_through, participant.last_read_at`,
+     RETURNING participant.hidden_through, participant.last_read_at,
+               CASE WHEN ${EXACT_HIDE_POINT("participant")} THEN participant.hidden_through_message_id END
+                 AS exact_message_id`,
     [threadId, userId, throughMessageId ?? null]
   )
   const row = result.rows[0]
   return row
-    ? { hiddenThrough: new Date(row.hidden_through).toISOString(), readAt: new Date(row.last_read_at).toISOString() }
+    ? {
+        hiddenThrough: new Date(row.hidden_through).toISOString(),
+        readAt: new Date(row.last_read_at).toISOString(),
+        ...(row.exact_message_id ? { hiddenThroughMessageId: String(row.exact_message_id) } : {})
+      }
     : null
 }
 

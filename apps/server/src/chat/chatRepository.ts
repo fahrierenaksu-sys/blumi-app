@@ -37,6 +37,11 @@ export interface ChatHideResult {
   hiddenThrough: string
   /** The stored unread cursor afterwards: hidden messages are never unread. */
   readAt: string
+  /**
+   * The hidden message at `hiddenThrough` when the point is exact (075): a
+   * message in the same millisecond with a later id is not hidden.
+   */
+  hiddenThroughMessageId?: string
 }
 
 export interface ChatMessageCreateResult {
@@ -326,13 +331,19 @@ export function createInMemoryChatRepository(
   /** Whether `message` is after `userId`'s hide point (always, before 071). */
   const isShownTo = (userId: string | undefined, message: Pick<ChatMessage, "threadId" | "sentAt" | "messageId">) => {
     if (!hideSupported || userId === undefined) return true
-    const { hiddenThrough, hidePoint } = cursorsOf(message.threadId, userId)
+    const cursors = cursorsOf(message.threadId, userId)
+    const { hiddenThrough } = cursors
     if (hiddenThrough === undefined) return true
-    const exact = hidePointSupported ? exactHidePoint(hiddenThrough, hidePoint) : undefined
+    const exact = exactPointOf(cursors)
     return exact
       ? compareChatMessagesAscending(message, exact) > 0
       : Date.parse(message.sentAt) > Date.parse(hiddenThrough)
   }
+  /** The exact hide point (075) when the store has one; 071's time rule otherwise. */
+  const exactPointOf = (cursors: InMemoryParticipantCursors) =>
+    hidePointSupported && cursors.hiddenThrough !== undefined
+      ? exactHidePoint(cursors.hiddenThrough, cursors.hidePoint)
+      : undefined
   const findPartnerMessage = (threadId: string, userId: string, messageId: string) =>
     (store.messagesByThread.get(threadId) ?? []).find((message) =>
       message.messageId === messageId && message.senderUserId !== userId)
@@ -350,14 +361,17 @@ export function createInMemoryChatRepository(
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.threadId.localeCompare(a.threadId))
         .slice(0, limit + 1)
       const threads = await withCurrentParticipants(candidates.slice(0, limit).map((thread) => {
-          const { readAt: lastReadAt, hiddenThrough } = cursorsOf(thread.threadId, userId)
+          const cursors = cursorsOf(thread.threadId, userId)
+          const { readAt: lastReadAt, hiddenThrough } = cursors
+          const exact = exactPointOf(cursors)
           const unreadCount = (store.messagesByThread.get(thread.threadId) ?? [])
-            .filter((message) => message.senderUserId !== userId && Date.parse(message.sentAt) > (lastReadAt ? Date.parse(lastReadAt) : -Infinity)).length
+            .filter((message) => message.senderUserId !== userId && isUnreadUnder(cursors, exact, message)).length
           return {
             ...cloneThread(thread),
             unreadCount,
             ...(lastReadAt ? { lastReadAt } : {}),
-            ...(hideSupported && hiddenThrough ? { hiddenThrough } : {})
+            ...(hideSupported && hiddenThrough ? { hiddenThrough } : {}),
+            ...(exact ? { hiddenThroughMessageId: exact.messageId } : {})
           }
         }))
       const last = threads.at(-1)
@@ -573,10 +587,10 @@ export function createInMemoryChatRepository(
       const counts = new Map<string, number>()
       for (const thread of store.threads.values()) {
         if (!thread.participantUserIds.includes(userId)) continue
-        const readAt = cursorsOf(thread.threadId, userId).readAt
-        const after = readAt ? Date.parse(readAt) : Number.NEGATIVE_INFINITY
+        const cursors = cursorsOf(thread.threadId, userId)
+        const exact = exactPointOf(cursors)
         for (const message of store.messagesByThread.get(thread.threadId) ?? []) {
-          if (message.senderUserId === userId || Date.parse(message.sentAt) <= after) continue
+          if (message.senderUserId === userId || !isUnreadUnder(cursors, exact, message)) continue
           counts.set(message.senderUserId, (counts.get(message.senderUserId) ?? 0) + 1)
         }
       }
@@ -614,7 +628,8 @@ export function createInMemoryChatRepository(
           ? { ...current, hiddenThrough: through, hidePoint: point, readAt }
           : { ...current, readAt }
       store.cursorsByParticipant.set(cursorKey(threadId, userId), next)
-      return { hiddenThrough: next.hiddenThrough!, readAt }
+      const exact = exactPointOf(next)
+      return { hiddenThrough: next.hiddenThrough!, readAt, ...(exact ? { hiddenThroughMessageId: exact.messageId } : {}) }
     }
   }
 }
@@ -626,6 +641,20 @@ function latestTime(values: ReadonlyArray<string | undefined>): string | undefin
     if (value !== undefined && (latest === undefined || Date.parse(value) > Date.parse(latest))) latest = value
   }
   return latest
+}
+
+/**
+ * Whether a partner message is unread. The unread cursor is a time, read
+ * inclusively. A hide moves it to the hide point's time, so a message in that
+ * same millisecond after an exact hide point (075) stays unread while the
+ * cursor has not moved since the hide: it was never hidden, and never shown.
+ */
+function isUnreadUnder(cursors: InMemoryParticipantCursors, exact: ChatOrderPosition | undefined, message: ChatOrderPosition): boolean {
+  if (cursors.readAt === undefined) return true
+  const readAt = Date.parse(cursors.readAt)
+  const sentAt = Date.parse(message.sentAt)
+  if (sentAt !== readAt) return sentAt > readAt
+  return exact !== undefined && Date.parse(exact.sentAt) === readAt && compareChatMessagesAscending(message, exact) > 0
 }
 
 /** The stored hide point when it is exact: written together with `hiddenThrough` and not moved since. */

@@ -18,9 +18,14 @@ export interface InboxConversationPrefs {
 export interface InboxThreadLike {
   threadId: string
   createdAt: string
-  lastMessage?: { sentAt: string } | null
+  lastMessage?: { sentAt: string; messageId?: string } | null
   /** The server's "delete chat for me" point for this account (every device, migration 071). */
   hiddenThrough?: string
+  /**
+   * The hidden message at `hiddenThrough` when the server knows it (075): a
+   * message in that millisecond with a later id is not hidden.
+   */
+  hiddenThroughMessageId?: string
 }
 
 export const EMPTY_INBOX_CONVERSATION_PREFS: InboxConversationPrefs = Object.freeze({
@@ -60,11 +65,25 @@ export function deleteConversationForMe(prefs: InboxConversationPrefs, thread: I
   return { ...unpinned, deletedThrough: capEntries({ ...unpinned.deletedThrough, [thread.threadId]: next }) }
 }
 
-/** Hidden until something newer than the delete arrives. */
+/**
+ * Hidden until something newer than the delete arrives. A point is a time,
+ * read inclusively, unless the server names the hidden message at that time:
+ * then a last message in the same millisecond with a later id (history order)
+ * is newer. The on-device delete stored only a time; at the server's time
+ * the server's exact point decides for it.
+ */
 export function isConversationDeletedForMe(prefs: InboxConversationPrefs, thread: InboxThreadLike): boolean {
   const activityAt = timeOf(getConversationActivityAt(thread))
+  const serverAt = thread.hiddenThrough === undefined ? undefined : timeOf(thread.hiddenThrough)
+  const exactId = thread.hiddenThroughMessageId
+  const lastId = thread.lastMessage?.messageId
+  const coveredAt = (throughAt: number) => {
+    if (activityAt !== throughAt) return activityAt < throughAt
+    if (exactId === undefined || serverAt !== throughAt || thread.lastMessage == null) return true
+    return lastId === undefined || lastId.localeCompare(exactId) <= 0
+  }
   return [prefs.deletedThrough[thread.threadId], thread.hiddenThrough]
-    .some((through) => through !== undefined && activityAt <= timeOf(through))
+    .some((through) => through !== undefined && coveredAt(timeOf(through)))
 }
 
 /**
