@@ -72,7 +72,8 @@ test("the beta reset counts, applies once, keeps protected data and refuses wron
       blumi_mini_room_invites: 1, blumi_reactions: 1, blumi_push_delivery_outbox: 3, blumi_room_presence: 1,
       blumi_realtime_payload_refs: 1, blumi_room_showcase_snapshots: 1
     })
-    assert.deepEqual(plan.counts.reset, { coinBalances: 2, avatarLoadouts: 4, roomDecorUpdates: 2, roomDecorInserts: 2 })
+    // The test persona's look and room are never written (seedTestPersonas.ts gives it its own).
+    assert.deepEqual(plan.counts.reset, { coinBalances: 2, avatarLoadouts: 3, roomDecorUpdates: 2, roomDecorInserts: 1 })
     assert.equal(plan.counts.keep.blumi_accounts, 5)
     assert.equal(plan.counts.keep["test persona likes"], 1)
     assert.deepEqual(plan.activity, { liveConnections: 0, livePresence: 0 })
@@ -241,7 +242,7 @@ async function assertResetState(client: PoolClient, accounts: Accounts, untouche
   assert.ok(coins.rows.every((row) => row.coins === 1250 && row.coin_debt === 0))
 
   const expected = { girl: DEFAULT_FEMALE_AVATAR_LOADOUT, boy: DEFAULT_MALE_AVATAR_LOADOUT,
-    legacy: DEFAULT_MALE_AVATAR_LOADOUT, fresh: DEFAULT_FEMALE_AVATAR_LOADOUT, persona: DEFAULT_FEMALE_AVATAR_LOADOUT }
+    legacy: DEFAULT_MALE_AVATAR_LOADOUT, fresh: DEFAULT_FEMALE_AVATAR_LOADOUT }
   const defaultsOwned = getDefaultOwnedItemIds("avatar")
   for (const [name, loadout] of Object.entries(expected)) {
     const { rows } = await client.query<{ avatar_selection: unknown; avatar_preset_id: string; avatar_revision: number }>(
@@ -263,10 +264,16 @@ async function assertResetState(client: PoolClient, accounts: Accounts, untouche
     repository: createPostgresPersonalRoomDecorRepository(client),
     getOwnedRoomItemIds: async () => getDefaultOwnedItemIds("room")
   })
-  for (const name of ["girl", "boy", "legacy", "persona"] as const) {
+  for (const name of ["girl", "boy", "legacy"] as const) {
     const room = await rooms.get(accounts[name].userId)
     assert.deepEqual(room?.decor.placedItems.map((item) => item.itemId), [STARTER_ROOM_BED_ID], `${name} gets the starter room`)
   }
+  const persona = await client.query<{ avatar_selection: unknown; avatar_revision: number }>(
+    "SELECT avatar_selection, avatar_revision FROM blumi_accounts WHERE account_id = $1", [accounts.persona.accountId])
+  assert.deepEqual(persona.rows[0]?.avatar_selection, { ...DEFAULT_FEMALE_AVATAR_LOADOUT, topId: "avatar_v2_top_retired_tee" },
+    "the test persona keeps its seeded look")
+  assert.equal(persona.rows[0]?.avatar_revision, 0)
+  assert.equal(await rooms.get(accounts.persona.userId), null, "the test persona's room is never written")
   assert.equal(await rooms.get(accounts.fresh.userId), null, "an account still in onboarding saves its own first room")
 }
 

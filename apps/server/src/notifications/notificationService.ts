@@ -91,12 +91,22 @@ export interface NotificationService {
   onDeliveriesQueued?(listener: () => void): () => void
 }
 
+/** Default limit for one push provider call (send, receipt lookup). */
+export const DEFAULT_PUSH_PROVIDER_TIMEOUT_MS = 10_000
+
 export interface CreateNotificationServiceOptions {
   repository?: NotificationRepository
   pushProvider?: PushProvider
   now?: () => Date
   deliveryIdFactory?: () => string
   providerTimeoutMs?: number
+  /**
+   * Limit for the push send made while the dispatch holds row and advisory
+   * locks (withAuthorizedDelivery). Defaults to providerTimeoutMs and never
+   * exceeds it. The PostgreSQL server sets it below its lock_timeout so
+   * device removal and account deletion never time out behind a slow send.
+   */
+  lockedSendTimeoutMs?: number
   reportPushFailure?: (failure: SafePushFailure) => void
   /** The recipient's app language when the server knows it; English otherwise. */
   resolveRecipientLocale?: (userId: string) => Promise<PushLocale | undefined>
@@ -156,7 +166,8 @@ export function createNotificationService(
   const pushProvider = options.pushProvider ?? createDevelopmentPushProvider()
   const now = options.now ?? (() => new Date())
   const deliveryIdFactory = options.deliveryIdFactory ?? createDeliveryId
-  const providerTimeoutMs = options.providerTimeoutMs ?? 10_000
+  const providerTimeoutMs = options.providerTimeoutMs ?? DEFAULT_PUSH_PROVIDER_TIMEOUT_MS
+  const lockedSendTimeoutMs = Math.min(options.lockedSendTimeoutMs ?? providerTimeoutMs, providerTimeoutMs)
   const reportPushFailure = (stage: SafePushFailure["stage"], errorCode: string, attempt: number, type?: string) => {
     const notificationType = ["chat.message", "chat.room_invite", "discovery.match", "discovery.like", "discovery.watch_match"].includes(type ?? "")
       ? type! : "unknown"
@@ -184,6 +195,9 @@ export function createNotificationService(
   }
   if (!Number.isSafeInteger(providerTimeoutMs) || providerTimeoutMs < 1 || providerTimeoutMs >= DELIVERY_LEASE_MS) {
     throw new Error("Provider timeout must be shorter than the delivery lease.")
+  }
+  if (!Number.isSafeInteger(lockedSendTimeoutMs) || lockedSendTimeoutMs < 1) {
+    throw new Error("Locked push send timeout must be a positive integer.")
   }
   const queuedListeners = new Set<() => void>()
   const announceQueued = () => {
@@ -444,7 +458,7 @@ export function createNotificationService(
             timer = setTimeout(() => {
               controller.abort()
               reject(new Error("provider unavailable: timeout"))
-            }, providerTimeoutMs)
+            }, lockedSendTimeoutMs)
           })
         ]))
         if (!admitted.authorized) {

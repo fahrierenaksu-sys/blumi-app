@@ -137,3 +137,27 @@ test("a migrator waiting on another migrator's advisory lock stops at the lock t
     await fixture.cleanup()
   }
 })
+
+test("a migration on a connection that still carries the app's session budget runs without it", {
+  skip: !databaseUrl
+}, async () => {
+  const fixture = await createFixture()
+  try {
+    await writeFile(join(fixture.directory, "002_slow.sql"), `
+      SELECT pg_sleep(1.5);
+      CREATE TABLE ${fixture.schema}.session_observed AS
+        SELECT current_setting('statement_timeout') AS statement_timeout,
+          current_setting('idle_in_transaction_session_timeout') AS idle_timeout;
+    `)
+    const client = await fixture.migrator.connect()
+    // What a session pooler could hand over after an app connection used it.
+    await client.query(`SELECT set_config('statement_timeout', '1s', false),
+      set_config('lock_timeout', '1s', false), set_config('idle_in_transaction_session_timeout', '1s', false)`)
+    const result = await runMigrationsWithClient(client, fixture.directory)
+    assert.deepEqual(result.applied, ["001_probe.sql", "002_slow.sql"])
+    const observed = await fixture.admin.query(`SELECT * FROM ${fixture.schema}.session_observed`)
+    assert.deepEqual(observed.rows[0], { statement_timeout: "0", idle_timeout: "0" })
+  } finally {
+    await fixture.cleanup()
+  }
+})

@@ -1,4 +1,5 @@
 import { Pool } from "pg"
+import { applySessionBudget } from "../src/db/databasePoolConfig"
 import { auditDatabaseRelease, type DatabaseReleaseAudit } from "../src/operations/databaseReleaseAudit"
 
 const expectedProjectRef = process.argv[process.argv.indexOf("--project-ref") + 1]
@@ -16,6 +17,8 @@ const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_00
 async function main(): Promise<void> {
   const client = await pool.connect()
   try {
+    // Own session limits, never a pooled connection's app budget.
+    await applySessionBudget(client, { statementTimeoutMs: 20_000, lockTimeoutMs: 5_000, idleInTransactionTimeoutMs: 60_000 })
     await client.query("BEGIN READ ONLY")
     await client.query("SET LOCAL statement_timeout = '20s'")
     const result = await auditDatabaseRelease(client)

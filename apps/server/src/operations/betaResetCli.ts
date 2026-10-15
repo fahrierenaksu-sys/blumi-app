@@ -1,8 +1,13 @@
 import { spawnSync } from "node:child_process"
 import { resolve } from "node:path"
 import { Pool } from "pg"
+import { applySessionBudget } from "../db/databasePoolConfig"
 import { applyBetaReset, planBetaReset, type BetaResetContext, type BetaResetPlan, type BetaResetSource } from "./betaReset"
 import { assertStarterMatchesSource, describeBetaResetStarter, readBetaResetStarter } from "./betaResetStarter"
+
+const BETA_RESET_SESSION_BUDGET = Object.freeze({
+  statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, idleInTransactionTimeoutMs: 60_000
+})
 
 /**
  * Operator entry for the beta reset (`apps/server/scripts/betaReset.ts`). Dry run is the default and runs READ ONLY.
@@ -18,7 +23,7 @@ export const BETA_RESET_CONFIRM_ENV = "BLUMI_BETA_RESET_CONFIRM"
 const PROJECT_REF = /^[a-z0-9]{20}$/
 const SHA256 = /^[0-9a-f]{64}$/
 const FINGERPRINT = /^[0-9a-f]{16}$/
-const GIT_SHA = /^[0-9a-f]{7,40}$/
+const GIT_SHA = /^[0-9a-f]{12,40}$/
 
 export interface BetaResetArgs {
   readonly projectRef: string
@@ -45,7 +50,7 @@ export function parseBetaResetArgs(argv: readonly string[]): BetaResetArgs {
   if (apply && !FINGERPRINT.test(fingerprint ?? "")) throw new Error("--apply needs --fingerprint <fp> from the dry run.")
   const deployedCommit = valueOf("--deployed-commit")?.toLowerCase() ?? null
   if (apply && !GIT_SHA.test(deployedCommit ?? "")) {
-    throw new Error("--apply needs --deployed-commit <sha> (the commit /health reports as live).")
+    throw new Error("--apply needs --deployed-commit <sha> of at least 12 characters (the commit /health reports as live).")
   }
   return { projectRef, apply, expectHash, fingerprint, deployedCommit }
 }
@@ -81,10 +86,16 @@ export function readBetaResetSource(repositoryRoot = REPOSITORY_ROOT): BetaReset
   return { commit: fullCommit.slice(0, SHORT_COMMIT_LENGTH), modified: status.stdout.trim().length > 0, fullCommit }
 }
 
-/** The live server (/health `commit`) must run exactly the commit this checkout is on. */
-export function assertDeployedCommit(fullCommit: string, deployedCommit: string): void {
-  const compared = Math.min(deployedCommit.length, SHORT_COMMIT_LENGTH)
-  if (fullCommit.slice(0, compared) !== deployedCommit.slice(0, compared)) {
+/**
+ * Apply runs only from a clean checkout of exactly the commit the live server (/health `commit`) runs: a local
+ * edit to the delete list would otherwise hash consistently between dry run and apply and pass unreviewed.
+ * Every typed character is compared, not just a prefix of it.
+ */
+export function assertApplySource(source: { readonly fullCommit: string; readonly modified: boolean }, deployedCommit: string): void {
+  if (source.modified) {
+    throw new Error("This checkout has uncommitted changes to tracked files; check out the deployed commit cleanly. Reset refused.")
+  }
+  if (deployedCommit.length < SHORT_COMMIT_LENGTH || !source.fullCommit.startsWith(deployedCommit)) {
     throw new Error("This checkout is not the deployed commit; check out the commit /health reports. Reset refused.")
   }
 }
@@ -98,7 +109,7 @@ export async function runBetaResetCli(
   const connectionString = assertDatabaseMatchesProjectRef(environment.DATABASE_URL, args.projectRef)
   if (args.apply) assertTypedConfirmation(environment, args.projectRef)
   const { fullCommit, ...source } = readBetaResetSource()
-  if (args.apply) assertDeployedCommit(fullCommit, args.deployedCommit!)
+  if (args.apply) assertApplySource({ fullCommit, modified: source.modified }, args.deployedCommit!)
   const starter = readBetaResetStarter()
   await assertStarterMatchesSource(REPOSITORY_ROOT, starter)
   const context: BetaResetContext = { source, starter }
@@ -106,6 +117,9 @@ export async function runBetaResetCli(
   try {
     const client = await pool.connect()
     try {
+      // Own limits for the whole session, never a pooled connection's app budget;
+      // the transaction below narrows them again with SET LOCAL.
+      await applySessionBudget(client, BETA_RESET_SESSION_BUDGET)
       await client.query(args.apply ? "BEGIN" : "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
       await client.query("SET LOCAL lock_timeout = '5s'")
       await client.query("SET LOCAL statement_timeout = '120s'")

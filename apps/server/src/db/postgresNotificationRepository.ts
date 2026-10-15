@@ -32,6 +32,9 @@ export function createPostgresNotificationRepository(
     async withAuthorizedDelivery(delivery, now, send) {
       if (!pool.connect) throw new Error("Dispatch authorization requires a dedicated database connection.")
       const client = await pool.connect()
+      // A connection whose ROLLBACK failed may still hold the watch and outbox
+      // locks: release(error) makes node-postgres destroy it instead of reusing it.
+      let broken: Error | undefined
       try {
         await client.query("BEGIN")
         if (delivery.notification.data?.type === "discovery.watch_match" && !delivery.discoveryWatch) {
@@ -57,9 +60,11 @@ export function createPostgresNotificationRepository(
         await client.query("COMMIT")
         return { authorized: true, value }
       } catch (error) {
-        await client.query("ROLLBACK")
+        await client.query("ROLLBACK").catch((rollbackError: unknown) => {
+          broken = rollbackError instanceof Error ? rollbackError : new Error("ROLLBACK failed.")
+        })
         throw error
-      } finally { client.release() }
+      } finally { client.release(broken) }
     },
     async claimDueReceipts({ now, limit, leaseMs }) {
       const result = await pool.query(`WITH due AS (

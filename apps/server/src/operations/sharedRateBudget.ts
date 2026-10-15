@@ -101,6 +101,16 @@ export function createInMemoryRateBudget(now: () => number = Date.now): SharedRa
 
 interface BudgetExecutor { query(sql: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> }
 
+/**
+ * One autocommit upsert per budgeted request on the app's shared pool: no
+ * transaction, no extra round trip, no dedicated connection. Measured on an
+ * isolated PostgreSQL 17 cluster (2026-10-15, 500 requests, concurrency 10,
+ * pool max 10, warm second round, loaded machine): the budget alone took
+ * p50 1.3 ms / p95 8.3 ms, and a request with one indexed read went from
+ * p50 1.1 / p95 5.8 ms (in-process budget) to p50 3.3 / p95 21 ms, with no
+ * pool waits and no connections beyond the pool. Against Supabase each
+ * request adds one network round trip and one small row write.
+ */
 export function createPostgresRateBudget(pool: BudgetExecutor): SharedRateBudget {
   return {
     async consumeUser(userId, scope = "general") {

@@ -8,8 +8,9 @@ import { canonicalJson, isRecord, sha256, type BetaResetStarter } from "./betaRe
  * The owner-approved full beta reset (option "c", 2026-10-10; spec: release plan 13/10 §4).
  * Coins go to the starter amount, every loadout to its body's starter look, every finished room to the starter
  * room with the bed; all chats, messages, matches, mini rooms and their pending pushes are deleted.
- * Accounts, profiles, gender, sessions, blocks, money ledgers, settings and the test personas (with the likes they
- * hand out, so persona QA can still match instantly) are never written.
+ * Accounts, profiles, gender, sessions, blocks, money ledgers and settings are never written. The test personas
+ * are never written either: not their coins, look or room (scripts/seedTestPersonas.ts gives each its own), and
+ * not the likes they hand out, so persona QA can still match instantly.
  * Every count is computed, hashed and printed; IDs, phone numbers and bodies never leave this module.
  */
 
@@ -255,11 +256,13 @@ function assertResetComplete(before: BetaResetCounts, after: BetaResetCounts): v
   if (changedKeep.length > 0) throw new Error(`Post-check failed: kept tables changed (${changedKeep.join(", ")}); rolled back.`)
 }
 
-const coinsOffStarter = (starter: BetaResetStarter): string => `coins <> ${Math.trunc(starter.coins)} OR coin_debt <> 0`
-const DECOR_OFF_STARTER = "decor <> $1::jsonb"
+const NOT_PERSONA = "user_id NOT IN (SELECT user_id FROM blumi_test_personas)"
+const coinsOffStarter = (starter: BetaResetStarter): string =>
+  `(coins <> ${Math.trunc(starter.coins)} OR coin_debt <> 0) AND ${NOT_PERSONA}`
+const DECOR_OFF_STARTER = `decor <> $1::jsonb AND ${NOT_PERSONA}`
 const PERSONA_LIKES = "from_user_id IN (SELECT user_id FROM blumi_test_personas)"
 // Only finished rooms get a starter row; an account still in onboarding saves its first room itself (revision 0).
-const ACCOUNTS_MISSING_DECOR = `a.onboarding_room_complete
+const ACCOUNTS_MISSING_DECOR = `a.onboarding_room_complete AND a.${NOT_PERSONA}
   AND NOT EXISTS (SELECT 1 FROM blumi_personal_room_decor d WHERE d.user_id = a.user_id)`
 
 async function countRows(client: PoolClient, table: string, where?: string, values: unknown[] = []): Promise<number> {
@@ -293,6 +296,7 @@ async function planLoadoutChanges(client: PoolClient, starter: BetaResetStarter)
     `SELECT a.account_id, a.avatar_selection, a.avatar_preset_id, COALESCE(a.identity_gender, a.gender) AS gender,
             i.owned_avatar_item_ids AS owned
        FROM blumi_accounts a LEFT JOIN blumi_economy_inventories i ON i.user_id = a.user_id
+      WHERE a.${NOT_PERSONA}
       ORDER BY a.account_id`
   )
   const defaultOwned = getDefaultOwnedItemIds("avatar", resolveProductionEconomyCatalog())

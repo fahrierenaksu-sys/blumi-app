@@ -125,12 +125,13 @@ project and environment have not been independently confirmed.
 
 `apps/server/scripts/betaReset.ts` is the only way to run it; never ad-hoc SQL.
 It sets coins to 1,250, every loadout to its body's starter look, every finished
-room to the starter room with the bed, and deletes all chats, messages, matches,
+room to the starter room with the bed (all three skip the test personas, which
+keep their seeded coins, looks and rooms), and deletes all chats, messages, matches,
 discovery decisions (except the likes the test personas hand out), mini rooms,
 invites, reactions, pending pushes about them, room presence, realtime payloads
 and old room renders. It never writes profile columns, sessions, push devices,
-settings, blocks, reports, bans, money ledgers, owned items, test personas or
-`blumi_migrations`. Deleting a mini room queues a LiveKit media revocation per
+settings, blocks, reports, bans, money ledgers, owned items, test personas (their
+rows, coins, looks or rooms) or `blumi_migrations`. Deleting a mini room queues a LiveKit media revocation per
 participant (database trigger, as when the app ends a room; voice is off).
 Output is counts, catalog item IDs and commit SHAs only.
 
@@ -178,7 +179,10 @@ command; stop at the first STOP.
    each user gets, what is kept. The reset is pre-approved; this is a notice.
 6. Apply: the same command plus `--apply --expect <sha256> --fingerprint <fp>
    --deployed-commit <step 1 commit>`, with `BLUMI_BETA_RESET_CONFIRM=reset-beta-<ref>`
-   set for that one command. It locks the tables it writes, refuses on a hash,
+   set for that one command. It refuses before connecting when the checkout has
+   uncommitted changes to tracked files or when the typed commit (12 characters
+   or more, every one compared) is not the checkout's HEAD. It locks the tables
+   it writes, refuses on a hash,
    fingerprint or commit mismatch or when a live connection or room presence
    exists, and rolls back unless the post-check finds nothing left to reset, the
    accounts, inventories and persona likes at their old counts. `hash mismatch`
@@ -220,6 +224,22 @@ above. A separate staging Supabase project is recommended and still open
    ledger test (`apps/server/src/db/migrationLedger.test.ts`) then fails if
    that file ever changes, and holds every file not yet listed to the
    additive, RLS-and-revoke policy.
+
+### Pre-deploy checklist: Railway variables
+
+Before every API deploy, check the variable names in Railway → project →
+service `blumi-app` → Variables. Look only at whether each name is set and to
+which allowed word; never copy, print or paste a secret value.
+
+- [ ] check Railway variables: `BLUMI_RATE_BUDGET_STORE` must be unset or
+  `postgres`. The server refuses to start in production with `memory` (audit
+  D09), so the deploy would crash-loop. Fix: delete the variable or set it to
+  `postgres`.
+- [ ] `BLUMI_TRUST_PROXY` is set (`100.64.0.0/10` on Railway); production
+  refuses to start without it.
+- [ ] `BLUMI_DB_STATEMENT_TIMEOUT_MS`, `BLUMI_DB_LOCK_TIMEOUT_MS` and
+  `BLUMI_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` are unset unless the owner chose
+  other limits (defaults 10 s, 3 s, 30 s; see `databasePoolConfig.ts`).
 
 Until staging exists, rehearse each migration on the fresh dump instead: run
 `node scripts/security/restore-upgrade-gate.mjs /absolute/path/to/fresh.dump`
