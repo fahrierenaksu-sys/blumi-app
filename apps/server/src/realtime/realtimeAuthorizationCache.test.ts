@@ -286,10 +286,11 @@ test("invalidation drops the cached result for that user immediately", async () 
   assert.equal(await cache.authorize(other), false)
 })
 
-test("a check that started before an invalidation is neither cached nor joined afterwards", async () => {
+test("a check that started before an invalidation is neither trusted, cached nor joined afterwards", async () => {
   const first = deferred<boolean>()
   const second = deferred<boolean>()
-  const pending = [first, second]
+  const recheck = deferred<boolean>()
+  const pending = [first, second, recheck]
   let checks = 0
   const cache = createRealtimeAuthorizationCache({
     now: createClock().now,
@@ -301,15 +302,36 @@ test("a check that started before an invalidation is neither cached nor joined a
   const afterRevocation = cache.authorize(FAMILY)
   first.resolve(true)
   second.resolve(false)
-  assert.equal(await beforeRevocation, true)
+  recheck.resolve(false)
+  // The pre-revocation positive answer is checked again, and the fresh read wins.
+  assert.equal(await beforeRevocation, false)
   assert.equal(await afterRevocation, false)
-  assert.equal(checks, 2)
-  // The pre-revocation positive answer must not have been stored.
-  const third = deferred<boolean>()
-  third.resolve(false)
-  pending.push(third)
-  assert.equal(await cache.authorize(FAMILY), false)
   assert.equal(checks, 3)
+  // It must not have been stored either.
+  const fourth = deferred<boolean>()
+  fourth.resolve(false)
+  pending.push(fourth)
+  assert.equal(await cache.authorize(FAMILY), false)
+  assert.equal(checks, 4)
+})
+
+test("a stale positive answer is denied when revocations keep overtaking the re-check", async () => {
+  const first = deferred<boolean>()
+  const recheck = deferred<boolean>()
+  const pending = [first, recheck]
+  const cache = createRealtimeAuthorizationCache({
+    now: createClock().now,
+    check() { return pending.shift()!.promise }
+  })
+  const decision = cache.authorize(FAMILY)
+  await Promise.resolve()
+  cache.invalidate({ kind: "user", userId: FAMILY.userId })
+  first.resolve(true)
+  await new Promise((resolve) => setImmediate(resolve))
+  cache.invalidate({ kind: "all" })
+  recheck.resolve(true)
+  assert.equal(await decision, false)
+  assert.equal(cache.size(), 0)
 })
 
 test("purgeExpired removes stale entries", async () => {

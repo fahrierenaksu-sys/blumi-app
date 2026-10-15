@@ -14,6 +14,7 @@ import {
   SafetyLimitError,
   type SafetyService
 } from "../safety/safetyService"
+import type { BlockRecord, ReportRecord } from "../safety/safetyRepository"
 import { createFixedWindowLimiter } from "../operations/requestLimits"
 import { isPublicRequestError } from "../errors/publicRequestError"
 import { readParam, resolveBearerSession, schemaValidationFailed } from "./routeHelpers"
@@ -41,6 +42,57 @@ const reporterReportResponseSchema = {
     createdAt: { type: "string" },
     status: { type: "string", enum: ["pending", "resolved", "dismissed"] },
     response: { type: "string" }
+  }
+} as const
+
+// What a reporter may read back after POST /v1/safety/reports, on the first
+// answer and on an idempotent replay alike. An explicit allow-list: moderation
+// fields (resolution action, private note, operator and token record) and the
+// stored idempotency key never leave the server through this route.
+const reporterSubmittedReportSchema = {
+  type: "object",
+  required: ["reportId", "actorUserId", "reportedUserId", "reason", "createdAt", "status"],
+  additionalProperties: false,
+  properties: {
+    reportId: { type: "string" },
+    actorUserId: { type: "string" },
+    reportedUserId: { type: "string" },
+    reason: { type: "string" },
+    note: { type: "string" },
+    createdAt: { type: "string" },
+    status: { type: "string", enum: ["pending", "resolved", "dismissed"] }
+  }
+} as const
+
+const reporterBlockSchema = {
+  type: "object",
+  required: ["actorUserId", "blockedUserId", "createdAt"],
+  additionalProperties: false,
+  properties: {
+    actorUserId: { type: "string" },
+    blockedUserId: { type: "string" },
+    createdAt: { type: "string" },
+    blockedProfile: {
+      type: "object",
+      required: ["userId", "displayName"],
+      additionalProperties: false,
+      properties: {
+        userId: { type: "string" },
+        displayName: { type: "string" },
+        avatarPresetId: { type: "string" }
+      }
+    }
+  }
+} as const
+
+const reportSubmissionResponseSchema = {
+  type: "object",
+  required: ["report", "block", "replayed"],
+  additionalProperties: false,
+  properties: {
+    report: reporterSubmittedReportSchema,
+    block: reporterBlockSchema,
+    replayed: { type: "boolean" }
   }
 } as const
 
@@ -215,8 +267,8 @@ export async function registerSafetyRoutes(
         additionalProperties: true
       },
       response: {
-        200: successResponseJsonSchema,
-        201: successResponseJsonSchema,
+        200: reportSubmissionResponseSchema,
+        201: reportSubmissionResponseSchema,
         ...authenticatedErrorResponses
       }
     }
@@ -260,7 +312,11 @@ export async function registerSafetyRoutes(
           type: "mini_room.ended", payload: ended
         })
       }
-      return reply.code(result.replayed ? 200 : 201).send(result)
+      return reply.code(result.replayed ? 200 : 201).send({
+        report: toReporterReport(result.report),
+        block: toReporterBlock(result.block),
+        replayed: result.replayed
+      })
     } catch (error) {
       if (error instanceof ReportIdempotencyConflictError) {
         return reply.code(409).send({ error: error.message })
@@ -272,6 +328,34 @@ export async function registerSafetyRoutes(
       })
     }
   })
+}
+
+function toReporterReport(report: ReportRecord) {
+  return {
+    reportId: report.reportId,
+    actorUserId: report.actorUserId,
+    reportedUserId: report.reportedUserId,
+    reason: report.reason,
+    ...(report.note ? { note: report.note } : {}),
+    createdAt: report.createdAt,
+    status: report.status
+  }
+}
+
+function toReporterBlock(block: BlockRecord) {
+  const profile = block.blockedProfile
+  return {
+    actorUserId: block.actorUserId,
+    blockedUserId: block.blockedUserId,
+    createdAt: block.createdAt,
+    ...(profile ? {
+      blockedProfile: {
+        userId: profile.userId,
+        displayName: profile.displayName,
+        ...(profile.avatarPresetId ? { avatarPresetId: profile.avatarPresetId } : {})
+      }
+    } : {})
+  }
 }
 
 function reporterResponseForStatus(status: "pending" | "resolved" | "dismissed"): string {
