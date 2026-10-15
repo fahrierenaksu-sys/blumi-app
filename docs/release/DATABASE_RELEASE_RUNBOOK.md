@@ -225,6 +225,22 @@ above. A separate staging Supabase project is recommended and still open
    that file ever changes, and holds every file not yet listed to the
    additive, RLS-and-revoke policy.
 
+### Pre-deploy checklist: Railway variables
+
+Before every API deploy, check the variable names in Railway → project →
+service `blumi-app` → Variables. Look only at whether each name is set and to
+which allowed word; never copy, print or paste a secret value.
+
+- [ ] check Railway variables: `BLUMI_RATE_BUDGET_STORE` must be unset or
+  `postgres`. The server refuses to start in production with `memory` (audit
+  D09), so the deploy would crash-loop. Fix: delete the variable or set it to
+  `postgres`.
+- [ ] `BLUMI_TRUST_PROXY` is set (`100.64.0.0/10` on Railway); production
+  refuses to start without it.
+- [ ] `BLUMI_DB_STATEMENT_TIMEOUT_MS`, `BLUMI_DB_LOCK_TIMEOUT_MS` and
+  `BLUMI_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` are unset unless the owner chose
+  other limits (defaults 10 s, 3 s, 30 s; see `databasePoolConfig.ts`).
+
 Until staging exists, rehearse each migration on the fresh dump instead: run
 `node scripts/security/restore-upgrade-gate.mjs /absolute/path/to/fresh.dump`
 (below), which restores it into a throwaway PostgreSQL 17 cluster, applies the

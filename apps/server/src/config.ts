@@ -560,7 +560,8 @@ export function resolveRateBudgetStore(
     return "memory"
   }
   if (requested === "memory" && nodeEnv === "production") {
-    throw new Error("BLUMI_RATE_BUDGET_STORE=memory is not shared across instances; production must use postgres.")
+    throw new Error("BLUMI_RATE_BUDGET_STORE=memory is refused in production: it counts requests per instance (audit D09). " +
+      "Fix: unset BLUMI_RATE_BUDGET_STORE in the deployment's variables (Railway) or set it to postgres, then redeploy.")
   }
   return requested ?? "postgres"
 }

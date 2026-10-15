@@ -601,7 +601,7 @@ test("with PostgreSQL repositories the request budget is shared across instances
   assert.equal(resolveServerConfig({ ...postgresDevelopment, BLUMI_RATE_BUDGET_STORE: "memory" }).rateBudgetStore, "memory")
   // Production instances must never count requests per process.
   assert.throws(() => resolveServerConfig({ ...VALID_PRODUCTION_ENV, BLUMI_RATE_BUDGET_STORE: "memory" }),
-    /BLUMI_RATE_BUDGET_STORE=memory/)
+    /BLUMI_RATE_BUDGET_STORE=memory.*(unset|remove).*BLUMI_RATE_BUDGET_STORE.*postgres/is)
   // Memory repositories have no database to share a budget in; asking for one is a mistake, not a no-op.
   assert.throws(() => resolveServerConfig({ BLUMI_RATE_BUDGET_STORE: "postgres" }), /BLUMI_RATE_BUDGET_STORE=postgres/)
 })
