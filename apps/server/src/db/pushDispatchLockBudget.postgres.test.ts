@@ -6,6 +6,7 @@ import { createDefaultAvatarSelection } from "../auth/authStore"
 import { createPhoneBanHasher } from "../auth/moderationPhoneBan"
 import { createNotificationService } from "../notifications/notificationService"
 import { createDatabasePools, resolveDatabasePoolSettings, resolveLockedSendTimeoutMs } from "./databasePoolConfig"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 import { createPostgresAuthRepository } from "./postgresAuthRepository"
 import { createPostgresNotificationRepository } from "./postgresNotificationRepository"
 
@@ -54,9 +55,9 @@ async function timed<T>(run: () => Promise<T>): Promise<{ ms: number; value?: T;
   try { return { ms: Date.now() - started, value: await run() } } catch (error) { return { ms: Date.now() - started, error } }
 }
 
-test("a hanging push send ends before device removal and account deletion run out of lock budget", { skip: !databaseUrl, timeout: 60_000 }, async () => {
+test("a hanging push send ends before device removal and account deletion run out of lock budget", { skip: disposablePostgresSkip().skip, timeout: 60_000 }, async () => {
   const settings = resolveDatabasePoolSettings({})
-  const { pool } = createDatabasePools({ databaseUrl, databasePool: { ...settings, max: 4 } })
+  const { pool } = createDatabasePools({ databaseUrl: disposablePostgresUrl(databaseUrl), databasePool: { ...settings, max: 4 } })
   const lockedSendTimeoutMs = resolveLockedSendTimeoutMs(PROVIDER_TIMEOUT_MS, settings)
   assert.ok(lockedSendTimeoutMs < settings.lockTimeoutMs, "the locked send ends before a waiter's lock_timeout")
   try {

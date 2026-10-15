@@ -139,7 +139,7 @@ test("a migrator waiting on another migrator's advisory lock stops at the lock t
 })
 
 test("a migration on a connection that still carries the app's session budget runs without it", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const fixture = await createFixture()
   try {

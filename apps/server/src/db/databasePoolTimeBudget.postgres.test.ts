@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { Pool } from "pg"
 import { createDatabasePools, resolveDatabasePoolSettings } from "./databasePoolConfig"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 // Slack for a loaded machine: the budget must bound the wait, not match it exactly.
@@ -17,11 +18,11 @@ async function elapsed(run: () => Promise<unknown>): Promise<{ ms: number; error
   }
 }
 
-test("the app pool bounds lock waits and long statements by default, and keeps serving afterwards", { skip: !databaseUrl }, async () => {
+test("the app pool bounds lock waits and long statements by default, and keeps serving afterwards", { skip: disposablePostgresSkip().skip }, async () => {
   const settings = resolveDatabasePoolSettings({})
-  const { pool } = createDatabasePools({ databaseUrl, databasePool: { ...settings, max: 2 } })
+  const { pool } = createDatabasePools({ databaseUrl: disposablePostgresUrl(databaseUrl), databasePool: { ...settings, max: 2 } })
   // A connection without the app budget, like the migrator's, holds the lock.
-  const holder = new Pool({ connectionString: databaseUrl, max: 1 })
+  const holder = new Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: 1 })
   const lockHolder = await holder.connect()
   try {
     await pool.query("CREATE TABLE IF NOT EXISTS pool_budget_probe (id INTEGER PRIMARY KEY)")
@@ -52,9 +53,9 @@ test("the app pool bounds lock waits and long statements by default, and keeps s
   }
 })
 
-test("the client-side query timeout ends a stalled statement and the pool replaces the connection", { skip: !databaseUrl }, async () => {
+test("the client-side query timeout ends a stalled statement and the pool replaces the connection", { skip: disposablePostgresSkip().skip }, async () => {
   const settings = resolveDatabasePoolSettings({ BLUMI_DB_STATEMENT_TIMEOUT_MS: "60000", BLUMI_DB_QUERY_TIMEOUT_MS: "61000" })
-  const { pool } = createDatabasePools({ databaseUrl, databasePool: { ...settings, queryTimeoutMs: 1_500, max: 1 } })
+  const { pool } = createDatabasePools({ databaseUrl: disposablePostgresUrl(databaseUrl), databasePool: { ...settings, queryTimeoutMs: 1_500, max: 1 } })
   try {
     const stalled = await elapsed(() => pool.query("SELECT pg_sleep(20)"))
     assert.match(String((stalled.error as Error | undefined)?.message), /timeout/i)
@@ -66,7 +67,7 @@ test("the client-side query timeout ends a stalled statement and the pool replac
     await pool.end()
     // The client gave up, but the server statement runs on (the app's 10 s statement_timeout bounds it in
     // production; it is 60 s here). End it so the gate can drop its database.
-    const admin = new Pool({ connectionString: databaseUrl, max: 1 })
+    const admin = new Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: 1 })
     await admin.query(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
       WHERE datname = current_database() AND pid <> pg_backend_pid() AND query = 'SELECT pg_sleep(20)'`)
     await admin.end()
