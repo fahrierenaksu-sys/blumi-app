@@ -56,6 +56,28 @@ export interface UserRouteServices {
   afterResponseTasks?: AfterResponseTasks
 }
 
+/**
+ * Documents the Firebase re-authentication challenge answer in the OpenAPI
+ * catalog. additionalProperties stays open so the answer is serialized as
+ * before; only the description is new.
+ */
+const firebaseActionChallengeResponseJsonSchema = {
+  type: "object",
+  required: ["challengeId", "expiresAt"],
+  properties: {
+    challengeId: { type: "string" },
+    expiresAt: { type: "string", format: "date-time" },
+    targetPhoneNumber: {
+      type: "string",
+      description:
+        "The signed-in account's own phone (E.164), for account_deletion, account_data_export and " +
+        "phone_change_current; never for phone_change_new. Sent only to that account's session " +
+        "(5 requests per 5 minutes, Cache-Control: no-store) and never logged. Older servers omit it."
+    }
+  },
+  additionalProperties: true
+} as const
+
 const accountChallengeRouteSchema = {
   response: {
     202: successResponseJsonSchema,
@@ -106,7 +128,7 @@ export async function registerUserRoutes(
         },
         additionalProperties: false
       },
-      response: { 200: successResponseJsonSchema, ...authenticatedErrorResponses }
+      response: { 200: firebaseActionChallengeResponseJsonSchema, ...authenticatedErrorResponses }
     }
   }, async (request, reply) => {
     const sessionToken = readBearerToken(request)

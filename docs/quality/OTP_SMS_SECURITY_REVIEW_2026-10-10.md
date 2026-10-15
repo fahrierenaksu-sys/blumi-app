@@ -87,7 +87,7 @@ Sign-in ekranı yeni faturalı projeler için ayrı 1.000 SMS/gün kotası hakk�
 | `POST /v1/auth/send-code` | Eski sunucu OTP yolu | Firebase verifier mevcutsa 410; gerçek SMS yolu değildir. Yerel geliştirici SMS sağlayıcısı mesaj göndermez. |
 | `POST /v1/auth/verify` | Eski OTP doğrulama | Firebase modunda 410. Yerel OTP deneme/tüketme kontrolleri ayrıca test edildi; Firebase gönderim faturası koruması olarak sayılmadı. |
 | `POST /v1/accounts/register` | Eski kayıt OTP yolu | Firebase modunda 410; geçerli Firebase kanıtı olmadan yeni yolun yerine kullanılamaz. |
-| `POST /v1/account/firebase/challenge` | Oturum ve amaç bağlı taze doğrulama challenge'ı | SMS göndermez. Amaç/hedef/session bağlama mevcut kaynakta incelendi. Bir API challenge'ı tek başına Firebase'in doğrudan SMS API'sini engellemez. |
+| `POST /v1/account/firebase/challenge` | Oturum ve amaç bağlı taze doğrulama challenge'ı | SMS göndermez. Amaç/hedef/session bağlama mevcut kaynakta incelendi. Bir API challenge'ı tek başına Firebase'in doğrudan SMS API'sini engellemez. 2026-10-15 ekinden beri yanıt, `phone_change_new` dışındaki amaçlarda hesabın kayıtlı telefonunu `targetPhoneNumber` olarak da döner (aşağıdaki nota bakın). |
 | `POST /v1/account/firebase/reauth` | Silme/export/mevcut-yeni telefon için taze kanıt | Amaç, oturum, hedef ve `auth_time` bağlı tek kullanımlık challenge mevcut. Eşzamanlı ayrı güvenlik çalışmasındaki bağlı Firebase UID kontrolü korunarak test edildi; o düzeltme bu çalışmaya ait sayılmadı. |
 | `POST /v1/account/deletion/challenge` ve `/confirm` | Eski silme OTP yolu | Firebase modunda 410. Mobil mevcut Firebase numarasına SMS ister; yeni sağlayıcı bütçesi aynı numara hakkını kullanır. |
 | `DELETE /v1/account` | Hesap silme | SMS göndermez; uygun tek kullanımlık silme onayı gerekir. Firebase silme kuyruğu/revocation senaryoları mevcut testlerle doğrulandı. |
@@ -104,6 +104,15 @@ Sign-in ekranı yeni faturalı projeler için ayrı 1.000 SMS/gün kotası hakk�
 Firebase Auth anahtarı mobil uygulamada görünür; onu saklamak ana koruma değildir. Giriş formunun düğmesini kapatmak, CORS, Blumi API IP limiti veya istemciye yazılan günlük sayaç doğrudan Firebase çağrısını tek başına durdurmaz. API anahtarının diğer Google API'lerine erişimi ayrıca daraltılmalı; iOS reCAPTCHA geri dönüşü doğrulanmadan kör kısıtlama uygulanmamalı.
 
 Okunan Browser anahtarı listesi Identity Toolkit/Token Service yanında Firebase AI Logic, Phone Number Verification, ML/ML Kit, Firestore/Datastore, Cloud SQL Admin, Logging, Hosting, Storage, Remote Config ve başka Firebase yönetim API'lerini de içeriyor. Whitelist'te yer almak bu API'nin etkin/ücretli kullanılıyor olması veya anahtarın IAM/user-data yetkisi vermesi demek değildir. Blumi'nin fiilen kullandığı Auth/FCM/Installations ve kurulacak App Check yolları native testle eşleştirildikten sonra gereksiz servisler listeden çıkarılmalı. Bu incelemede o API'lerde yetkisiz veri erişimi veya ek faturalanabilir çağrı kanıtı elde edilmedi.
+
+
+### Re-auth challenge yanıtındaki hesap telefonu (2026-10-15 eki)
+
+`fix/audit-session` dalındaki değişiklikle `POST /v1/account/firebase/challenge`, `account_deletion`, `account_data_export` ve `phone_change_current` amaçlarında hesabın sunucudaki telefonunu `targetPhoneNumber` olarak döner; `phone_change_new` için dönmez. Amaç, yarım kalmış bir telefon değişikliğinden sonra kodun Firebase'in tuttuğu numaraya değil hesabın numarasına gitmesidir. Alan OpenAPI kataloğunda bu yolun 200 yanıt şemasında açıklanır.
+
+- **Kim alır:** Yalnız oturum açmış hesabın kendi oturumu, kendi numarasını alır. Başka hesabın numarası bu yoldan okunamaz; oturumu olmayan istek 401 alır.
+- **Sınırlar:** Yol 5 dakikada 5 istekle sınırlıdır; `/v1/` yanıtları `Cache-Control: no-store` taşır; numara günlüklere, analitiğe veya hata yanıtlarına yazılmaz.
+- **Bilinen kalan risk:** İstek taze telefon kanıtı (re-auth) gerektirmez. Ele geçirilmiş geçerli bir oturum, o hesabın kendi telefon numarasını bu yoldan okuyabilir. Kabul edilmiş bir karar değildir; açık kalan risk olarak listelenir.
 
 ## Düzeltilen somut açıklar
 
