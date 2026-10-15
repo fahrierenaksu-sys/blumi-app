@@ -565,6 +565,16 @@ class LegVariantOwnersTest(unittest.TestCase):
         self.assertEqual(owners, {'pants': [('bottom', 'bottom'), ('bottom+shoes', 'bottom+shoes')],
                                   'sneakers': [('shoes', 'shoes')], 'trousers': [('trousers', 'bottom')]})
 
+    def test_an_item_pair_key_does_not_take_a_slot_key_from_its_shoes(self):
+        # a dress brings drawings keyed with each pair of shoes; the girl's slot 'shoes' drawing stays on her mint
+        items = {'pants': {'slot': 'bottom'}, 'mint': {'slot': 'shoes'}, 'white': {'slot': 'shoes'},
+                 'dress': {'slot': 'dress'}}
+        keys = ['bottom', 'bottom+shoes', 'shoes', 'white', 'dress', 'dress+mint', 'dress+white']
+        owners = self.ex.leg_variant_owners(dict.fromkeys(keys, {}), items)
+        self.assertEqual(owners, {'pants': [('bottom', 'bottom'), ('bottom+shoes', 'bottom+shoes')],
+                                  'mint': [('shoes', 'shoes')], 'white': [('white', 'shoes')],
+                                  'dress': [('dress', 'bottom')]})
+
     def test_bad_keys_stop_the_export(self):
         for key in ('top_a', 'nobody', 'bottom_a+bottom_b', 'bottom_a+shoes_a+shoes_b', 'bottom'):
             with self.assertRaises(SystemExit, msg=key):

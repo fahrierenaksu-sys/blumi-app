@@ -769,7 +769,9 @@ def leg_variant_owners(leg_variants, items):
     for iid, it in sorted(items.items()):
         slot_item.setdefault(it['slot'], []).append(iid)
     owners, seen = {}, set()
-    keyed = frozenset(p for key in leg_variants for p in key.split('+') if p not in LEG_ROLES)
+    # an item's own drawing is a single-part key; an item-id pair (a dress with each pair of shoes) is composed at
+    # runtime and does not take a slot key from its shoes
+    keyed = frozenset(key for key in leg_variants if '+' not in key and key not in LEG_ROLES)
     for key in leg_variants:
         parts = key.split('+')
         if len(parts) > 2:
