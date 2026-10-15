@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import type { ChatThread } from "@blumi/contracts"
-import { applyChatThreadListed, removeChatThreadsWithPartner, resetChatStore } from "./chatStore"
+import { applyChatThreadListed, removeChatThreadsWithPartner, resetChatStore, subscribeToChatStore } from "./chatStore"
 import {
   clearChatComposerDrafts,
   readChatComposerDraft,
@@ -76,4 +76,17 @@ test("blocking a partner forgets the drafts of their conversations only", () => 
   removeChatThreadsWithPartner("partner-blocked")
   assert.equal(readChatComposerDraft(ACCOUNT_A, "thread-blocked"), "")
   assert.equal(readChatComposerDraft(ACCOUNT_A, "thread-kept"), "Synthetic to kept")
+})
+
+test("typing a draft never notifies chat store subscribers, so the message list stays put", () => {
+  resetChatComposerDrafts()
+  let notifications = 0
+  const unsubscribe = subscribeToChatStore(() => { notifications += 1 })
+  try {
+    writeChatComposerDraft(ACCOUNT_A, "thread-one", "Synthetic a")
+    writeChatComposerDraft(ACCOUNT_A, "thread-one", "Synthetic ab")
+    writeChatComposerDraft(ACCOUNT_A, "thread-one", "")
+    clearChatComposerDrafts(["thread-one"])
+    assert.equal(notifications, 0)
+  } finally { unsubscribe() }
 })
