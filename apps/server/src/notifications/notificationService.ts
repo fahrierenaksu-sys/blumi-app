@@ -149,7 +149,7 @@ export interface CreateNotificationServiceOptions {
 }
 
 export interface SafePushFailure {
-  stage: "ticket" | "receipt"
+  stage: "ticket" | "receipt" | "device_seen"
   errorCode: string
   notificationType: string
   attempt: number
@@ -246,8 +246,15 @@ export function createNotificationService(
   // quota replaces the device the account used least recently.
   const markSeen = async (device: DeviceRegistration, now: Date): Promise<DeviceRegistration> => {
     if (!device.registrationId || Date.parse(device.registeredAt) >= now.getTime() - DEVICE_SEEN_REFRESH_MS) return device
-    await repository.markDeviceSeen({ userId: device.userId, pushToken: device.pushToken,
-      registrationId: device.registrationId, seenAt: now })
+    try {
+      await repository.markDeviceSeen({ userId: device.userId, pushToken: device.pushToken,
+        registrationId: device.registrationId, seenAt: now })
+    } catch {
+      // Best-effort: a registration that already exists must not fail because its
+      // sighting could not be recorded. Only a fixed code is reported, never ids.
+      reportPushFailure("device_seen", "device_seen_refresh_failed", 1)
+      return device
+    }
     return { ...device, registeredAt: now.toISOString() }
   }
 

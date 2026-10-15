@@ -170,9 +170,14 @@ export function createPostgresNotificationRepository(
     async markDeviceSeen({ userId, pushToken, registrationId, seenAt }) {
       // Ownership is the WHERE clause: only this account's current registration
       // is refreshed, and a removed or transferred token updates nothing.
+      // A row held by a locked push send (FOR SHARE) is skipped, not waited on:
+      // the refresh is best-effort and app start must never queue behind a send.
       await pool.query(
         `UPDATE blumi_push_devices SET registered_at = $4
-          WHERE user_id = $1 AND push_token = $2 AND registration_id = $3 AND registered_at < $5`,
+          WHERE user_id = $1 AND push_token IN (
+            SELECT push_token FROM blumi_push_devices
+             WHERE user_id = $1 AND push_token = $2 AND registration_id = $3 AND registered_at < $5
+               FOR NO KEY UPDATE SKIP LOCKED)`,
         [userId, pushToken, registrationId, seenAt, new Date(seenAt.getTime() - DEVICE_SEEN_REFRESH_MS)]
       )
     },
