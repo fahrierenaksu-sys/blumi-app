@@ -1,4 +1,3 @@
-import type { ChatLocale } from "../features/chat/chatRoomInviteModel"
 import type { OnboardingRoute } from "../features/session/onboardingFlowModel"
 import type { SessionEntryRoute } from "../features/session/sessionRouting"
 import type { BottomNavKey } from "../ui/bottomNav"
@@ -232,10 +231,6 @@ export function getOnboardingEntryRoute(
     return route
   }
   return null
-}
-
-export function getChatLocale(deviceLocale: string | undefined): ChatLocale {
-  return deviceLocale?.toLowerCase().startsWith("tr") ? "tr" : "en"
 }
 
 export function getLobbyReturnStrategy(

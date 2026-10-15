@@ -140,8 +140,8 @@ export const CHAT_COPY: Record<ChatLocale, ChatThreadCopy> = {
 }
 
 /**
- * The route may pin the chat locale; otherwise the device (ICU) locale
- * decides. The device locale is only read when the route provides none.
+ * The route may pin the chat locale; otherwise the app language registered at
+ * the root decides (an explicit locale tag argument wins over it).
  */
 export function resolveChatThreadLocale(
   routeLocale: ChatLocale | undefined,

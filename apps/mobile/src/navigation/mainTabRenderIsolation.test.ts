@@ -278,7 +278,6 @@ function mountRoot(nativeIdle = true) {
       "../features/inventory/inventoryHydrationPolicy": { shouldHydrateProductionInventory: () => false },
       "../config/env": { IS_BLUMI_PAID_COINS_ENABLED: false },
       "./rootNavigationModel": {
-        getChatLocale: () => "en",
         getChatThreadScreenOptions: () => ({}),
         getMiniRoomScreenOptions: () => ({}),
         getDetailScreenOptions: () => DETAIL_OPTIONS_STUB,
