@@ -40,7 +40,9 @@ test("only independently guarded additive features are optional for readiness", 
     // drops optional statistics without preventing application sign-in.
     "073_sms_verification_outcomes.sql",
     // An index: no query depends on it for its result.
-    "074_notification_retention_index.sql"
+    "074_notification_retention_index.sql",
+    // The chat repository's own ledger probe keeps 071's time-only hide rule until it is applied.
+    "075_chat_hide_point_message.sql"
   ])
 })
 

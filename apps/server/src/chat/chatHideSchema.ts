@@ -21,3 +21,17 @@ export function createChatHideSchemaProbe(
 ): ChatHideSchemaProbe {
   return createMigrationLedgerProbe(pool, CHAT_HIDE_MIGRATION_ID, options)
 }
+
+/**
+ * Migration 075 adds the exact hide point (hidden message id and its time)
+ * next to `hidden_through`. Until its ledger row exists no query names the new
+ * columns and hiding keeps 071's time-only rule.
+ */
+export const CHAT_HIDE_POINT_MIGRATION_ID = "075_chat_hide_point_message.sql"
+
+export function createChatHidePointSchemaProbe(
+  pool: Parameters<typeof createMigrationLedgerProbe>[0],
+  options: MigrationLedgerProbeOptions = {}
+): ChatHideSchemaProbe {
+  return createMigrationLedgerProbe(pool, CHAT_HIDE_POINT_MIGRATION_ID, options)
+}

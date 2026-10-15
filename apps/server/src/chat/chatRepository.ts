@@ -241,7 +241,15 @@ interface InMemoryParticipantCursors {
   deliveredUpTo?: ChatReceiptCursor
   /** "Delete chat for me" point (hidden_through, migration 071). */
   hiddenThrough?: string
+  /**
+   * The hidden message itself (migration 075), valid only while its time
+   * equals `hiddenThrough`; otherwise 071's inclusive time rule applies.
+   */
+  hidePoint?: ChatOrderPosition
 }
+
+/** A place in the history order every page uses: (sentAt, messageId). */
+type ChatOrderPosition = Pick<ChatMessage, "sentAt" | "messageId">
 
 export interface InMemoryChatStore {
   threads: Map<string, ChatThread>
@@ -268,6 +276,8 @@ export function createInMemoryChatRepository(
   options: {
     receiptsSupported?: boolean
     hideSupported?: boolean
+    /** Migration 075: the exact hide point; false keeps 071's time-only rule. */
+    hidePointSupported?: boolean
     blockSource?: ChatRepositoryBlockSource
     /** Accounts' current names and outfits (PostgreSQL joins blumi_accounts instead). */
     profileSource?: ChatParticipantProfileSource
@@ -275,6 +285,7 @@ export function createInMemoryChatRepository(
 ): ChatRepository {
   const receiptsSupported = options.receiptsSupported ?? true
   const hideSupported = options.hideSupported ?? true
+  const hidePointSupported = hideSupported && (options.hidePointSupported ?? true)
   const blockSource = options.blockSource
   const profileSource = options.profileSource
   /** One batched account lookup for every participant of `threads`. */
@@ -313,10 +324,14 @@ export function createInMemoryChatRepository(
     store.deliveryJobs.set(message.messageId, { message: { ...message }, ...job })
   }
   /** Whether `message` is after `userId`'s hide point (always, before 071). */
-  const isShownTo = (userId: string | undefined, message: Pick<ChatMessage, "threadId" | "sentAt">) => {
+  const isShownTo = (userId: string | undefined, message: Pick<ChatMessage, "threadId" | "sentAt" | "messageId">) => {
     if (!hideSupported || userId === undefined) return true
-    const hiddenThrough = cursorsOf(message.threadId, userId).hiddenThrough
-    return hiddenThrough === undefined || Date.parse(message.sentAt) > Date.parse(hiddenThrough)
+    const { hiddenThrough, hidePoint } = cursorsOf(message.threadId, userId)
+    if (hiddenThrough === undefined) return true
+    const exact = hidePointSupported ? exactHidePoint(hiddenThrough, hidePoint) : undefined
+    return exact
+      ? compareChatMessagesAscending(message, exact) > 0
+      : Date.parse(message.sentAt) > Date.parse(hiddenThrough)
   }
   const findPartnerMessage = (threadId: string, userId: string, messageId: string) =>
     (store.messagesByThread.get(threadId) ?? []).find((message) =>
@@ -585,15 +600,21 @@ export function createInMemoryChatRepository(
       const thread = store.threads.get(threadId)
       if (!thread || !thread.participantUserIds.includes(userId)) return null
       const messages = store.messagesByThread.get(threadId) ?? []
-      const through = throughMessageId === undefined
-        ? latestTime(messages.map((message) => message.sentAt)) ?? thread.createdAt
-        : messages.find((message) => message.messageId === throughMessageId)?.sentAt
+      const target = throughMessageId === undefined
+        ? [...messages].sort(compareChatMessagesAscending).at(-1)
+        : messages.find((message) => message.messageId === throughMessageId)
+      const through = target?.sentAt ?? (throughMessageId === undefined ? thread.createdAt : undefined)
       if (through === undefined) return null
       const current = cursorsOf(threadId, userId)
-      const hiddenThrough = latestTime([current.hiddenThrough, through])!
       const readAt = latestTime([current.readAt, through])!
-      store.cursorsByParticipant.set(cursorKey(threadId, userId), { ...current, hiddenThrough, readAt })
-      return { hiddenThrough, readAt }
+      const point = target ? { sentAt: target.sentAt, messageId: target.messageId } : undefined
+      const next: InMemoryParticipantCursors = !hidePointSupported
+        ? { ...current, hiddenThrough: latestTime([current.hiddenThrough, through])!, readAt }
+        : isLaterHidePoint(current, through, point)
+          ? { ...current, hiddenThrough: through, hidePoint: point, readAt }
+          : { ...current, readAt }
+      store.cursorsByParticipant.set(cursorKey(threadId, userId), next)
+      return { hiddenThrough: next.hiddenThrough!, readAt }
     }
   }
 }
@@ -607,7 +628,25 @@ function latestTime(values: ReadonlyArray<string | undefined>): string | undefin
   return latest
 }
 
-function compareChatMessagesAscending(a: ChatMessage, b: ChatMessage): number {
+/** The stored hide point when it is exact: written together with `hiddenThrough` and not moved since. */
+function exactHidePoint(hiddenThrough: string, point: ChatOrderPosition | undefined): ChatOrderPosition | undefined {
+  return point && Date.parse(point.sentAt) === Date.parse(hiddenThrough) ? point : undefined
+}
+
+/**
+ * Whether hiding through `through` (and `point`, the hidden message; none for
+ * an empty thread, which hides everything at that time) moves the stored hide
+ * point forward. A time-only point already hides everything at its time.
+ */
+function isLaterHidePoint(current: InMemoryParticipantCursors, through: string, point: ChatOrderPosition | undefined): boolean {
+  if (current.hiddenThrough === undefined) return true
+  const difference = Date.parse(through) - Date.parse(current.hiddenThrough)
+  if (difference !== 0) return difference > 0
+  const exact = exactHidePoint(current.hiddenThrough, current.hidePoint)
+  return exact !== undefined && (point === undefined || compareChatMessagesAscending(point, exact) > 0)
+}
+
+function compareChatMessagesAscending(a: ChatOrderPosition, b: ChatOrderPosition): number {
   const timeDifference = Date.parse(a.sentAt) - Date.parse(b.sentAt)
   return timeDifference || a.messageId.localeCompare(b.messageId)
 }

@@ -1,6 +1,8 @@
 import type { ChatMessage, ChatThread } from "@blumi/contracts"
 import type { QueryResultRow } from "pg"
 import type {
+  ChatHideResult,
+  ChatHideTarget,
   ChatMessagePageOptions,
   ChatRepository
 } from "../chat/chatRepository"
@@ -22,17 +24,26 @@ interface QueryExecutor {
  * `receiptSchema` says whether migration 070 is applied. Without one the
  * repository assumes it is not (fail closed): receipts stay off and no query
  * names a 070 column or table. `hideSchema` does the same for 071
- * (`hidden_through`, "delete chat for me").
+ * (`hidden_through`, "delete chat for me"), and `hidePointSchema` for 075
+ * (the exact hide point: the hidden message's id and time).
  */
 export function createPostgresChatRepository(
   pool: QueryExecutor,
-  options: { receiptSchema?: ChatReceiptSchemaProbe; hideSchema?: ChatHideSchemaProbe; testPersonaCacheTtlMs?: number } = {}
+  options: {
+    receiptSchema?: ChatReceiptSchemaProbe
+    hideSchema?: ChatHideSchemaProbe
+    hidePointSchema?: ChatHideSchemaProbe
+    testPersonaCacheTtlMs?: number
+  } = {}
 ): ChatRepository {
   const receipts = createPostgresChatReceipts(
     pool,
     options.receiptSchema ?? createStaticChatReceiptSchema(false)
   )
   const hideSchema = options.hideSchema ?? createStaticChatReceiptSchema(false)
+  const hidePointSchema = options.hidePointSchema ?? createStaticChatReceiptSchema(false)
+  /** 075 needs 071; a probe answers for its own migration only. */
+  const hidePointReady = async () => await hideSchema.isReady() && await hidePointSchema.isReady()
   const testPersonaIds = createTestPersonaIdCache(pool, options.testPersonaCacheTtlMs ?? TEST_PERSONA_CACHE_TTL_MS)
   return {
     ...receipts,
@@ -217,7 +228,8 @@ export function createPostgresChatRepository(
         ? options.viewerUserId
         : undefined
       const result = options
-        ? await listMessagesPage(pool, threadId, options, viewerUserId)
+        ? await listMessagesPage(pool, threadId, options, viewerUserId,
+          viewerUserId !== undefined && await hidePointReady())
         : await pool.query(
             `SELECT message_id, thread_id, sender_user_id, body, sent_at,
                     delivered_at, read_at, edited_at
@@ -546,6 +558,7 @@ export function createPostgresChatRepository(
 
     async hideThreadForParticipant({ threadId, userId, throughMessageId }) {
       if (!await hideSchema.isReady()) throw new Error("Hiding a chat needs migration 071.")
+      if (await hidePointReady()) return hideThroughExactPoint(pool, { threadId, userId, throughMessageId })
       // One statement. GREATEST ignores NULL, so both cursors only move
       // forward. An empty thread hides through its creation. Moving
       // last_read_at keeps unread counts and the push badge free of hidden
@@ -582,18 +595,95 @@ export function createPostgresChatRepository(
 }
 
 /**
+ * True when `hide` (a participant row) holds an exact hide point (075): the
+ * hidden message's id, written together with `hidden_through` and not moved
+ * since by a binary that does not know the 075 columns.
+ */
+const EXACT_HIDE_POINT = (hide: string) => `(${hide}.hidden_through_message_id IS NOT NULL
+  AND ${hide}.hidden_through_message_sent_at IS NOT DISTINCT FROM ${hide}.hidden_through)`
+
+/**
+ * Whether the target (`target.through`, `target.through_id`; no id for an
+ * empty thread, which hides everything at that time) is after the
+ * participant's stored hide point. A time-only point already hides everything
+ * at its time. Evaluated on the row being updated, so concurrent hides never
+ * move the point back.
+ */
+const LATER_HIDE_POINT = `(participant.hidden_through IS NULL
+  OR target.through > participant.hidden_through
+  OR (target.through = participant.hidden_through AND ${EXACT_HIDE_POINT("participant")}
+      AND (target.through_id IS NULL OR target.through_id > participant.hidden_through_message_id)))`
+
+/**
+ * "Delete chat for me" after 075: one statement stores the hidden message's
+ * place in the history order, (sent_at, message_id), next to its time. Both
+ * cursors only move forward; last_read_at moves as before 075.
+ */
+async function hideThroughExactPoint(
+  pool: QueryExecutor,
+  { threadId, userId, throughMessageId }: ChatHideTarget
+): Promise<ChatHideResult | null> {
+  const result = await pool.query(
+    `WITH viewer AS (
+       SELECT thread.created_at
+         FROM blumi_chat_thread_participants AS participant
+         JOIN blumi_chat_threads AS thread ON thread.thread_id = participant.thread_id
+        WHERE participant.thread_id = $1 AND participant.user_id = $2
+     ), target AS (
+       SELECT COALESCE(picked.sent_at, CASE WHEN $3::text IS NULL THEN viewer.created_at END) AS through,
+              picked.message_id AS through_id
+         FROM viewer
+         LEFT JOIN LATERAL (
+           SELECT sent_at, message_id FROM blumi_chat_messages
+            WHERE thread_id = $1 AND ($3::text IS NULL OR message_id = $3::text)
+            ORDER BY sent_at DESC, message_id DESC
+            LIMIT 1
+         ) AS picked ON true
+     )
+     UPDATE blumi_chat_thread_participants AS participant
+        SET hidden_through = CASE WHEN ${LATER_HIDE_POINT}
+              THEN target.through ELSE participant.hidden_through END,
+            hidden_through_message_id = CASE WHEN ${LATER_HIDE_POINT}
+              THEN target.through_id ELSE participant.hidden_through_message_id END,
+            hidden_through_message_sent_at = CASE WHEN ${LATER_HIDE_POINT}
+              THEN CASE WHEN target.through_id IS NULL THEN NULL ELSE target.through END
+              ELSE participant.hidden_through_message_sent_at END,
+            last_read_at = GREATEST(participant.last_read_at, target.through)
+       FROM target
+      WHERE participant.thread_id = $1 AND participant.user_id = $2 AND target.through IS NOT NULL
+     RETURNING participant.hidden_through, participant.last_read_at`,
+    [threadId, userId, throughMessageId ?? null]
+  )
+  const row = result.rows[0]
+  return row
+    ? { hiddenThrough: new Date(row.hidden_through).toISOString(), readAt: new Date(row.last_read_at).toISOString() }
+    : null
+}
+
+/**
  * `viewerUserId` is set only after 071: the page then starts after that
- * participant's hide point. Before 071 no statement names `hidden_through`.
+ * participant's hide point. Before 071 no statement names `hidden_through`;
+ * before 075 (`exactHidePoint` false) none names the 075 columns and the
+ * point is the inclusive time `hidden_through`.
  */
 async function listMessagesPage(
   pool: QueryExecutor,
   threadId: string,
   options: ChatMessagePageOptions,
-  viewerUserId: string | undefined
+  viewerUserId: string | undefined,
+  exactHidePoint = false
 ): Promise<{ rows: QueryResultRow[] }> {
   const visible = (parameter: number) => viewerUserId === undefined
     ? ""
-    : `AND sent_at > COALESCE((SELECT hidden_through FROM blumi_chat_thread_participants
+    : exactHidePoint
+      ? `AND NOT EXISTS (
+           SELECT 1 FROM blumi_chat_thread_participants AS hide
+            WHERE hide.thread_id = $1 AND hide.user_id = $${parameter}
+              AND (blumi_chat_messages.sent_at < hide.hidden_through
+                OR (blumi_chat_messages.sent_at = hide.hidden_through AND (
+                  NOT (${EXACT_HIDE_POINT("hide")})
+                  OR blumi_chat_messages.message_id <= hide.hidden_through_message_id))))`
+      : `AND sent_at > COALESCE((SELECT hidden_through FROM blumi_chat_thread_participants
                                 WHERE thread_id = $1 AND user_id = $${parameter}), '-infinity'::timestamptz)`
   const viewer = viewerUserId === undefined ? [] : [viewerUserId]
   if (options.beforeMessageId) {
