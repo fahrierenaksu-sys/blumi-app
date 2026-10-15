@@ -2,6 +2,7 @@ import {
   createInMemoryNotificationRepository,
   isEnabled,
   isWithinQuietHours,
+  DEVICE_SEEN_REFRESH_MS,
   MAX_DEVICES_PER_ACCOUNT,
   type DeviceRegistration,
   type NotificationPreferences,
@@ -241,6 +242,15 @@ export function createNotificationService(
     }
   }
 
+  // An app start that finds its token registered counts as use, so a full
+  // quota replaces the device the account used least recently.
+  const markSeen = async (device: DeviceRegistration, now: Date): Promise<DeviceRegistration> => {
+    if (!device.registrationId || Date.parse(device.registeredAt) >= now.getTime() - DEVICE_SEEN_REFRESH_MS) return device
+    await repository.markDeviceSeen({ userId: device.userId, pushToken: device.pushToken,
+      registrationId: device.registrationId, seenAt: now })
+    return { ...device, registeredAt: now.toISOString() }
+  }
+
   const ensureDeviceRegistered: NotificationService["ensureDeviceRegistered"] = async (userId, input, now = new Date()) => {
     const device: DeviceRegistration = {
       registrationId: randomUUID(),
@@ -256,8 +266,9 @@ export function createNotificationService(
     const readEpoch = registrationCache.epoch()
     const existing = await findCurrent()
     if (existing?.platform === device.platform) {
-      registrationCache.remember(existing, readEpoch)
-      return { device: existing, changed: false }
+      const seen = await markSeen(existing, now)
+      registrationCache.remember(seen, readEpoch)
+      return { device: seen, changed: false }
     }
     if (await repository.saveDeviceBounded(device) === "limit") {
       throw new DeviceRegistrationLimitError()
