@@ -36,7 +36,7 @@ export function ProfileEditSaveButton(props: {
           style={styles.gradient}
         >
           {saved ? <Ionicons name="checkmark" size={16} color={uiTheme.colors.onPrimary} /> : null}
-          <Text style={styles.text} maxFontSizeMultiplier={1.4} numberOfLines={1}>
+          <Text style={styles.text}>
             {saved ? copy.saved : isSaving ? copy.saving : copy.saveShort}
           </Text>
         </LinearGradient>
@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
   gradient: {
     minHeight: 40,
     paddingHorizontal: uiTheme.spacing.md,
+    paddingVertical: uiTheme.spacing.xxs,
     borderRadius: uiTheme.radius.full,
     flexDirection: "row",
     alignItems: "center",
@@ -65,6 +66,8 @@ const styles = StyleSheet.create({
   },
   text: {
     ...uiTheme.font.label,
-    color: uiTheme.colors.onPrimary
+    color: uiTheme.colors.onPrimary,
+    flexShrink: 1,
+    textAlign: "center"
   }
 })

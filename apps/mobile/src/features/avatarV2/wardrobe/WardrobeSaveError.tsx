@@ -15,7 +15,7 @@ export function WardrobeSaveError(props: { message: string }) {
         size={17}
         color={uiTheme.colors.danger}
       />
-      <Text maxFontSizeMultiplier={1.3} style={styles.saveErrorText}>
+      <Text style={styles.saveErrorText}>
         {props.message}
       </Text>
     </View>

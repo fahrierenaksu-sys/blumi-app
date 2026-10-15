@@ -103,3 +103,13 @@ test("a drag that dismissed the keyboard settles on the top; an ordinary drag st
   // Scrolling a tall page with the keyboard closed is the reader's own position.
   assert.equal(settleSetupKeyboardScrollAfterDrag(false, 0, 140), null)
 })
+
+test("the reserved primary action grows with the user's text size instead of clipping it", () => {
+  const viewport = { width: 390, height: 844 }
+  const heights = [1, 1.3, 2, 3.1].map((fontScale) => getSetupLayoutMetrics({ ...viewport, fontScale }).primaryActionHeight)
+  assert.equal(heights[0], 58, "the default text size keeps the designed action height")
+  for (let index = 1; index < heights.length; index += 1) {
+    assert.ok(heights[index] >= heights[index - 1], "a larger text size never reserves less room")
+  }
+  assert.ok(heights[3] >= 24 * 3.1 * 2, "the largest accessibility size reserves two full label lines")
+})

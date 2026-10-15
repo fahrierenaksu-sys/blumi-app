@@ -62,8 +62,8 @@ export function ShopStatusCard(props: {
           />
         </View>
       )}
-      <Text maxFontSizeMultiplier={1.25} style={styles.shopStatusTitle}>{details.title}</Text>
-      <Text maxFontSizeMultiplier={1.25} style={styles.shopStatusBody}>{details.body}</Text>
+      <Text style={styles.shopStatusTitle}>{details.title}</Text>
+      <Text style={styles.shopStatusBody}>{details.body}</Text>
       {action ? (
         <Pressable
           testID={isRetry ? "shop-status-retry" : "shop-status-action"}
@@ -78,7 +78,7 @@ export function ShopStatusCard(props: {
             isDisabled ? styles.shopStatusRetryDisabled : null
           ]}
         >
-          <Text maxFontSizeMultiplier={1.2} style={styles.shopStatusRetryText}>{action.label}</Text>
+          <Text style={styles.shopStatusRetryText}>{action.label}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -96,7 +96,7 @@ export function ShopOfflineNotice(props: { locale: AppLocale }) {
       style={styles.shopOfflineNotice}
     >
       <Ionicons name="cloud-offline-outline" size={17} color={uiTheme.colors.primary} />
-      <Text maxFontSizeMultiplier={1.25} style={styles.shopOfflineNoticeText}>
+      <Text style={styles.shopOfflineNoticeText}>
         {copy.offline.body}
       </Text>
     </View>

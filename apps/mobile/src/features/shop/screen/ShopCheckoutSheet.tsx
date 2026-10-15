@@ -370,8 +370,6 @@ function SheetButton(props: {
       ]}
     >
       <Text
-        maxFontSizeMultiplier={1.4}
-        numberOfLines={2}
         style={[styles.buttonText, primary ? styles.buttonTextPrimary : null]}
       >
         {props.label}

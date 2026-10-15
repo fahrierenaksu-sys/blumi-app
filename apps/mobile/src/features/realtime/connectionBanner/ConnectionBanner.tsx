@@ -74,8 +74,6 @@ export function ConnectionBanner({ status }: ConnectionBannerProps) {
         <View style={[styles.dot, isWarning ? styles.dotWarning : styles.dotNeutral]} />
         <Text
           style={[styles.text, isWarning ? styles.textWarning : styles.textNeutral]}
-          numberOfLines={2}
-          maxFontSizeMultiplier={1.4}
         >
           {label}
         </Text>

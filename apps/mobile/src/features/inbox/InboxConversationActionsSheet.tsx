@@ -103,7 +103,7 @@ export function InboxConversationActionsSheetContent(props: InboxConversationAct
 
       {confirming ? (
         <>
-          <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.body}>
+          <Text style={styles.body}>
             {copy.confirmBody(target.partnerName)}
           </Text>
           <View style={styles.confirmRow}>
@@ -113,7 +113,7 @@ export function InboxConversationActionsSheetContent(props: InboxConversationAct
               onPress={() => setConfirming(false)}
               style={({ pressed }) => [styles.confirmButton, styles.secondaryButton, pressed ? styles.pressed : null]}
             >
-              <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.secondaryText}>{copy.cancel}</Text>
+              <Text style={styles.secondaryText}>{copy.cancel}</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -122,7 +122,7 @@ export function InboxConversationActionsSheetContent(props: InboxConversationAct
               onPress={() => onDelete(target.threadId)}
               style={({ pressed }) => [styles.confirmButton, styles.destructiveButton, pressed ? styles.pressed : null]}
             >
-              <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.destructiveText}>{copy.confirmDelete}</Text>
+              <Text style={styles.destructiveText}>{copy.confirmDelete}</Text>
             </Pressable>
           </View>
         </>

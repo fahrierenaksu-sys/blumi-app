@@ -136,20 +136,12 @@ export function SetupFlowPrimaryAction({
               {outgoingLabel ? (
               <Animated.Text
                 accessible={false}
-                adjustsFontSizeToFit
-                maxFontSizeMultiplier={1.25}
-                minimumFontScale={0.82}
-                numberOfLines={1}
                 style={[styles.label, styles.outgoingLabel, outgoingLabelStyle]}
                 >
                   {outgoingLabel}
                 </Animated.Text>
               ) : null}
               <Animated.Text
-                adjustsFontSizeToFit
-                maxFontSizeMultiplier={1.25}
-                minimumFontScale={0.82}
-                numberOfLines={1}
                 style={[styles.label, incomingLabelStyle]}
               >
                 {label}
@@ -164,21 +156,22 @@ export function SetupFlowPrimaryAction({
 
 const styles = StyleSheet.create({
   root: {
-    height: ONBOARDING_PRIMARY_ACTION_LAYOUT.height,
+    minHeight: ONBOARDING_PRIMARY_ACTION_LAYOUT.height,
     width: "100%"
   },
   pressable: {
     borderRadius: uiTheme.radius.full,
-    height: ONBOARDING_PRIMARY_ACTION_LAYOUT.height,
+    minHeight: ONBOARDING_PRIMARY_ACTION_LAYOUT.height,
     overflow: "hidden",
     width: "100%"
   },
   surface: {
     alignItems: "center",
     borderRadius: uiTheme.radius.full,
-    height: ONBOARDING_PRIMARY_ACTION_LAYOUT.height,
+    minHeight: ONBOARDING_PRIMARY_ACTION_LAYOUT.height,
     justifyContent: "center",
     paddingHorizontal: uiTheme.spacing.lg,
+    paddingVertical: uiTheme.spacing.sm,
     width: "100%"
   },
   labelFrame: {
@@ -193,6 +186,8 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   outgoingLabel: {
-    position: "absolute"
+    left: 0,
+    position: "absolute",
+    right: 0
   }
 })
