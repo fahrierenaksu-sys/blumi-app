@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import * as pendingPhoneChangeStore from "../settings/pendingPhoneChangeStore"
 import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../../testing/hookHarness"
 import type { UseSessionStateResult } from "./useSessionState"
 
@@ -34,6 +35,8 @@ function mount() {
           saveHasSeenIntro: async () => undefined,
           saveSessionActor: async () => undefined
         },
+        "../network/apiRequestError": { isSessionInvalidError: () => false },
+        "./sensitiveReauthGate": { isSensitiveReauthOpen: () => false },
         "./sessionRefresh": {
           createSessionRefreshCoordinator: () => {
             calls.push("createRefreshCoordinator")
@@ -57,7 +60,9 @@ function mount() {
           isOnboardingComplete: () => false,
           shouldApplyProductionAccountSync: () => true
         },
-        "../referrals/referralCaptureSignal": { subscribeToPendingReferralCapture: () => () => undefined }
+        "../referrals/referralCaptureSignal": { subscribeToPendingReferralCapture: () => () => undefined },
+        "../settings/pendingPhoneChange": { pendingPhoneChange: { clear: async () => undefined } },
+        "../settings/pendingPhoneChangeStore": pendingPhoneChangeStore
       },
       real: ["./sessionMutationCoordinator"],
       inertUnknown: true

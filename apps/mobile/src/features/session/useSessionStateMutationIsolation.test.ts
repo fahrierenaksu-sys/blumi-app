@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import * as pendingPhoneChangeStore from "../settings/pendingPhoneChangeStore"
 import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../../testing/hookHarness"
 import * as onboardingCompletion from "./onboardingCompletion"
 import * as onboardingFlowModel from "./onboardingFlowModel"
@@ -10,6 +11,8 @@ import * as sessionModel from "./sessionModel"
 import { createDemoSessionActor, type SessionActor } from "./sessionModel"
 import * as sessionMutationCoordinator from "./sessionMutationCoordinator"
 import * as sessionRefresh from "./sessionRefresh"
+import * as apiRequestError from "../network/apiRequestError"
+import * as sensitiveReauthGate from "./sensitiveReauthGate"
 import * as preAuthOnboardingDraft from "./preAuthOnboardingDraft"
 import type { UseSessionStateResult } from "./useSessionState"
 
@@ -41,6 +44,12 @@ function productionActor(userId: string, token: string): SessionActor {
 }
 
 const AUTH_EXPIRED = "Sign in again to continue."
+/** What the API adapters throw for a server-verified invalid session (401). */
+const authExpired = () => new apiRequestError.ApiRequestError({
+  status: 401,
+  code: "session_invalid",
+  message: AUTH_EXPIRED
+})
 
 interface MountOptions {
   rejectOtp?: boolean
@@ -88,7 +97,7 @@ function mount(options: MountOptions = {}) {
   let profileSignal: AbortSignal | undefined
   let refreshSignal: AbortSignal | undefined
   let nextLogin: SessionActor | null = null
-  const authCalls = { cachedTokens: 0, confirmations: 0, completions: 0 }
+  const authCalls = { cachedTokens: 0, confirmations: 0, completions: 0, pendingPhoneChangeClears: 0 }
 
   const pausedNetwork = async () => {
     network.started.resolve()
@@ -139,7 +148,7 @@ function mount(options: MountOptions = {}) {
           fetchProductionAccountSnapshot: async (_url: string, _token: string, _fetch: unknown, signal: AbortSignal) => {
             profileSignal = signal
             profileCalls += 1
-            if (options.recover && profileCalls === 1) throw new Error(AUTH_EXPIRED)
+            if (options.recover && profileCalls === 1) throw authExpired()
             profileStarted.resolve()
             return profile.promise // Deliberately ignores abort to exercise late completions.
           },
@@ -193,6 +202,8 @@ function mount(options: MountOptions = {}) {
         "./onboardingFlowModel": onboardingFlowModel,
         "./onboardingCompletion": onboardingCompletion,
         "./sessionModel": sessionModel,
+        "../network/apiRequestError": apiRequestError,
+        "./sensitiveReauthGate": sensitiveReauthGate,
         "./sessionRefresh": {
           ...sessionRefresh,
           refreshAndPersistSession: async (_url: string, _actor: SessionActor, input: { signal: AbortSignal }) => {
@@ -242,7 +253,11 @@ function mount(options: MountOptions = {}) {
         "../referrals/referralModel": {
           resolvePendingReferralClaim: () => ({ kind: "discard" }),
           shouldClaimCapturedReferral: () => false
-        }
+        },
+        "../settings/pendingPhoneChange": {
+          pendingPhoneChange: { clear: async () => { authCalls.pendingPhoneChangeClears += 1 } }
+        },
+        "../settings/pendingPhoneChangeStore": pendingPhoneChangeStore
       }
     }
   )
@@ -274,6 +289,19 @@ function mount(options: MountOptions = {}) {
     }
   }
 }
+
+test("signing out forgets a pending phone change", async () => {
+  const f = mount()
+  await f.profileStarted.promise
+  f.profile.resolve(f.snapshot)
+  await settle()
+
+  await f.result().clearSessionActor()
+
+  assert.equal(f.current(), null)
+  assert.equal(f.authCalls.pendingPhoneChangeClears, 1)
+  f.runtime.unmount()
+})
 
 test("a cached Firebase identity cannot sign in without a new code request", async () => {
   const f = mount()
@@ -388,7 +416,7 @@ test("startup profile late rejection after unmount cannot start auth recovery", 
   const f = mount()
   await f.profileStarted.promise
   f.runtime.unmount()
-  f.profile.reject(new Error(AUTH_EXPIRED))
+  f.profile.reject(authExpired())
   await settle()
   assert.equal(f.refreshCalls(), 0)
   assert.equal(f.saves.length, 0)
@@ -430,7 +458,7 @@ test("foreground refresh late failure after unmount cannot publish errors or cle
   f.foreground()
   await f.refreshStarted.promise
   f.runtime.unmount()
-  f.refresh.reject(new Error(AUTH_EXPIRED))
+  f.refresh.reject(authExpired())
   f.profile.resolve(f.snapshot)
   await settle()
   assert.equal(f.saves.length, 0)
@@ -442,7 +470,7 @@ test("foreground refresh late failure after unmount cannot publish errors or cle
 test("startup auth clear already in progress cannot publish after unmount", async () => {
   const f = mount({ recover: true, pauseClear: true })
   await f.refreshStarted.promise
-  f.refresh.reject(new Error(AUTH_EXPIRED))
+  f.refresh.reject(authExpired())
   await f.clearStarted.promise
   f.runtime.unmount()
   f.clearing.resolve()
@@ -512,3 +540,132 @@ for (const [name, run] of Object.entries(lateActions)) for (const relogin of rel
     f.runtime.unmount()
   })
 }
+
+// A refresh failure signs the user out only when the server verified the
+// session is invalid. Gateway, rate-limit, timeout and transport failures keep
+// the session; the real refreshSession produces each error from a response.
+const refreshFailure = async (response: () => Response | Promise<Response>): Promise<Error> => {
+  try {
+    await sessionRefresh.refreshSession("https://fixture.invalid", "fixture-token", (async () => response()) as typeof fetch)
+  } catch (error) {
+    return error as Error
+  }
+  throw new Error("expected the refresh to fail")
+}
+const jsonFailure = (status: number, body: unknown) => () =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
+
+const SESSION_KEEPING_FAILURES: Array<[string, () => Response | Promise<Response>]> = [
+  ["503 edge JSON without an error field", jsonFailure(503, { status: "error", code: 503, message: "unavailable" })],
+  ["429 JSON without an error field", jsonFailure(429, { message: "rate limited", retryAfter: 30 })],
+  ["502 gateway JSON", jsonFailure(502, { status: "error", code: 502, message: "Application failed to respond" })],
+  ["503 server error body", jsonFailure(503, { error: "Service temporarily unavailable." })],
+  ["502 HTML body", () => new Response("<html>bad gateway</html>", { status: 502 })],
+  ["empty 500 body", () => new Response("", { status: 500 })],
+  ["network failure", () => { throw new TypeError("Network request failed") }]
+]
+
+for (const [name, response] of SESSION_KEEPING_FAILURES) {
+  test(`foreground refresh ${name} keeps the session`, async () => {
+    const f = mount()
+    await f.profileStarted.promise
+    f.foreground()
+    await f.refreshStarted.promise
+    f.refresh.reject(await refreshFailure(response))
+    await settle()
+    assert.deepEqual(f.clears, [])
+    assert.equal(f.current()?.session.userId, f.actor.session.userId)
+    f.runtime.unmount()
+  })
+}
+
+test("foreground refresh with a verified invalid session signs out", async () => {
+  const f = mount()
+  await f.profileStarted.promise
+  f.foreground()
+  await f.refreshStarted.promise
+  f.refresh.reject(await refreshFailure(jsonFailure(401, { error: "Sign in again to continue." })))
+  await settle()
+  assert.deepEqual(f.clears, ["production"])
+  assert.equal(f.current(), null)
+  f.runtime.unmount()
+})
+
+// A deletion or phone change that finishes late resets only the session it
+// started in. Another login (or a new login of the same user) in between
+// keeps the newer session.
+for (const relogin of relogins) {
+  test(`a late account-ending completion cannot reset the session after logout and ${relogin.label}`, async () => {
+    const f = mount()
+    await f.profileStarted.promise
+    f.profile.resolve(f.snapshot)
+    await settle()
+    const resetStartedSession = f.result().bindSessionReset()
+
+    await f.result().clearSessionActor()
+    const next = productionActor(relogin.userId, relogin.token)
+    await f.login(next)
+    const clearsBefore = f.clears.length
+    await resetStartedSession()
+    await settle()
+
+    assert.deepEqual(f.current(), next)
+    assert.deepEqual(f.stored(), next)
+    assert.equal(f.clears.length, clearsBefore)
+    f.runtime.unmount()
+  })
+}
+
+test("an account-ending completion still resets its own session after a token refresh", async () => {
+  const f = mount()
+  await f.profileStarted.promise
+  f.profile.resolve(f.snapshot)
+  await settle()
+  const resetStartedSession = f.result().bindSessionReset()
+  f.foreground()
+  await f.refreshStarted.promise
+  f.refresh.resolve(f.rotated)
+  await settle()
+
+  await resetStartedSession()
+  await settle()
+
+  assert.equal(f.current(), null)
+  assert.deepEqual(f.clears, ["production"])
+})
+
+// The server binds an SMS re-auth challenge to the requesting token; a
+// rotation in between voids the code. Foreground refresh waits until the
+// re-auth is over (or its hold expires).
+test("foreground refresh waits while a sensitive re-auth code is pending", async () => {
+  const f = mount()
+  await f.profileStarted.promise
+  f.profile.resolve(f.snapshot)
+  await settle()
+  const release = sensitiveReauthGate.holdSensitiveReauth()
+
+  f.foreground()
+  await settle()
+  const refreshesWhileHeld = f.refreshCalls()
+  release()
+  f.foreground()
+  await f.refreshStarted.promise
+
+  assert.equal(refreshesWhileHeld, 0)
+  assert.equal(f.refreshCalls(), 1)
+  f.refresh.resolve(f.rotated)
+  await settle()
+  f.runtime.unmount()
+})
+
+test("a forgotten re-auth hold expires after the server challenge would have", () => {
+  const startMs = Date.UTC(2026, 0, 1)
+  const release = sensitiveReauthGate.holdSensitiveReauth(startMs)
+  assert.equal(sensitiveReauthGate.isSensitiveReauthOpen(startMs + 1), true)
+  assert.equal(
+    sensitiveReauthGate.isSensitiveReauthOpen(startMs + sensitiveReauthGate.SENSITIVE_REAUTH_HOLD_MS + 1),
+    false
+  )
+  release()
+  assert.equal(sensitiveReauthGate.isSensitiveReauthOpen(startMs + 1), false)
+})

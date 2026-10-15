@@ -1,6 +1,11 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  ApiRequestError,
+  isRetryableRequestFailure,
+  isSessionInvalidError
+} from "../network/apiRequestError"
+import {
   createSessionRefreshCoordinator,
   refreshAndPersistSession,
   refreshSession,
@@ -253,17 +258,47 @@ test("shouldRefreshSessionSoon only targets expiring production sessions", () =>
   assert.equal(shouldRefreshSessionSoon(productionActor), true)
 })
 
-test("refresh keeps readable 401 errors as the sign-in-again auth signal", async () => {
-  await assert.rejects(
-    refreshSession("https://api.blumi.test", "old_token", (async () =>
-      createJsonResponse(401, { error: "Sign in again to continue." })) as typeof fetch),
-    /sign in again/i
-  )
-  await assert.rejects(
-    refreshSession("https://api.blumi.test", "old_token", (async () =>
-      createJsonResponse(401, {})) as typeof fetch),
-    /sign in again/i
-  )
+test("refresh marks only a readable 401 as a verified invalid session", async () => {
+  for (const body of [{ error: "Sign in again to continue." }, {}]) {
+    await assert.rejects(
+      refreshSession("https://api.blumi.test", "old_token", (async () =>
+        createJsonResponse(401, body)) as typeof fetch),
+      (error: unknown) => {
+        assert.ok(error instanceof ApiRequestError)
+        assert.equal(error.code, "session_invalid")
+        assert.equal(error.retryable, false)
+        assert.ok(isSessionInvalidError(error))
+        assert.match(error.message, /sign in again/i)
+        return true
+      }
+    )
+  }
+})
+
+test("refresh classifies rate limits and server failures as retryable, never as sign-out", async () => {
+  const cases: Array<[number, unknown, string]> = [
+    [429, { message: "rate limited", retryAfter: 30 }, "rate_limited"],
+    [503, { status: "error", code: 503, message: "unavailable" }, "server_unavailable"],
+    [500, { error: "Sign in again to continue." }, "server_unavailable"],
+    [401, { code: "OTP_INVALID_OR_EXPIRED", error: "That security code is invalid." }, "request_rejected"]
+  ]
+  for (const [status, body, code] of cases) {
+    await assert.rejects(
+      refreshSession("https://api.blumi.test", "old_token", (async () =>
+        createJsonResponse(status, body)) as typeof fetch),
+      (error: unknown) => {
+        assert.ok(error instanceof ApiRequestError)
+        assert.equal(error.status, status)
+        assert.equal(error.code, code)
+        assert.equal(isSessionInvalidError(error), false)
+        assert.equal(isRetryableRequestFailure(error), status >= 429 && status !== 401)
+        return true
+      }
+    )
+  }
+  const unreadable401 = await refreshSession("https://api.blumi.test", "old_token", (async () =>
+    new Response("<html>denied</html>", { status: 401 })) as typeof fetch).catch((error: unknown) => error)
+  assert.equal(isSessionInvalidError(unreadable401), false)
 })
 
 test("refresh does not turn an unreadable gateway error into a sign-out signal", async () => {

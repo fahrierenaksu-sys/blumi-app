@@ -97,6 +97,8 @@ import {
 } from "./preAuthOnboardingDraft"
 import { getSecureSessionStorageRecoveryMessage } from "./sessionPersistence"
 import { getSessionErrorMessageForDisplay } from "./sessionErrorCopy"
+import { isSessionInvalidError } from "../network/apiRequestError"
+import { isSensitiveReauthOpen } from "./sensitiveReauthGate"
 import { claimReferralInvite } from "../referrals/referralApi"
 import {
   clearPendingReferralCode,
@@ -108,6 +110,8 @@ import {
   resolvePendingReferralClaim,
   shouldClaimCapturedReferral
 } from "../referrals/referralModel"
+import { pendingPhoneChange } from "../settings/pendingPhoneChange"
+import { createPendingPhoneChangeSessionWatcher } from "../settings/pendingPhoneChangeStore"
 
 export interface UseSessionStateResult {
   sessionActor: SessionActor | null
@@ -146,6 +150,12 @@ export interface UseSessionStateResult {
   acknowledgeModeration: () => Promise<void>
   refreshAccountModeration: () => Promise<void>
   clearSessionActor: () => Promise<void>
+  /**
+   * Returns a reset bound to the current account and login generation. Call
+   * it when an account-ending action (deletion, phone change) starts; a late
+   * completion after logout or another login then leaves the newer session.
+   */
+  bindSessionReset: () => () => Promise<void>
 }
 
 export function getErrorMessage(error: unknown): string {
@@ -164,12 +174,8 @@ function warmDiscoveryBeforeMain(actor: SessionActor | null): void {
   void warmDiscoveryFirstFrameAssets()
 }
 
-function isAuthSessionError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    error.message.toLowerCase().includes("sign in again")
-  )
-}
+/** Only a server-verified invalid session may sign the user out. */
+const isAuthSessionError = isSessionInvalidError
 
 // Dev-only Simulator QA against the local in-memory API (see localQaEnvironment).
 const IS_LOCAL_QA_PHONE_AUTH = IS_LOCAL_QA_ENVIRONMENT
@@ -214,6 +220,14 @@ export function useSessionState(): UseSessionStateResult {
       capabilities: createFailClosedCapabilityResolution().capabilities
     })
   const sessionActorRef = useRef<SessionActor | null>(null)
+  // A saved phone-change origin never outlives the session it was saved in:
+  // sign-out, a forced reset, a new sign-in or another account drop it.
+  const [pendingPhoneChangeWatcher] = useState(() =>
+    createPendingPhoneChangeSessionWatcher(pendingPhoneChange.clear))
+  const sessionUserId = sessionActor?.session.userId ?? null
+  useEffect(() => {
+    pendingPhoneChangeWatcher.observe(sessionUserId, !isHydrating)
+  }, [isHydrating, pendingPhoneChangeWatcher, sessionUserId])
   const firebasePhoneConfirmationRef = useRef<PendingPhoneCode | null>(null)
   // Coordinators are created once per mount (stable effect dependencies).
   const [mutationCoordinator] = useState(() => createSessionMutationCoordinator({
@@ -512,6 +526,9 @@ export function useSessionState(): UseSessionStateResult {
       }
       if (state !== "active") return
       if (!actor || !shouldRefreshSessionSoon(actor)) return
+      // A rotation now would void a pending SMS re-auth code; refresh on a
+      // later foreground once the re-auth is over.
+      if (isSensitiveReauthOpen()) return
 
       void refreshCoordinator.refresh(actor)
         .then((refreshedActor) => {
@@ -805,6 +822,7 @@ export function useSessionState(): UseSessionStateResult {
             : undefined,
         clear: () => clearing
       })
+      // The pending phone-change record is dropped by the session watcher.
       await signOutFirebasePhoneAuth()
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
@@ -813,6 +831,21 @@ export function useSessionState(): UseSessionStateResult {
       setIsBootstrapping(false)
     }
   }, [mutationCoordinator, refreshCoordinator, sessionActor])
+  const clearSessionActorRef = useRef(clearSessionActor)
+  clearSessionActorRef.current = clearSessionActor
+
+  const bindSessionReset = useCallback((): (() => Promise<void>) => {
+    const boundGeneration = mutationCoordinator.currentGeneration()
+    const boundUserId = sessionActorRef.current?.session.userId ?? null
+    return async () => {
+      if (
+        boundUserId === null ||
+        mutationCoordinator.currentGeneration() !== boundGeneration ||
+        sessionActorRef.current?.session.userId !== boundUserId
+      ) return
+      await clearSessionActorRef.current()
+    }
+  }, [mutationCoordinator])
 
   const persistProfileUpdate = useCallback(
     async (
@@ -1156,6 +1189,7 @@ export function useSessionState(): UseSessionStateResult {
     clearErrorMessage,
     acknowledgeModeration,
     refreshAccountModeration,
-    clearSessionActor
+    clearSessionActor,
+    bindSessionReset
   }
 }

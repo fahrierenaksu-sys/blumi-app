@@ -323,7 +323,8 @@ export function RootNavigator() {
     clearErrorMessage,
     acknowledgeModeration,
     refreshAccountModeration,
-    clearSessionActor
+    clearSessionActor,
+    bindSessionReset
   } = useSessionState()
   const {
     preAuthDraft,
@@ -854,6 +855,7 @@ export function RootNavigator() {
                     {...screenProps}
                     sessionActor={sessionActor}
                     onResetSession={clearSessionActor}
+                    bindSessionReset={bindSessionReset}
                     onUpdateProfile={updateSessionProfile}
                     pushPermissionStatus={pushRegistration.permissionStatus}
                     isRequestingPushPermission={

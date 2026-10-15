@@ -53,6 +53,8 @@ type SettingsScreenProps = NativeStackScreenProps<
 > & {
   sessionActor: SessionActor
   onResetSession: () => Promise<void>
+  /** Binds an account-ending reset to the session it started in. */
+  bindSessionReset: () => () => Promise<void>
   onUpdateProfile: (input: UpdateSessionProfileInput) => Promise<void>
   pushPermissionStatus: "unknown" | "undetermined" | "granted" | "denied"
   isRequestingPushPermission: boolean
@@ -70,6 +72,7 @@ type SettingsScreenProps = NativeStackScreenProps<
  */
 export function SettingsScreen(props: SettingsScreenProps) {
   const {
+    bindSessionReset,
     navigation,
     onRequestPushPermission,
     onResetSession,
@@ -87,9 +90,9 @@ export function SettingsScreen(props: SettingsScreenProps) {
     sessionActor.profile.userId,
     sessionActor.session.mode === "production"
   )
-  const deletion = useAccountDeletion({ sessionActor, copy, locale, onResetSession })
+  const deletion = useAccountDeletion({ sessionActor, copy, locale, bindSessionReset })
   const dataExport = useAccountDataExport({ sessionActor, copy, locale })
-  const phoneChange = usePhoneChange({ sessionActor, copy, locale, onResetSession })
+  const phoneChange = usePhoneChange({ sessionActor, copy, locale, bindSessionReset })
   const analyticsConsent = useAnalyticsConsent()
   const matching = useMatchingPreferences(sessionActor, onUpdateProfile)
   const myReports = useMyReports(sessionActor)

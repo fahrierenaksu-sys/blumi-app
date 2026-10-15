@@ -187,6 +187,15 @@ test("Firebase sensitive actions reject incomplete challenge and proof responses
   }
 })
 
+test("a Firebase challenge keeps the account phone the server names, and only a well-formed one", async () => {
+  const challenge = (body: Record<string, unknown>) => requestFirebaseAccountActionChallenge("https://api.blumi.test", "token", {
+    purpose: "account_deletion"
+  }, async () => new Response(JSON.stringify({ challengeId: "challenge", expiresAt: "2999-01-01T00:05:00.000Z", ...body }), { status: 200 }))
+  assert.equal((await challenge({ targetPhoneNumber: "+900000000001" })).targetPhoneNumber, "+900000000001")
+  assert.equal("targetPhoneNumber" in (await challenge({})), false, "an older server names none")
+  assert.equal("targetPhoneNumber" in (await challenge({ targetPhoneNumber: "not a phone" })), false)
+})
+
 test("account deletion calls the production account boundary", async () => {
   const fetchCalls: { url: string; init?: RequestInit }[] = []
   await deleteProductionAccount(

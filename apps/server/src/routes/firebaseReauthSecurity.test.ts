@@ -126,3 +126,29 @@ test("Firebase token rejection stays 401 while database errors use the central s
     assert.doesNotMatch(dbFailure.body, /private-database-detail/)
   } finally { await app.close() }
 })
+
+test("a Firebase challenge names the account's phone for re-authentication, never for a new phone", async () => {
+  const auth = createAuthService()
+  const signedIn = await auth.signInWithVerifiedPhone(PHONE, {
+    firebaseUid: randomUUID(), acceptedTerms: { version: "test-terms-v1", locale: "tr" }
+  })
+  const app = createServer({ authService: auth, firebaseAuthVerifier: {
+    async verifyIdToken() { return { uid: randomUUID(), phoneNumber: PHONE, authTime: Math.ceil(Date.now() / 1000) + 1 } }
+  } })
+  const headers = { authorization: `Bearer ${signedIn.sessionToken}` }
+  try {
+    for (const purpose of ["account_deletion", "account_data_export", "phone_change_current"]) {
+      const challenge = await app.inject({ method: "POST", url: "/v1/account/firebase/challenge", headers, payload: { purpose } })
+      assert.equal(challenge.statusCode, 200)
+      assert.equal(challenge.json().targetPhoneNumber, PHONE)
+    }
+    const next = await app.inject({ method: "POST", url: "/v1/account/firebase/challenge", headers,
+      payload: { purpose: "phone_change_new", targetPhoneNumber: NEW_PHONE } })
+    assert.equal(next.statusCode, 200)
+    assert.equal("targetPhoneNumber" in next.json(), false)
+    const signedOut = await app.inject({ method: "POST", url: "/v1/account/firebase/challenge",
+      headers: { authorization: "Bearer fake-ended-session" }, payload: { purpose: "account_deletion" } })
+    assert.equal(signedOut.statusCode, 401)
+    assert.equal("targetPhoneNumber" in signedOut.json(), false)
+  } finally { await app.close() }
+})
