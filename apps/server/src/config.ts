@@ -4,6 +4,7 @@ import {
   createDatabasePools,
   resolveDatabaseListenUrl,
   resolveDatabasePoolSettings,
+  resolveLockedSendTimeoutMs,
   type DatabasePoolSettings
 } from "./db/databasePoolConfig"
 import { createInMemoryRateBudget, createPostgresRateBudget, type SharedRateBudget } from "./operations/sharedRateBudget"
@@ -98,6 +99,7 @@ import {
 } from "./notifications/pushProvider"
 import {
   createNotificationService,
+  DEFAULT_PUSH_PROVIDER_TIMEOUT_MS,
   type NotificationService
 } from "./notifications/notificationService"
 import { createNotificationDeliveryHooks } from "./notifications/notificationDeliveryContext"
@@ -618,6 +620,8 @@ export function createConfiguredServerServices(
     const notificationService = createNotificationService({
       repository: createPostgresNotificationRepository(pool),
       pushProvider,
+      // Removal and account deletion wait for the dispatch's locks under lock_timeout.
+      lockedSendTimeoutMs: resolveLockedSendTimeoutMs(DEFAULT_PUSH_PROVIDER_TIMEOUT_MS, config.databasePool),
       ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }), notificationPortraits)
     })
     const authService = createAuthService({

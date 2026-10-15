@@ -72,6 +72,18 @@ export const DEFAULT_DATABASE_POOL_SETTINGS: Readonly<DatabasePoolSettings> = Ob
   queryTimeoutMs: 12_000
 })
 
+/**
+ * How long a push send may run while its dispatch holds row and advisory
+ * locks (see withAuthorizedDelivery). Device removal, logout and account
+ * deletion wait for those locks under the app's lock_timeout, so the hold
+ * must end first: two thirds of lock_timeout (2 s at the 3 s default), never
+ * more than the provider timeout. A send cut short is retried like any
+ * provider timeout; a removal that then wins the locks stops the retry.
+ */
+export function resolveLockedSendTimeoutMs(providerTimeoutMs: number, settings: Pick<DatabasePoolSettings, "lockTimeoutMs">): number {
+  return Math.max(1, Math.min(providerTimeoutMs, Math.floor(settings.lockTimeoutMs * 2 / 3)))
+}
+
 export function resolveDatabasePoolSettings(env: NodeJS.ProcessEnv): DatabasePoolSettings {
   const statementTimeoutMs = readInteger(env, "BLUMI_DB_STATEMENT_TIMEOUT_MS", 1_000, 600_000) ??
     DEFAULT_DATABASE_POOL_SETTINGS.statementTimeoutMs
