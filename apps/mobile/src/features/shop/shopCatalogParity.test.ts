@@ -322,7 +322,7 @@ test("server loadout metadata exactly follows the runtime mobile avatar catalog"
   }
 });
 
-test("the boy's starter pieces (curls + basic_a) are free, owned by default, and never sold in the Shop", () => {
+test("the boy's starter pieces (curls + basic_a) are free and owned by default, never priced for sale", () => {
   const starterIds = [
     DEFAULT_MALE_AVATAR_LOADOUT.hairId,
     DEFAULT_MALE_AVATAR_LOADOUT.topId,
@@ -333,7 +333,6 @@ test("the boy's starter pieces (curls + basic_a) are free, owned by default, and
   for (const itemId of starterIds) {
     const avatarItem = AVATAR_V2_CATALOG.find((item) => item.id === itemId);
     assert.ok(avatarItem, itemId);
-    assert.equal(avatarItem.hiddenFromShop, true, itemId);
     assert.equal(avatarItem.ownedByDefault, true, itemId);
     assert.deepEqual(
       avatarItem.compatibleBodyIds,
@@ -348,6 +347,102 @@ test("the boy's starter pieces (curls + basic_a) are free, owned by default, and
     assert.equal(economyItem.priceCoins, 0, itemId);
     assert.equal(economyItem.ownedByDefault, true, itemId);
   }
+});
+
+// The production Shop shelf for one body: the receipt-backed projection, the server's inventory and the
+// on-screen picture filter, exactly as useShopCatalogProducts builds it in a production session.
+function productionAvatarShelfFor(bodyId: string, ownedAvatarItemIds: readonly string[]) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset loading requires static require.
+  const { isDisplayableAvatarShopProduct } = require("./screen/shopAvatarProductOrder") as typeof import("./screen/shopAvatarProductOrder");
+  const published = resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG);
+  return buildShopCatalogItems({
+    avatar: resolveInitialAvatarV2(bodyId),
+    inventory: {
+      coins: 1_250,
+      ownedAvatarItemIds: [...ownedAvatarItemIds],
+      ownedRoomItemIds: [],
+      unlockedFeatureIds: [],
+      updatedAt: "2026-10-15T00:00:00.000Z",
+    },
+    roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
+    economyCatalog: published,
+    publishedItemIds: published.map((item) => item.itemId),
+  })
+    .filter((product) => product.sectionId === "avatar")
+    .filter(isDisplayableAvatarShopProduct);
+}
+
+test("the boy's production Shop lists all 26 of his wardrobe pieces, each with a picture", () => {
+  const shelf = productionAvatarShelfFor("avatar_v2_body_male_light", BOY_WARDROBE_PREVIEW_ALL_IDS);
+  const listed = new Set(shelf.map((product) => product.sourceItemId));
+
+  assert.equal(BOY_WARDROBE_PREVIEW_ALL_IDS.length, 26);
+  for (const id of BOY_WARDROBE_PREVIEW_ALL_IDS) {
+    assert.ok(listed.has(id), `the boy's Shop lists ${id}`);
+  }
+  for (const id of GIRL_WARDROBE_PREVIEW_ALL_IDS) {
+    assert.ok(!listed.has(id), `the boy's Shop never offers the girl's ${id}`);
+  }
+});
+
+test("pieces the server says the viewer owns show as owned with a wear action, never an unlock", () => {
+  const shelf = productionAvatarShelfFor("avatar_v2_body_male_light", BOY_WARDROBE_PREVIEW_ALL_IDS);
+  const boyPieces = shelf.filter((product) => BOY_WARDROBE_PREVIEW_ALL_IDS.includes(product.sourceItemId));
+
+  assert.equal(boyPieces.length, 26);
+  for (const product of boyPieces) {
+    assert.equal(product.owned, true, product.sourceItemId);
+    assert.notEqual(product.actionType, "avatarUnlock", product.sourceItemId);
+    // the piece he is wearing is marked as worn; every other owned piece can be put on from the Shop
+    assert.ok(["avatarEquip", "disabled"].includes(product.actionType), product.sourceItemId);
+  }
+  assert.ok(boyPieces.some((product) => product.actionType === "avatarEquip"));
+});
+
+test("the girl's production Shop lists her free wardrobe pieces and none of the boy's", () => {
+  const shelf = productionAvatarShelfFor("avatar_v2_body_default", GIRL_WARDROBE_PREVIEW_ALL_IDS);
+  const listed = new Set(shelf.map((product) => product.sourceItemId));
+
+  for (const id of GIRL_WARDROBE_PREVIEW_ALL_IDS) {
+    assert.ok(listed.has(id), `the girl's Shop lists ${id}`);
+    assert.equal(shelf.find((product) => product.sourceItemId === id)?.owned, true, id);
+  }
+  for (const id of BOY_WARDROBE_PREVIEW_ALL_IDS) {
+    assert.ok(!listed.has(id), `the girl's Shop never offers the boy's ${id}`);
+  }
+});
+
+function pricedFixtureShelf(ownedAvatarItemIds: string[]) {
+  const boyTop = AVATAR_V2_CATALOG.find((item) => item.id === BOY_WARDROBE_PREVIEW_ALL_IDS[2]);
+  assert.ok(boyTop);
+  const fixtureId = "avatar_v2_top_male_shop_fixture_priced";
+  const products = buildShopCatalogItems({
+    avatar: resolveInitialAvatarV2("avatar_v2_body_male_light"),
+    inventory: {
+      coins: 1_250,
+      ownedAvatarItemIds,
+      ownedRoomItemIds: [],
+      unlockedFeatureIds: [],
+      updatedAt: "2026-10-15T00:00:00.000Z",
+    },
+    roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
+    avatarCatalog: [{ ...boyTop, id: fixtureId, ownedByDefault: false }],
+    economyCatalog: [{ itemId: fixtureId, type: "avatar", title: "Fixture Top", priceCoins: 240 }],
+  });
+  return { fixtureId, product: products.find((candidate) => candidate.sourceItemId === fixtureId) };
+}
+
+test("a listed priced piece goes through the purchase action until the server inventory holds it", () => {
+  const before = pricedFixtureShelf([]);
+  assert.ok(before.product);
+  assert.equal(before.product.owned, false);
+  assert.equal(before.product.priceCoins, 240);
+  assert.equal(before.product.actionType, "avatarUnlock");
+
+  const after = pricedFixtureShelf([before.fixtureId]);
+  assert.ok(after.product);
+  assert.equal(after.product.owned, true);
+  assert.equal(after.product.actionType, "avatarEquip");
 });
 
 test("every visible starter garment has a local shop preview", () => {

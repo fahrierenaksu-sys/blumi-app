@@ -2,7 +2,1294 @@
   "schemaVersion": "blumi-release-catalog-v1",
   "catalogId": "blumi-r1-core-catalog",
   "releaseLine": "r1",
-  "publishedItems": [],
+  "publishedItems": [
+    {
+      "itemId": "avatar_v2_hair_male_textured_twists",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_hair_male_textured_twists__o4p6.webp",
+            "sha256": "97d008b183b3c6e03fc9dca14748cf19c68eea5125d81d23f182703c6ce5e5c2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_hair_male_textured_twists__o4p6.webp",
+            "sha256": "f978b0cd8fd8283b722547216662545a14e85434c7735e1f3c311bb79f059565"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_hair_male_textured_twists__back.webp",
+            "sha256": "c622c28daad5aa4d5a0def0ade148cc76879cb3c8a311cbe2419e13bb7e0600c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_hair_male_textured_twists__front.webp",
+            "sha256": "d7e39b7a0a3b0259d4ea9630e40c0c45b07f7279933b73a9ea3d47d1800bad7e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_hair_male_textured_twists.webp",
+            "sha256": "4b5fc889ec788bad82511445fdbe12e5b1cc111b8ffe018ffece33a29c1485ca"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_top_male_navy_knit_polo",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_navy_knit_polo__o0p45.webp",
+            "sha256": "e71f9e41098273c016206aa3fa2fccdc450cae11a14101e4c4f68efded3a6d21"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_navy_knit_polo__o3p45.webp",
+            "sha256": "8704d7047c38463410ef80ef6401ff7d1ecbf879f516cc0b03695005eda8e43e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_navy_knit_polo__o5p45.webp",
+            "sha256": "c4c824d8794bc12f6ad1af5d5b40a8f75277e303e5f973dd5a5b767697dfbc12"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_navy_knit_polo__o0p45.webp",
+            "sha256": "e70095303b2c8ab3771fefbc58a07c5f53d0f174eaca9e4691b2e90a56d8b085"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_navy_knit_polo__o3p45.webp",
+            "sha256": "e6cfbbec0ad19a8de5c95b0bbe7fc47196d1d3b2cb181e2dfa69abc8a1a018e6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_navy_knit_polo__o5p45.webp",
+            "sha256": "6f1b9cdc9c43b66687985de977d2a13d9c2dd3d0200dcf9865fc29a1b726b6d7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_navy_knit_polo__front.webp",
+            "sha256": "4c8c1052659ae920fb1469d879d6cc6fdb62bdebe33b27d2043c5b6d252ec963"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_navy_knit_polo__under.webp",
+            "sha256": "278c9e0fd1122af5e665fd3fd17520c305612c2e1ae11a2c4f11e96aadc7da51"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_navy_knit_polo.webp",
+            "sha256": "c773d9ef059d36bd4aea47a2d93a8760be8ade9011597eb58d9532cb5326ed53"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_top_male_olive_overshirt",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_olive_overshirt__o0p45.webp",
+            "sha256": "e4e667059423f06b11eb71f391acd50ee2a9c3ee4cd2b918fddbfcec73e8a388"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_olive_overshirt__o3p45.webp",
+            "sha256": "2ede18c51c7f8134889a53a6c594dc9216a70adecd9d09ae00928a56ca2d1244"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_olive_overshirt__o5p45.webp",
+            "sha256": "ab0c40831e6d8c564d56a44caa9a9af415cdf9a81380bddfc0e2a232aee13cdd"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_olive_overshirt__o0p45.webp",
+            "sha256": "de8cfefe1053455a2efe990a846324714b1807a4a42e34eb3d047a89869b3dcf"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_olive_overshirt__o3p45.webp",
+            "sha256": "26a39e2fb49ee415dd372be29bd49f83307e5cbebe9bce74613ba9b92d07a85a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_olive_overshirt__o5p45.webp",
+            "sha256": "11b88af359493fe10cab7a17d1734815f6d2fa29e92335a8b0b909c95a024838"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_olive_overshirt__front.webp",
+            "sha256": "3fec9c16dba781a9c930d26e5d8622e88a9631986b2c1e9da466b6ad57a648da"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_olive_overshirt__under.webp",
+            "sha256": "0c9b54d326af933df001fbb0a270dfe1d933d1c80795a8c39448ef6ea87646c7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_olive_overshirt.webp",
+            "sha256": "35e6e121db37cb3fe42f7bb4a487860881d9397a9b547442ac932526e2241d68"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_top_male_forest_collar_sweater",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_forest_collar_sweater__o0p45.webp",
+            "sha256": "4f2dcba78c96f3047f3d703d23d018a63ecbc4f44083464c52c21f06c9075214"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_forest_collar_sweater__o3p45.webp",
+            "sha256": "e9215b33c22c7e4fc7a97b47a1242d116958981c97a457e5a48f405bff08eb16"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_forest_collar_sweater__o5p45.webp",
+            "sha256": "4f458e43fe3d4190d284fce56a8db6b5215a65a455144d4113a2bf764a8bbe24"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_forest_collar_sweater__o0p45.webp",
+            "sha256": "eb2d9d393f9f5bca69a84f5e94d4d16662a4a3d7592f7c236877d31a671d3dc5"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_forest_collar_sweater__o3p45.webp",
+            "sha256": "2eb8da07ce507a987da8a92f217f218634e5184e344daa30648e93779d291c24"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_forest_collar_sweater__o5p45.webp",
+            "sha256": "866bb14f21ac507a32422890325e5799d66d27f6814db9cb6567a61753637ffa"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_forest_collar_sweater__front.webp",
+            "sha256": "fe836e9065f0cfde5760a0c6f6bd6baeb836d31043b3fd881a1c5b434baa98d3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_forest_collar_sweater__under.webp",
+            "sha256": "df3390345562c8283514e3a0210a953995f0d0cf8577517b465bee1397a6e6a5"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_forest_collar_sweater.webp",
+            "sha256": "af5a112f9e1e0daf27b90ad8bdcb02eee96454f8534701916998fa0ba785f633"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_top_male_black_embroidered_sweatshirt",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_black_embroidered_sweatshirt__o0p45.webp",
+            "sha256": "00cddefe7641526e2cdebe4db95b86d9803857aa430fc4a08d33815c7a093403"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_black_embroidered_sweatshirt__o3p45.webp",
+            "sha256": "58d95eee6ff01af5724e7a648be20c8b7ef47f6992add0b8e24a05c6b7fc9cc7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_black_embroidered_sweatshirt__o5p45.webp",
+            "sha256": "77508610de7f42dfd77c54340ed897611de2fef0b8ef8dfc99a09fc0d8de20b6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_black_embroidered_sweatshirt__o0p45.webp",
+            "sha256": "909e2cf740328894ce8bdc711928085c5172cfd8a28a8ee7001df0377c924a28"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_black_embroidered_sweatshirt__o3p45.webp",
+            "sha256": "dd7628259baffedc5b45a60d9afe024a0b0506561a2a2a46a4beca8d7c73b32b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_black_embroidered_sweatshirt__o5p45.webp",
+            "sha256": "3d2ef8a53ecd50beefaff836bf8b9dc328618f169ee9825c42f201bbc087a0f0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_black_embroidered_sweatshirt__front.webp",
+            "sha256": "6b94ce0d4a25747fbb1fa514aa34c5acdbb9ffaf2609741cf7905e94cc1f965b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_black_embroidered_sweatshirt__under.webp",
+            "sha256": "b05df95b7d714c899d3025e97d5aa88297607ce8e40255aedc20a4fdeb169f05"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_black_embroidered_sweatshirt.webp",
+            "sha256": "eb8881d36f18efdf811765be8a6b8e0e24624defe64e872cf6e0bd2ad8770564"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_top_male_taupe_waffle_blouson",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_taupe_waffle_blouson__o0p45.webp",
+            "sha256": "0bb043bd60d347ef02c23022b1f0813ae664a5a28d6d1906a3fab97276693c0a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_taupe_waffle_blouson__o3p45.webp",
+            "sha256": "f529a52f53b080ba278e6e1875654a70d1ebba6922a57cb1da1de8a6846f451f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_taupe_waffle_blouson__o5p45.webp",
+            "sha256": "a6829a16e0bdf1f173930828d8b41211b63985f2388bb1bde2b6380ad3f453ee"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_taupe_waffle_blouson__o0p45.webp",
+            "sha256": "9a5e38fe2fa85f43522a9189103dbc243ad94d00207aaf9cfd22ec18160ff154"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_taupe_waffle_blouson__o3p45.webp",
+            "sha256": "2f5c7df0b255a4a39781d09229a303a70dbe3637aba2fdb98360cb89a75a04e5"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_taupe_waffle_blouson__o5p45.webp",
+            "sha256": "55d4d23bb6c7e4845bb92beda24b0fff4008d8fdb781b3c58131e5e300cc67e9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_taupe_waffle_blouson__front.webp",
+            "sha256": "d99043f171ffc35eed08538e618717f3a543632724ae9f541529a93f9eb072b3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_taupe_waffle_blouson__under.webp",
+            "sha256": "f3d097a1cddd172854ccaa251fc8f89afd1b6868d48cda0cc035c313d2a8e1f9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_taupe_waffle_blouson.webp",
+            "sha256": "2e4e9da40416b0f112501cfe0bdcf50efceb8c5c21c60a6e43e876fcc36a9759"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_top_male_check_flannel_white_tee",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_check_flannel_white_tee__o0p45.webp",
+            "sha256": "0850eade8de9419a6d1b7dc4fb8948c9d8d9d314b4fb0e819b599d1445fb96ee"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_check_flannel_white_tee__o3p45.webp",
+            "sha256": "dcfb4e8fd504ac2b3c95f4ba358914276db273e29773b8813ce7f5cb2fdc0473"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_check_flannel_white_tee__o5p45.webp",
+            "sha256": "85c4cd02447cae778570204778405f52c4d08532bf40fac4cd4ffdd30ba28cc0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_check_flannel_white_tee__o0p45.webp",
+            "sha256": "02f59d8edc405a757ef73e879eeef2651bffa04e60674f97714bb0a2740ec3f0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_check_flannel_white_tee__o3p45.webp",
+            "sha256": "92086a5c6c08c8519da58564071f41525bf30be1a66e94a97caee2408d2b68cf"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_check_flannel_white_tee__o5p45.webp",
+            "sha256": "c70aaffd6a39bc1128059ec9e22dc32611410e3e0a9836f2e32f5b8fd8dec89a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_check_flannel_white_tee__front.webp",
+            "sha256": "9bf892fe53310a580ae933a287babdbd8f42df42a84a83a16d575fbba1ac217e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_check_flannel_white_tee__under.webp",
+            "sha256": "208db49319746094a0cabef52a7f99f9fdb9fa094f3ebc29f6b78134830c00f8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_check_flannel_white_tee.webp",
+            "sha256": "9ebbd6664434bbdfadcd8b0b1dbd78badb5fd3d4bd3d4ea042a84e8209102556"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_top_male_black_basic_tee",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_black_basic_tee__o0p45.webp",
+            "sha256": "30837e5fc7486f4ef30aa934beb5671513239c857d465e52b268fbcdaafe9dc9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_black_basic_tee__o3p45.webp",
+            "sha256": "179424cae7e8733b5ade7687d484d832b8c74c149df93e9325254f128b9b3a9b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/avatar_v2_top_male_black_basic_tee__o5p45.webp",
+            "sha256": "10f1e353e7c6f3135724f862d6a90cab2c014603e318a6251cfb8f2ab6cfd833"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_black_basic_tee__o0p45.webp",
+            "sha256": "4ffa8722ab91c328324777af05398b0b8eb201458e7f3bd01c45183e98ce2aea"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_black_basic_tee__o3p45.webp",
+            "sha256": "b2aeb45014983b505d9508067160f2241c6813fa378f0f2a33d06fde014e7f79"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_top_male_black_basic_tee__o5p45.webp",
+            "sha256": "877812ea947ec0b0767ca07e6c6eb0571250406a643062d49b830680a698f42c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_black_basic_tee__front.webp",
+            "sha256": "b59671430f6dceaa1b6922828ce4d2989331466e04530679f888c6f6cd176443"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_top_male_black_basic_tee__under.webp",
+            "sha256": "7cb38db8eb84e2be92c816124565fc0fdaeb7e9415dd58fd38e4c6208109ed34"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_black_basic_tee.webp",
+            "sha256": "0f5f9a78314bf6a66da85165c17926bc50088aed8eb0d49eb00b36fc1e3fd0a9"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_bottom_male_cream_pleated_trousers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_pleated_trousers__o1__bottom-cut.webp",
+            "sha256": "ea558a7e3da782b21b0ef0741415ae9ce127b263129e2b64ea692ef53e75f44b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_pleated_trousers__o1__bottom.webp",
+            "sha256": "56da117331d5c4febfccaf6dbb9ba8d55c0af8ea9b4ba95f05b13d2565621c67"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_pleated_trousers__o1p3.webp",
+            "sha256": "dc3f80025540269139e664aa4867cf9d2b466220a356a48f9b4dca8c38831bde"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_pleated_trousers__o2__bottom-cut.webp",
+            "sha256": "06b7263fb7536cc90fa5d4de5e957b3fe41a70113669c4e2bfc31cc855a0554b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_pleated_trousers__o2__bottom.webp",
+            "sha256": "a9992d1d91f79b63156adf2b5a1ecc79670296126b047a2ab6d22cdb05be1ad2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_pleated_trousers__o2p3.webp",
+            "sha256": "290ff8849948eafa40ea25e82c9b66584dfe5eb5a2cfc5375f667a5481c13ed3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_pleated_trousers__o3p3.webp",
+            "sha256": "d0827b166e9589159ee4af9f3b2606a778aade47371016236c2b649e0a7691ac"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_cream_pleated_trousers__front.webp",
+            "sha256": "a99f5c18939d5f6d4d281c7dbdf4636b57ef4aeca4c363e423d95150e74cef60"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_cream_pleated_trousers__under.webp",
+            "sha256": "cfd899a014abbe8a40636c134d03543c62ae7cd59485d6dff67d5dfa9f7552d2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_cream_pleated_trousers.webp",
+            "sha256": "615df82292ae1955aa02ff042cc5a46b7f65b1fad817943f30a6cf72457f6322"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_bottom_male_dark_straight_jeans",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_dark_straight_jeans__o1__bottom-cut.webp",
+            "sha256": "eab2bac91ea25f27fc0fb76e6b2cc1be59e4d2439abdaf6a894841f4c10ab2e0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_dark_straight_jeans__o1__bottom.webp",
+            "sha256": "0c0de17017012a42bffa6f58fd2987954c70c81258b66fa37f843d90018e2c15"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_dark_straight_jeans__o1p3.webp",
+            "sha256": "718162cd69e3686227559fd29fe9dbad2f28763424fa5b00f79b565b44a249d0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_dark_straight_jeans__o2__bottom-cut.webp",
+            "sha256": "5e393f7d4b59d840efba65b663ecbe31f61ad9cb702ce8c996f5ca5dbca04ed0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_dark_straight_jeans__o2__bottom.webp",
+            "sha256": "ea76e03ec1de47b23c1a738389a1ed89cc2289bdb5e8a8da1189726dde4a4871"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_dark_straight_jeans__o2p3.webp",
+            "sha256": "3b059007e10b9a08afe33d125609482b8bcd79ea84fb90bb0e9c367c2784232c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_dark_straight_jeans__o3p3.webp",
+            "sha256": "c55e34c1a3122a469317fdec9e3d4cca5b92a0d820b7f7a3e9cfc66d7f1a2de0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_dark_straight_jeans__front.webp",
+            "sha256": "552a3a76b30ad2944bc9902667a664bd0ea493da181c655d37a1687f1273a841"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_dark_straight_jeans__under.webp",
+            "sha256": "ed5eb6fc4e99f94aa5f2d2647108b11c84b0764e7f79622ca4702526f6e9f46f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_dark_straight_jeans.webp",
+            "sha256": "26900144ec6f89e7081b28d7e50222e0e7a61d4bcbb597c3d983d28e0a26c148"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_bottom_male_charcoal_trousers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_charcoal_trousers__o1__bottom-cut.webp",
+            "sha256": "eab2bac91ea25f27fc0fb76e6b2cc1be59e4d2439abdaf6a894841f4c10ab2e0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_charcoal_trousers__o1__bottom.webp",
+            "sha256": "0c0de17017012a42bffa6f58fd2987954c70c81258b66fa37f843d90018e2c15"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_charcoal_trousers__o1p3.webp",
+            "sha256": "123fa9796cb843d9de4648a975f84b1d61f41775f238828e163df32f5a80afa9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_charcoal_trousers__o2__bottom-cut.webp",
+            "sha256": "31e6024580db3b0f34b9d2584ce0ff24378cac90a03d18b08c816b5b2731a6e4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_charcoal_trousers__o2__bottom.webp",
+            "sha256": "1a4bde11abec78332efb126d8ac940bb357acc8475eca033cdff5de160fcb2b4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_charcoal_trousers__o2p3.webp",
+            "sha256": "ff31681053a5d7ef61145957edcc1124ca170ea0f0b6b3760f3d1f16f922078b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_charcoal_trousers__o3p3.webp",
+            "sha256": "a18b548a9091edbcc066e84f3001e211b241c80260bc23293aaa47f06a01251c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_charcoal_trousers__front.webp",
+            "sha256": "65b51ba73e108b2878f6d940e49dc8303b3ea201978b9a8ddcaa27913c6c4b9c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_charcoal_trousers__under.webp",
+            "sha256": "3187f6c830388bad39c2e2343c3243309fc332d78836841c65e5a2094e3bcb64"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_charcoal_trousers.webp",
+            "sha256": "7c553cd92da4aab67ac6335c29150732589f7a3a92ee2ac140a6aaf10a243175"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_bottom_male_cream_drawstring_trousers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_drawstring_trousers__o1__bottom-cut.webp",
+            "sha256": "ea558a7e3da782b21b0ef0741415ae9ce127b263129e2b64ea692ef53e75f44b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_drawstring_trousers__o1__bottom.webp",
+            "sha256": "56da117331d5c4febfccaf6dbb9ba8d55c0af8ea9b4ba95f05b13d2565621c67"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_drawstring_trousers__o1p3.webp",
+            "sha256": "4fa3aaabf271a83da344af3fd660fb614d5ba6f9d6078422b813f4f59fa01534"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_drawstring_trousers__o2__bottom-cut.webp",
+            "sha256": "06b7263fb7536cc90fa5d4de5e957b3fe41a70113669c4e2bfc31cc855a0554b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_drawstring_trousers__o2__bottom.webp",
+            "sha256": "a9992d1d91f79b63156adf2b5a1ecc79670296126b047a2ab6d22cdb05be1ad2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_drawstring_trousers__o2p3.webp",
+            "sha256": "51fcc03e64856bfb1e82f238082afa61a416522e092da241c30463a94ff55de9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_cream_drawstring_trousers__o3p3.webp",
+            "sha256": "a5683cfae87bf414f089a5553749059320f0ac809003bcbc2fe8c8f980c642b3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_cream_drawstring_trousers__front.webp",
+            "sha256": "6168145ca0769dd701f44ccd1ff6615cb94e86beb81d43bc3c7e8a7600926bd8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_cream_drawstring_trousers__under.webp",
+            "sha256": "ab39eac0fe97aaebf360ed4b31ad893d6bbde2d8e6e6909bb8e93d2c51246558"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_cream_drawstring_trousers.webp",
+            "sha256": "854af0006df52526e1ac2fdcf033df18625dd95fa93c0513d3c7108c7e8654d4"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_bottom_male_ecru_wide_trousers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_ecru_wide_trousers__o1__bottom-cut.webp",
+            "sha256": "ea558a7e3da782b21b0ef0741415ae9ce127b263129e2b64ea692ef53e75f44b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_ecru_wide_trousers__o1__bottom.webp",
+            "sha256": "56da117331d5c4febfccaf6dbb9ba8d55c0af8ea9b4ba95f05b13d2565621c67"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_ecru_wide_trousers__o1p3.webp",
+            "sha256": "eb11f52427a3e5a50df279558d43cdfaa4bda3df588fb4588751d0a97362a254"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_ecru_wide_trousers__o2__bottom-cut.webp",
+            "sha256": "06b7263fb7536cc90fa5d4de5e957b3fe41a70113669c4e2bfc31cc855a0554b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_ecru_wide_trousers__o2__bottom.webp",
+            "sha256": "a9992d1d91f79b63156adf2b5a1ecc79670296126b047a2ab6d22cdb05be1ad2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_ecru_wide_trousers__o2p3.webp",
+            "sha256": "60ddbb6b50ff318746e35b375fd13355ac4d12712c0743178e3c8ce0971a29fd"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_ecru_wide_trousers__o3p3.webp",
+            "sha256": "18be028a9b7990adb001302abbe7c25c9981f125b1c485d9c81be987934f1706"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_ecru_wide_trousers__front.webp",
+            "sha256": "7815509a463daf7fe8c2606570cc2e6fbf2e306b7b5793c6716780649a1f90da"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_ecru_wide_trousers__under.webp",
+            "sha256": "39cb56d9c4ad06ed4bea43f09d32abdffa50eba55efde926144142f0314ce1e4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_ecru_wide_trousers.webp",
+            "sha256": "956ffefcd5837366269f000904a266f86ed09a08c7c4f049b9fc49195e6e63ad"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_bottom_male_grey_wide_jeans",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_grey_wide_jeans__o1__bottom-cut.webp",
+            "sha256": "ea558a7e3da782b21b0ef0741415ae9ce127b263129e2b64ea692ef53e75f44b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_grey_wide_jeans__o1__bottom.webp",
+            "sha256": "56da117331d5c4febfccaf6dbb9ba8d55c0af8ea9b4ba95f05b13d2565621c67"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_grey_wide_jeans__o1p3.webp",
+            "sha256": "cf5cc38e7093d69223100c7b0dc7ef2191d853093dd98d252f6be31a67d30dbf"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_grey_wide_jeans__o2__bottom-cut.webp",
+            "sha256": "06b7263fb7536cc90fa5d4de5e957b3fe41a70113669c4e2bfc31cc855a0554b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_grey_wide_jeans__o2__bottom.webp",
+            "sha256": "a9992d1d91f79b63156adf2b5a1ecc79670296126b047a2ab6d22cdb05be1ad2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_grey_wide_jeans__o2p3.webp",
+            "sha256": "907152c8fe5a4c2082e223cc36e0802b38677eb1a6b9e08be209ed9edebe8264"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_grey_wide_jeans__o3p3.webp",
+            "sha256": "02997fc6b26cf53f71a9c43c843fce2429daadd589c1b1443f514df137dfab80"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_grey_wide_jeans__front.webp",
+            "sha256": "c6b419715e1f44e19ca2639ac031ab057db8a06fe24f8d52fbacecd971b1135b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_grey_wide_jeans__under.webp",
+            "sha256": "57a3ec91ed9278825202a0cb52893005343246d41cd9ed19d1ce113e8e4a6484"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_grey_wide_jeans.webp",
+            "sha256": "643bf1b099d84d76ef8daf218507f78ceaa0a41af092f36f3368b996b45e158d"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_bottom_male_black_pocket_trousers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o1__bottom-cut.webp",
+            "sha256": "ea558a7e3da782b21b0ef0741415ae9ce127b263129e2b64ea692ef53e75f44b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o1__bottom.webp",
+            "sha256": "56da117331d5c4febfccaf6dbb9ba8d55c0af8ea9b4ba95f05b13d2565621c67"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o1p3.webp",
+            "sha256": "ce6422f6cb2b237aaab59216398614592f02805338b8e04cb2ad63f81a08b6c5"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o2__bottom-cut.webp",
+            "sha256": "06b7263fb7536cc90fa5d4de5e957b3fe41a70113669c4e2bfc31cc855a0554b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o2__bottom.webp",
+            "sha256": "a9992d1d91f79b63156adf2b5a1ecc79670296126b047a2ab6d22cdb05be1ad2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o2p3.webp",
+            "sha256": "6a217acd6a17bd983ea6edc83e7297776f3cc720a718b4b996eb00c8659212b3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o3p3.webp",
+            "sha256": "ad752c2032b0dd26258943902971b500ce0bdf284ceb3c41dc353c2e8c7ef7ff"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_black_pocket_trousers__front.webp",
+            "sha256": "e40ae393dc03213a4d4b9bf5e2c2c8d16b7becec40d6cb8dd1cec163e1a543d0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_bottom_male_black_pocket_trousers__under.webp",
+            "sha256": "2c28b872071c48323ace3e0c97fc76b22ece07cf1b0ab87ea466b2a88aa4cfd6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_black_pocket_trousers.webp",
+            "sha256": "afd63f446f797b2c923d056190b324f6d51be59c8952024cc416b4963bda41b6"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_shoes_male_tan_loafers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_tan_loafers__o1__shoes.webp",
+            "sha256": "9c63fbe4402e5782e352ed4c2b633c12118160b0a4fa85f2714d82facf51e5c0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_tan_loafers__o1p15.webp",
+            "sha256": "010b5629b6462cb3eac0fe48a3822524589ce6459eebe608704f351d880d4075"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_tan_loafers__o2__shoes.webp",
+            "sha256": "3b53ec62515cd586f51db597d68eeeef0a65fd41d75231ef75aca437a0efbda9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_tan_loafers__o2p15.webp",
+            "sha256": "faac51b1fb944c3377b9c2e5c92f826d045f9153f3f55a143d7265d9561260cc"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_tan_loafers__front.webp",
+            "sha256": "356286aa0713dff45d30fd1d415812bc49972ed00f1420e36652d85ab97b072d"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_tan_loafers__under.webp",
+            "sha256": "b813fb55f99e4eec5b984f107efab6932916311785150e391032825f463703bd"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_tan_loafers.webp",
+            "sha256": "1b79cfe18643b6e6d066b5671a6a882b9712d2f292e091bbef2676e275db5d89"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_shoes_male_sand_desert_boots",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_sand_desert_boots__o1__shoes.webp",
+            "sha256": "cc1029ed8217f81ffd16a751b3999267ec144cff16a47c16275698a9587dde23"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_sand_desert_boots__o1p15.webp",
+            "sha256": "b7f45ab704e8014cfe2b4c0a9836960714862c41a8d53ed126a420d14a56c55b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_sand_desert_boots__o2__shoes.webp",
+            "sha256": "21dd310eb89978a25b88404b8c3a38eb10145828187a399a7a957bbf7da1c3e0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_sand_desert_boots__o2p15.webp",
+            "sha256": "fc1d0c26337ef4d319ca9fcd679e89c10eac0233bca96b15fc14a2548ffa5247"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_sand_desert_boots__front.webp",
+            "sha256": "fe82b29f92a36d10e8774652dcf8b0ae39996c3cbc2c5c629a8da3f358a58315"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_sand_desert_boots__under.webp",
+            "sha256": "17b9b40f3553a71ee94e500429462e92741bfda384d91729b35d0667827c5db8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_sand_desert_boots.webp",
+            "sha256": "ecb52e5cdb8ec5c3449f5d6b72e76b2ace079794e6d8e148e1be88c080958778"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_shoes_male_brown_loafers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_brown_loafers__o1__shoes.webp",
+            "sha256": "2090d1057c9594fbdc016936ba394725dca25dc31a56b01859df31a4116010d9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_brown_loafers__o1p15.webp",
+            "sha256": "17941c6ee499233f75de47fb3084e5d0755a26446c71ce382278c51dc2d64760"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_brown_loafers__o2__shoes.webp",
+            "sha256": "1c169653a52862c7a3d8a37581b1d778d119a7b172dcfdf74a1c009879138b10"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_brown_loafers__o2p15.webp",
+            "sha256": "558dd08d9fe6517de1937031aa39d8b6681696b53d8ba1c3c43881ed7af20989"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_brown_loafers__front.webp",
+            "sha256": "406b795672be8b0ea8755c42d475d53d4ba5152686960f7508b37ec7e2badeed"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_brown_loafers__under.webp",
+            "sha256": "f87b68f5c3057eb523d9925ba4a3a308788e7035795aa1b4011a7fdabdd6e1d4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_brown_loafers.webp",
+            "sha256": "c751aae10c36ec03737724c8b730700495d572dd24aeac228b6e3bdd18b6e91b"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_shoes_male_cream_chunky_sneakers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_cream_chunky_sneakers__o1__shoes.webp",
+            "sha256": "cddeb93f47bd878ae3d4466378023ace52a437ac816261aa74ba66d7732323f2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_cream_chunky_sneakers__o1p15.webp",
+            "sha256": "24665e38db37bab3a32537283789f2a2b0c0bf894a589f83f75800382d25848b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_cream_chunky_sneakers__o2__shoes.webp",
+            "sha256": "8e45696ee6e15295991281dc02b526b3f17b0ecdc4f6ea3127216e5e56341779"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_cream_chunky_sneakers__o2p15.webp",
+            "sha256": "a5c4ea743d81deaf7204b1db08c924a3955f39e10c1d4a2df8e0dbd6e0ef2b9a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_cream_chunky_sneakers__front.webp",
+            "sha256": "d19d389e3707fe04dccb551b2d234c35588f34eb6a352a175c0f39bcd5660c14"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_cream_chunky_sneakers__under.webp",
+            "sha256": "042265e5e9d1ffe7d1eeb8c9dd52eba8c0821ea30674c74b2b4bb9ff1a96712d"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_cream_chunky_sneakers.webp",
+            "sha256": "2f6f37871b8af7c14fb81acf87b6c25023e40f2ee84cf44f1d23ba575b69d0c6"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_shoes_male_dark_leather_sneakers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_dark_leather_sneakers__o1__shoes.webp",
+            "sha256": "0baa15f1fd14f0714621b9648af9373148a9b3b5022a311e535fae1802fe56c6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_dark_leather_sneakers__o1p15.webp",
+            "sha256": "c6da608b2dbdf6f2ec475722de624eaeefe704ff0fca8b03753fc96560a33bf4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_dark_leather_sneakers__o2__shoes.webp",
+            "sha256": "98ef7ab118961f837133856c7fa9ed65a0d223053ca27a61304ab85968c16772"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_dark_leather_sneakers__o2p15.webp",
+            "sha256": "692aea16a67f4ff5d999b430adf657969328e9aa0829ab3b0c1a27be496dae57"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_dark_leather_sneakers__front.webp",
+            "sha256": "9d024f24101761adbe396127b65cd1f8c7a7d1959226e85b56391e1e6fc4fadf"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_dark_leather_sneakers__under.webp",
+            "sha256": "79df03dbe38493909806ec99495a61975d9b963a947e6651f9cb027582e48536"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_dark_leather_sneakers.webp",
+            "sha256": "1ead793b6303e34706b491c5640f288c80b8d61d23311b5bc6423452d74f3976"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_shoes_male_green_skate_shoes",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_green_skate_shoes__o1__shoes.webp",
+            "sha256": "344ec7033021106b884cf004e8a0d7efb06ecd0820586ffa43e3116ff2a45751"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_green_skate_shoes__o1p15.webp",
+            "sha256": "f583e37c367cc1495d59e34c390b4ac45ed924864598ae4febc0d53bc73eb21f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_green_skate_shoes__o2__shoes.webp",
+            "sha256": "8388e070a4e9cf7eb30ed1d0840a88efdca15ebe1e268c1236680630e99748a5"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_green_skate_shoes__o2p15.webp",
+            "sha256": "0d769d6c2454d65b42b812bb04a6e6501e83cbf8e939004a74a569c6af20428a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_green_skate_shoes__front.webp",
+            "sha256": "39ada18867fbd94bdd1ea022693e674bcfb8b6112ab5ebbf0af0033e47080252"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_green_skate_shoes__under.webp",
+            "sha256": "24214e0a9e84a0232e426889f3fd48992b8ca2253928df900375b6abf7127636"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_green_skate_shoes.webp",
+            "sha256": "c546dd847b2fa134cd916483a6c9dd9ec01c9c1f70ccb398e037f2b851f7ec83"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_shoes_male_black_everyday_sneakers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_black_everyday_sneakers__o1__shoes.webp",
+            "sha256": "6ac0ce3d0b51b771f05009e0430733b8fdb6061aeb8e15b4336520262a376507"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_black_everyday_sneakers__o1p15.webp",
+            "sha256": "407426878d9c26a8aef856e31703fa3d1e02a6f769919d244affb485bfc44758"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_black_everyday_sneakers__o2__shoes.webp",
+            "sha256": "d437e630edd7829a5ed111d2f895cd3c1af7bd1a4b4b562dbb5c60f106c58b9a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/avatar_v2_shoes_male_black_everyday_sneakers__o2p15.webp",
+            "sha256": "4413ff7c1acfdba9025004a2dc37e65906321d2b5e6772bbb9c0ae23f97ce12b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_black_everyday_sneakers__front.webp",
+            "sha256": "d7d0f1b1c72643001bfd455ba399b306b31bfa53886f313864f1a49bc21e2987"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_black_everyday_sneakers__under.webp",
+            "sha256": "aef4ed2e5b4b603d530a345570da2b12dc4fa18675b09c55b3ce179c0b91abf6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_black_everyday_sneakers.webp",
+            "sha256": "3582ba487be6d1c968d00d0bdd47b5db6a87873eb067ca9b0d0e73216f8bfbfd"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_hair_mocha_ribbon_waves",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/avatar_v2_hair_mocha_ribbon_waves__o0p6.webp",
+            "sha256": "4d71dd3b50a8bdefab0f29dcbb34aaa267a51eb22bf8c01909dee886b6cdf2ff"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/avatar_v2_hair_mocha_ribbon_waves__o4p6.webp",
+            "sha256": "b3e8ad720255ed37690afeab3bd1d574b7c1e58866728967ffaa305bc5146966"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_hair_mocha_ribbon_waves__o0p6.webp",
+            "sha256": "a3f989de9ee5a10c66807144fe58c016db361d54d696332c2df4b32e1e45f994"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_hair_mocha_ribbon_waves__o4p6.webp",
+            "sha256": "69f291417314062a9ac3e0ec027c033bef902d7f28a6b309463f34736cf53690"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/avatar_v2_hair_mocha_ribbon_waves.webp",
+            "sha256": "2eb7f5beb4ec3ff520edb68d471a81093b26f8ec33f8a53ee376d849be088775"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_girl_bob",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_bob__o0p6.webp",
+            "sha256": "46cad9c9398a6647859930467b2298931a710b0d2a7881ab2d5b9148f2bd4b4a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_bob__o4p6.webp",
+            "sha256": "9a560f88c39ba1b437fe50cd9749841c44bb0d3a903c8d771be85d360b64f031"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_bob__o0p6.webp",
+            "sha256": "705517dff2db772288f067ad4b6883d90f229f60b27b8a141ebe3e393993089a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_bob__o4p6.webp",
+            "sha256": "870de42177635f111f829e4ece21c475546257f183faa47dcd3fb798da462279"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_bob__back.webp",
+            "sha256": "aac78e76d49f594db22bdd0fc1e6198e4431580d0f745cdb511ebf4b3cd11d35"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_bob__front.webp",
+            "sha256": "b0cc6a150dd3b7b8d8544a95b2ac9bd29f6330f03285d895e75e8ea15b3cd4ad"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_bob.webp",
+            "sha256": "9c0791d8b4b3d206f3c99532a28057c15e0d27c56f60194d14151ed8de1532f1"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_girl_pigtails",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_pigtails__o0p6.webp",
+            "sha256": "732da27e8d42729312c4bcf36dd6a71bca37570af24641282e901b74c8d983c2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_pigtails__o4p6.webp",
+            "sha256": "fb9e89e4a8df3f510ae80ec8ff542f221a10c5b5775d20ecd4ee89f3ec2a7219"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_pigtails__o0p6.webp",
+            "sha256": "4bf03781a0edfde67c69de08daf439189e4650a38a0b10b976483b4a288def1d"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_pigtails__o4p6.webp",
+            "sha256": "23e92c0dfc89108164868b9124b748e3f0b6fefea3ce17b0079987f89ecf34bd"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_pigtails__back.webp",
+            "sha256": "3d80d83d80344edd346ee03d1144e325398788747ec07082a3a1c3920ae28508"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_pigtails__front.webp",
+            "sha256": "f7bc74c0d76d539abac7bd77966cfa322277523878f476b06bb66cf0c6ba97f3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_pigtails.webp",
+            "sha256": "4196bc40fb202db82fa4c5cc81e23f8733d3481246aa97af54408cbf49cee90c"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "avatar_v2_shoes_white_clean_sneakers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-15",
+        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-15",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
+          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_shoes_white_clean_sneakers__o1__shoes.webp",
+            "sha256": "5c6ee1b32b0ac75ba107a665ca0d7d054d6b6e8c9398f21addc7a85639b49fc9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_shoes_white_clean_sneakers__o1p15.webp",
+            "sha256": "4cef0393417603f1b432e17b3fe2c40a76ad88c948efa9b035cd23651c2a0589"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_shoes_white_clean_sneakers__o2__shoes.webp",
+            "sha256": "be7a2c5ad2d2b2d1ba745471f9df02942fd782a321a62eb104f28c67f37d47d8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_shoes_white_clean_sneakers__o2p15.webp",
+            "sha256": "b935dca335c6ba93d50c1025aaeefc22b6b77f5ebebffd5b02509573ba18c48e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/avatar_v2_shoes_white_clean_sneakers.webp",
+            "sha256": "77be5876f232fb84858fe9abaa6236976634aceb98dbb8b2bf090d2fc3cff0e8"
+          }
+        ]
+      }
+    }
+  ],
   "heldScopes": [
     {
       "scope": "pricing-pending",

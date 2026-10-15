@@ -5,6 +5,9 @@
  * owner's decision for testing they are free and owned by every account: the economy catalog lists them at 0 coins with
  * ownedByDefault (server-authoritative, the inventory self-heal grants them to existing accounts). They have no receipt
  * and are never sold (hidden from the shop).
+ *
+ * 2026-10-15 (owner price yes): the four starters stay free and owned by default; the other 22 pieces are listed in the
+ * Shop and sold at R1_WARDROBE_PRICE_COINS (economyCatalog.ts) through their receipts. Rows already granted stay owned.
  */
 export const BOY_WARDROBE_PREVIEW_ITEM_IDS = {
   hair: ["avatar_v2_hair_male_blue_black_curls", "avatar_v2_hair_male_textured_twists"],

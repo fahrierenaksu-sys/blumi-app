@@ -21,6 +21,11 @@
  * 2026-10-15 (release/2.5d-beta-5): the factory-finished powder blue ribbon corset top joins on the same terms, under the
  * ID its art and rig use, `top_powder_blue_ribbon_corset_top` (the old `avatar_v2_` corset stays retired and untouched).
  * It brings its own torso drawings (alone and with the black trousers) instead of the body's tank.
+ *
+ * 2026-10-15 (owner price yes): the four pieces the approved table prices (waves, white sneakers, bob, pigtails;
+ * R1_WARDROBE_PRICE_COINS in economyCatalog.ts) are listed in the Shop and sold at that price through their receipts.
+ * The other pieces here have no approved price or receipt yet, so they stay free and owned by default. Accounts created
+ * before the price launch keep every piece that used to be free (server grant rule, legacyFreeWardrobeGrant.ts).
  */
 export const GIRL_WARDROBE_PREVIEW_ITEM_IDS = {
   hair: ["avatar_v2_hair_mocha_ribbon_waves", "hair_girl_bob", "hair_girl_pigtails"],

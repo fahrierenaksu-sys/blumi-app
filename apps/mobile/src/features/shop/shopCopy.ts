@@ -284,7 +284,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
     previewOnAvatar: "Avatarında önizle",
     showcaseTitle: "Yeni favorini\nkeşfet.",
     roomPreview: "Oda önizlemesi",
-    owned: "Sahip olundu",
+    owned: "Dolabında",
     previewing: "Önizleniyor",
     avatarPreviewGuide: "Avatarında canlı gör",
     roomPreviewGuide: "Odanda gör",
@@ -312,7 +312,7 @@ const COPY: Record<AppLocale, ShopCopy> = {
     readyToPlace: "Yerleştirmeye hazır",
     product: {
       wearing: "Giyili", wearingOutfit: "Kombin giyili", ownedOutfit: "Kombin sende",
-      placed: (count) => `${count} yerleştirildi`, wearNow: "Şimdi giy", wearOutfit: "Kombini giy",
+      placed: (count) => `${count} yerleştirildi`, wearNow: "Giy", wearOutfit: "Kombini giy",
       placeNow: "Şimdi yerleştir", tryStyle: "Tarzı dene", avatarOutfit: "Avatar kombini",
       avatarAccessory: "Avatar aksesuarı", avatarCategory: (category) => `Avatar ${category}`,
       roomCategory: (category) => `Oda ${category}`
