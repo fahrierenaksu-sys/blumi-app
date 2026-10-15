@@ -16,6 +16,7 @@ import Animated, {
   useSharedValue,
   withTiming
 } from "react-native-reanimated"
+import { useAccessibilityAnnouncement } from "./accessibilityAnnouncement"
 import { blumiEntryTheme as uiTheme } from "./theme"
 
 const FIELD_FOCUS_COLOR_DURATION_MS = 120
@@ -47,6 +48,7 @@ export function FieldInput(props: FieldInputProps) {
     onBlur,
     ...inputProps
   } = props
+  useAccessibilityAnnouncement(error)
   const [focused, setFocused] = useState(false)
   // Focus colour crossfades on the UI thread. A colour fade is not movement,
   // so it runs under Reduce Motion as the JS spring did.

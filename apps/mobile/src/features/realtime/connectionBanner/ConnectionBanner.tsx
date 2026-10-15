@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
-import { AccessibilityInfo, StyleSheet, Text, View } from "react-native"
+import { StyleSheet, Text, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import type { RealtimeConnectionStatus } from "@blumi/realtime-client"
+import { useAccessibilityAnnouncement } from "../../../ui/accessibilityAnnouncement"
 import { animateTo, useMotion } from "../../../ui/motion"
 import { uiTheme } from "../../../ui/theme"
 import { getAppLocale } from "../../session/appLocale"
@@ -36,9 +37,9 @@ export function ConnectionBanner({ status }: ConnectionBannerProps) {
   useEffect(() => {
     if (bannerState === "hidden") return
     setLastVisibleState(bannerState)
-    // iOS has no live regions: announce once the problem is actually shown.
-    AccessibilityInfo.announceForAccessibility(getConnectionBannerLabel(bannerState, locale))
-  }, [bannerState, locale])
+  }, [bannerState])
+  // Spoken once when a problem shows (iOS); Android reads the live region.
+  useAccessibilityAnnouncement(visible ? getConnectionBannerLabel(bannerState, locale) : null)
 
   useEffect(() => {
     // Fades in (and drops 6 pt) when a problem shows, fades out when it
@@ -74,8 +75,6 @@ export function ConnectionBanner({ status }: ConnectionBannerProps) {
         <View style={[styles.dot, isWarning ? styles.dotWarning : styles.dotNeutral]} />
         <Text
           style={[styles.text, isWarning ? styles.textWarning : styles.textNeutral]}
-          numberOfLines={2}
-          maxFontSizeMultiplier={1.4}
         >
           {label}
         </Text>

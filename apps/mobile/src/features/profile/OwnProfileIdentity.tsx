@@ -43,7 +43,7 @@ export function OwnProfileIdentity(props: {
           end={{ x: 1, y: 0 }}
           style={styles.editGradient}
         >
-          <Ionicons name="pencil" size={16} color="#FFFFFF" />
+          <Ionicons name="pencil" size={16} color={uiTheme.colors.onPrimary} />
           <Text style={styles.editText}>{copy.editProfile}</Text>
         </LinearGradient>
       </PressableScale>
@@ -116,6 +116,6 @@ const styles = StyleSheet.create({
   },
   editText: {
     ...uiTheme.font.bodyBold,
-    color: "#FFFFFF"
+    color: uiTheme.colors.onPrimary
   }
 })

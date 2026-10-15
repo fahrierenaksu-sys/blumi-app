@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     ...uiTheme.font.overline,
-    color: uiTheme.colors.primary,
+    color: uiTheme.colors.primaryDeep,
   },
   input: {
     ...uiTheme.font.bodyMedium,
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
     color: uiTheme.colors.textMuted,
   },
   segmentTextSelected: {
-    color: uiTheme.colors.primary,
+    color: uiTheme.colors.primaryDeep,
   },
   errorRow: {
     flexDirection: "row",

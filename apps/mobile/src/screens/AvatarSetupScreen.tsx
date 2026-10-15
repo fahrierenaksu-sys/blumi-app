@@ -36,6 +36,7 @@ import type {
 } from "../features/avatarV2/avatarV2.types"
 import { hapticSelection } from "../ui/haptics"
 import { useReducedMotionPreference } from "../ui/animations"
+import { useAccessibilityAnnouncement } from "../ui/accessibilityAnnouncement"
 import { blumiEntryTheme as uiTheme } from "../ui/theme"
 import { getCurrentSetupFlowCopy } from "../features/session/setupFlow/setupFlowLocale"
 import type { AvatarStudioCategoryKey } from "../features/session/setupFlow/setupFlowCopy"
@@ -76,6 +77,7 @@ export function AvatarSetupScreen({
   onSignOut,
   motionActive = true
 }: AvatarSetupScreenProps) {
+  useAccessibilityAnnouncement(errorMessage)
   const { fontScale, height, width } = useWindowDimensions()
   const copy = getCurrentSetupFlowCopy()
   const { avatar, catalog, canEquipItem, equipItem } = useAvatarV2()

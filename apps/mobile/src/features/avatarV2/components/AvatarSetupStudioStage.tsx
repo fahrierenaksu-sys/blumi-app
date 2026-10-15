@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   genderButtonTextActive: {
-    color: "#FFFFFF"
+    color: uiTheme.colors.onPrimary
   },
   avatarAnchor: {
     position: "absolute",
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   podTextActive: {
-    color: uiTheme.colors.primary
+    color: uiTheme.colors.primaryDeep
   },
   podArrow: {
     width: POD_ARROW_VISUAL_SIZE,

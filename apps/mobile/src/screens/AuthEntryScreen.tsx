@@ -105,13 +105,7 @@ function CinematicActionButton({
             disabled ? styles.cinematicActionDisabled : null
           ]}
         >
-          <Text
-            adjustsFontSizeToFit
-            maxFontSizeMultiplier={1.25}
-            minimumFontScale={0.82}
-            numberOfLines={1}
-            style={styles.cinematicActionText}
-          >
+          <Text style={styles.cinematicActionText}>
             {label}
           </Text>
         </PressableScale>
@@ -143,7 +137,7 @@ function PreludeAccountLink({
         ]}
         testID="onboarding-already-have-account"
       >
-        <Text maxFontSizeMultiplier={1.35} style={styles.accountLinkText}>{label}</Text>
+        <Text style={styles.accountLinkText}>{label}</Text>
       </Pressable>
     </Reanimated.View>
   )
@@ -499,6 +493,7 @@ const styles = StyleSheet.create({
   cinematicAction: {
     minHeight: ONBOARDING_PRIMARY_ACTION_LAYOUT.height,
     paddingHorizontal: uiTheme.spacing.lg,
+    paddingVertical: uiTheme.spacing.sm,
     borderRadius: uiTheme.radius.full,
     alignItems: "center",
     justifyContent: "center",
@@ -515,7 +510,8 @@ const styles = StyleSheet.create({
   cinematicActionText: {
     ...uiTheme.font.bodyBold,
     color: "#FFFFFF",
-    letterSpacing: -0.1
+    letterSpacing: -0.1,
+    textAlign: "center"
   },
   cinematicActionPressed: {
     backgroundColor: uiTheme.colors.actionDarkPressed,

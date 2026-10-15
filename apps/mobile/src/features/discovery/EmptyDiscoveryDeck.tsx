@@ -134,11 +134,11 @@ export function EmptyDiscoveryDeck(props: EmptyDiscoveryDeckProps) {
           >
             <View style={styles.refreshIconBubble}>
               {props.refreshing ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <ActivityIndicator color={uiTheme.colors.onPrimary} size="small" />
               ) : (
                 <Ionicons
                   accessible={false}
-                  color="#FFFFFF"
+                  color={uiTheme.colors.onPrimary}
                   name="refresh"
                   size={18}
                 />
@@ -241,7 +241,7 @@ export function DiscoverErrorCard(props: {
           onPress={props.onRetry}
           style={styles.retryButton}
         >
-          {props.refreshing ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.retryButtonText}>{copy.empty.errorAction}</Text>}
+          {props.refreshing ? <ActivityIndicator color={uiTheme.colors.onPrimary} /> : <Text style={styles.retryButtonText}>{copy.empty.errorAction}</Text>}
         </PressableScale>
       </DiscoveryCardSurface>
     </View>
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     ...uiTheme.font.bodyBold,
-    color: "#FFFFFF"
+    color: uiTheme.colors.onPrimary
   },
   copyBlock: {
     alignItems: "center",
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   },
   refreshButtonText: {
     ...uiTheme.font.bodyBold,
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     flex: 1,
     textAlign: "center"
   }

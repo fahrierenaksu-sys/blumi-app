@@ -12,6 +12,7 @@ import { getShopStatusContent, type ShopPresentationState } from "./shopPresenta
 import type { AppLocale } from "../session/appLocale"
 import { getShopCopy } from "./shopCopy"
 import { animateTo, useMotion } from "../../ui/motion"
+import { useAccessibilityAnnouncement } from "../../ui/accessibilityAnnouncement"
 import { uiTheme } from "../../ui/theme"
 
 export type ShopMode = "avatar" | "home"
@@ -36,6 +37,7 @@ export function ShopStatusCard(props: {
   locale: AppLocale
 }) {
   const details = getShopStatusContent({ state: props.state, mode: props.mode, locale: props.locale })
+  useAccessibilityAnnouncement(`${details.title}. ${details.body}`)
   const action = details.action
   const isRetry = action?.kind === "retry"
   const isDisabled = isRetry && props.isRetrying
@@ -62,8 +64,8 @@ export function ShopStatusCard(props: {
           />
         </View>
       )}
-      <Text maxFontSizeMultiplier={1.25} style={styles.shopStatusTitle}>{details.title}</Text>
-      <Text maxFontSizeMultiplier={1.25} style={styles.shopStatusBody}>{details.body}</Text>
+      <Text style={styles.shopStatusTitle}>{details.title}</Text>
+      <Text style={styles.shopStatusBody}>{details.body}</Text>
       {action ? (
         <Pressable
           testID={isRetry ? "shop-status-retry" : "shop-status-action"}
@@ -78,7 +80,7 @@ export function ShopStatusCard(props: {
             isDisabled ? styles.shopStatusRetryDisabled : null
           ]}
         >
-          <Text maxFontSizeMultiplier={1.2} style={styles.shopStatusRetryText}>{action.label}</Text>
+          <Text style={styles.shopStatusRetryText}>{action.label}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -96,7 +98,7 @@ export function ShopOfflineNotice(props: { locale: AppLocale }) {
       style={styles.shopOfflineNotice}
     >
       <Ionicons name="cloud-offline-outline" size={17} color={uiTheme.colors.primary} />
-      <Text maxFontSizeMultiplier={1.25} style={styles.shopOfflineNoticeText}>
+      <Text style={styles.shopOfflineNoticeText}>
         {copy.offline.body}
       </Text>
     </View>
@@ -164,7 +166,7 @@ export const ShopModeDock = memo(function ShopModeDock(props: {
             <Ionicons
               name={option.icon}
               size={16}
-              color={active ? "#FFFFFF" : "rgba(45, 31, 58, 0.62)"}
+              color={active ? uiTheme.colors.onPrimary : "rgba(45, 31, 58, 0.62)"}
             />
             <Text style={[styles.modePillText, active ? styles.modePillTextActive : null]}>
               {label}
@@ -253,7 +255,7 @@ const styles = StyleSheet.create({
   },
   shopStatusRetryText: {
     ...uiTheme.font.bodyBold,
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
   },
   modeDock: {
     position: "relative",
@@ -302,7 +304,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   modePillTextActive: {
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
   },
   modeCount: {
     ...uiTheme.font.captionBold,
@@ -315,7 +317,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.50)",
   },
   modeCountActive: {
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     backgroundColor: "rgba(255, 255, 255, 0.22)",
   }
 })

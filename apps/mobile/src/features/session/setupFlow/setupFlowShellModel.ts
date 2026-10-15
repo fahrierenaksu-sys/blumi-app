@@ -1,6 +1,6 @@
 import { getSetupFlowCopy } from "./setupFlowCopy"
 import {
-  ONBOARDING_PRIMARY_ACTION_LAYOUT,
+  getOnboardingPrimaryActionHeight,
   getOnboardingPrimaryActionMetrics
 } from "../onboardingActionLayout"
 
@@ -44,7 +44,7 @@ export interface SetupLayoutMetrics {
   stageHeight: number
   headerHeight: 56
   progressHeight: 4
-  primaryActionHeight: 58
+  primaryActionHeight: number
   shouldScroll: boolean
 }
 
@@ -75,11 +75,14 @@ export function getSetupProgress(step: PreAuthSetupStep): {
 export function getSetupLayoutMetrics({
   width,
   height,
-  fontScale
+  fontScale,
+  primaryActionLabel
 }: {
   width: number
   height: number
   fontScale: number
+  /** The action's label, so the reserved height follows the lines it wraps to. */
+  primaryActionLabel?: string
 }): SetupLayoutMetrics {
   const normalizedHeight = Number.isFinite(height) ? height : REGULAR_SETUP_MIN_HEIGHT
   const normalizedFontScale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1
@@ -109,7 +112,10 @@ export function getSetupLayoutMetrics({
       : clamp(SETUP_FLOW_STAGE_HEIGHT.regular, 238, 258),
     headerHeight: 56,
     progressHeight: 4,
-    primaryActionHeight: ONBOARDING_PRIMARY_ACTION_LAYOUT.height,
+    primaryActionHeight: getOnboardingPrimaryActionHeight(normalizedFontScale, {
+      label: primaryActionLabel,
+      viewportWidth: width
+    }),
     shouldScroll: compact || normalizedFontScale > 1.15
   }
 }

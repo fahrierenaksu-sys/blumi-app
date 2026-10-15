@@ -99,7 +99,7 @@ export function ChatRoomInviteCard({ invite, currentUserId, locale, you, partner
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryFill}>
               {isBusy ? <ActivityIndicator size="small" color={uiTheme.colors.primaryDeep} /> : null}
               <Text style={[styles.primaryText, disabled && styles.disabledText]}>{card.primaryLabel}</Text>
-              {!isBusy ? <Ionicons name={primaryIcon} size={16} color={disabled ? uiTheme.colors.textMuted : uiTheme.colors.textInverted} /> : null}
+              {!isBusy ? <Ionicons name={primaryIcon} size={16} color={disabled ? uiTheme.colors.textMuted : uiTheme.colors.onPrimary} /> : null}
             </LinearGradient>
           </Pressable>
         ) : null}
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   acceptedStatus: { color: uiTheme.colors.successInk },
   primary: { minHeight: 44, borderRadius: uiTheme.radius.md, overflow: "hidden" },
   primaryFill: { minHeight: 44, paddingHorizontal: uiTheme.spacing.sm, paddingVertical: uiTheme.spacing.sm, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: uiTheme.spacing.xs },
-  primaryText: { ...uiTheme.font.label, color: uiTheme.colors.textInverted, flexShrink: 1, textAlign: "center" },
+  primaryText: { ...uiTheme.font.label, color: uiTheme.colors.onPrimary, flexShrink: 1, textAlign: "center" },
   disabledText: { color: uiTheme.colors.textMuted },
   pressed: { opacity: 0.92 },
   secondary: { minHeight: 44, borderRadius: uiTheme.radius.md, paddingHorizontal: uiTheme.spacing.sm, paddingVertical: uiTheme.spacing.sm, alignItems: "center", justifyContent: "center" },

@@ -142,7 +142,7 @@ export const styles = StyleSheet.create({
     elevation: 3
   },
   saveButtonText: {
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     fontFamily: "Inter_700Bold",
     fontSize: 14,
     lineHeight: 20
