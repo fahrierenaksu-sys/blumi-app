@@ -3,6 +3,7 @@ import test from "node:test"
 import { setTimeout as delay } from "node:timers/promises"
 import pg from "pg"
 import { startSocialLoop, type SimSocket, type SimUser, type SocialLoopHarness } from "./socialLoopHarness"
+import { disposablePostgresSkip } from "../db/disposablePostgres"
 
 /**
  * Database round trips per chat message on PostgreSQL, for the HTTP route and
@@ -24,7 +25,7 @@ import { startSocialLoop, type SimSocket, type SimUser, type SocialLoopHarness }
  */
 
 const requirePostgres = {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }
 
 /** Upper bounds per send (the measured maximum over SENDS sends). */

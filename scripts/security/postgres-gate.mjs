@@ -1,11 +1,22 @@
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, chmodSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs"
+import { mkdtempSync, chmodSync, existsSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { resolve, join } from "node:path"
 import { randomBytes } from "node:crypto"
+import { assertPostgresSelectionComplete, selectPostgresTestFiles } from "./postgres-test-selection.mjs"
 
 // Never accept DATABASE_URL: this gate can mutate only the cluster it creates.
 const root = resolve(import.meta.dirname, "../..")
+const serverSourceRoot = join(root, "apps/server/src")
+const requestedTests = process.argv.slice(2).filter((argument) => argument !== "--list")
+// Select before any cluster exists, so a lost suite fails fast and cheaply.
+const selected = requestedTests.length ? requestedTests : selectPostgresTestFiles(serverSourceRoot)
+if (!requestedTests.length) assertPostgresSelectionComplete(serverSourceRoot, selected)
+if (process.argv.includes("--list")) {
+  for (const file of selected) console.log(file.startsWith(root) ? file.slice(root.length + 1) : file)
+  console.log(`PostgreSQL test files selected: ${selected.length}`)
+  process.exit(0)
+}
 const directory = mkdtempSync(join(tmpdir(), "blumi-pg-gate-"))
 chmodSync(directory, 0o700)
 const data = join(directory, "data")
@@ -45,12 +56,7 @@ try {
       await pool.query('CREATE ROLE authenticated NOLOGIN');
     } finally {await pool.end()}
   `])
-  const tests = process.argv.slice(2)
-  const selected = tests.length ? tests : readdirSync(join(root, "apps/server/src"), { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".test.ts"))
-    .map((entry) => join(entry.parentPath, entry.name))
-    .filter((path) => /process\.env\.DATABASE_URL/.test(readFileSync(path, "utf8")))
-    .sort()
+  console.log(`PostgreSQL test files selected: ${selected.length}`)
   if (selected.length === 0) throw new Error("No PostgreSQL integration tests registered")
   for (const file of selected) {
     const path = resolve(root, file)

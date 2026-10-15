@@ -21,6 +21,7 @@ import { createConnectionManager } from "../realtime/connectionManager"
 import { createRealtimeServer } from "../realtime/realtimeServer"
 import { createRealtimeTicketService } from "../realtime/realtimeTicketService"
 import { createServer } from "../server"
+import { assertDisposablePostgresDatabase } from "../db/disposablePostgres"
 
 /**
  * End-to-end harness for the social loop (see socialLoop.e2e.test.ts).
@@ -250,7 +251,7 @@ export interface SocialLoopHarness {
 export async function startSocialLoop(options: { storage?: SocialLoopStorage } = {}): Promise<SocialLoopHarness> {
   const storage = options.storage ?? "memory"
   const databaseUrl = process.env.DATABASE_URL?.trim()
-  if (storage === "postgres") assert.ok(databaseUrl, "PostgreSQL scenarios run through the isolated postgres gate")
+  if (storage === "postgres") assertDisposablePostgresDatabase(databaseUrl)
   const config = resolveServerConfig(storage === "postgres"
     ? {
         NODE_ENV: "test",

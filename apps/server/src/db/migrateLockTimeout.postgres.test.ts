@@ -6,6 +6,7 @@ import { join } from "node:path"
 import test from "node:test"
 import { Pool } from "pg"
 import { runMigrationsWithClient } from "./migrate"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 
@@ -14,7 +15,7 @@ const databaseUrl = process.env.DATABASE_URL?.trim()
 // private schema with its own ledger so the real ledger is never touched.
 async function createFixture() {
   const schema = `lock_probe_${randomUUID().replaceAll("-", "").slice(0, 12)}`
-  const admin = new Pool({ connectionString: databaseUrl, max: 2 })
+  const admin = new Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: 2 })
   await admin.query(`CREATE SCHEMA ${schema}`)
   await admin.query(`CREATE TABLE ${schema}.sessions (id TEXT PRIMARY KEY)`)
   await admin.query(`CREATE TABLE ${schema}.accounts (id TEXT PRIMARY KEY)`)
@@ -30,7 +31,7 @@ async function createFixture() {
   // One connection, scoped to the private schema, exactly like the migrator's
   // single pooled connection.
   const migrator = new Pool({
-    connectionString: databaseUrl,
+    connectionString: disposablePostgresUrl(databaseUrl),
     max: 1,
     options: `-c search_path=${schema}`
   })
@@ -52,7 +53,7 @@ async function createFixture() {
 }
 
 test("a blocked migration stops at the lock timeout and leaves no partial change", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const fixture = await createFixture()
   const holder = await fixture.admin.connect()
@@ -93,6 +94,46 @@ test("a blocked migration stops at the lock timeout and leaves no partial change
     assert.equal(observed.rows[0].lock_timeout, "500ms")
   } finally {
     holder.release()
+    await fixture.cleanup()
+  }
+})
+
+test("a migrator waiting on another migrator's advisory lock stops at the lock timeout and resets it", {
+  skip: disposablePostgresSkip().skip
+}, async () => {
+  const fixture = await createFixture()
+  const otherMigrator = await fixture.admin.connect()
+  try {
+    // A second migrator (another deploy) holds the migration lock for longer
+    // than the first one may wait.
+    await otherMigrator.query("SELECT pg_advisory_lock(hashtextextended('blumi:migrations', 0))")
+
+    const started = Date.now()
+    await assert.rejects(
+      runMigrationsWithClient(await fixture.migrator.connect(), fixture.directory, {
+        lockTimeoutMs: 500
+      }),
+      (error: { code?: string; message?: string }) =>
+        error.code === "55P03" && /lock timeout/.test(error.message ?? "")
+    )
+    const elapsed = Date.now() - started
+    assert.ok(elapsed >= 450 && elapsed < 5_000, `stopped after ${elapsed} ms`)
+
+    // Nothing ran while the lock was held, and the session limit is gone from
+    // the pooled connection that will be reused.
+    assert.deepEqual(await fixture.columns(), [])
+    assert.deepEqual(await fixture.ledger(), [])
+    const after = await fixture.migrator.query("SHOW lock_timeout")
+    assert.equal(after.rows[0].lock_timeout, "0")
+
+    // When the other migrator finishes, the waiting one applies in full.
+    await otherMigrator.query("SELECT pg_advisory_unlock(hashtextextended('blumi:migrations', 0))")
+    const result = await runMigrationsWithClient(
+      await fixture.migrator.connect(), fixture.directory, { lockTimeoutMs: 500 })
+    assert.deepEqual(result.applied, ["001_probe.sql"])
+  } finally {
+    await otherMigrator.query("SELECT pg_advisory_unlock_all()")
+    otherMigrator.release()
     await fixture.cleanup()
   }
 })

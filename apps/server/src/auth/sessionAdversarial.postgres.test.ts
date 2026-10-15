@@ -11,13 +11,14 @@ import {
   hashSessionToken
 } from "./authStore"
 import type { RealtimeAccessRevocation } from "./realtimeAccessRevocation"
+import { disposablePostgresSkip, disposablePostgresUrl } from "../db/disposablePostgres"
 
 // Adversarial session and account-lifecycle scenarios (audit domain C).
 // Every scenario runs against the in-memory repository in the normal suite and
 // against PostgreSQL inside the isolated gate, so races are exercised where the
 // two implementations can differ.
 const databaseUrl = process.env.DATABASE_URL?.trim()
-const postgresSkip = process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !databaseUrl
+const postgresSkip = disposablePostgresSkip().skip
 const TERMS = { version: "test-terms-v1", locale: "en" as const }
 const T0 = new Date("2026-09-30T10:00:00.000Z")
 const at = (ms: number) => new Date(T0.getTime() + ms)
@@ -336,7 +337,7 @@ for (const [name, scenario] of Object.entries(scenarios)) {
   })
 
   test(`postgres: ${name}`, { skip: postgresSkip }, async () => {
-    const pool = new pg.Pool({ connectionString: databaseUrl, max: 30 })
+    const pool = new pg.Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: 30 })
     try {
       await scenario(createHarness(createPostgresAuthRepository(pool), pool))
     } finally {
@@ -347,7 +348,7 @@ for (const [name, scenario] of Object.entries(scenarios)) {
 
 for (const [name, scenario] of Object.entries(postgresOnlyScenarios)) {
   test(`postgres: ${name}`, { skip: postgresSkip }, async () => {
-    const pool = new pg.Pool({ connectionString: databaseUrl, max: 30 })
+    const pool = new pg.Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: 30 })
     try {
       await scenario(createHarness(createPostgresAuthRepository(pool), pool))
     } finally {

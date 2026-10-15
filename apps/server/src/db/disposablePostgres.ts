@@ -27,3 +27,38 @@ export function assertDisposablePostgresDatabase(
   assert.match(url.pathname, /^\/blumi_gate_\d+$/,
     "integration tests require a per-file disposable blumi_gate database")
 }
+
+/**
+ * Returns the connection string only when it points at a disposable gate
+ * database. Pass every test connection through this so the check runs right
+ * before the first connect, whatever the test does with the pool.
+ */
+export function disposablePostgresUrl(databaseUrl: string | undefined): string {
+  assertDisposablePostgresDatabase(databaseUrl)
+  return databaseUrl
+}
+
+/**
+ * Environment for a child test process. `DATABASE_URL` survives only when the
+ * isolated gate set it (gate flag plus a throwaway-cluster URL). Any other
+ * value, for example one exported in the developer's shell, is dropped, so a
+ * plain test run cannot reach a real database even by mistake.
+ */
+export function sanitizeTestDatabaseEnvironment(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const { DATABASE_URL: databaseUrl, BLUMI_TEST_REQUIRE_POSTGRES: gateFlag, ...rest } = environment
+  if (gateFlag === "1" && databaseUrl && isDisposablePostgresUrl(databaseUrl)) {
+    return { ...rest, DATABASE_URL: databaseUrl, BLUMI_TEST_REQUIRE_POSTGRES: gateFlag }
+  }
+  return rest
+}
+
+function isDisposablePostgresUrl(databaseUrl: string): boolean {
+  try {
+    const url = new URL(databaseUrl)
+    return url.hostname === "localhost"
+      && /blumi-pg-gate-/.test(url.searchParams.get("host") ?? "")
+      && /^\/blumi_gate_\d+$/.test(url.pathname)
+  } catch {
+    return false
+  }
+}

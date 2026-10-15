@@ -4,10 +4,11 @@ import { randomUUID } from "node:crypto"
 import { Pool } from "pg"
 import { createPostgresRealtimeFanout, purgeExpiredRealtimePayloads, REALTIME_FANOUT_CHANNEL } from "../db/postgresRealtimeFanout"
 import type { RealtimeFanoutMessage } from "./realtimeFanout"
+import { disposablePostgresSkip, disposablePostgresUrl } from "../db/disposablePostgres"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
-test("large payload roundtrips; expired/unknown refs signal gaps and recover", { skip: !databaseUrl, timeout: 10_000 }, async () => {
-  const pool = new Pool({ connectionString: databaseUrl })
+test("large payload roundtrips; expired/unknown refs signal gaps and recover", { skip: disposablePostgresSkip().skip, timeout: 10_000 }, async () => {
+  const pool = new Pool({ connectionString: disposablePostgresUrl(databaseUrl) })
   const publisher = createPostgresRealtimeFanout(pool)
   const subscriber = createPostgresRealtimeFanout(pool, { reconnectDelayMs: 0 })
   const messages: RealtimeFanoutMessage[] = []

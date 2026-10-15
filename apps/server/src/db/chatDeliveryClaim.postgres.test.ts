@@ -4,6 +4,7 @@ import test from "node:test"
 import { Pool } from "pg"
 import { createChatService } from "../chat/chatService"
 import { createPostgresChatRepository } from "./postgresChatRepository"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 // Found by the PostgreSQL social-loop E2E (src/e2e/socialLoop.postgres.test.ts):
 // a message sent right after the previous one sometimes reached the partner
@@ -13,10 +14,10 @@ import { createPostgresChatRepository } from "./postgresChatRepository"
 // millisecond the truncated Date is earlier than NOW(), the targeted claim
 // finds nothing, and only the one-second worker delivers the message.
 
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !process.env.DATABASE_URL }
+const requirePostgres = { skip: disposablePostgresSkip().skip }
 
 test("the sender's own dispatch claims a just-committed delivery within the same millisecond", requirePostgres, async () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   const suffix = randomUUID()
   const chatService = createChatService({ repository: createPostgresChatRepository(pool) })
   try {

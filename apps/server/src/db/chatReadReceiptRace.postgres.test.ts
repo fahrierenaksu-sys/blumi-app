@@ -4,12 +4,13 @@ import test from "node:test"
 import { Pool } from "pg"
 import { createChatReceiptSchemaProbe } from "../chat/chatReceiptSchema"
 import { createPostgresChatRepository } from "./postgresChatRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
+const requirePostgres = { skip: disposablePostgresSkip().skip }
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 test("two reads by id that run at the same moment never move the read receipt backwards", requirePostgres, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 })
   const repository = createPostgresChatRepository(pool, { receiptSchema: createChatReceiptSchemaProbe(pool) })
   const suffix = randomUUID()

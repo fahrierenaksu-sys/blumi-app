@@ -7,13 +7,14 @@ import type { AccountRecord } from "../auth/authStore"
 import { createPostgresAuthRepository } from "./postgresAuthRepository"
 import { createPhoneBanHasher } from "../auth/moderationPhoneBan"
 import { createPostgresPresenceRepository } from "./postgresPresenceRepository"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 const testAvatarSelection = toAvatarLoadoutV2(DEFAULT_FEMALE_AVATAR_LOADOUT)
 
 function createPool(applicationName: string): pg.Pool {
   return new pg.Pool({
-    connectionString: databaseUrl,
+    connectionString: disposablePostgresUrl(databaseUrl),
     application_name: `${applicationName}-${randomUUID()}`,
     max: 3
   })
@@ -84,7 +85,7 @@ async function waitForBlockedQuery(
 }
 
 test("old replica disconnect removes only its lease while a rejoined connection remains live", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const replicaA = createPool("realtime-lease-a")
   const replicaB = createPool("realtime-lease-b")
@@ -135,7 +136,7 @@ test("old replica disconnect removes only its lease while a rejoined connection 
 })
 
 test("concurrent heartbeat and disconnect cannot resurrect a removed connection lease", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const replicaA = createPool("realtime-heartbeat-a")
   const replicaB = createPool("realtime-heartbeat-b")
@@ -173,7 +174,7 @@ test("concurrent heartbeat and disconnect cannot resurrect a removed connection 
 })
 
 test("a batched renewal extends live leases only and never resurrects one removed concurrently", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const replicaA = createPool("realtime-batch-a")
   const replicaB = createPool("realtime-batch-b")
@@ -232,7 +233,7 @@ test("a batched renewal extends live leases only and never resurrects one remove
 })
 
 test("a batched shutdown disconnect keeps presence of users with another live connection", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const pool = createPool("realtime-batch-disconnect")
   const repository = asLeaseRepository(pool)
@@ -271,7 +272,7 @@ test("a batched shutdown disconnect keeps presence of users with another live co
 })
 
 test("account deletion and last websocket disconnect use one lock order", {
-  skip: !databaseUrl,
+  skip: disposablePostgresSkip().skip,
   timeout: 20_000
 }, async () => {
   if (!databaseUrl) return
@@ -280,13 +281,13 @@ test("account deletion and last websocket disconnect use one lock order", {
   const accountApplicationName = `account-delete-lease-race-${suffix}`
   const disconnectApplicationName = `lease-disconnect-race-${suffix}`
   const accountPool = new pg.Pool({
-    connectionString: databaseUrl,
+    connectionString: disposablePostgresUrl(databaseUrl),
     application_name: accountApplicationName,
     statement_timeout: 10_000,
     max: 2
   })
   const disconnectPool = new pg.Pool({
-    connectionString: databaseUrl,
+    connectionString: disposablePostgresUrl(databaseUrl),
     application_name: disconnectApplicationName,
     statement_timeout: 10_000,
     max: 2
@@ -372,7 +373,7 @@ test("account deletion and last websocket disconnect use one lock order", {
 })
 
 test("expired connection leases are collected using the database clock", {
-  skip: !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const pool = createPool("realtime-lease-expiry")
   const userId = `lease-user-${randomUUID()}`

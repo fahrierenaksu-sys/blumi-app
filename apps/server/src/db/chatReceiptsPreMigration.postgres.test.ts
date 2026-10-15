@@ -9,6 +9,7 @@ import { createChatService } from "../chat/chatService"
 import { createSchemaReadinessCheck } from "../operations/schemaReadiness"
 import { runMigrations } from "./migrate"
 import { createPostgresChatRepository } from "./postgresChatRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 // The rollback documented in docs/release/MIGRATION_070_RUNBOOK.md. The gate
 // database is disposable and has every migration; removing 070 here recreates
@@ -24,10 +25,10 @@ const ROLL_BACK_070 = [
 ]
 
 test("before 070 chat and /ready work on PostgreSQL with receipts off; applying 070 turns them on without a restart", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES === "1" ? false : "PostgreSQL contract runs in the isolated gate"
+  skip: disposablePostgresSkip().skip ? "PostgreSQL contract runs in the isolated gate" : false
 }, async () => {
   const databaseUrl = process.env.DATABASE_URL
-  assert.ok(databaseUrl, "Use the isolated postgres-gate runner.")
+  assertDisposablePostgresDatabase(databaseUrl)
   const pool = new Pool({ connectionString: databaseUrl, max: 4 })
   try {
     for (const statement of ROLL_BACK_070) await pool.query(statement)

@@ -17,6 +17,7 @@ import {
 import { createPhoneBanHasher } from "../auth/moderationPhoneBan"
 import { createPostgresAuthRepository } from "./postgresAuthRepository"
 import { runRepositoryContract } from "./repositoryContract"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 // Auth repository behavior owed by both implementations: account fields,
 // profile writes, onboarding, avatar CAS and the OTP lifecycles. Outcomes and
@@ -415,11 +416,11 @@ runRepositoryContract<AuthHarness>({
 // Stored prompt normalization and transaction rollbacks need raw rows and
 // injected faults, so they run only on PostgreSQL.
 const requirePostgres = {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !process.env.DATABASE_URL
+  skip: disposablePostgresSkip().skip
 }
 
 test("PostgreSQL account reads drop invented, duplicate and oversized stored prompts", requirePostgres, async () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   try {
     const auth = createPostgresAuthRepository(pool)
     const account = await signUp(auth)
@@ -456,7 +457,7 @@ async function withFailingTrigger<T>(
 }
 
 test("PostgreSQL sign-in that fails to store its session leaves no account and keeps the code", requirePostgres, async () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   try {
     const auth = createPostgresAuthRepository(pool)
     const phone = uniquePhone()
@@ -483,7 +484,7 @@ test("PostgreSQL sign-in that fails to store its session leaves no account and k
 })
 
 test("PostgreSQL account deletion that fails midway leaves every row in place", requirePostgres, async () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(process.env.DATABASE_URL), max: 2 })
   try {
     const auth = createPostgresAuthRepository(pool)
     const account = await signUp(auth)

@@ -10,12 +10,13 @@ import { createPostgresChatRepository } from "./postgresChatRepository"
 import { createPostgresMiniRoomRepository } from "./postgresMiniRoomRepository"
 import { createPostgresSafetyRepository } from "./postgresSafetyRepository"
 import { ReportedAccountDeletedError, createSafetyService } from "../safety/safetyService"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 // Account deletion against the real schema. Foreign keys (for example
 // blumi_mini_rooms.invite_id -> blumi_mini_room_invites, NO ACTION) only fail
 // on a real database, so a statement-list test cannot prove the order works.
 
-const requirePostgres = { skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" }
+const requirePostgres = { skip: disposablePostgresSkip().skip }
 const phoneBanHash = createPhoneBanHasher("account-deletion-integrity-secret-0123456789")
 const avatar = {
   schemaVersion: 1 as const, bodyId: "avatar_v2_body_default", faceId: "avatar_v2_face_default",
@@ -35,7 +36,7 @@ const RETAINED_AFTER_DELETION = new Set([
 ])
 
 function openPool(): Pool {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   return new Pool({ connectionString: process.env.DATABASE_URL, max: 4 })
 }
 

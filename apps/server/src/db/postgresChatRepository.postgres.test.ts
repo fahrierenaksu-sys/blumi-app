@@ -9,11 +9,12 @@ import { ChatDeliveryBlockedError, createChatMessageDeliveryService } from "../c
 import { createSafetyService } from "../safety/safetyService"
 import type { ConnectionManager } from "../realtime/connectionManager"
 import type { NotificationService } from "../notifications/notificationService"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 test("PostgreSQL chat aggregate rolls back preview/outbox failures and recovers durable delivery", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const repository = createPostgresChatRepository(pool)
   const threadId = `thread_${randomUUID()}`
@@ -63,9 +64,9 @@ test("PostgreSQL chat aggregate rolls back preview/outbox failures and recovers 
 })
 
 test("PostgreSQL ACK-loss retry after block returns the committed row without another outbox row", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const threadId = `thread_${randomUUID()}`
   const clientMessageId = "client-ack-blocked-001"
@@ -133,9 +134,9 @@ test("PostgreSQL ACK-loss retry after block returns the committed row without an
 })
 
 test("PostgreSQL one-statement send: personas, a lost first-insert race, repair of a retried message and a broken thread", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 })
   const repository = createPostgresChatRepository(pool)
   const scope = randomUUID().slice(0, 8)

@@ -4,11 +4,12 @@ import { Pool } from "pg"
 import { createPostgresNotificationRepository } from "./postgresNotificationRepository"
 import { createNotificationService } from "../notifications/notificationService"
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "../notifications/notificationRepository"
+import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostgres"
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 
-test("PostgreSQL cancels old-account retry and guards already claimed ownership changes", { skip: !databaseUrl }, async () => {
-  const pool = new Pool({ connectionString: databaseUrl })
+test("PostgreSQL cancels old-account retry and guards already claimed ownership changes", { skip: disposablePostgresSkip().skip }, async () => {
+  const pool = new Pool({ connectionString: disposablePostgresUrl(databaseUrl) })
   const repository = createPostgresNotificationRepository(pool)
   const now = new Date("2026-09-05T10:00:00Z")
   let calls = 0
@@ -106,10 +107,10 @@ test("PostgreSQL cancels old-account retry and guards already claimed ownership 
 })
 
 test("PostgreSQL parallel outbox claims never hand one delivery to two workers", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !databaseUrl
+  skip: disposablePostgresSkip().skip
 }, async () => {
   const workers = 8
-  const pool = new Pool({ connectionString: databaseUrl, max: workers })
+  const pool = new Pool({ connectionString: disposablePostgresUrl(databaseUrl), max: workers })
   const repository = createPostgresNotificationRepository(pool)
   const now = new Date("2026-09-06T10:00:00Z")
   const deliveryIds = Array.from({ length: 20 }, (_, index) => `parallel_claim_${index}`)

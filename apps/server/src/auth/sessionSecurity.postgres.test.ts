@@ -14,12 +14,13 @@ import {
   hashSessionToken
 } from "./authStore"
 import type { RealtimeAccessRevocation } from "./realtimeAccessRevocation"
+import { disposablePostgresSkip, disposablePostgresUrl } from "../db/disposablePostgres"
 
 // Every scenario runs against the in-memory repository in the normal suite
 // and against PostgreSQL inside the isolated gate (npm run verify:postgres),
 // so both repositories must behave identically.
 const databaseUrl = process.env.DATABASE_URL?.trim()
-const postgresSkip = process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1" || !databaseUrl
+const postgresSkip = disposablePostgresSkip().skip
 const TERMS = { version: "test-terms-v1", locale: "en" as const }
 const T0 = new Date("2026-09-30T10:00:00.000Z")
 const at = (ms: number) => new Date(T0.getTime() + ms)
@@ -277,7 +278,7 @@ for (const [name, scenario] of Object.entries(scenarios)) {
   })
 
   test(`postgres: ${name}`, { skip: postgresSkip }, async () => {
-    const pool = new pg.Pool({ connectionString: databaseUrl })
+    const pool = new pg.Pool({ connectionString: disposablePostgresUrl(databaseUrl) })
     try {
       const repository = createPostgresAuthRepository(pool)
       await scenario(withRevocations(createAuthService({ repository }), repository))

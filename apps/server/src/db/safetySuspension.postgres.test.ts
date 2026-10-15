@@ -3,11 +3,12 @@ import test from "node:test"
 import { randomUUID } from "node:crypto"
 import { Pool } from "pg"
 import { createPostgresSafetyRepository } from "./postgresSafetyRepository"
+import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "./disposablePostgres"
 
 test("a second, shorter suspension never shortens a longer one; a longer one extends it", {
-  skip: process.env.BLUMI_TEST_REQUIRE_POSTGRES !== "1"
+  skip: disposablePostgresSkip().skip
 }, async () => {
-  assert.ok(process.env.DATABASE_URL, "Use the isolated postgres-gate runner")
+  assertDisposablePostgresDatabase(process.env.DATABASE_URL)
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 })
   const repository = createPostgresSafetyRepository(pool)
   const suffix = randomUUID().slice(0, 8)
