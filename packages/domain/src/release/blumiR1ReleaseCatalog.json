@@ -45,13 +45,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
@@ -88,7 +88,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_navy_knit_polo.webp",
-            "sha256": "c773d9ef059d36bd4aea47a2d93a8760be8ade9011597eb58d9532cb5326ed53"
+            "sha256": "830df2075b4dbc6d48f51e92e281be594292c661c70e3c23e164c90fe72cef5f"
           }
         ]
       }
@@ -363,13 +363,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
@@ -406,7 +406,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_black_basic_tee.webp",
-            "sha256": "0f5f9a78314bf6a66da85165c17926bc50088aed8eb0d49eb00b36fc1e3fd0a9"
+            "sha256": "7034ea45722e83782048e003ff7caf6d545c3bbb52b0ddcab54849fc654337b9"
           }
         ]
       }
@@ -815,13 +815,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
@@ -850,7 +850,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_tan_loafers.webp",
-            "sha256": "1b79cfe18643b6e6d066b5671a6a882b9712d2f292e091bbef2676e275db5d89"
+            "sha256": "669b06b386d9c7d250a80f499624e21e15148d88442445e8efbf0dd51606c8b0"
           }
         ]
       }
@@ -860,13 +860,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
@@ -895,7 +895,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_sand_desert_boots.webp",
-            "sha256": "ecb52e5cdb8ec5c3449f5d6b72e76b2ace079794e6d8e148e1be88c080958778"
+            "sha256": "7463df6c4185d5a86e581cd3179d91da986d8ee44a930dff5de9452785993d54"
           }
         ]
       }
@@ -905,13 +905,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
@@ -940,7 +940,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_brown_loafers.webp",
-            "sha256": "c751aae10c36ec03737724c8b730700495d572dd24aeac228b6e3bdd18b6e91b"
+            "sha256": "2b5075873bbd3161a501d50e86cf058242c3d0d64243487c386b0d67a317f897"
           }
         ]
       }
@@ -950,13 +950,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
@@ -985,7 +985,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_cream_chunky_sneakers.webp",
-            "sha256": "2f6f37871b8af7c14fb81acf87b6c25023e40f2ee84cf44f1d23ba575b69d0c6"
+            "sha256": "64d71ae9a5184cf1f2d71ca8beb2751eeb385eca548519c29d1f0090364e6f15"
           }
         ]
       }
@@ -995,13 +995,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
@@ -1030,7 +1030,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_dark_leather_sneakers.webp",
-            "sha256": "1ead793b6303e34706b491c5640f288c80b8d61d23311b5bc6423452d74f3976"
+            "sha256": "6cb1cf1dd8dae4950c19934d5b7bae299f0b88f491d341f2870241d7b782abff"
           }
         ]
       }
@@ -1040,13 +1040,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
@@ -1075,7 +1075,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_green_skate_shoes.webp",
-            "sha256": "c546dd847b2fa134cd916483a6c9dd9ec01c9c1f70ccb398e037f2b851f7ec83"
+            "sha256": "e7c9e25ec64e5cf8f3296a71d691445fb13eff0af160ec2abac2ef3b1dba204b"
           }
         ]
       }
@@ -1085,13 +1085,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
@@ -1120,7 +1120,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_black_everyday_sneakers.webp",
-            "sha256": "3582ba487be6d1c968d00d0bdd47b5db6a87873eb067ca9b0d0e73216f8bfbfd"
+            "sha256": "3d489f588843eb7ba05a2aebb1788dc6af9bb91adce97c1439690302db91b9eb"
           }
         ]
       }
@@ -1130,34 +1130,42 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/avatar_v2_hair_mocha_ribbon_waves__o0p6.webp",
-            "sha256": "4d71dd3b50a8bdefab0f29dcbb34aaa267a51eb22bf8c01909dee886b6cdf2ff"
+            "sha256": "2d31ecbeb53c93aba7757035e34d38bcf575d2898ffa79809dd989111255a394"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/avatar_v2_hair_mocha_ribbon_waves__o4p6.webp",
-            "sha256": "b3e8ad720255ed37690afeab3bd1d574b7c1e58866728967ffaa305bc5146966"
+            "sha256": "a450a244b1d1dc7a8ad9efd6f99afb5c5fc154a3e9e75e5e5db22b5891016ea9"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_hair_mocha_ribbon_waves__o0p6.webp",
-            "sha256": "a3f989de9ee5a10c66807144fe58c016db361d54d696332c2df4b32e1e45f994"
+            "sha256": "7f9f8786ac4505a48931f39696e642673881ababed66d775c249f3db9ca07b73"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_hair_mocha_ribbon_waves__o4p6.webp",
-            "sha256": "69f291417314062a9ac3e0ec027c033bef902d7f28a6b309463f34736cf53690"
+            "sha256": "cf6ae5f869b750ab41d29c7e73569e7c948f48e176d4d8e41e58504101b85bf8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/avatar_v2_hair_mocha_ribbon_waves__back.webp",
+            "sha256": "abc296f4d272afcdfd300a97230119c69ff4290da73ced8bbb3ae0c911d83e2e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/avatar_v2_hair_mocha_ribbon_waves__front.webp",
+            "sha256": "4e3ec96f1ab8bbd359ef0261fcd836c59eca5a03f7d9ae222e6f2380f66ff3ab"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/avatar_v2_hair_mocha_ribbon_waves.webp",
-            "sha256": "2eb7f5beb4ec3ff520edb68d471a81093b26f8ec33f8a53ee376d849be088775"
+            "sha256": "c61b467505e6bffe8ad39fdf980be3065f89d2e1dac7d28c45b306fc44077e2c"
           }
         ]
       }
@@ -1167,30 +1175,30 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_bob__o0p6.webp",
-            "sha256": "46cad9c9398a6647859930467b2298931a710b0d2a7881ab2d5b9148f2bd4b4a"
+            "sha256": "b8a66d4a8a191eed5d28b126ef4fe867965b390db41627a4a5fbd068facdb6fb"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_bob__o4p6.webp",
-            "sha256": "9a560f88c39ba1b437fe50cd9749841c44bb0d3a903c8d771be85d360b64f031"
+            "sha256": "4a021a8fe86363c8d4516dc3a8110fb53e381cacca18ee994306991883998829"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_bob__o0p6.webp",
-            "sha256": "705517dff2db772288f067ad4b6883d90f229f60b27b8a141ebe3e393993089a"
+            "sha256": "4fda9c57f9054019a4a0f0c77110aadcd79a0ea756cda9500549f4759c6caddc"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_bob__o4p6.webp",
-            "sha256": "870de42177635f111f829e4ece21c475546257f183faa47dcd3fb798da462279"
+            "sha256": "1cc92e3a9f0baa074a27b83644a2a4922bffd1de319e7d43ffc772d13bf0dd6d"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_bob__back.webp",
@@ -1202,7 +1210,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_bob.webp",
-            "sha256": "9c0791d8b4b3d206f3c99532a28057c15e0d27c56f60194d14151ed8de1532f1"
+            "sha256": "46ba6b4e9eee5dcc4e77c6f83cfeed44c4073c1dc0f829e2ae74e16d2f943db4"
           }
         ]
       }
@@ -1212,30 +1220,30 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_pigtails__o0p6.webp",
-            "sha256": "732da27e8d42729312c4bcf36dd6a71bca37570af24641282e901b74c8d983c2"
+            "sha256": "0d45e6b70f3ff8685c07a0277911257482d51602bf8191ea74a178836e40d3b9"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_pigtails__o4p6.webp",
-            "sha256": "fb9e89e4a8df3f510ae80ec8ff542f221a10c5b5775d20ecd4ee89f3ec2a7219"
+            "sha256": "428bd59dde94caf0191d5014b7bd95c65e877c6155231253a0dfe849dedca676"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_pigtails__o0p6.webp",
-            "sha256": "4bf03781a0edfde67c69de08daf439189e4650a38a0b10b976483b4a288def1d"
+            "sha256": "bd40f7b524593ae8fcf7fb947944d552dcbbe9f8cf5cac2140e4fcd7f89598e3"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_pigtails__o4p6.webp",
-            "sha256": "23e92c0dfc89108164868b9124b748e3f0b6fefea3ce17b0079987f89ecf34bd"
+            "sha256": "ffc5d0c0d2873be1cdd287179e61956345391325d32add10a2b0864046965383"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_pigtails__back.webp",
@@ -1247,7 +1255,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_pigtails.webp",
-            "sha256": "4196bc40fb202db82fa4c5cc81e23f8733d3481246aa97af54408cbf49cee90c"
+            "sha256": "cdbf3a1b1655bcf1e10cd7db217ecc1a7968ba7b4447574097a4c70a0ad89db1"
           }
         ]
       }
@@ -1257,34 +1265,42 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-15",
-        "sourceCommit": "33494a72c583586ee4feab71ff47556f8911e4e4",
+        "receiptId": "owner-reissue-2026-10-15",
+        "sourceCommit": "bb5469162556b3669789d8c3b94d143fbe8f3f9c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-15",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-15.md",
-          "manifestSha256": "ca96b4a68c0a0f53c8fe562b9a0de10af327935e2fec1f5c9c71a010982ed14e"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-15.md",
+          "manifestSha256": "a199642dbefb5eaa1bbc24d969248a1738ff9e0f2a3ff2a773bb75c3623def7d"
         },
         "assets": [
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_shoes_white_clean_sneakers__o1__shoes.webp",
-            "sha256": "5c6ee1b32b0ac75ba107a665ca0d7d054d6b6e8c9398f21addc7a85639b49fc9"
+            "sha256": "8d839d385be25887bd2a8367ef4dc7fd5333dc79a164555432beff5a45b34ea7"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_shoes_white_clean_sneakers__o1p15.webp",
-            "sha256": "4cef0393417603f1b432e17b3fe2c40a76ad88c948efa9b035cd23651c2a0589"
+            "sha256": "2deb5c28cf24f866861f097f4218698901893dd923c8eecc2d1b92cdc3b8640f"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_shoes_white_clean_sneakers__o2__shoes.webp",
-            "sha256": "be7a2c5ad2d2b2d1ba745471f9df02942fd782a321a62eb104f28c67f37d47d8"
+            "sha256": "1e36d5003465ff96031b924741fb3a4fb610d5b7622f12b4e8bd19c0bab1a0f2"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_shoes_white_clean_sneakers__o2p15.webp",
-            "sha256": "b935dca335c6ba93d50c1025aaeefc22b6b77f5ebebffd5b02509573ba18c48e"
+            "sha256": "bb905caee99943e1a4488c4e89d18ea4b8cae4b8e90911bb14e85e4b689d3646"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/avatar_v2_shoes_white_clean_sneakers__front.webp",
+            "sha256": "248d2599bc906355a80f2a133402e514abc51b6c9c0bc5a86cc4a4a8f324dfce"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/avatar_v2_shoes_white_clean_sneakers__under.webp",
+            "sha256": "244bcb336f66dd914ee006f8affcca503f6beaf3c04ed777f677fb314293456d"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/avatar_v2_shoes_white_clean_sneakers.webp",
-            "sha256": "77be5876f232fb84858fe9abaa6236976634aceb98dbb8b2bf090d2fc3cff0e8"
+            "sha256": "6b2e11f3e5bba4a1efc29e596877d3d938db4bf01a028307d11784b983064765"
           }
         ]
       }
