@@ -17,6 +17,8 @@ import {
 } from "../session/sessionApi"
 import type { SessionActor } from "../session/sessionModel"
 import { getSettingsActionErrorMessageForDisplay } from "../session/settingsActionErrorCopy"
+import { resolveAccountReauthPhone } from "./accountReauthPhone"
+import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import { sanitizeVerificationCode } from "./settingsPresentationModel"
 
@@ -53,12 +55,20 @@ export function useAccountDataExport(input: {
     }
     setIsExportingAccountData(true)
     try {
-      const currentPhoneNumber = getFirebaseCurrentPhoneNumber()
-      if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
-      exportChallengeRef.current = (await requestFirebaseAccountActionChallenge(
+      const challenge = await requestFirebaseAccountActionChallenge(
         MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "account_data_export" }
-      )).challengeId
-      exportFirebaseConfirmationRef.current = await requestFirebasePhoneCode(currentPhoneNumber)
+      )
+      // The account's phone, not Firebase's: an interrupted phone change must
+      // never block the export.
+      const accountPhoneNumber = await resolveAccountReauthPhone({
+        userId: sessionActor.session.userId,
+        serverPhone: challenge.targetPhoneNumber,
+        pending: pendingPhoneChange,
+        firebasePhone: getFirebaseCurrentPhoneNumber
+      })
+      if (!accountPhoneNumber) throw new Error("Sign in again to verify your phone.")
+      exportChallengeRef.current = challenge.challengeId
+      exportFirebaseConfirmationRef.current = await requestFirebasePhoneCode(accountPhoneNumber)
       setExportCode("")
       setExportCodeVisible(true)
     } catch (error) {

@@ -8,8 +8,11 @@
  * verified original number is kept in secure storage until the change ends.
  *
  * Minimal and short-lived: one record for the signed-in user, dropped on
- * success, sign-out, another user, expiry, or once Firebase is back on it.
- * Never logged.
+ * success, on every session change after start-up (sign-out, forced reset,
+ * a new sign-in, another user; createPendingPhoneChangeSessionWatcher), on
+ * expiry, and whenever the server's account phone disagrees with it
+ * (resolveAccountReauthPhone). It is only a fallback: re-authentication texts
+ * the phone the server names. Never logged.
  */
 export const PENDING_PHONE_CHANGE_STORAGE_KEY = "blumi.mobile.pending_phone_change.v1"
 export const PENDING_PHONE_CHANGE_TTL_MS = 1000 * 60 * 60 * 24
@@ -98,5 +101,27 @@ export function createPendingPhoneChangeStore(
       return record.originPhone
     },
     clear
+  }
+}
+
+/**
+ * Drops the pending record whenever the signed-in user changes after the
+ * stored session was restored at start-up: sign-out, a forced reset (401),
+ * another account, or a new sign-in (Firebase then holds the phone just used
+ * to sign in, which is the account's). Restoring the stored session keeps it.
+ */
+export function createPendingPhoneChangeSessionWatcher(clear: () => Promise<void>) {
+  let observedUserId: string | null | undefined
+  return {
+    /** `ready` is false until the stored session has been restored. */
+    observe(userId: string | null, ready: boolean): void {
+      if (observedUserId === undefined) {
+        if (ready) observedUserId = userId
+        return
+      }
+      if (userId === observedUserId) return
+      observedUserId = userId
+      void clear()
+    }
   }
 }

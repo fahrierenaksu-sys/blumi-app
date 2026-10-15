@@ -33,6 +33,7 @@ import {
   getSettingsActionErrorMessageForDisplay,
   getSettingsVerificationErrorToastForDisplay
 } from "../session/settingsActionErrorCopy"
+import { resolveAccountReauthPhone } from "./accountReauthPhone"
 import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import {
@@ -160,18 +161,23 @@ export function usePhoneChange(input: {
     }
     setIsChangingPhone(true)
     try {
-      // After an interrupted change Firebase may hold the new phone; the
-      // account's original phone is kept in secure storage until it ends.
-      const currentPhoneNumber =
-        verifiedCurrentPhoneRef.current ??
-        (await pendingPhoneChange.readOrigin(sessionActor.session.userId)) ??
-        getFirebaseCurrentPhoneNumber()
+      reauthHold.hold()
+      const challenge = await requestFirebaseAccountActionChallenge(
+        MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "phone_change_current" }
+      )
+      // After an interrupted change Firebase may hold the new phone (or a lost
+      // answer hid a landed change): text the phone the server says the
+      // account has. An older server falls back to the saved original.
+      const currentPhoneNumber = (!challenge.targetPhoneNumber && verifiedCurrentPhoneRef.current) ||
+        await resolveAccountReauthPhone({
+          userId: sessionActor.session.userId,
+          serverPhone: challenge.targetPhoneNumber,
+          pending: pendingPhoneChange,
+          firebasePhone: getFirebaseCurrentPhoneNumber
+        })
       if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
       verifiedCurrentPhoneRef.current = currentPhoneNumber
-      reauthHold.hold()
-      currentPhoneChallengeRef.current = (await requestFirebaseAccountActionChallenge(
-        MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "phone_change_current" }
-      )).challengeId
+      currentPhoneChallengeRef.current = challenge.challengeId
       currentPhoneFirebaseConfirmationRef.current = await requestFirebasePhoneCode(currentPhoneNumber)
       dispatch({ type: "opened" })
     } catch (error) {

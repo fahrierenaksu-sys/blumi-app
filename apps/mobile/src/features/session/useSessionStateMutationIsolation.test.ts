@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import * as pendingPhoneChangeStore from "../settings/pendingPhoneChangeStore"
 import { createFakeReactRuntime, createReactNativeStub, loadSourceWithFakeReact } from "../../testing/hookHarness"
 import * as onboardingCompletion from "./onboardingCompletion"
 import * as onboardingFlowModel from "./onboardingFlowModel"
@@ -255,7 +256,8 @@ function mount(options: MountOptions = {}) {
         },
         "../settings/pendingPhoneChange": {
           pendingPhoneChange: { clear: async () => { authCalls.pendingPhoneChangeClears += 1 } }
-        }
+        },
+        "../settings/pendingPhoneChangeStore": pendingPhoneChangeStore
       }
     }
   )

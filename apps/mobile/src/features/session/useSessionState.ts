@@ -111,6 +111,7 @@ import {
   shouldClaimCapturedReferral
 } from "../referrals/referralModel"
 import { pendingPhoneChange } from "../settings/pendingPhoneChange"
+import { createPendingPhoneChangeSessionWatcher } from "../settings/pendingPhoneChangeStore"
 
 export interface UseSessionStateResult {
   sessionActor: SessionActor | null
@@ -219,6 +220,14 @@ export function useSessionState(): UseSessionStateResult {
       capabilities: createFailClosedCapabilityResolution().capabilities
     })
   const sessionActorRef = useRef<SessionActor | null>(null)
+  // A saved phone-change origin never outlives the session it was saved in:
+  // sign-out, a forced reset, a new sign-in or another account drop it.
+  const [pendingPhoneChangeWatcher] = useState(() =>
+    createPendingPhoneChangeSessionWatcher(pendingPhoneChange.clear))
+  const sessionUserId = sessionActor?.session.userId ?? null
+  useEffect(() => {
+    pendingPhoneChangeWatcher.observe(sessionUserId, !isHydrating)
+  }, [isHydrating, pendingPhoneChangeWatcher, sessionUserId])
   const firebasePhoneConfirmationRef = useRef<PendingPhoneCode | null>(null)
   // Coordinators are created once per mount (stable effect dependencies).
   const [mutationCoordinator] = useState(() => createSessionMutationCoordinator({
@@ -813,8 +822,8 @@ export function useSessionState(): UseSessionStateResult {
             : undefined,
         clear: () => clearing
       })
+      // The pending phone-change record is dropped by the session watcher.
       await signOutFirebasePhoneAuth()
-      await pendingPhoneChange.clear()
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
       throw error

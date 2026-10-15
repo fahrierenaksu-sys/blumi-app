@@ -19,6 +19,8 @@ import {
   getSettingsActionErrorMessageForDisplay,
   getSettingsVerificationErrorToastForDisplay
 } from "../session/settingsActionErrorCopy"
+import { resolveAccountReauthPhone } from "./accountReauthPhone"
+import { pendingPhoneChange } from "./pendingPhoneChange"
 import type { SettingsCopy } from "./settingsCopy"
 import { sanitizeVerificationCode } from "./settingsPresentationModel"
 import { useSensitiveReauthHold } from "./useSensitiveReauthHold"
@@ -79,13 +81,21 @@ export function useAccountDeletion(input: {
     }
     setIsDeletingAccount(true)
     try {
-      const currentPhoneNumber = getFirebaseCurrentPhoneNumber()
-      if (!currentPhoneNumber) throw new Error("Sign in again to verify your phone.")
       reauthHold.hold()
-      deletionChallengeRef.current = (await requestFirebaseAccountActionChallenge(
+      const challenge = await requestFirebaseAccountActionChallenge(
         MOBILE_HTTP_BASE_URL, sessionActor.session.sessionToken, { purpose: "account_deletion" }
-      )).challengeId
-      deletionFirebaseConfirmationRef.current = await requestFirebasePhoneCode(currentPhoneNumber)
+      )
+      // The account's phone, not Firebase's: an interrupted phone change must
+      // never block deletion.
+      const accountPhoneNumber = await resolveAccountReauthPhone({
+        userId: sessionActor.session.userId,
+        serverPhone: challenge.targetPhoneNumber,
+        pending: pendingPhoneChange,
+        firebasePhone: getFirebaseCurrentPhoneNumber
+      })
+      if (!accountPhoneNumber) throw new Error("Sign in again to verify your phone.")
+      deletionChallengeRef.current = challenge.challengeId
+      deletionFirebaseConfirmationRef.current = await requestFirebasePhoneCode(accountPhoneNumber)
       setDeletionCode("")
       setDeletionCodeVisible(true)
     } catch (error) {
