@@ -130,6 +130,7 @@ try {
       "src/navigation/mainTabRenderIsolation.test.ts",
       "src/navigation/mainTabPager/mainTabPagerInteractivity.test.ts",
       "src/ui/PressableScale.test.ts",
+      "src/ui/themeContrast.test.ts",
       "src/ui/MainTabPagerGestureOwnership.test.ts",
       "src/ui/animations.test.ts",
       "src/ui/motion.test.ts",

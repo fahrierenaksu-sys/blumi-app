@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     marginTop: uiTheme.spacing.sm
   },
   recoverText: {
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     ...uiTheme.font.body,
     fontWeight: "800"
   },

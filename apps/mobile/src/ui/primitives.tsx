@@ -99,6 +99,8 @@ interface SharedButtonProps {
 export function PrimaryButton(props: SharedButtonProps) {
   const { label, onPress, disabled = false, busy = false, style, icon, testID, tone = "default" } = props
   const buttonTheme = tone === "entry" ? blumiEntryTheme : uiTheme
+  // Entry draws this action dark plum with a white label; the app draws it pink with a plum label.
+  const labelColor = tone === "entry" ? buttonTheme.colors.textInverted : buttonTheme.colors.onPrimary
   return (
     <View>
       <PressableScale
@@ -127,9 +129,9 @@ export function PrimaryButton(props: SharedButtonProps) {
           end={{ x: 1, y: 0 }}
           style={styles.buttonGradient}
         >
-          {busy ? <ActivityIndicator color={uiTheme.colors.textInverted} /> : <>
+          {busy ? <ActivityIndicator color={labelColor} /> : <>
             {icon ? <View style={styles.buttonIcon}>{icon}</View> : null}
-            <Text style={styles.primaryButtonText}>{label}</Text>
+            <Text style={[styles.primaryButtonText, { color: labelColor }]}>{label}</Text>
           </>}
         </LinearGradient>
       </PressableScale>
@@ -429,7 +431,6 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   primaryButtonText: {
-    color: "#FFFFFF",
     ...uiTheme.font.bodyBold,
     letterSpacing: 0.3,
   },
@@ -575,7 +576,7 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   circleButtonTextPrimary: {
-    color: "#FFFFFF"
+    color: uiTheme.colors.onPrimary
   },
   circleButtonTextDanger: {
     color: uiTheme.colors.danger,

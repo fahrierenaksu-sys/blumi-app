@@ -433,7 +433,7 @@ export function ProfilePreviewScreen(props: ProfilePreviewScreenProps) {
                         style={styles.likeButtonGradient}
                       >
                         <View style={styles.likeButtonContent}>
-                          <Ionicons name="heart" size={18} color="#FFFFFF" />
+                          <Ionicons name="heart" size={18} color={uiTheme.colors.onPrimary} />
                           <Text style={styles.likeButtonText}>
                             {isDeciding ? copy.saving : copy.sayHi}
                           </Text>
@@ -665,7 +665,7 @@ const styles = StyleSheet.create({
   },
   likeButtonText: {
     ...uiTheme.font.bodyBold,
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     letterSpacing: 0.3,
   },
   likeButtonContent: {

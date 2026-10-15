@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   bottomNavBadgeText: {
-    color: "#FFFFFF",
+    color: uiTheme.colors.onPrimary,
     fontSize: 9,
     fontWeight: "900"
   }
