@@ -3,6 +3,7 @@ import type { PoolClient } from "pg"
 import { getDefaultOwnedItemIds, resolveProductionEconomyCatalog } from "../economy/economyCatalog"
 import { PUSH_ROUTED_TYPES } from "../notifications/pushMessagePolicy"
 import { canonicalJson, isRecord, sha256, type BetaResetStarter } from "./betaResetStarter"
+import { assertBetaResetRunsReady, assertResetMayRun, BETA_RESET_RUNS_TABLE, recordBetaResetRun } from "./betaResetRuns"
 
 /**
  * The owner-approved full beta reset (option "c", 2026-10-10; spec: release plan 13/10 §4).
@@ -74,7 +75,9 @@ export const BETA_RESET_KEPT_TABLES = [
 
 /** Every table the reset deletes from or writes to; the postgres test proves all other tables stay byte-identical. */
 export const BETA_RESET_DELETED_TABLES: readonly string[] = DELETED_TABLES.map((entry) => entry.table)
-export const BETA_RESET_WRITTEN_TABLES = ["blumi_accounts", "blumi_economy_inventories", "blumi_personal_room_decor"] as const
+export const BETA_RESET_WRITTEN_TABLES = [
+  "blumi_accounts", "blumi_economy_inventories", "blumi_personal_room_decor", BETA_RESET_RUNS_TABLE
+] as const
 const LOCKED_KEPT_TABLES = ["blumi_accounts", "blumi_economy_inventories"] as const
 
 /**
@@ -189,14 +192,19 @@ function hashPlan(input: {
 /**
  * Applies the reset inside the caller's open transaction. Locks every written table first, so the counts that
  * matched `expected.hash` are exactly the rows changed; any difference throws and the caller rolls back.
+ * One-shot (migration 076): a database that recorded a reset needs `expected.repeatReason`; the run is recorded
+ * in the same transaction.
  */
 export async function applyBetaReset(
   client: PoolClient,
   context: BetaResetContext,
-  expected: { readonly hash: string; readonly fingerprint: string }
+  expected: { readonly hash: string; readonly fingerprint: string; readonly repeatReason?: string | null }
 ): Promise<{ readonly before: BetaResetPlan; readonly after: BetaResetPlan }> {
+  await assertBetaResetRunsReady(client)
   const lockedTables = [...new Set([...DELETED_TABLES.map((entry) => entry.table), ...BETA_RESET_WRITTEN_TABLES])]
   await client.query(`LOCK TABLE ${lockedTables.join(", ")} IN EXCLUSIVE MODE`)
+  const repeatReason = expected.repeatReason ?? null
+  await assertResetMayRun(client, repeatReason)
   const before = await planBetaReset(client, context)
   if (before.fingerprint !== expected.fingerprint) throw new Error("Database fingerprint does not match; reset refused.")
   if (before.hash !== expected.hash) {
@@ -214,6 +222,7 @@ export async function applyBetaReset(
   await resetAccountState(client, context.starter, before.counts)
   const after = await planBetaReset(client, context)
   assertResetComplete(before.counts, after.counts)
+  await recordBetaResetRun(client, { commit: context.source.commit, planHash: before.hash, repeatReason })
   return { before, after }
 }
 

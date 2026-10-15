@@ -113,6 +113,8 @@ export interface ChatHideForMeResult {
   hiddenThrough: string
   /** The reader's unread cursor afterwards (what `chat.thread_read` reports). */
   readAt: string
+  /** The hidden message at `hiddenThrough` when the point is exact (075). */
+  hiddenThroughMessageId?: string
 }
 
 export type ChatCheckedSend =

@@ -235,7 +235,7 @@ export async function markThreadRead(
  * still applies.
  */
 export type HideThreadForMeResult =
-  | { hidden: true; hiddenThrough: string; readAt: string }
+  | { hidden: true; hiddenThrough: string; readAt: string; hiddenThroughMessageId?: string }
   | { hidden: false }
 
 export async function hideThreadForMe(
@@ -267,7 +267,12 @@ export async function hideThreadForMe(
   ) {
     throw new Error("Blumi could not confirm that chat was deleted.")
   }
-  return { hidden: true, hiddenThrough: parsed.data.hiddenThrough, readAt: parsed.data.readAt }
+  return {
+    hidden: true,
+    hiddenThrough: parsed.data.hiddenThrough,
+    readAt: parsed.data.readAt,
+    ...(parsed.data.hiddenThroughMessageId ? { hiddenThroughMessageId: parsed.data.hiddenThroughMessageId } : {})
+  }
 }
 
 export function normalizeThreadListPayload(payload: unknown): ChatThreadList {

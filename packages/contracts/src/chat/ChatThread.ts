@@ -59,6 +59,12 @@ export interface ChatThread {
    * the row until its newest message is later than this.
    */
   hiddenThrough?: string;
+  /**
+   * The hidden message at `hiddenThrough` when the server knows it (migration
+   * 075). A message in that same millisecond with a later id is not hidden.
+   * Absent: everything at `hiddenThrough` is hidden.
+   */
+  hiddenThroughMessageId?: string;
 }
 
 export interface ChatThreadList {
@@ -71,7 +77,7 @@ export interface ChatThreadList {
 export interface ChatThreadRead { userId: string; threadId: string; readAt: string; }
 
 /** "Delete chat for me": messages at or before `hiddenThrough` are hidden from `userId` only. */
-export interface ChatThreadHidden { userId: string; threadId: string; hiddenThrough: string; readAt: string; }
+export interface ChatThreadHidden { userId: string; threadId: string; hiddenThrough: string; readAt: string; hiddenThroughMessageId?: string; }
 
 export interface ChatMessageList {
   userId: string;

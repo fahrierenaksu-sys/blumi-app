@@ -14,9 +14,9 @@
  *   so a claim is only needed for the producer's retry window and the
  *   one-hour frequency cap; 30 days matches the chat outbox tombstone.
  *   'match' and 'discovery_watch' claims stay permanent (migration 036).
- *   No index serves this global time scan yet; at today's size a scan every
- *   ten minutes is cheap. The next migration should add
- *   (created_at) WHERE notification_type IN ('message', 'like').
+ *   The partial index of migration 074 serves this global time scan; keep
+ *   this predicate textually equal to that index's, or the planner falls
+ *   back to reading the whole table.
  * - blumi_sessions, 7 days after the family's absolute lifetime ends
  *   (2026-10-02). Every refresh leaves its rotated row for reuse detection,
  *   which only matters while the family can still be refreshed. Rows created

@@ -10,6 +10,14 @@ if (!archive || !isAbsolute(archive) || !archive.endsWith(".dump") || !statSync(
   throw new Error("Pass an existing absolute .dump archive path.")
 }
 const root = resolve(import.meta.dirname, "../..")
+// Optional: rehearse only the files of an isolated migrator directory (the
+// partial apply in DATABASE_RELEASE_RUNBOOK.md). Each file there must be
+// byte-identical to the repository file; repository files left out stay
+// pending and are reported instead of failing the audit.
+const onlyDirectory = process.env.BLUMI_MIGRATIONS_ONLY_DIRECTORY
+if (onlyDirectory !== undefined && (!isAbsolute(onlyDirectory) || !statSync(onlyDirectory).isDirectory())) {
+  throw new Error("BLUMI_MIGRATIONS_ONLY_DIRECTORY must be an existing absolute directory.")
+}
 const pgBin = process.env.BLUMI_PG17_BIN ?? "/opt/homebrew/opt/postgresql@17/bin"
 const directory = mkdtempSync(join(tmpdir(), "blumi-restore-gate-"))
 chmodSync(directory, 0o700)
@@ -53,14 +61,26 @@ try {
     "--file", join(root, "apps/server/db/migrations/059_revoke_public_api_access.sql")])
   const count = run(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
     import pg from 'pg';
+    import {createHash} from 'node:crypto';
+    import {readdirSync, readFileSync} from 'node:fs';
+    import {join} from 'node:path';
     import migrationModule from './apps/server/src/db/migrate.ts';
     import auditModule from './apps/server/src/operations/databaseReleaseAudit.ts';
     const pool = new pg.Pool({connectionString: process.env.DATABASE_URL});
     try {
       const before = await pool.query('SELECT count(*)::int AS count FROM blumi_migrations');
       const {runMigrations} = migrationModule;
-      const first = await runMigrations({databaseUrl:process.env.DATABASE_URL});
-      const second = await runMigrations({databaseUrl:process.env.DATABASE_URL});
+      const only = process.env.BLUMI_MIGRATIONS_ONLY_DIRECTORY;
+      const repoDirectory = './apps/server/db/migrations';
+      const sha = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
+      if (only) {
+        for (const name of readdirSync(only).filter((entry) => entry.endsWith('.sql'))) {
+          if (sha(join(only, name)) !== sha(join(repoDirectory, name))) throw new Error('Isolated file differs from the repository: '+name);
+        }
+      }
+      const target = only ? {migrationsDirectory: only} : {};
+      const first = await runMigrations({databaseUrl:process.env.DATABASE_URL, ...target});
+      const second = await runMigrations({databaseUrl:process.env.DATABASE_URL, ...target});
       if (second.applied.length) throw new Error('Migration rerun was not idempotent');
       const {auditDatabaseRelease} = auditModule;
       const audit = await auditDatabaseRelease(pool);
@@ -69,11 +89,16 @@ try {
         'malformedAvatarInventoryRows','malformedRoomInventoryRows','invalidBalanceRows',
         'unknownOwnedAvatarIds','unknownOwnedRoomIds','unknownEquippedAvatarIds',
         'unownedEquippedAvatarIds','exposedTables','exposedSequences','exposedFunctions'];
-      const findings = Object.fromEntries(issueKeys.filter(key => audit[key]).map(key => [key,audit[key]]));
+      const ledger = new Set((await pool.query('SELECT id FROM blumi_migrations')).rows.map((row) => row.id));
+      const stillPending = readdirSync(repoDirectory).filter((name) => name.endsWith('.sql') && !ledger.has(name)).sort();
+      const checked = only ? issueKeys.filter((key) => key !== 'missingMigrations') : issueKeys;
+      if (only && audit.missingMigrations !== stillPending.length) throw new Error('Pending migrations do not match the ledger.');
+      const findings = Object.fromEntries(checked.filter(key => audit[key]).map(key => [key,audit[key]]));
       if (Object.keys(findings).length) {
         throw new Error('Restored database has release integrity findings: '+JSON.stringify(findings));
       }
       console.log(JSON.stringify({beforeMigrations:before.rows[0].count, applied:first.applied.length,
+        appliedFiles:first.applied, stillPending,
         rerunApplied:second.applied.length, accounts:audit.accounts, inventories:audit.inventories,
         remainingFindings:audit.unknownOwnedAvatarIds+audit.unknownOwnedRoomIds+audit.unownedEquippedAvatarIds}));
     } finally {await pool.end()}

@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto"
 import { readdirSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { CHAT_HIDE_MIGRATION_ID } from "../chat/chatHideSchema"
+import { CHAT_HIDE_MIGRATION_ID, CHAT_HIDE_POINT_MIGRATION_ID } from "../chat/chatHideSchema"
 import { CHAT_RECEIPTS_MIGRATION_ID } from "../chat/chatReceiptSchema"
 import { SMS_ADMISSION_MIGRATION_ID } from "../auth/firebaseSmsAdmission"
+import { BETA_RESET_RUNS_MIGRATION_ID } from "./betaResetRuns"
 
 interface MigrationIdentity { id: string; checksum: string }
 interface SchemaQueryExecutor {
@@ -21,7 +22,13 @@ export const OPTIONAL_READINESS_MIGRATIONS: readonly string[] = Object.freeze([
   CHAT_HIDE_MIGRATION_ID,
   // SMS functions and optional outcome reporting probe their own schema.
   "072_firebase_sms_admission.sql",
-  SMS_ADMISSION_MIGRATION_ID
+  SMS_ADMISSION_MIGRATION_ID,
+  // Index only: every query returns the same rows without it, only slower.
+  "074_notification_retention_index.sql",
+  // The chat repository probes its own ledger row and keeps 071's time rule until then.
+  CHAT_HIDE_POINT_MIGRATION_ID,
+  // The app never touches it; the beta reset script checks for it and refuses to apply without it.
+  BETA_RESET_RUNS_MIGRATION_ID
 ])
 
 /** Read the packaged schema manifest once at service construction, not on each probe. */
