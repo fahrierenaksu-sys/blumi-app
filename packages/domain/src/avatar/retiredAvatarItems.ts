@@ -4,8 +4,9 @@ import { RETIRING_AVATAR_ITEM_IDS } from "../legacy/legacyItemIds"
  * Old avatar items retired by the 2.5D world (plan X15), plus the boy's pre-2.5D starter pieces (the side part and
  * the interim garments), retired when his starter became the curls and the basic_a outfit (2026-10-13). Stable IDs
  * stay in the catalogs, purchase history, inventories and stored loadouts, and are never deleted or reused; they are
- * only hidden: never sold, listed, offered in the wardrobe or saved into a new look, and a stored look that holds one
- * reads as the body's starter piece for that slot (`coerceAvatarLoadout`).
+ * only hidden: never sold, listed or offered in the wardrobe, and a stored look that holds one reads as the body's
+ * starter piece for that slot (`coerceAvatarLoadout`). A save stores a retired ID only where the user still wears it
+ * (`keepWornRetiredAvatarItems`); one that is new for a slot is stored as the starter piece.
  */
 export const RETIRED_AVATAR_ITEM_IDS: ReadonlySet<string> = new Set<string>(RETIRING_AVATAR_ITEM_IDS)
 

@@ -13,7 +13,8 @@ export const LEGACY_AVATAR_ITEM_IDS: readonly string[] = Object.freeze([...legac
  * The old avatar ids that are still in the active catalog and stay wearable and owned until the avatar catalog
  * switch (plan X15), which moves them into the avatar part. Until then they are NOT legacy: `isLegacyItemId` is
  * false for them, so nothing about how they are sold, equipped or read changes. Once moved, every read path treats
- * them as legacy (coercion draws the body's starter piece, saves refuse them, rows stay untouched).
+ * them as legacy (coercion draws the body's starter piece; a save checks the starter piece in their place and keeps
+ * one only where the user still wears it, `keepWornRetiredAvatarItems`; rows are never rewritten by a read).
  */
 export const RETIRING_AVATAR_ITEM_IDS: readonly string[] = Object.freeze([...legacyItemIds.avatarRetiring])
 
