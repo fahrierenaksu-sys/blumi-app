@@ -9,7 +9,7 @@
       "baseSha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0",
       "qaPass": "line_1900/REPORT.md (o_g1fix8 16:37 FINAL; G5 starter-shoes waiver = owner yes 2026-10-12 20:07)",
       "ownerApproved": true,
-      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-14 15:23 +0300: the owner approved ('evet') the front looks of hair_girl_bob and hair_girl_pigtails (factory girl_bob_2130 and girl_pigtails_2130 sc/final_r2, shown in girl_preview_1500/girl_wardrobe_now.png; OWNER_DECISIONS.md FRONT SHOWCASE line of 2026-10-14). Ribbon waves and white sneakers are still pending.",
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-14 15:23 +0300: the owner approved ('evet') the front looks of hair_girl_bob and hair_girl_pigtails (factory girl_bob_2130 and girl_pigtails_2130 sc/final_r2, shown in girl_preview_1500/girl_wardrobe_now.png; OWNER_DECISIONS.md FRONT SHOWCASE line of 2026-10-14). Ribbon waves and white sneakers are still pending. 2026-10-15 10:38 +0300: the owner approved ('önden görünsün') the front looks of ribbon waves, white sneakers, crop white, crop black, black trousers, jacket and corset (OWNER_DECISIONS.md), conditional on the audit fixes (sneaker hem, trouser hips, waves flecks). Listed here: waves, white sneakers (hem moved to the trousers layer, factory girl_shoes5_1430 FIX r1 hem_move), both crops (factory girl_basics_sc_1640 o_basics_w10/k11), jacket and corset. The black trousers are NOT listed: the hip fix is still open (beta5_fix_1030/REPORT.md), so they keep the 3/4 fallback.",
       "crops": {
         "head": [
           876,
@@ -73,6 +73,58 @@
           "backFile": "girl_hairs_2130/hair_girl_pigtails_showcase_back.png",
           "sha256": "33908532a87bca73c1ed81f9fe049c80391f050f1678615c57b9b176fa83dd5e",
           "backSha256": "60b66d344ea6b83a7676267364d2c50e89d792db974edaf1cda152c1e57c5bfb"
+        },
+        "avatar_v2_hair_mocha_ribbon_waves": {
+          "slot": "hair",
+          "order": 4,
+          "file": "girl_fronts7_1030/hair_waves_front.png",
+          "backFile": "girl_fronts7_1030/hair_waves_back.png",
+          "sha256": "755d41d8ce27cf4ed57847a5197a1ce4e06b2631df93d83b048fbeb7b721f9db",
+          "backSha256": "81d9b4856126a37317a8aa5cce571a891af107befabc4a2b5c3473fc7d734b5d"
+        },
+        "avatar_v2_shoes_white_clean_sneakers": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "girl_fronts7_1030/shoes_white_sneakers.png",
+          "eraseFile": "girl_fronts7_1030/shoes_white_sneakers_erase.png",
+          "sha256": "704cd378c2ee51e381778cfaefc90ddcaed05b5e582c461de362e745418ccf85",
+          "eraseSha256": "679aea6cb46d15f23172fd706e1c64fa9ca1fb76c6d217ebcf98ea2de9826380"
+        },
+        "avatar_v2_top_white_cute_crop_top": {
+          "slot": "top",
+          "order": 3,
+          "file": "girl_fronts7_1030/top_white_crop.png",
+          "eraseFile": "girl_fronts7_1030/top_white_crop_erase.png",
+          "tucked": false,
+          "sha256": "80a8ab79ef9216f4f9dcd02421f8a804f4c275f9dcc1f20f5c7bff3f0656295a",
+          "eraseSha256": "c845ed9154f6c997ea84e08873a7d729bba3f56e0d9b012dc31e1b44281b0be1"
+        },
+        "avatar_v2_top_black_cute_crop_top": {
+          "slot": "top",
+          "order": 3,
+          "file": "girl_fronts7_1030/top_black_crop.png",
+          "eraseFile": "girl_fronts7_1030/top_black_crop_erase.png",
+          "tucked": false,
+          "sha256": "0ea66d50cab37283032fe6b2c47f8077e501b06ff12b7d441cfeff92f262b71a",
+          "eraseSha256": "69ab31952b2b8c9bdac902e7a45e81b13b8701e433e879e54736616aecdca6b2"
+        },
+        "top_sage_ribbon_knit_jacket": {
+          "slot": "top",
+          "order": 3,
+          "file": "girl_jacket_2130/top_sage_ribbon_knit_jacket_showcase_front.png",
+          "eraseFile": "girl_jacket_2130/top_sage_ribbon_knit_jacket_showcase_erase.png",
+          "tucked": false,
+          "sha256": "5419e7361230b935d7142be200110c5cfcfcdfa3448337c95e1e914a0d318388",
+          "eraseSha256": "5f90793c8bc3e191531e61aa4fe92b4d154161378396fa04ecfbdb289f4eafd6"
+        },
+        "top_powder_blue_ribbon_corset_top": {
+          "slot": "top",
+          "order": 3,
+          "file": "girl_corset_2130/top_powder_blue_ribbon_corset_top_showcase_front.png",
+          "eraseFile": "girl_corset_2130/top_powder_blue_ribbon_corset_top_showcase_erase.png",
+          "tucked": false,
+          "sha256": "6d8aa32f8b42f352afc0ca3c09d830ac78130927ca5060e33b907b59d8d8b6ba",
+          "eraseSha256": "fde1ef88776201de69ea8183fc1b504ff86e9b0252dcaefc2a48c409593feafd"
         }
       }
     },

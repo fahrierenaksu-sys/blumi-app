@@ -68,7 +68,26 @@
         "avatar_v2_shoes_white_clean_sneakers": {
           "slot": "shoes",
           "rigItemId": "shoes_white_sneakers",
-          "thumb": "avatar_v2_shoes_white_clean_sneakers"
+          "thumb": "avatar_v2_shoes_white_clean_sneakers",
+          "showcase": {
+            "key": "avatar_v2_shoes_white_clean_sneakers__front",
+            "rect": [
+              145,
+              1390,
+              319,
+              170
+            ],
+            "order": 1,
+            "under": {
+              "key": "avatar_v2_shoes_white_clean_sneakers__under",
+              "rect": [
+                136,
+                1381,
+                330,
+                179
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_coral_wave_pants": {
           "slot": "bottom",
@@ -194,10 +213,10 @@
             "under": {
               "key": "avatar_v2_top_coral_wave_polo__under",
               "rect": [
-                121,
+                113,
                 404,
-                362,
-                243
+                380,
+                328
               ]
             }
           }
@@ -226,7 +245,26 @@
               "part": "sit",
               "with": "avatar_v2_bottom_black_highwaist_trousers"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "avatar_v2_top_white_cute_crop_top__front",
+            "rect": [
+              124,
+              435,
+              359,
+              265
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_white_cute_crop_top__under",
+              "rect": [
+                113,
+                404,
+                380,
+                328
+              ]
+            }
+          }
         },
         "avatar_v2_top_black_cute_crop_top": {
           "slot": "top",
@@ -252,12 +290,50 @@
               "part": "sit",
               "with": "avatar_v2_bottom_black_highwaist_trousers"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "avatar_v2_top_black_cute_crop_top__front",
+            "rect": [
+              124,
+              435,
+              359,
+              265
+            ],
+            "order": 3,
+            "under": {
+              "key": "avatar_v2_top_black_cute_crop_top__under",
+              "rect": [
+                113,
+                404,
+                380,
+                328
+              ]
+            }
+          }
         },
         "top_sage_ribbon_knit_jacket": {
           "slot": "top",
           "rigItemId": "top_sage_ribbon_knit_jacket",
-          "thumb": "top_sage_ribbon_knit_jacket"
+          "thumb": "top_sage_ribbon_knit_jacket",
+          "showcase": {
+            "key": "top_sage_ribbon_knit_jacket__front",
+            "rect": [
+              106,
+              416,
+              393,
+              332
+            ],
+            "order": 3,
+            "under": {
+              "key": "top_sage_ribbon_knit_jacket__under",
+              "rect": [
+                113,
+                404,
+                380,
+                328
+              ]
+            }
+          }
         },
         "top_powder_blue_ribbon_corset_top": {
           "slot": "top",
@@ -282,7 +358,26 @@
             {
               "part": "torsoWalk"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "top_powder_blue_ribbon_corset_top__front",
+            "rect": [
+              172,
+              422,
+              263,
+              320
+            ],
+            "order": 3,
+            "under": {
+              "key": "top_powder_blue_ribbon_corset_top__under",
+              "rect": [
+                113,
+                404,
+                380,
+                328
+              ]
+            }
+          }
         },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
@@ -311,7 +406,26 @@
         "avatar_v2_hair_mocha_ribbon_waves": {
           "slot": "hair",
           "rigItemId": "hair_girl_waves",
-          "thumb": "avatar_v2_hair_mocha_ribbon_waves"
+          "thumb": "avatar_v2_hair_mocha_ribbon_waves",
+          "showcase": {
+            "key": "avatar_v2_hair_mocha_ribbon_waves__front",
+            "rect": [
+              88,
+              67,
+              431,
+              659
+            ],
+            "order": 4,
+            "back": {
+              "key": "avatar_v2_hair_mocha_ribbon_waves__back",
+              "rect": [
+                46,
+                15,
+                517,
+                731
+              ]
+            }
+          }
         },
         "hair_girl_bob": {
           "slot": "hair",

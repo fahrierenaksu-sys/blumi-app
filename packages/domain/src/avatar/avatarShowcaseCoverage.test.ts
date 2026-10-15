@@ -26,17 +26,13 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * girl_jacket_2130 sc/o_sage_j2) waits for the owner's yes on the front look.
  * 2026-10-15 (release/2.5d-beta-5): the powder blue ribbon corset top joins for the same reason; its front layer
  * (factory girl_corset_2130 showcase/o_corset7) waits for the owner's yes on the front look.
+ * 2026-10-15 10:38 (OWNER_DECISIONS): the owner approved the fronts of the waves, white sneakers, both crops, black
+ * trousers, jacket and corset, conditional on the audit fixes. Six are allowlisted and baked, so their entries are gone.
+ * The black trousers stay: with the polo, jacket or corset, fragments of the coral pants baked under those tops' hems
+ * show at the hips (audit F2), and that fix is still open (Workbench integration/beta5_fix_1030/REPORT.md).
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: [
-    "avatar_v2_hair_mocha_ribbon_waves",
-    "avatar_v2_shoes_white_clean_sneakers",
-    "avatar_v2_top_white_cute_crop_top",
-    "avatar_v2_top_black_cute_crop_top",
-    "avatar_v2_bottom_black_highwaist_trousers",
-    "top_sage_ribbon_knit_jacket",
-    "top_powder_blue_ribbon_corset_top",
-  ],
+  female: ["avatar_v2_bottom_black_highwaist_trousers"],
   male: [],
 };
 

@@ -55,6 +55,30 @@ test("the You hero is the showcase still of the whole figure, named for screen r
   for (const liveProp of ["liveScope", "liveActive", "waveSignal"]) assert.equal(liveProp in figure.props, false)
 })
 
+test("the ProfileEdit header is the viewer's front bust, falling back to the head-to-hips 3/4 still it drew before", () => {
+  const runtime = createFakeReactRuntime()
+  const { ProfileEditAvatar } = loadSourceWithFakeReact<{ ProfileEditAvatar: (props: Record<string, unknown>) => unknown }>(
+    "features/profile/ProfileEditAvatar.tsx",
+    runtime,
+    {
+      modules: {
+        "react-native": createReactNativeStub().module,
+        "../avatar/components/AvatarShowcase": { AvatarShowcase },
+        "../../ui/theme": { uiTheme: { shadow: { soft: {} } } },
+        "./useOwnAvatarLoadout": { useOwnAvatarLoadout: () => DEFAULT_FEMALE_AVATAR_LOADOUT }
+      }
+    }
+  )
+  const output = runtime.render(() => ProfileEditAvatar({ name: "Defne" })) as Element
+  const figure = find(output, AvatarShowcase)
+  assert.ok(figure, "the header draws the showcase, never a 3/4-only still")
+  assert.equal(figure.props.crop, "push")
+  assert.equal(figure.props.fallbackCrop, "half")
+  assert.equal(figure.props.loadout, DEFAULT_FEMALE_AVATAR_LOADOUT)
+  assert.equal(figure.props.decorative, true, "the frame carries the name")
+  assert.equal(output.props.accessibilityLabel, "Defne avatar")
+})
+
 test("the own chip (Discover, match moment) is the showcase still in the crop it drew before, turned when asked", () => {
   const runtime = createFakeReactRuntime()
   const { MyAvatarStill } = loadSourceWithFakeReact<{ MyAvatarStill: (props: Record<string, unknown>) => unknown }>(
