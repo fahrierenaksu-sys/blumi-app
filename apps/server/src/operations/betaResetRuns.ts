@@ -20,6 +20,10 @@ export function parseRepeatReason(argv: readonly string[], apply: boolean): stri
   if (index < 0) return null
   if (!apply) throw new Error(`${REPEAT_REASON_FLAG} is used only with --apply; reset refused.`)
   const reason = argv[index + 1]?.trim() ?? ""
+  // A missing reason must not take the next flag (for example --deployed-commit) as its text.
+  if (reason.length === 0 || reason.startsWith("-")) {
+    throw new Error(`${REPEAT_REASON_FLAG} needs a typed reason right after it, not a flag; reset refused.`)
+  }
   if (reason.length < REASON_LENGTH.min || reason.length > REASON_LENGTH.max || !REASON_TEXT.test(reason)) {
     throw new Error(`${REPEAT_REASON_FLAG} needs a plain-text reason of ${REASON_LENGTH.min}-${REASON_LENGTH.max} characters; reset refused.`)
   }
