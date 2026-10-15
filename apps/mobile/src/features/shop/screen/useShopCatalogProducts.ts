@@ -96,7 +96,8 @@ export function useShopCatalogProducts(input: {
       economyCatalog: productionEconomyCatalog,
       publishedItemIds,
       roomFurnitureCatalog,
-      qaOwnedRoomItemIds: qaOnlyOwnedRoomItemIds
+      qaOwnedRoomItemIds: qaOnlyOwnedRoomItemIds,
+      locale
     }),
     [
       roomOwnershipKey,

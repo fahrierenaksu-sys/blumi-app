@@ -1,5 +1,6 @@
 import type { AppLocale } from "../../session/appLocale"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
+import { getFurnitureDisplayName } from "../furnitureDisplayNames"
 import { normalizeRoomInventorySearchText, upsertRoomV2RenderItemSorted } from "../roomV2Selectors"
 import type { getRoomWorldMotionReadinessSummary } from "../../roomWorld/roomWorldDiagnostics"
 import type {
@@ -106,7 +107,8 @@ export function filterRoomEditorInventoryEntries<Entry extends RoomEditorInvento
   const normalizedQuery = normalizeRoomInventorySearchText(inventorySearchQuery)
   return inventoryEntries.filter((entry) => (
     (activeInventoryCategory === "all" || entry.item.category === activeInventoryCategory) &&
-    (!normalizedQuery || normalizeRoomInventorySearchText(entry.item.name).includes(normalizedQuery))
+    (!normalizedQuery || (normalizeRoomInventorySearchText(entry.item.name).includes(normalizedQuery) ||
+      normalizeRoomInventorySearchText(getFurnitureDisplayName(entry.item, "tr")).includes(normalizedQuery)))
   ))
 }
 

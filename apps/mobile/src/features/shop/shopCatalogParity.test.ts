@@ -599,3 +599,41 @@ test("every avatar piece on the Turkish Shop shelf shows its Turkish name, and t
   }
   assert.ok(checked > 0, "the Turkish shelf was checked");
 });
+
+test("every room piece the Shop can list has a Turkish name, shown on the Turkish shelf and absent from the English one", () => {
+  const { ROOM_AVATAR_25D_LAYERED_FLOOR_ENTRIES, ROOM_AVATAR_25D_LAYERED_WALL_ENTRIES } =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+    require("../roomV2/furniture/layeredFurnitureCatalog") as typeof import("../roomV2/furniture/layeredFurnitureCatalog");
+  // The runtime furniture catalog is empty in plain Node (it comes from the room seam), so list the layered entries.
+  const layeredEntries = [...ROOM_AVATAR_25D_LAYERED_FLOOR_ENTRIES, ...ROOM_AVATAR_25D_LAYERED_WALL_ENTRIES];
+  const roomFurnitureCatalog = layeredEntries as unknown as import("../roomV2/roomV2.types").FurnitureItem[];
+  const { FURNITURE_NAMES_TR } =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+    require("../roomV2/furnitureDisplayNames") as typeof import("../roomV2/furnitureDisplayNames");
+  const build = (locale: "tr" | "en") => buildShopCatalogItems({
+    avatar: resolveInitialAvatarV2("avatar_v2_body_default"),
+    inventory: {
+      coins: 1_250,
+      ownedAvatarItemIds: [],
+      ownedRoomItemIds: [],
+      unlockedFeatureIds: [],
+      updatedAt: "2026-07-14T00:00:00.000Z",
+    },
+    roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
+    roomFurnitureCatalog,
+    locale,
+  }).filter((product) => product.kind === "roomItem");
+  const english = new Map(build("en").map((product) => [product.sourceItemId, product.title]));
+  const listed = build("tr");
+  assert.ok(listed.length > 0, "the room shelf was checked");
+  assert.equal(listed.length, layeredEntries.filter((entry) => !isReleaseCatalogItemHeld(entry.id)).length);
+  for (const product of listed) {
+    const turkish = FURNITURE_NAMES_TR[product.sourceItemId];
+    assert.ok(turkish, `${product.sourceItemId} has a Turkish name`);
+    assert.equal(product.title, turkish, product.sourceItemId);
+    assert.equal(english.get(product.sourceItemId), product.roomItem?.name, product.sourceItemId);
+  }
+  for (const item of layeredEntries) {
+    assert.ok(FURNITURE_NAMES_TR[item.id], `${item.id} has a Turkish name`);
+  }
+});

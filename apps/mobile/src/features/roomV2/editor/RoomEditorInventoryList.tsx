@@ -13,6 +13,8 @@ import { scheduleOnRN } from "react-native-worklets"
 import { hapticError } from "../../../ui/haptics"
 import type { MyRoomEditorCopy } from "../myRoomCopy"
 import type { FurnitureItem, PlacedRoomItem } from "../roomV2.types"
+import { getAppLocale } from "../../session/appLocale"
+import { getFurnitureDisplayName } from "../furnitureDisplayNames"
 import { InventoryCatalogCard } from "./InventoryCatalogCard"
 import {
   ROOM_EDITOR_DOCK_COLUMNS,
@@ -170,7 +172,7 @@ export function RoomEditorInventoryList(props: {
             ? selectedInventoryRotation
             : getDefaultRoomV2FurnitureRotation(entry.item)}
           trayDragHint={copy.trayDragHint}
-          previewLabel={copy.previewItem(entry.item.name)}
+          previewLabel={copy.previewItem(getFurnitureDisplayName(entry.item, getAppLocale()))}
           onPreviewItem={setSelectedInventoryItemId}
           clearSelectionLabel={copy.clearSelection}
           onClearSelection={onClearSelection}

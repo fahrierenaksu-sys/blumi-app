@@ -4,6 +4,8 @@ import { memo, useMemo } from "react"
 import { Pressable, Text, View } from "react-native"
 import { GestureDetector, type PanGesture } from "react-native-gesture-handler"
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated"
+import { getAppLocale } from "../../session/appLocale"
+import { getFurnitureDisplayName } from "../furnitureDisplayNames"
 import { useReducedMotion } from "../../../ui/animations"
 import type { FurnitureItem, PlacedRoomItem } from "../roomV2.types"
 import { resolveRoomV2InventoryPreviewSource } from "./roomEditorPlacementModel"
@@ -122,7 +124,7 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
         </Pressable>
       ) : null}
       <Text numberOfLines={1} maxFontSizeMultiplier={1.3} style={styles.inventoryItemName}>
-        {item.name}
+        {getFurnitureDisplayName(item, getAppLocale())}
       </Text>
     </Animated.View>
   )

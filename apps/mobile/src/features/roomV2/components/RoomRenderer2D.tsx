@@ -64,6 +64,7 @@ import {
   getRoomV2FurnitureMobileRenderScale,
   isRoomV2LayeredFloorPiece
 } from "../roomV2RenderSurface"
+import { getFurnitureDisplayName } from "../furnitureDisplayNames"
 import { ROOM_V2_OUTSIDE_COLOR } from "../roomV2Camera"
 import {
   RoomRendererLiveAvatarFrame,
@@ -635,7 +636,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
     : isTouchInteractive && !seatTapTarget ? Pressable : View
   const itemAccessibility = getRoomV2ItemAccessibility({
     kind: item.kind,
-    name: item.name,
+    name: item.kind === "furniture" ? getFurnitureDisplayName({ id: item.itemId, name: item.name }, getAppLocale()) : item.name,
     interactionType: item.kind === "furniture" ? item.interactionType : undefined,
     mode: itemInteractionMode,
     locale: getAppLocale(),

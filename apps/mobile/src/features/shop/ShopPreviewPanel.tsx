@@ -27,6 +27,7 @@ import { getCombinationPage, getCombinationPageSize, getCombinationSelectionPage
 import { shopPreviewStyles as styles } from "./shopPreviewStyles"
 import { uiTheme } from "../../ui/theme"
 import { PressableScale } from "../../ui/PressableScale"
+import { getFurnitureDisplayName } from "../roomV2/furnitureDisplayNames"
 import { ShopCombinationRow } from "./ShopCombinationRow"
 import { useRetainedShopPreviewDrawing } from "./screen/shopRetainedPreviewModel"
 
@@ -408,7 +409,7 @@ const ShopRoomItemPreview = memo(function ShopRoomItemPreview(props: {
     <View
       style={styles.shopRoomScenePreview}
       testID="shop-room-preview"
-      accessibilityLabel={props.item ? `${props.item.name}, ${getShopCopy(props.locale).roomPreview}` : getShopCopy(props.locale).roomPreview}
+      accessibilityLabel={props.item ? `${getFurnitureDisplayName(props.item, props.locale)}, ${getShopCopy(props.locale).roomPreview}` : getShopCopy(props.locale).roomPreview}
     >
       <ShopRoomRenderer2D
         shell={scene.shell}

@@ -8,6 +8,7 @@ import {
 } from "../avatarV2/avatarV2Catalog"
 import { getAvatarV2ShopItemsCompatibleWithBody } from "../avatarV2/avatarBodyCompatibility"
 import { getAvatarItemDisplayName } from "../avatarV2/avatarItemDisplayNames"
+import { getFurnitureDisplayName } from "../roomV2/furnitureDisplayNames"
 import type { AppLocale } from "../session/appLocale"
 import {
   isAvatarV2ItemEquipped,
@@ -82,7 +83,7 @@ export interface BuildShopCatalogItemsInput {
   roomFurnitureCatalog?: readonly FurnitureItem[]
   /** Development-only ownership granted by an isolated QA catalog. */
   qaOwnedRoomItemIds?: readonly string[]
-  /** The app language; avatar piece names are Turkish when it is "tr". Omitted = the catalog's own names. */
+  /** The app language; avatar and room piece names are Turkish when it is "tr". Omitted = the catalog's own names. */
   locale?: AppLocale
 }
 
@@ -175,7 +176,7 @@ export function buildAvatarShopCatalogItem(
 
 export function buildRoomShopItems(input: Pick<
   BuildShopCatalogItemsInput,
-  "roomDecor" | "economyCatalog" | "publishedItemIds" | "roomFurnitureCatalog" | "qaOwnedRoomItemIds"
+  "roomDecor" | "economyCatalog" | "publishedItemIds" | "roomFurnitureCatalog" | "qaOwnedRoomItemIds" | "locale"
 > & { inventory: Pick<BlumiInventorySnapshot, "ownedRoomItemIds"> }): ShopCatalogItem[] {
   const publishedItemIds = input.publishedItemIds
     ? new Set(input.publishedItemIds)
@@ -202,7 +203,7 @@ export function buildRoomShopItems(input: Pick<
     return {
       id: `room:${item.id}`,
       kind: "roomItem",
-      title: item.name,
+      title: input.locale ? getFurnitureDisplayName(item, input.locale) : item.name,
       description: getRoomDescription(item),
       priceCoins,
       owned,
