@@ -1,8 +1,13 @@
 import { spawnSync } from "node:child_process"
 import { resolve } from "node:path"
 import { Pool } from "pg"
+import { applySessionBudget } from "../db/databasePoolConfig"
 import { applyBetaReset, planBetaReset, type BetaResetContext, type BetaResetPlan, type BetaResetSource } from "./betaReset"
 import { assertStarterMatchesSource, describeBetaResetStarter, readBetaResetStarter } from "./betaResetStarter"
+
+const BETA_RESET_SESSION_BUDGET = Object.freeze({
+  statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, idleInTransactionTimeoutMs: 60_000
+})
 
 /**
  * Operator entry for the beta reset (`apps/server/scripts/betaReset.ts`). Dry run is the default and runs READ ONLY.
@@ -112,6 +117,9 @@ export async function runBetaResetCli(
   try {
     const client = await pool.connect()
     try {
+      // Own limits for the whole session, never a pooled connection's app budget;
+      // the transaction below narrows them again with SET LOCAL.
+      await applySessionBudget(client, BETA_RESET_SESSION_BUDGET)
       await client.query(args.apply ? "BEGIN" : "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
       await client.query("SET LOCAL lock_timeout = '5s'")
       await client.query("SET LOCAL statement_timeout = '120s'")

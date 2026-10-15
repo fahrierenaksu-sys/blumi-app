@@ -24,7 +24,7 @@ import { safeOperationalErrorKind } from "../operations/safeErrorLog"
  * transaction pooler (port 6543) a session setting is not tied to this
  * client; there the client-side timeout still holds, and a role-level
  * `ALTER ROLE ... SET` is the owner's choice. Only the app pools get this
- * budget: the migrator and backup/restore tools open their own connections.
+ * budget: the migrator and other tools set their own (applySessionBudget).
  * | BLUMI_DB_APPLICATION_NAME             | unset   | [A-Za-z0-9._-]{1,63} | Labels sessions in pg_stat_activity. |
  *
  * TCP keepalive is always on, so a connection silently dropped by a NAT or
@@ -184,14 +184,26 @@ export function toPoolConfig(connectionString: string | undefined, settings: Dat
     ...(settings.applicationName ? { application_name: settings.applicationName } : {}),
     // pg-pool awaits this before handing the connection out; if it fails the
     // connection is closed and the checkout fails instead of running unbounded.
-    onConnect: async (client: Pick<ClientBase, "query">) => {
-      await client.query(APPLY_SESSION_BUDGET_SQL, [
-        `${settings.statementTimeoutMs}ms`,
-        `${settings.lockTimeoutMs}ms`,
-        `${settings.idleInTransactionTimeoutMs}ms`
-      ])
-    }
+    onConnect: (client: Pick<ClientBase, "query">) => applySessionBudget(client, settings)
   }
+}
+
+export type SessionBudget = Pick<DatabasePoolSettings, "statementTimeoutMs" | "lockTimeoutMs" | "idleInTransactionTimeoutMs">
+
+/**
+ * Sets the three server-side limits for the rest of this session. Behind the
+ * session pooler a server connection can be handed from the app (10 s
+ * statements, 3 s lock waits) to another client without a reset, so every
+ * tool that opens its own connection (migrator, beta reset, release audit,
+ * persona seed) calls this first with its own budget instead of inheriting
+ * one. 0 means no limit. pg_dump and pg_restore set their own.
+ */
+export async function applySessionBudget(client: Pick<ClientBase, "query">, budget: SessionBudget): Promise<void> {
+  await client.query(APPLY_SESSION_BUDGET_SQL, [
+    `${budget.statementTimeoutMs}ms`,
+    `${budget.lockTimeoutMs}ms`,
+    `${budget.idleInTransactionTimeoutMs}ms`
+  ])
 }
 
 const APPLY_SESSION_BUDGET_SQL = `SELECT set_config('statement_timeout', $1, false),

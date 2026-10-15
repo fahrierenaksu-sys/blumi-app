@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 import { readdir, readFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { Pool, type PoolClient } from "pg"
+import { applySessionBudget, type SessionBudget } from "./databasePoolConfig"
 import { resolveServerConfig } from "../config"
 
 const MIGRATIONS_TABLE_SQL = `
@@ -20,6 +21,12 @@ const MIGRATIONS_TABLE_SQL = `
 // migration transaction, so it does not depend on a pooler forwarding
 // startup options and never leaks to the session.
 export const DEFAULT_MIGRATION_LOCK_TIMEOUT_MS = 5_000
+// The session itself has no limits: a long CREATE INDEX or backfill must not
+// die mid-release because a pooled connection still carries the app's 10 s
+// statement budget. Lock waits stay bounded by the per-migration limit above.
+const MIGRATION_SESSION_BUDGET: SessionBudget = Object.freeze({
+  statementTimeoutMs: 0, lockTimeoutMs: 0, idleInTransactionTimeoutMs: 0
+})
 // Separate from the lock limit: how long the pool waits to open a database
 // connection at all (network, TLS, pooler queue, authentication).
 export const DEFAULT_MIGRATION_CONNECT_TIMEOUT_MS = 10_000
@@ -68,6 +75,7 @@ export async function runMigrationsWithClient(
     "lockTimeoutMs"
   )
   try {
+    await applySessionBudget(client, MIGRATION_SESSION_BUDGET)
     await client.query(MIGRATIONS_TABLE_SQL)
     await client.query(
       "SELECT pg_advisory_lock(hashtextextended('blumi:migrations', 0))"

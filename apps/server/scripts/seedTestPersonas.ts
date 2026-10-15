@@ -1,4 +1,5 @@
 import { Pool } from "pg"
+import { applySessionBudget } from "../src/db/databasePoolConfig"
 import {
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT
@@ -17,6 +18,8 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const client = await pool.connect()
   try {
+    // Own session limits, never a pooled connection's app budget.
+    await applySessionBudget(client, { statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, idleInTransactionTimeoutMs: 60_000 })
     await client.query("BEGIN")
     const marker = await client.query("SELECT to_regclass('public.blumi_test_personas') AS table_name")
     if (!marker.rows[0]?.table_name) throw new Error("Run migration 060 first.")

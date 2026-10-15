@@ -118,6 +118,20 @@ test("connection wait is bounded separately from the lock timeout", async () => 
   }
 })
 
+test("the migrator sets its own session limits before any other statement", async () => {
+  // A pooled server connection may still carry the app's 10 s statement and
+  // 3 s lock budget; a migration must never inherit it.
+  const directory = await mkdtemp(join(tmpdir(), "blumi-migration-session-"))
+  await writeFile(join(directory, "001_first.sql"), "SELECT 1")
+  const client = createFakeMigrationClient()
+
+  await runMigrationsWithClient(client as never, directory)
+  assert.match(client.executedSql[0] ?? "", /set_config\('statement_timeout', \$1, false\)/)
+  assert.match(client.executedSql[0] ?? "", /set_config\('lock_timeout', \$2, false\)/)
+  assert.match(client.executedSql[0] ?? "", /set_config\('idle_in_transaction_session_timeout', \$3, false\)/)
+  assert.deepEqual(client.executedValues[0], ["0ms", "0ms", "0ms"])
+})
+
 function createFakeMigrationClient() {
   const applied = new Map<string, string | null>()
   return {
