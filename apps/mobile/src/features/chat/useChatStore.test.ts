@@ -9,7 +9,7 @@ import type { ChatThread } from "@blumi/contracts"
 function mount() {
   const runtime = createFakeReactRuntime()
   const store = loadSourceWithFakeReact<typeof ChatStore>("features/chat/chatStore.ts", runtime, {
-    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState"]
+    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState", "./chatComposerDraftStore"]
   })
   return { runtime, store }
 }

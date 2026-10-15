@@ -21,7 +21,7 @@ const actorFor = (userId: string): SessionActor => ({
 function mount() {
   const runtime = createFakeReactRuntime()
   const store = loadSourceWithFakeReact<typeof Store>("features/chat/chatStore.ts", runtime, {
-    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState"]
+    real: ["./chatErrorCopy", "./chatReceiptModel", "./chatMessageRenderKeys", "./chatReadHere", "./chatPartnerReceiptsState", "./chatComposerDraftStore"]
   })
   const sending = loadSourceWithFakeReact<typeof Sending>("features/chat/thread/useChatMessageSending.ts", runtime, {
     modules: { "../../../analytics/productAnalytics": { captureProductEvent() {} }, "../../../ui/haptics": { hapticSelection() {} } },
