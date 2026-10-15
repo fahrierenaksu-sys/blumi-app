@@ -36,6 +36,8 @@ const {
 } = require("./room/avatarRoomMotionContract") as typeof import("./room/avatarRoomMotionContract")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset tables contain static requires.
 const { roomAvatarLayerAssets } = require("./room/avatarRoomAssets") as typeof import("./room/avatarRoomAssets")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset tables contain static requires.
+const { RETIRED_AVATAR_ART } = require("./retiredAvatarArt") as typeof import("./retiredAvatarArt")
 
 /**
  * The boy's starter (curls + basic_a) is drawn only by his 2.5D rig, so the legacy room projection leaves those pieces
@@ -210,24 +212,20 @@ test("the default female room avatar is fully dressed", () => {
   }
 })
 
-test("female Cream Basic Tee binds its stable ID to the approved v17 static and motion assets", () => {
+test("female Cream Basic Tee keeps its stable ID and asset keys after its art is retired", () => {
   const productId = "room_avatar_top_female_cream_basic_tee_v2"
   const staticAsset = roomAvatarLayerAssets.topFemaleCreamBasicTeeV2
   assert.equal(staticAsset.key, "avatar_room_top_female_cream_basic_tee_v2")
-  assert.equal(
-    String(staticAsset.source).split("/").at(-1),
-    "avatar_room_top_female_cream_basic_tee_v2_art_v17.png"
-  )
+  // the pre-2.5D bitmap is retired: the key stays, the picture is the transparent retired art (never drawn)
+  assert.equal(staticAsset.source, RETIRED_AVATAR_ART)
 
   const motionAssets = roomAvatarMotionLayerAssets.topFemaleCreamBasicTeeV2
   const motionFrames = [...motionAssets.walkingFront.frames, motionAssets.sittingFront]
   assert.ok(motionAssets.walkingFront.frames.length > 0)
   for (const frame of motionFrames) {
-    // A packed frame is an atlas crop that reproduces its original file
-    // pixel for pixel (roomAvatarMotionAtlas.test.ts).
-    const fileName = frame.crop
-      ? `${frame.crop.sourceName}.png`
-      : String(frame.source).split("/").at(-1) ?? ""
+    // Each frame keeps its packed name (its stable key); only the bitmap is retired.
+    assert.equal(frame.source, RETIRED_AVATAR_ART)
+    const fileName = `${frame.crop?.sourceName}.png`
     assert.ok(fileName.startsWith(productId), fileName)
     assert.ok(fileName.endsWith("_art_v17.png"), `${fileName} is part of the approved v17 set`)
   }
@@ -273,7 +271,7 @@ test("the masculine crew tee room art projects and renders only on the male fitt
 
   assert.equal(roomTop?.bodyPreset, "male")
   assert.equal(roomTop?.fitProfileId, "blumi_male_room_avatar_v1")
-  assert.match(String(roomTop?.asset.source), /avatar_room_top_male_powder_blue_crew_tee_v1\.png$/)
+  assert.equal(roomTop?.asset.source, RETIRED_AVATAR_ART, "its pre-2.5D bitmap is retired; the key stays")
 
   const { appearance, unmappedItemIds } = projectAvatarV2ToRoomAvatarAppearance({
     ...keptMaleFixture("avatar_v2_top_male_powder_blue_crew_tee", topId),
@@ -310,7 +308,7 @@ test("the navy straight pants room art projects above the shoes on the male fitt
   assert.equal(roomBottom?.bodyPreset, "male")
   assert.equal(roomBottom?.fitProfileId, "blumi_male_room_avatar_v1")
   assert.equal(roomBottom?.occlusionRole, "bottomOverShoeUpper")
-  assert.match(String(roomBottom?.asset.source), /avatar_room_bottom_male_navy_straight_pants_v1\.png$/)
+  assert.equal(roomBottom?.asset.source, RETIRED_AVATAR_ART, "its pre-2.5D bitmap is retired; the key stays")
   assert.ok(roomBottom!.layerOrder > shoes!.layerOrder)
 
   const { appearance, unmappedItemIds } = projectAvatarV2ToRoomAvatarAppearance({

@@ -115,6 +115,12 @@ try {
     join(outputDirectory, "features/roomV2/assets"),
     { recursive: true }
   )
+  // the baked 2.5D stills: Shop and wardrobe cards resolve their item thumbnails from here
+  cpSync(
+    join(workspaceRoot, "src/features/avatar/stills/layers"),
+    join(outputDirectory, "features/avatar/stills/layers"),
+    { recursive: true }
+  )
 
   execFileSync(
     resolve(repositoryRoot, "node_modules/.bin/tsx"),
