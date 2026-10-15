@@ -555,7 +555,7 @@ const refreshFailure = async (response: () => Response | Promise<Response>): Pro
 const jsonFailure = (status: number, body: unknown) => () =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 
-const SESSION_KEEPING_FAILURES: Array<[string, () => Response | Promise<Response>]> = [
+const SESSION_KEEPING_FAILURES: [string, () => Response | Promise<Response>][] = [
   ["503 edge JSON without an error field", jsonFailure(503, { status: "error", code: 503, message: "unavailable" })],
   ["429 JSON without an error field", jsonFailure(429, { message: "rate limited", retryAfter: 30 })],
   ["502 gateway JSON", jsonFailure(502, { status: "error", code: 502, message: "Application failed to respond" })],

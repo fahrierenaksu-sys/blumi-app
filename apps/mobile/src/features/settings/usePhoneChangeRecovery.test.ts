@@ -20,7 +20,7 @@ const serverError = (status: number, code: apiRequestError.ApiRequestErrorCode) 
   new apiRequestError.ApiRequestError({ status, code, message: `fake ${status}` })
 const timeoutError = () => Object.assign(new Error("timed out"), { name: "TimeoutError" })
 
-const mountedHolders: Array<{ release: (() => void) | null }> = []
+const mountedHolders: { release: (() => void) | null }[] = []
 
 // ─── Boundaries shared by every re-authenticating hook ──────
 
@@ -96,7 +96,7 @@ function mountPhoneChange(confirmOutcomes: ConfirmOutcome[], world: FakeWorld = 
   // Each test starts with no re-auth hold left open by an earlier test.
   for (const holder of mountedHolders.splice(0)) holder.release?.()
   const runtime = createFakeReactRuntime()
-  let alertButtons: Array<{ onPress?: () => void }> = []
+  let alertButtons: { onPress?: () => void }[] = []
   const calls = {
     confirm: 0,
     firebaseConfirms: 0,

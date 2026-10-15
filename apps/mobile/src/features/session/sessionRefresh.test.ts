@@ -276,7 +276,7 @@ test("refresh marks only a readable 401 as a verified invalid session", async ()
 })
 
 test("refresh classifies rate limits and server failures as retryable, never as sign-out", async () => {
-  const cases: Array<[number, unknown, string]> = [
+  const cases: [number, unknown, string][] = [
     [429, { message: "rate limited", retryAfter: 30 }, "rate_limited"],
     [503, { status: "error", code: 503, message: "unavailable" }, "server_unavailable"],
     [500, { error: "Sign in again to continue." }, "server_unavailable"],
