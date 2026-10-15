@@ -18,9 +18,19 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * girl_bob_2130 and girl_pigtails_2130 sc/final_r2) passed QA and wait for the owner's yes on the front look.
  * 2026-10-14 15:23 (OWNER_DECISIONS): the owner approved the bob and pigtails front looks, so they are allowlisted and
  * baked and their entries are gone. Ribbon waves and white sneakers still wait for that yes.
+ *
+ * Reason for the girl's crop tops and black trousers (2026-10-13, branch wip/body-replacement-2): their room art is in
+ * (owner-approved bare belly), but their front art is still NEEDS-FIX in the factory (crop waist stubs, trousers shape)
+ * and has no owner approval, so the showcase allowlist cannot list them. Remove them as fronts land.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: ["avatar_v2_hair_mocha_ribbon_waves", "avatar_v2_shoes_white_clean_sneakers"],
+  female: [
+    "avatar_v2_hair_mocha_ribbon_waves",
+    "avatar_v2_shoes_white_clean_sneakers",
+    "avatar_v2_top_white_cute_crop_top",
+    "avatar_v2_top_black_cute_crop_top",
+    "avatar_v2_bottom_black_highwaist_trousers",
+  ],
   male: [],
 };
 

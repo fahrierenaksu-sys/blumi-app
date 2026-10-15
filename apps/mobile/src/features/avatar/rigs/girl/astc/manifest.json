@@ -12,70 +12,70 @@
  "preset": "VERYTHOROUGH",
  "sets": {
   "back": {
-   "file": "back.astc.zip",
-   "fileBytes": 4044240,
-   "gpuBytes": 4044240,
-   "height": 592,
-   "layers": 5,
+   "file": "back.astc-packed.zip",
+   "fileBytes": 11400368,
+   "gpuBytes": 11400368,
+   "height": 1192,
+   "layers": 7,
    "levels": [
     {
-     "bh": 148,
+     "bh": 298,
      "bw": 256,
-     "h": 592,
+     "h": 1192,
      "w": 1024
     },
     {
-     "bh": 74,
+     "bh": 149,
      "bw": 128,
-     "h": 296,
+     "h": 596,
      "w": 512
     },
     {
-     "bh": 37,
+     "bh": 75,
      "bw": 64,
-     "h": 148,
+     "h": 298,
      "w": 256
     },
     {
-     "bh": 19,
+     "bh": 38,
      "bw": 32,
-     "h": 74,
+     "h": 149,
      "w": 128
     },
     {
-     "bh": 10,
+     "bh": 19,
      "bw": 16,
-     "h": 37,
+     "h": 74,
      "w": 64
     },
     {
-     "bh": 5,
+     "bh": 10,
      "bw": 8,
-     "h": 18,
+     "h": 37,
      "w": 32
     },
     {
-     "bh": 3,
+     "bh": 5,
      "bw": 4,
-     "h": 9,
+     "h": 18,
      "w": 16
     },
     {
-     "bh": 1,
+     "bh": 3,
      "bw": 2,
-     "h": 4,
+     "h": 9,
      "w": 8
     },
     {
      "bh": 1,
      "bw": 1,
-     "h": 2,
+     "h": 4,
      "w": 4
     },
     {
      "bh": 1,
      "bw": 1,
-     "h": 1,
+     "h": 2,
      "w": 2
     },
     {
@@ -85,88 +85,97 @@
      "w": 1
     }
    ],
+   "packed": {
+    "bytes": 1138388,
+    "encoding": "sparse-astc-v1",
+    "sha256": "d577a6a9fa046e13a22ebef7ee775b8e92e5766cee37f9a23c003cad732175aa"
+   },
    "pages": [
     "back_page0.png",
     "back_page1.png",
     "back_page2.png",
     "back_page3.png",
-    "back_page4.png"
+    "back_page4.png",
+    "back_page5.png",
+    "back_page6.png"
    ],
-   "sha256": "df785c14832d195bec5b139ebef6312b2c3651314ad7b5e71f739a22001d11a7",
+   "sha256": "2a6fcf0bb4f4406a7c3162327f2df3bd42373803a0d9dbdd81260a3805a9a544",
    "sourceSha256": {
-    "back_page0.png": "c17cfa6aa06062f92fb5744b17261ba1f8efd6518e754296f1eff03b0b4fd211",
-    "back_page1.png": "3333440d9eb31360e52edb6649e6f0445541425173d808b79719a9cf0f646e7c",
-    "back_page2.png": "c0226b5dabb2a02055de6a637a150e24af859bddb3b0129214839c620cdf9ac5",
-    "back_page3.png": "87f73526780d1ae9b480cfb0f913bf07246d1bf8fe3146d4ba85b9a04e71c2cc",
-    "back_page4.png": "a45cbd6bbc40c708fa3fa2669ee07513b80c8bb80ae17fe6732ed9248eb2eaf6"
+    "back_page0.png": "c53cc8fec0fae31c336d72f7111406978fc07edbc0317eec7a65ad738f44e94e",
+    "back_page1.png": "624c48a89386eb812b6fa04c2747c7f9fa4156689a1feb7eb676c2f162cd7975",
+    "back_page2.png": "6dea3d7cb4bdcc20bde9b4217ca64950823ff00caf4dc5a3820998927983802e",
+    "back_page3.png": "5c0bc8b62fb40ea8e176919a36d7589fc94f6903b98bc060bf86f5c829986679",
+    "back_page4.png": "9ad41ac131d6078bf99ffe43c41d561e9fabf620c45b767d6678fa4772abf9a0",
+    "back_page5.png": "9b9d0118f92bda9ba35122165f67c47cbd0cba7b773c6df25a6d18f852315e21",
+    "back_page6.png": "65ba00d409810ad5239fe131d8fb8868244a2dc7c0855405b986c6dcf7219f12"
    },
    "width": 1024
   },
   "front": {
-   "file": "front.astc.zip",
-   "fileBytes": 4210640,
-   "gpuBytes": 4210640,
-   "height": 616,
-   "layers": 5,
+   "file": "front.astc-packed.zip",
+   "fileBytes": 11317936,
+   "gpuBytes": 11317936,
+   "height": 1184,
+   "layers": 7,
    "levels": [
     {
-     "bh": 154,
+     "bh": 296,
      "bw": 256,
-     "h": 616,
+     "h": 1184,
      "w": 1024
     },
     {
-     "bh": 77,
+     "bh": 148,
      "bw": 128,
-     "h": 308,
+     "h": 592,
      "w": 512
     },
     {
-     "bh": 39,
+     "bh": 74,
      "bw": 64,
-     "h": 154,
+     "h": 296,
      "w": 256
     },
     {
-     "bh": 20,
+     "bh": 37,
      "bw": 32,
-     "h": 77,
+     "h": 148,
      "w": 128
     },
     {
-     "bh": 10,
+     "bh": 19,
      "bw": 16,
-     "h": 38,
+     "h": 74,
      "w": 64
     },
     {
-     "bh": 5,
+     "bh": 10,
      "bw": 8,
-     "h": 19,
+     "h": 37,
      "w": 32
     },
     {
-     "bh": 3,
+     "bh": 5,
      "bw": 4,
-     "h": 9,
+     "h": 18,
      "w": 16
     },
     {
-     "bh": 1,
+     "bh": 3,
      "bw": 2,
-     "h": 4,
+     "h": 9,
      "w": 8
     },
     {
      "bh": 1,
      "bw": 1,
-     "h": 2,
+     "h": 4,
      "w": 4
     },
     {
      "bh": 1,
      "bw": 1,
-     "h": 1,
+     "h": 2,
      "w": 2
     },
     {
@@ -176,20 +185,29 @@
      "w": 1
     }
    ],
+   "packed": {
+    "bytes": 1183564,
+    "encoding": "sparse-astc-v1",
+    "sha256": "04638afbe344014fb927f01367e70e4c7d834a1d5cad19e35a4baa4ab9935537"
+   },
    "pages": [
     "front_page0.png",
     "front_page1.png",
     "front_page2.png",
     "front_page3.png",
-    "front_page4.png"
+    "front_page4.png",
+    "front_page5.png",
+    "front_page6.png"
    ],
-   "sha256": "40ffafccac1e1c1248d6c90aaaa4c9c00cb1ca9e923501477c7b18f085301a4b",
+   "sha256": "03e813f71e0c636e8f8faafae1656ec7178a19ad3677e8f67a667aeb2a00c05b",
    "sourceSha256": {
-    "front_page0.png": "aed6b1439a5d0109d3bcf8b0e9d6db8505ba4a3b70883bbdb99b17de5ec4a18c",
-    "front_page1.png": "e9240dc1928ebc6d789851723155097cdab23d0e4380a7d1df1c687a6ccd8d90",
-    "front_page2.png": "fc0a5803fa42195419acc20c2b2a70b7768ea493b9d7a00c51fda329a0894485",
-    "front_page3.png": "b3551fc336e4ba61d54f6551b5ed5907996b579548f712d53556e43ca12883c8",
-    "front_page4.png": "4547164135bebf6f48bce3a5d9692bc476aebfd2f0065ce8daa9ab1ec54e9585"
+    "front_page0.png": "9757f3402d999b516fdca4b0978f4d8d5ce2714c0c77304fdacf2aec30a55d41",
+    "front_page1.png": "f780cdd605cd52a12466142afb038e6a124701a7409512b6453d15c27cf9bdfa",
+    "front_page2.png": "c7d0a42b91612b591a7c71126e2b250f0e39a0d5d8c059fed023a83ab7b918af",
+    "front_page3.png": "eb40a28930a2709b94a4d1ab1911d9e205fd01d136f6eca6a1c07284e4deac6b",
+    "front_page4.png": "0930aada647a624a124605ffb47e25e248dc404e6ae2d6869082c1975213e134",
+    "front_page5.png": "2fcb2505945fa18f0ef369034fdc415930ca3ba10ed0adb4830fb96718f3b71a",
+    "front_page6.png": "2d836f5b637df3940c3ffe5d78af2a0fa615064a5b07949de06200de0ffcc4cc"
    },
    "width": 1024
   }

@@ -9,6 +9,7 @@ import {
 } from "../rigs/boy/astc/astcAssets"
 import { ROOM_AVATAR_25D_TEXTURES as ROOM_AVATAR_25D_MALE_TEXTURES } from "../rigs/boy/rigAssets"
 import type { Avatar25AstcManifest, Avatar25AstcSource } from "./avatar25Astc"
+import { decodeAvatar25PackedAstc } from "./avatar25PackedAstc"
 import type { Rig25 } from "./rigTypes"
 
 /** The girl's exported rig (tools/avatar25d/export_rig.py → rigs/girl/). */
@@ -32,12 +33,13 @@ export interface Avatar25RigAssets {
   id: AvatarRigId
   rig: Rig25
   readTextureBytes: (name: string) => Promise<ArrayBuffer>
-  /** Derived ASTC 4x4 pages (<rig>/astc/, compress_pages.py); used where the GPU supports them (avatar25Astc). */
+  /** Derived ASTC 4x4 pages (<rig>/astc/, compress_pages.py), packed on disk; used where the GPU supports them (avatar25Astc). */
   astc: Avatar25AstcSource
 }
 
 function astcSource(manifest: unknown, files: Record<string, number>): Avatar25AstcSource {
-  return { manifest: manifest as Avatar25AstcManifest, readBlob: textureReader(files) }
+  const readPacked = textureReader(files)
+  return { manifest: manifest as Avatar25AstcManifest, readBlob: async (file) => decodeAvatar25PackedAstc(await readPacked(file)) }
 }
 
 /** Both drawn bodies. Their page files share names (front_page0.png …): GPU caches key them by rig id. */

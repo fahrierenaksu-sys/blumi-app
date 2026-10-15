@@ -51,7 +51,7 @@ const roomItem = (
 
 /**
  * "avatar_v2_top_male_navy_knit_polo" -> "Navy Knit Polo", "avatar_v2_shoes_white_clean_sneakers" -> "White Clean Sneakers",
- * "hair_girl_bob" -> "Bob"
+ * "avatar_v2_top_white_cute_crop_top" -> "White Cute Crop Top", "hair_girl_bob" -> "Bob"
  */
 const titleFromItemId = (itemId: string): string =>
   itemId

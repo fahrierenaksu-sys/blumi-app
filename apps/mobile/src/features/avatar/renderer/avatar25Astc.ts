@@ -13,10 +13,15 @@ const ASTC_BLOCK_BYTES = 16
 const ASTC_BLOCK_SIZE = 4
 
 export interface Avatar25AstcLevel { w: number; h: number; bw: number; bh: number }
+/** The packed file on disk (avatar25PackedAstc.ts); it decodes to the blob that `sha256` and `fileBytes` describe. */
+export interface Avatar25AstcPacking { encoding: string; bytes: number; sha256: string }
 export interface Avatar25AstcSet {
+  /** The bundled file: a packed blob. */
   file: string
+  /** sha256 and size of the decoded ASTC blob, the bytes the GPU receives. */
   sha256: string
   fileBytes: number
+  packed: Avatar25AstcPacking
   gpuBytes: number
   width: number
   height: number
@@ -35,7 +40,7 @@ export interface Avatar25AstcManifest {
   encoder: { name: string; version: string }
   sets: Record<string, Avatar25AstcSet>
 }
-/** What a rig offers the renderer: its manifest and a reader for the bundled blob files. */
+/** What a rig offers the renderer: its manifest and a reader that returns a set's decoded ASTC blob. */
 export interface Avatar25AstcSource {
   manifest: Avatar25AstcManifest
   readBlob: (file: string) => Promise<ArrayBuffer>

@@ -12,7 +12,7 @@
  "preset": "VERYTHOROUGH",
  "sets": {
   "back": {
-   "file": "back.astc.zip",
+   "file": "back.astc-packed.zip",
    "fileBytes": 10256736,
    "gpuBytes": 10256736,
    "height": 536,
@@ -85,6 +85,11 @@
      "w": 1
     }
    ],
+   "packed": {
+    "bytes": 1739308,
+    "encoding": "sparse-astc-v1",
+    "sha256": "611f0efc601c4acc3235ca3d9f7f1677b8628018b1e46403a22afbea255c2829"
+   },
    "pages": [
     "back_page0.png",
     "back_page1.png",
@@ -121,7 +126,7 @@
    "width": 1024
   },
   "front": {
-   "file": "front.astc.zip",
+   "file": "front.astc-packed.zip",
    "fileBytes": 10401888,
    "gpuBytes": 10401888,
    "height": 544,
@@ -194,6 +199,11 @@
      "w": 1
     }
    ],
+   "packed": {
+    "bytes": 1804492,
+    "encoding": "sparse-astc-v1",
+    "sha256": "1a65bf6e2761e250f52c9834102e6024b182e06750a9e06d7a1046064f10deed"
+   },
    "pages": [
     "front_page0.png",
     "front_page1.png",

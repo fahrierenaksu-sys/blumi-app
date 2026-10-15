@@ -58,8 +58,8 @@ export function seatedShinBandRows(v: Pick<Rig25View, "sit">): [number, number] 
  * indices): the top strip on `rootSlot`, the bottom strip on `legSlot`, the band from one to the other (so it
  * stretches evenly). Null when the mesh has no seated card or it is any other shape (it is then drawn as it is).
  */
-export function seatedCardStrips(mesh: Rig25Mesh, bandRows: [number, number], rootSlot: number, legSlot: number): Rig25Mesh | null {
-  const range = mesh.ranges.find((r) => r.name === "sit")
+export function seatedCardStrips(mesh: Rig25Mesh, bandRows: [number, number], rootSlot: number, legSlot: number, rangeName = "sit"): Rig25Mesh | null {
+  const range = mesh.ranges.find((r) => r.name === rangeName)
   if (!range || range.count !== 6) return null
   const corners = [...new Set(mesh.index.slice(range.start, range.start + 6))]
   if (corners.length !== 4) return null
@@ -103,6 +103,6 @@ export function seatedCardStrips(mesh: Rig25Mesh, bandRows: [number, number], ro
     const a = strip * 2, b = a + 1, c = a + 3, d = a + 2
     out.index.push(a, b, c, a, c, d)
   }
-  out.ranges.push({ name: "sit", order: range.order, start: 0, count: out.index.length })
+  out.ranges.push({ name: range.name, order: range.order, start: 0, count: out.index.length })
   return out
 }

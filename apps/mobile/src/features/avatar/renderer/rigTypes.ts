@@ -18,6 +18,14 @@ export interface Rig25Range {
    * bottom worn with shoes draws its 'bottom' drawing gated by the shoes' 'shoes' drawing (avatar25Pose `legPlan`).
    */
   legVariant?: string
+  /**
+   * A body drawing owned by this item (export_rig.py body_replacements): the body range it is drawn instead of while
+   * the item is worn ('torso', 'torsoCardArms', 'farArm', 'sit', ...), with that range's mesh and order
+   * (avatar25BodySwap). The black trousers' shorts-trimmed torso, a crop top's bare belly.
+   */
+  bodyPart?: string
+  /** Only while this other worn item is worn too (a lab `<bottom>+<top>` pair drawing). */
+  bodyWith?: string
 }
 
 export interface Rig25Mesh {
@@ -58,6 +66,11 @@ export interface Rig25Item {
   /** Painted walk cards for this item (only meaningful when the body has painted walk frames). */
   hasWalk: boolean
   mesh: Rig25Mesh
+  /**
+   * "midriff": the item's torso drawings bare her waist (a crop top's shared bare-belly set). While they are drawn,
+   * bottoms' and shoes' seated cards go above the torso (avatar25BodySwap `seatedCardOrder`).
+   */
+  torso?: "midriff"
   /**
    * Mirror cards (optional; export_rig.py writes them for parts with a pre-flipped drawing). The renderer mirrors
    * the whole avatar for the two mirrored directions, which moves a one-sided marker (a hair clip) to her other

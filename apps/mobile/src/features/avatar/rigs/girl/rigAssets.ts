@@ -5,9 +5,13 @@ export const ROOM_AVATAR_25D_TEXTURES: Record<string, number> = {
   "back_page2.png": require("./back_page2.png"),
   "back_page3.png": require("./back_page3.png"),
   "back_page4.png": require("./back_page4.png"),
+  "back_page5.png": require("./back_page5.png"),
+  "back_page6.png": require("./back_page6.png"),
   "front_page0.png": require("./front_page0.png"),
   "front_page1.png": require("./front_page1.png"),
   "front_page2.png": require("./front_page2.png"),
   "front_page3.png": require("./front_page3.png"),
   "front_page4.png": require("./front_page4.png"),
+  "front_page5.png": require("./front_page5.png"),
+  "front_page6.png": require("./front_page6.png"),
 }

@@ -21,6 +21,11 @@
  *                                                                          bake-showcase.mjs (verified by sha256)
  *   packages/domain/src/avatar/avatarStillManifest.json                   layers, rects, windows, rigSha256, and the
  *                                                                          showcaseBase / item showcase layers
+ *
+ * Body drawings owned by items (avatar25BodySwap: the black trousers' torso and arms, a crop top's bare belly): the
+ * body layers they can replace carry `part`, each item's drawing is its own layer (`bodyPart`, `bodyWith` for a pair)
+ * baked as the item draws it when it wins, and each item lists its claims (`replaces`), so the still resolver
+ * (domain avatarStills) hides and shows exactly the layers the live renderer does.
  * --check: bake into memory and fail if anything on disk differs (nothing is written).
  * BAKE_STILLS_EVIDENCE=<dir>: also write the seam evidence and, per item thumb, before/after/body/stages PNGs.
  */
@@ -228,17 +233,22 @@ function composite(layers, canvas) {
 
 const webp = (raw, w, h) => sharp(raw, { raw: { width: w, height: h, channels: 4 } }).webp({ lossless: true, effort: 6 }).toBuffer()
 const orderTag = (order) => `o${String(order).replace(".", "p")}`
-const layerKey = (owner, order, legVariant, gatedBy) =>
-  `${owner}__${orderTag(order)}${legVariant ? `__${legVariant.replace("+", "-")}` : ""}${gatedBy ? `__cut-by__${gatedBy}` : ""}`
+const bodyTag = (bodyPart, bodyWith) => (bodyPart ? `__body-${bodyPart}${bodyWith ? `-with-${bodyWith}` : ""}` : "")
+const layerKey = (owner, order, legVariant, gatedBy, bodyPart, bodyWith) =>
+  `${owner}__${orderTag(order)}${legVariant ? `__${legVariant.replace("+", "-")}` : ""}${gatedBy ? `__cut-by__${gatedBy}` : ""}${bodyTag(bodyPart, bodyWith)}`
 /** The shared sheet of a bottom's composed legs on one leg layer (every shoes' cell, stacked). */
 const sheetKey = (owner, order) => `${owner}__${orderTag(order)}__bottom-cut`
 const SHEET_GAP = 2
 
-/** The layer key of a stand entry: body bands, item parts, item leg drawings and composed (cut) legs. */
+/** The layer key of a stand entry: body bands, item parts, item leg drawings, composed (cut) legs, item body drawings. */
 function entryKey(entry, canonicalOf) {
   const owner = entry.owner === "body" ? "body" : canonicalOf[entry.owner]
-  return layerKey(owner, entry.order, entry.legVariant, entry.legMask ? canonicalOf[entry.legMask.owner] : undefined)
+  return layerKey(owner, entry.order, entry.legVariant, entry.legMask ? canonicalOf[entry.legMask.owner] : undefined,
+    entry.bodyPart, entry.bodyWith ? canonicalOf[entry.bodyWith] : undefined)
 }
+
+/** An item's body drawings (export_rig.py body_replacements): its ranges that draw a body range instead of the body's. */
+const bodyClaims = (view, id) => view.items[id].mesh.ranges.filter((r) => r.bodyPart !== undefined)
 
 /**
  * Every stand layer a body can show, enumerated per item so any wardrobe bakes: the body with nothing worn, every
@@ -248,6 +258,8 @@ function entryKey(entry, canonicalOf) {
  */
 function standLayers(rig, rigItemIds, canonicalOf) {
   const view = rig.views.front
+  // body ranges a worn item can draw instead of the body's: their body layers are tagged with the range (`part`)
+  const replaceable = new Set(rigItemIds.flatMap((id) => bodyClaims(view, id).map((r) => r.bodyPart)))
   const ofSlot = (slot) => rigItemIds.filter((id) => view.items[id].slot === slot)
   const groups = new Map()
   const add = (worn, keep) => {
@@ -256,11 +268,17 @@ function standLayers(rig, rigItemIds, canonicalOf) {
       const owner = entry.owner === "body" ? "body" : canonicalOf[entry.owner]
       const key = entryKey(entry, canonicalOf)
       const rank = entry.owner === "body" ? 0 : (SLOT_RANK[view.items[entry.owner].slot] + 1) * 1000
+      const part = entry.owner === "body" && replaceable.has(entry.name) ? entry.name : undefined
       const group = groups.get(key) ?? {
         key, owner, rigItemId: entry.owner === "body" ? null : entry.owner,
         slot: entry.owner === "body" ? "body" : view.items[entry.owner].slot,
         order: entry.order, seq: Infinity, legVariant: entry.legVariant, leg: entry.leg, index: new Set(), triangles: [],
-        gatedBy: entry.legMask ? canonicalOf[entry.legMask.owner] : undefined
+        gatedBy: entry.legMask ? canonicalOf[entry.legMask.owner] : undefined,
+        part, bodyPart: entry.bodyPart, bodyWith: entry.bodyWith ? canonicalOf[entry.bodyWith] : undefined
+      }
+      // a replaceable body range must be a layer of its own, or hiding it would hide the other range too
+      if (group.part !== part || (part !== undefined && group.triangles.length > 0 && group.triangles[0].index.join() !== entry.index.join())) {
+        throw new Error(`stills: body layer ${key} mixes a replaceable range (${group.part ?? part}) with another range`)
       }
       // seq: the live tie-break is monotone in (worn slot, range); a stable rank keeps it for any worn subset
       const localSeq = rank + entryRangeIndex(rig, entry)
@@ -274,10 +292,17 @@ function standLayers(rig, rigItemIds, canonicalOf) {
     }
   }
   add([], () => true)
-  add(rigItemIds, (entry) => entry.owner !== "body" && entry.legVariant === undefined)
+  add(rigItemIds, (entry) => entry.owner !== "body" && entry.legVariant === undefined && entry.bodyPart === undefined)
   const bottoms = ofSlot("bottom"), shoes = ofSlot("shoes")
   for (const id of [...bottoms, ...shoes]) add([id], (entry) => entry.legVariant !== undefined)
   for (const bottom of bottoms) for (const pair of shoes) add([pair, bottom], (entry) => entry.legVariant !== undefined)
+  // each item's body drawings, as drawn while it wins them: worn alone, or with its pair partner (one with art)
+  for (const id of rigItemIds) {
+    for (const partner of new Set(bodyClaims(view, id).map((r) => r.bodyWith))) {
+      if (partner !== undefined && !canonicalOf[partner]) continue
+      add(partner === undefined ? [id] : [id, partner], (entry) => entry.owner === id && entry.bodyPart !== undefined && entry.bodyWith === partner)
+    }
+  }
   return [...groups.values()].sort((a, b) => a.order - b.order || a.seq - b.seq)
 }
 
@@ -384,7 +409,8 @@ async function bakeBody(rigId, rigDir, files) {
     rendered.push({ layer, rgba, rect })
     const entry = { key: layer.key, owner: layer.owner, slot: layer.slot, order: layer.order, seq: layer.seq, rect,
       ...(layer.leg ? { leg: layer.leg } : {}), ...(layer.legVariant !== undefined ? { legVariant: layer.legVariant } : {}),
-      ...(layer.gatedBy ? { gatedBy: layer.gatedBy } : {}) }
+      ...(layer.gatedBy ? { gatedBy: layer.gatedBy } : {}), ...(layer.part ? { part: layer.part } : {}),
+      ...(layer.bodyPart ? { bodyPart: layer.bodyPart } : {}), ...(layer.bodyWith ? { bodyWith: layer.bodyWith } : {}) }
     drawn.push(entry)
     if (layer.gatedBy) {
       // a composed leg is a cell of its bottom's sheet; legs never reach the bust window
@@ -403,7 +429,7 @@ async function bakeBody(rigId, rigDir, files) {
   }
   const sources = await packCutSheets(cut, rigId, files)
   const full = drawn.map((entry) => (sources.has(entry.key) ? { ...entry, source: sources.get(entry.key) } : entry))
-  // thumbs: each item alone (its own parts, never the bare legs it draws for a worn set), cropped, max 256 px
+  // thumbs: each item alone (its own parts, never the bare legs or body it draws for a worn set), cropped, max 256 px
   const items = {}
   // the body as drawn with nothing worn: the rig's own skin, face and ears at the stand pose, the reference an item
   // thumb is cleaned against (an item's art may carry the body it was cut from: hands in cuffs, neck, face under hair)
@@ -411,7 +437,7 @@ async function bakeBody(rigId, rigDir, files) {
   const debugThumbs = process.env.BAKE_STILLS_EVIDENCE ? [] : null
   for (const rigItemId of rigItemIds) {
     const canonical = canonicalOf[rigItemId]
-    const own = rendered.filter((r) => r.layer.rigItemId === rigItemId && r.layer.legVariant === undefined)
+    const own = rendered.filter((r) => r.layer.rigItemId === rigItemId && r.layer.legVariant === undefined && r.layer.bodyPart === undefined)
     const withBody = composite(own, canvas)
     const { rgba: alone, removed } = THUMB_KEEPS_BODY_ART.has(canonical)
       ? { rgba: withBody, removed: new Uint8Array(canvas.width * canvas.height) }
@@ -423,7 +449,11 @@ async function bakeBody(rigId, rigDir, files) {
       .resize(Math.max(1, Math.round(rect[2] * scale)), Math.max(1, Math.round(rect[3] * scale)), { kernel: "lanczos3" })
       .webp({ lossless: true, effort: 6 }).toBuffer()
     files.set(`layers/${rigId}/thumb/${canonical}.webp`, thumb)
-    items[canonical] = { slot: view.items[rigItemId].slot, rigItemId, thumb: canonical }
+    // every body range it draws instead of the body's, in any pose: the resolver picks winners from these, as live
+    const claims = [...new Map(bodyClaims(view, rigItemId)
+      .filter((r) => r.bodyWith === undefined || canonicalOf[r.bodyWith])
+      .map((r) => [`${r.bodyPart}|${r.bodyWith ?? ""}`, { part: r.bodyPart, ...(r.bodyWith ? { with: canonicalOf[r.bodyWith] } : {}) }])).values()]
+    items[canonical] = { slot: view.items[rigItemId].slot, rigItemId, thumb: canonical, ...(claims.length > 0 ? { replaces: claims } : {}) }
   }
   const evidence = await seamEvidence(rigId, rig, starter, artMap, rigItemIds, canonicalOf, rendered, canvas, meshOf, skinned, pages)
   if (debugThumbs) await writeThumbEvidence(rigId, debugThumbs, bodySkin, canvas)

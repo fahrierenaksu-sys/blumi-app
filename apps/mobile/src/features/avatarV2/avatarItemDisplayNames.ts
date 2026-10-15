@@ -24,6 +24,9 @@ export const AVATAR_ITEM_NAMES_TR: Readonly<Record<string, string>> = {
   avatar_v2_shoes_white_clean_sneakers: "Beyaz Sneaker",
   hair_girl_bob: "Tokalı Bob",
   hair_girl_pigtails: "Fiyonklu Çift Kuyruk",
+  avatar_v2_top_white_cute_crop_top: "Beyaz Crop Top",
+  avatar_v2_top_black_cute_crop_top: "Siyah Crop Top",
+  avatar_v2_bottom_black_highwaist_trousers: "Siyah Yüksek Bel Pantolon",
   // Boy: hair
   avatar_v2_hair_male_blue_black_curls: "Lacivert Bukleler",
   avatar_v2_hair_male_textured_twists: "Burgu Saç",

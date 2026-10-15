@@ -332,6 +332,29 @@ class BlinkGateTest(unittest.TestCase):
                 self.assertTrue(any(c[key] for c in cases if c['outfit'].startswith('dressed')), broken)
 
 
+@unittest.skipUnless((APP_RIG / 'girl/rig25.json').exists(), 'app rig not exported')
+class SharedBodyDrawingTest(unittest.TestCase):
+    """An item's identical body drawings (the trousers' torso fitted to each crop top) are packed once and shared."""
+
+    def test_identical_pair_drawings_of_one_item_share_their_page_rect(self):
+        rig = json.loads((APP_RIG / 'girl/rig25.json').read_text())
+        shared = 0
+        for view in rig['views'].values():
+            for item in view['items'].values():
+                m = item['mesh']
+                uvs = {}
+                for r in m['ranges']:
+                    if 'bodyWith' not in r:
+                        continue
+                    verts = list(dict.fromkeys(m['index'][r['start']:r['start'] + r['count']]))
+                    uvs.setdefault(r['bodyPart'], []).append(tuple(m['uv'][i * 2 + k] for i in verts for k in (0, 1)))
+                for part, sets in uvs.items():
+                    if len(sets) > 1:
+                        self.assertEqual(len(set(sets)), 1, part)
+                        shared += 1
+        self.assertGreater(shared, 0, 'the girl rig has pair drawings shared by two partners')
+
+
 def data_uri(image):
     import io, base64
     buf = io.BytesIO()
@@ -487,6 +510,13 @@ class LegVariantOwnersTest(unittest.TestCase):
                                   'mint': [('shoes', 'shoes')], 'white': [('white', 'shoes')]})
         with self.assertRaises(SystemExit):   # two shoes without their own key: the slot key names nobody
             self.ex.leg_variant_owners(dict.fromkeys(['shoes'], {}), items)
+
+    def test_a_slot_key_belongs_to_the_one_item_of_that_slot_without_its_own_key(self):
+        # the girl: her starter pants keep the QA'd slot drawings; the black trousers bring a drawing keyed by their id
+        items = {'pants': {'slot': 'bottom'}, 'trousers': {'slot': 'bottom'}, 'sneakers': {'slot': 'shoes'}}
+        owners = self.ex.leg_variant_owners(dict.fromkeys(['bottom', 'bottom+shoes', 'shoes', 'trousers'], {}), items)
+        self.assertEqual(owners, {'pants': [('bottom', 'bottom'), ('bottom+shoes', 'bottom+shoes')],
+                                  'sneakers': [('shoes', 'shoes')], 'trousers': [('trousers', 'bottom')]})
 
     def test_bad_keys_stop_the_export(self):
         for key in ('top_a', 'nobody', 'bottom_a+bottom_b', 'bottom_a+shoes_a+shoes_b', 'bottom'):
@@ -667,6 +697,137 @@ class BlinkPatchesOneOutfitTest(unittest.TestCase):
         patches = [{'item': 'hair_a'}, {'item': 'hair_b'}, {'item': 'hair_b'}, {'item': 'hat'}]
         self.assertEqual(load_exporter().blink_patches_one_outfit(patches, self.ITEMS), 3)
 
+
+
+# the factory's QA'd girl rig with the black high-waist trousers' body drawings (lab doll25 torso/arm/sit variants)
+TROUSERS_RIG = pathlib.Path.home() / 'BlumiArtWorkbench/avatar25-v2/factory/work/girl_trousers_hem_0720/rigs/rig_r2.json'
+TROUSERS = 'bottom_black_highwaist_straight'
+CROP = 'top_crop_white'
+
+
+class BodyReplacementOwnersTest(unittest.TestCase):
+    """Which item carries which body drawing (body_replacements): item keys, pairs, the shared midriff set."""
+
+    @classmethod
+    def setUpClass(cls):
+        from PIL import Image
+        cls.ex = load_exporter()
+        cls.img = staticmethod(lambda size: data_uri(Image.new('RGBA', size, (200, 150, 120, 255))))
+        cls.items = {'b': {'slot': 'bottom'}, 't': {'slot': 'top', 'torso': 'midriff'}, 's': {'slot': 'shoes'}}
+        cls.sizes = {'torso': (4, 6), 'torsoCardArms': (4, 5), 'farArm': (2, 3), 'nearArm': (2, 3), 'sit': (7, 7)}
+
+    def test_item_and_pair_keys_go_to_their_first_item_and_the_midriff_set_to_every_item_that_asks_for_it(self):
+        hy = {'torsoVariants': {'b': {'full': self.img((4, 6)), 'cardArms': self.img((4, 5))}, 'b+t': {'full': self.img((4, 6))}},
+              'armVariants': {'b': {'farArm': self.img((2, 3))}}, 'sitVariants': {'b': self.img((7, 7))},
+              'torsoMidriff': {'full': self.img((4, 6)), 'cardArms': self.img((4, 5))}}
+        got = {k: sorted((body, w or '') for body, _, w in v) for k, v in self.ex.body_replacements(hy, self.items, self.sizes).items()}
+        self.assertEqual(got, {'b': [('farArm', ''), ('sit', ''), ('torso', ''), ('torso', 't'), ('torsoCardArms', '')],
+                               't': [('torso', ''), ('torsoCardArms', '')]})
+
+    def test_a_rig_without_body_variants_has_no_replacements(self):
+        self.assertEqual(self.ex.body_replacements({}, {'b': {'slot': 'bottom'}}, self.sizes), {})
+
+    def test_bad_body_variants_stop_the_export(self):
+        bad = [
+            ({'torsoVariants': {'b': {'full': self.img((5, 6))}}}, {'b': {'slot': 'bottom'}}),           # not the body's size
+            ({'torsoVariants': {'x': {'full': self.img((4, 6))}}}, {'b': {'slot': 'bottom'}}),           # not an item
+            ({'torsoVariants': {'b': {'chest': self.img((4, 6))}}}, {'b': {'slot': 'bottom'}}),          # unknown map
+            ({'armVariants': {'b+s+t': {'farArm': self.img((2, 3))}}}, self.items),                      # three items
+            ({'torsoVariants': {'b': {'walk': self.img((4, 6))}}}, {'b': {'slot': 'bottom'}}),           # body has no torsoWalk
+            ({}, self.items),                                                                             # midriff, no set
+            ({'torsoMidriff': {'full': self.img((4, 6))}}, {'t': {'slot': 'top', 'torso': 'tank'}}),     # unknown torso kind
+        ]
+        for hy, items in bad:
+            with self.assertRaises(SystemExit, msg=str(list(hy))):
+                self.ex.body_replacements(hy, items, self.sizes)
+
+
+@unittest.skipUnless(TROUSERS_RIG.exists(), 'factory trousers rig not on this machine')
+class ExportBodyReplacementTest(unittest.TestCase):
+    """The trousers' body drawings and a crop top's midriff are exported on the body ranges' own meshes, their pixels
+    exactly on the owning item's page; every other item and the body are exported exactly as without them."""
+
+    def test_trousers_and_midriff_drawings_ride_the_body_meshes_and_change_nothing_else(self):
+        import io, base64
+        from PIL import Image
+        lab = json.loads(TROUSERS_RIG.read_text())
+        plain = json.loads(TROUSERS_RIG.read_text())
+        keep = {TROUSERS, CROP, 'shoes_white_sneakers'}   # one item per slot; the lab's slot-keyed legs are the coral pants'
+        for rig in (lab, plain):
+            for view in ('front', 'back'):
+                rig[view]['items'] = {k: v for k, v in rig[view]['items'].items() if k in keep}
+                legs = rig[view]['hybrid']['legVariants']
+                rig[view]['hybrid']['legVariants'] = {k: v for k, v in legs.items() if k not in ('bottom', 'shoes', 'bottom+shoes')}
+        for view in ('front', 'back'):
+            hy = lab[view]['hybrid']
+            # a stand-in midriff set (the real belly art is installed by the factory): the body's maps, recoloured
+            hy['torsoMidriff'] = {}
+            for name, key in (('full', None), ('cardArms', 'torsoCardArms')):
+                src = next(L['png'] for L in lab[view]['layers'] if L['name'] == 'torso') if key is None else hy[key]
+                im = Image.open(io.BytesIO(base64.b64decode(src.split(',', 1)[1]))).convert('RGBA')
+                hy['torsoMidriff'][name] = data_uri(Image.merge('RGBA', (im.getchannel('B'), im.getchannel('G'), im.getchannel('R'), im.getchannel('A'))))
+            lab[view]['items'][CROP]['torso'] = 'midriff'
+            for fam in ('torsoVariants', 'armVariants', 'sitVariants'):   # the plain rig: no body drawings at all
+                plain[view]['hybrid'].pop(fam, None)
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b, tempfile.TemporaryDirectory() as tmp:
+            src_a, src_b = pathlib.Path(tmp) / 'plain.json', pathlib.Path(tmp) / 'repl.json'
+            src_a.write_text(json.dumps(plain)); src_b.write_text(json.dumps(lab))
+            ra, rb = export_full_resolution(src_a, a), export_full_resolution(src_b, b)
+            self.assertEqual(ra.returncode, 0, ra.stderr[-2000:]); self.assertEqual(rb.returncode, 0, rb.stderr[-2000:])
+            old = json.loads((pathlib.Path(a) / 'rig25.json').read_text())
+            new = json.loads((pathlib.Path(b) / 'rig25.json').read_text())
+            for view in ('front', 'back'):
+                ov, nv = old['views'][view], new['views'][view]
+                # the body and the other items are exported exactly as before (uv in page px: the pages may grow taller)
+                def same_mesh(m1, size1, m0, size0, what):
+                    self.assertEqual({**m1, 'uv': None}, {**m0, 'uv': None}, what)
+                    self.assertLess(max(abs(x * size1[i % 2] - y * size0[i % 2]) for i, (x, y) in enumerate(zip(m1['uv'], m0['uv']))), 0.01, what)
+                same_mesh(nv['mesh'], nv['pageSize'], ov['mesh'], ov['pageSize'], view)
+                for iid, item in ov['items'].items():
+                    extra = [r for r in nv['items'][iid]['mesh']['ranges'] if r.get('bodyPart')]
+                    self.assertEqual(nv['items'][iid].get('torso'), 'midriff' if iid == CROP else None, iid)
+                    if iid not in (TROUSERS, CROP):
+                        same_mesh(nv['items'][iid]['mesh'], nv['pageSize'], item['mesh'], ov['pageSize'], iid)
+                        self.assertEqual(extra, [])
+                body = {r['name']: r for r in nv['mesh']['ranges']}
+                hy = lab[view]['hybrid']
+                torso_ranges = {'full': 'torso', 'walk': 'torsoWalk', 'upper': 'torsoUpper', 'noArms': 'torsoNoArms', 'sit': 'torsoSit', 'cardArms': 'torsoCardArms'}
+                want = {TROUSERS: {f'{torso_ranges[k]}@body' for k in hy['torsoVariants'][TROUSERS]}
+                        | {f'{arm}@body' for arm in hy['armVariants'][TROUSERS]} | {'sit@body'},
+                        CROP: {'torso@body', 'torsoCardArms@body'}}
+                page_of = {}
+                for iid, names in want.items():
+                    item = nv['items'][iid]
+                    got = {r['name']: r for r in item['mesh']['ranges'] if r.get('bodyPart')}
+                    self.assertEqual(set(got), names, f'{view} {iid}')
+                    for r in got.values():
+                        twin = body[r['bodyPart']]
+                        self.assertEqual((r['order'], r['count']), (twin['order'], twin['count']), r['name'])
+                        self.assertNotIn('bodyWith', r)
+                        # same triangles and positions as the body range: drawn exactly where the body drawing is
+                        mi, bi = item['mesh'], nv['mesh']
+                        a_idx = mi['index'][r['start']:r['start'] + r['count']]
+                        b_idx = bi['index'][twin['start']:twin['start'] + twin['count']]
+                        self.assertEqual([mi['pos'][i * 2:i * 2 + 2] for i in a_idx], [bi['pos'][i * 2:i * 2 + 2] for i in b_idx])
+                        self.assertEqual({mi['page'][i] for i in a_idx}, {item['page']})
+                    page_of[iid] = Image.open(pathlib.Path(b) / nv['pages'][item['page']]).convert('RGBA')
+                # the crop top's torso drawing on its page is the midriff set's pixels
+                item = nv['items'][CROP]; r = next(x for x in item['mesh']['ranges'] if x['name'] == 'torso@body')
+                W, H = page_of[CROP].size
+                ids = item['mesh']['index'][r['start']:r['start'] + r['count']]
+                import numpy as np
+                mid = Image.open(io.BytesIO(base64.b64decode(lab[view]['hybrid']['torsoMidriff']['full'].split(',', 1)[1]))).convert('RGBA')
+                # every vertex of the crop top's torso drawing samples the midriff set's texel at the same drawing point
+                layer = next(L for L in lab[view]['layers'] if L['name'] == 'torso')
+                page = np.asarray(page_of[CROP]); art = np.asarray(mid)
+                verts = sorted(set(ids))
+                self.assertEqual(len(verts), len(layer['uvs']))
+                for k, vtx in enumerate(verts):
+                    u, w = layer['uvs'][k]
+                    sx, sy = min(int(u * mid.width), mid.width - 1), min(int((1 - w) * mid.height), mid.height - 1)
+                    px, py = item['mesh']['uv'][vtx * 2] * W, item['mesh']['uv'][vtx * 2 + 1] * H
+                    tx, ty = min(int(round(px - u * mid.width)) + sx, W - 1), min(int(round(py - (1 - w) * mid.height)) + sy, H - 1)
+                    self.assertEqual(page[ty, tx].tolist(), art[sy, sx].tolist() if art[sy, sx, 3] else page[ty, tx].tolist(), (view, k))
 
 if __name__ == '__main__':
     unittest.main()

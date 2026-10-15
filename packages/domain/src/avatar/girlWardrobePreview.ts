@@ -6,14 +6,18 @@
  * ownedByDefault (server-authoritative, the inventory self-heal grants them to existing accounts). They have no
  * receipt, are never sold (hidden from the shop) and are loadout-valid for the girl's body only.
  *
+ * 2026-10-13 (wip/body-replacement-2): the white and black crop tops and the black high-waist trousers join on the same
+ * terms (girl basics, NEW IDs). The crop tops bare her waist (the owner-approved belly, 2026-10-13) and the trousers
+ * bring their own torso, arms and seated card (renderer avatar25BodySwap).
+ *
  * 2026-10-14 (wip/girl-hairs): the factory-finished bob (side clip) and pigtails (bows) join on the same terms. They are
  * new designs with no planned `avatar_v2_` ID, so they keep the item IDs their art and rig use (`hair_girl_bob`,
  * `hair_girl_pigtails`); no old ID is renamed or reused.
  */
 export const GIRL_WARDROBE_PREVIEW_ITEM_IDS = {
   hair: ["avatar_v2_hair_mocha_ribbon_waves", "hair_girl_bob", "hair_girl_pigtails"],
-  top: [],
-  bottom: [],
+  top: ["avatar_v2_top_white_cute_crop_top", "avatar_v2_top_black_cute_crop_top"],
+  bottom: ["avatar_v2_bottom_black_highwaist_trousers"],
   shoes: ["avatar_v2_shoes_white_clean_sneakers"],
 } as const satisfies Record<"hair" | "top" | "bottom" | "shoes", readonly string[]>;
 

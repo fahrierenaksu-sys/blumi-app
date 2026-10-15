@@ -28,7 +28,10 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     avatar_v2_hair_mocha_ribbon_waves: "hair_girl_waves",
     avatar_v2_shoes_white_clean_sneakers: "shoes_white_sneakers",
     hair_girl_bob: "hair_girl_bob",
-    hair_girl_pigtails: "hair_girl_pigtails"
+    hair_girl_pigtails: "hair_girl_pigtails",
+    avatar_v2_top_white_cute_crop_top: "top_crop_white",
+    avatar_v2_top_black_cute_crop_top: "top_crop_black",
+    avatar_v2_bottom_black_highwaist_trousers: "bottom_black_highwaist_straight"
   },
   // the boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts; QA unlock only, no receipts)
   male: {
