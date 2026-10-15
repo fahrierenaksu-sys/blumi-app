@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "71484582c8b694db4eff302b2c3e50f6793bf4e4c45a6ad56ac715a632c00632",
+      "rigSha256": "17bf1f2c31a728b46cb2a2b7994c916913594369324b8d85716ca486aaedd522",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -105,10 +105,10 @@
             "under": {
               "key": "avatar_v2_bottom_coral_wave_pants__under",
               "rect": [
-                17,
-                809,
-                577,
-                587
+                11,
+                642,
+                583,
+                754
               ]
             }
           }
@@ -195,7 +195,26 @@
             {
               "part": "sit"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__front",
+            "rect": [
+              13,
+              663,
+              581,
+              747
+            ],
+            "order": 2,
+            "under": {
+              "key": "avatar_v2_bottom_black_highwaist_trousers__under",
+              "rect": [
+                11,
+                642,
+                583,
+                754
+              ]
+            }
+          }
         },
         "avatar_v2_top_coral_wave_polo": {
           "slot": "top",
@@ -216,7 +235,7 @@
                 113,
                 404,
                 380,
-                328
+                325
               ]
             }
           }
@@ -261,7 +280,7 @@
                 113,
                 404,
                 380,
-                328
+                325
               ]
             }
           }
@@ -306,7 +325,7 @@
                 113,
                 404,
                 380,
-                328
+                325
               ]
             }
           }
@@ -330,7 +349,7 @@
                 113,
                 404,
                 380,
-                328
+                325
               ]
             }
           }
@@ -374,7 +393,7 @@
                 113,
                 404,
                 380,
-                328
+                325
               ]
             }
           }

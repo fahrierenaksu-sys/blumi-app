@@ -9,7 +9,7 @@
       "baseSha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0",
       "qaPass": "line_1900/REPORT.md (o_g1fix8 16:37 FINAL; G5 starter-shoes waiver = owner yes 2026-10-12 20:07)",
       "ownerApproved": true,
-      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-14 15:23 +0300: the owner approved ('evet') the front looks of hair_girl_bob and hair_girl_pigtails (factory girl_bob_2130 and girl_pigtails_2130 sc/final_r2, shown in girl_preview_1500/girl_wardrobe_now.png; OWNER_DECISIONS.md FRONT SHOWCASE line of 2026-10-14). Ribbon waves and white sneakers are still pending. 2026-10-15 10:38 +0300: the owner approved ('önden görünsün') the front looks of ribbon waves, white sneakers, crop white, crop black, black trousers, jacket and corset (OWNER_DECISIONS.md), conditional on the audit fixes (sneaker hem, trouser hips, waves flecks). Listed here: waves, white sneakers (hem moved to the trousers layer, factory girl_shoes5_1430 FIX r1 hem_move), both crops (factory girl_basics_sc_1640 o_basics_w10/k11), jacket and corset. The black trousers are NOT listed: the hip fix is still open (beta5_fix_1030/REPORT.md), so they keep the 3/4 fallback. 2026-10-15 (chat): the owner approved the starter polo front v6 ('Polo değişikliğini onaylıyorum') and allowed the corset and jacket pins to move to their hip-fix v6 files (front + erase, Workbench integration/card_design/showcase/f2_hem_1545, integration/front_fix_1545/REPORT.md).",
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-14 15:23 +0300: the owner approved ('evet') the front looks of hair_girl_bob and hair_girl_pigtails (factory girl_bob_2130 and girl_pigtails_2130 sc/final_r2, shown in girl_preview_1500/girl_wardrobe_now.png; OWNER_DECISIONS.md FRONT SHOWCASE line of 2026-10-14). Ribbon waves and white sneakers are still pending. 2026-10-15 10:38 +0300: the owner approved ('önden görünsün') the front looks of ribbon waves, white sneakers, crop white, crop black, black trousers, jacket and corset (OWNER_DECISIONS.md), conditional on the audit fixes (sneaker hem, trouser hips, waves flecks). Listed here: waves, white sneakers (hem moved to the trousers layer, factory girl_shoes5_1430 FIX r1 hem_move), both crops (factory girl_basics_sc_1640 o_basics_w10/k11), jacket and corset. The black trousers are NOT listed: the hip fix is still open (beta5_fix_1030/REPORT.md), so they keep the 3/4 fallback. 2026-10-15 (chat): the owner approved the starter polo front v6 ('Polo değişikliğini onaylıyorum') and allowed the corset and jacket pins to move to their hip-fix v6 files (front + erase, Workbench integration/card_design/showcase/f2_hem_1545, integration/front_fix_1545/REPORT.md). 2026-10-15 (hip fix, Workbench integration/gpt3_1745/REPORT.md): the black trousers are listed with their v2 front (skin at the hip flare where the base tank showed under both crops) and v2 erase (corset hip specks); this is the audit fix the 10:38 approval was conditional on. The changed look is on the sheet integration/gpt3_1745/t2/SHEET_black_trousers_phone_2x.png. 2026-10-15 19:37 +0300: the owner approved the starter polo front v7 ('Polo v7 değişikliğini onaylıyorum.', OWNER_DECISIONS.md): hem notch filled and stray pink specks removed, file gpt3_1745/top_polo_v7.png; the polo erase is unchanged.",
       "crops": {
         "head": [
           876,
@@ -28,10 +28,10 @@
         "avatar_v2_top_coral_wave_polo": {
           "slot": "top",
           "order": 3,
-          "file": "f2_hem_1545/top_polo_v6.png",
+          "file": "gpt3_1745/top_polo_v7.png",
           "eraseFile": "line_1900/girl/o_g1fix8/layers/girl_top_erase.png",
           "tucked": false,
-          "sha256": "0c34cae928af082912ccd3e107795b970dfbd6cfe51340232368ef11f98dc50a",
+          "sha256": "7fc57d4002581fea41939cfcfd843be64f8d3afcd2cf4ec1166cc59de6e4a526",
           "eraseSha256": "67b7ac362103435aa020053217b136939f271ebfc03978701db413daab8878d4"
         },
         "avatar_v2_bottom_coral_wave_pants": {
@@ -127,6 +127,14 @@
           "tucked": false,
           "sha256": "d30ded5a73b3239a74e4b957c24f270ffb47d755a8b38f7d864c157e07d3c83e",
           "eraseSha256": "f3c3c5ec4827a675a26b0046b425051423cc9003dfeb6d7b736317d92a0408a3"
+        },
+        "avatar_v2_bottom_black_highwaist_trousers": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "gpt3_1745/bottom_black_trousers_v2.png",
+          "eraseFile": "gpt3_1745/bottom_black_trousers_erase_v2.png",
+          "sha256": "692fbdf584dd85310b0e60f44dde07be27c63738259de171c404799878adcc14",
+          "eraseSha256": "1a5e3a73e6715f9bc4adf6cd47d3b0523fb4dc6fe2cdb9dacc4cc0405b0d2a13"
         }
       }
     },

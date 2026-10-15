@@ -57,7 +57,7 @@
               113,
               404,
               380,
-              328
+              325
             ]
           }
         },
@@ -74,10 +74,10 @@
           "under": {
             "key": "avatar_v2_bottom_coral_wave_pants__under",
             "rect": [
-              17,
-              809,
-              577,
-              587
+              11,
+              642,
+              583,
+              754
             ]
           }
         },
@@ -217,7 +217,7 @@
               113,
               404,
               380,
-              328
+              325
             ]
           }
         },
@@ -237,7 +237,7 @@
               113,
               404,
               380,
-              328
+              325
             ]
           }
         },
@@ -257,7 +257,7 @@
               113,
               404,
               380,
-              328
+              325
             ]
           }
         },
@@ -277,17 +277,37 @@
               113,
               404,
               380,
-              328
+              325
+            ]
+          }
+        },
+        "avatar_v2_bottom_black_highwaist_trousers": {
+          "key": "avatar_v2_bottom_black_highwaist_trousers__front",
+          "rect": [
+            13,
+            663,
+            581,
+            747
+          ],
+          "order": 2,
+          "slot": "bottom",
+          "under": {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__under",
+            "rect": [
+              11,
+              642,
+              583,
+              754
             ]
           }
         }
       },
       "files": {
-        "base__front": "7d85a580615fe5f8eb0b8e3bf6504a14ac91d7bfd1437aad68793b68357c1022",
-        "avatar_v2_top_coral_wave_polo__front": "6cb529d7a47c9003e1e5f8abddb2b0142356e4c0c4d521ad4ffa9891d00a36e0",
-        "avatar_v2_top_coral_wave_polo__under": "b77636d56ff0cf2d952c61912a04e1c04b9a870b78a085de07eccfd956ee65d0",
+        "base__front": "e8d753e9106e4485f9d601c0b859ec2aa9a0ed903e89bd09f0566605fe6d440c",
+        "avatar_v2_top_coral_wave_polo__front": "dfdfc464e1234775b7a7ca76543fabbdb12b0ec66cf6bf7accbc60dc65d252b5",
+        "avatar_v2_top_coral_wave_polo__under": "8e3fc5e68057796cae8989ff1c625f7b67fc9776f9d9259fc0104125365951e3",
         "avatar_v2_bottom_coral_wave_pants__front": "239b9a0e231bcec5bee786fb8790efde4f95416fa97953fa6e719ad71ca03437",
-        "avatar_v2_bottom_coral_wave_pants__under": "48b5afcf13c05756b120dd858c80d11670fc336a6f97469e05d3631c69f3acf0",
+        "avatar_v2_bottom_coral_wave_pants__under": "28a071d8a8055bbab8ab31700e2be8852c41fc2976a477fc90d82d4102cbab1e",
         "avatar_v2_shoes_mint_ribbon_court_sneakers__front": "6eeb193d0ca5bf09ceb22b8cdcc32aaf599fe79d31692491f868caed49a3833c",
         "avatar_v2_shoes_mint_ribbon_court_sneakers__under": "6a884c028f30a5dda7c5a852974e1a1e26fc6e156a46827d595103f9eeb44e20",
         "avatar_v2_hair_ink_pageboy_star__front": "76351dc1d6eee23becbb7dbee0fa26a4baf5b8d7741a31c88cb0ed1b935b1353",
@@ -301,13 +321,15 @@
         "avatar_v2_shoes_white_clean_sneakers__front": "248d2599bc906355a80f2a133402e514abc51b6c9c0bc5a86cc4a4a8f324dfce",
         "avatar_v2_shoes_white_clean_sneakers__under": "244bcb336f66dd914ee006f8affcca503f6beaf3c04ed777f677fb314293456d",
         "avatar_v2_top_white_cute_crop_top__front": "3f4d9d111588ec92617d1201944fb64d0be000cc5ea461ca72f07f825afc515e",
-        "avatar_v2_top_white_cute_crop_top__under": "6912a604229eccf88f14dda09a464e59cbcc3b7ab38244c7e30ace9199372c84",
+        "avatar_v2_top_white_cute_crop_top__under": "47d646bad69e8d60a7057fa07607e4e087af363488af5cb0ba805103ae447a57",
         "avatar_v2_top_black_cute_crop_top__front": "4c5e38553dbe5fa2e0be653030c42987f64efffa89265f67410484baacd43d73",
-        "avatar_v2_top_black_cute_crop_top__under": "ca6911d35588e49d6d1cdb8af56b1b3c235c3e900a7810c724d4ba5a0fc609e6",
+        "avatar_v2_top_black_cute_crop_top__under": "ed026ca3b4451318b190de79dabd254f0c59a817962faf182128e22e6315d59b",
         "top_sage_ribbon_knit_jacket__front": "fa9f0c5723ce51bf43c0ed23218a34aef0032de42504257d928d1ff94c241a09",
-        "top_sage_ribbon_knit_jacket__under": "32db6568591434c17730e862775a9a6337dd30ce3593d69b660bbb090635e038",
+        "top_sage_ribbon_knit_jacket__under": "66c0db03fb517ddca9e59fd6e68ecf8b6d259ce6ae43ce50d7f3d8b7539f65cf",
         "top_powder_blue_ribbon_corset_top__front": "37f7aba56ea04a275ec5bc2b17d4b301e4a18d577f27e66458e7196914e9154f",
-        "top_powder_blue_ribbon_corset_top__under": "908c2881d7f1da5701cb51d97448c6cfbeb3f26119554c416f6ccd8a5915b53f"
+        "top_powder_blue_ribbon_corset_top__under": "7a8490bf56c5391fcbf9a4d733327e085e503ad021543ac13152bcf669ef582e",
+        "avatar_v2_bottom_black_highwaist_trousers__front": "5662c55f963758bb49a8f630ad353ca76c33230d3d7c1806f6bd95d9b7fb3c72",
+        "avatar_v2_bottom_black_highwaist_trousers__under": "9d097926e6148aee591933541211cc5e0cdc2b79cc8c6a82dc066a5a57cadbba"
       }
     },
     "male": {
