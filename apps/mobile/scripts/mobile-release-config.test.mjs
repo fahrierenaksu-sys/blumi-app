@@ -605,3 +605,57 @@ test("the release check refuses front (showcase) looks the owner has not approve
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test("the native UI test session reset can only be enabled in the native-ui-test profile", () => {
+  const profiles = ["development", "native-ui-test", "server-test", "preview", "production"]
+  const connected = {
+    EXPO_PUBLIC_BLUMI_API_HTTP_URL: "https://api.blumi.app",
+    EXPO_PUBLIC_REALTIME_EDGE_WS_URL: "wss://realtime.blumi.app"
+  }
+  for (const profile of profiles) {
+    for (const publicProfile of [undefined, ...profiles]) {
+      for (const reset of [undefined, "", "0", "1", "true", " 1 "]) {
+        const environment = {
+          ...connected,
+          EAS_BUILD_PROFILE: profile,
+          ...(publicProfile ? { EXPO_PUBLIC_BLUMI_BUILD_PROFILE: publicProfile } : {}),
+          ...(reset === undefined ? {} : { EXPO_PUBLIC_BLUMI_NATIVE_UI_TEST_SESSION_RESET: reset })
+        }
+        const wantsReset = reset !== undefined && reset.trim() !== "" && reset.trim() !== "0"
+        const shouldRefuse =
+          (publicProfile !== undefined && publicProfile !== profile) ||
+          (wantsReset && reset.trim() !== "1") ||
+          (wantsReset && profile !== "native-ui-test")
+        const label = `${profile}/${publicProfile ?? "-"}/${JSON.stringify(reset)}`
+        if (shouldRefuse) {
+          assert.throws(() => resolveMobileReleaseEnvironment(environment), /EXPO_PUBLIC_BLUMI_BUILD_PROFILE|session reset|SESSION_RESET/, label)
+        } else {
+          assert.doesNotThrow(() => resolveMobileReleaseEnvironment(environment), label)
+        }
+      }
+    }
+  }
+})
+
+test("eas.json turns the session reset on for native-ui-test only and every profile names itself", () => {
+  const easProfiles = JSON.parse(read("eas.json")).build
+  assert.ok(Object.keys(easProfiles).length >= 5)
+  for (const [name, profile] of Object.entries(easProfiles)) {
+    assert.equal(profile.env.EAS_BUILD_PROFILE, name)
+    assert.equal(profile.env.EXPO_PUBLIC_BLUMI_BUILD_PROFILE, name)
+    const reset = profile.env.EXPO_PUBLIC_BLUMI_NATIVE_UI_TEST_SESSION_RESET
+    if (name === "native-ui-test") assert.equal(reset, "1")
+    else assert.ok(reset === undefined || reset === "0", `${name} must not enable the session reset`)
+    if (name === "preview" || name === "production") {
+      assert.throws(
+        () => resolveMobileReleaseEnvironment({
+          ...profile.env,
+          EXPO_PUBLIC_BLUMI_API_HTTP_URL: "https://api.blumi.app",
+          EXPO_PUBLIC_REALTIME_EDGE_WS_URL: "wss://realtime.blumi.app",
+          EXPO_PUBLIC_BLUMI_NATIVE_UI_TEST_SESSION_RESET: "1"
+        }),
+        /native-ui-test/
+      )
+    }
+  }
+})

@@ -2,6 +2,7 @@ const LOCAL_API_HTTP_URL = "http://127.0.0.1:4000"
 const LOCAL_REALTIME_WS_URL = "ws://127.0.0.1:4100"
 const EXTERNAL_BUILD_PROFILES = new Set(["preview", "production"])
 const SERVER_TEST_BUILD_PROFILE = "server-test"
+const NATIVE_UI_TEST_BUILD_PROFILE = "native-ui-test"
 
 function resolveMobileReleaseEnvironment(environment = process.env) {
   const buildProfile = normalizeValue(environment.EAS_BUILD_PROFILE) || "development"
@@ -42,6 +43,21 @@ function resolveMobileReleaseEnvironment(environment = process.env) {
     normalizeValue(environment.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY) || undefined
   const revenueCatAndroidApiKey =
     normalizeValue(environment.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY) || undefined
+
+  // The profile the app reads at runtime (src/config/env.ts) must be the profile EAS is building, or a
+  // preview/production bundle could carry the native-ui-test profile and its session reset.
+  const publicBuildProfile = normalizeValue(environment.EXPO_PUBLIC_BLUMI_BUILD_PROFILE)
+  if (publicBuildProfile && publicBuildProfile !== buildProfile) {
+    throw new Error("EXPO_PUBLIC_BLUMI_BUILD_PROFILE must match EAS_BUILD_PROFILE.")
+  }
+  const nativeUiTestSessionReset =
+    normalizeValue(environment.EXPO_PUBLIC_BLUMI_NATIVE_UI_TEST_SESSION_RESET) || "0"
+  if (nativeUiTestSessionReset !== "0" && nativeUiTestSessionReset !== "1") {
+    throw new Error("EXPO_PUBLIC_BLUMI_NATIVE_UI_TEST_SESSION_RESET must be 0 or 1.")
+  }
+  if (nativeUiTestSessionReset !== "0" && buildProfile !== NATIVE_UI_TEST_BUILD_PROFILE) {
+    throw new Error("The native UI test session reset is only allowed in the native-ui-test build profile.")
+  }
 
   if (enableDemo !== "0" && enableDemo !== "1") {
     throw new Error("EXPO_PUBLIC_BLUMI_ENABLE_DEMO must be 0 or 1.")
