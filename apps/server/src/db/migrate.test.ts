@@ -131,7 +131,11 @@ test("the lock timeout bounds the ledger DDL and the advisory-lock wait, then is
   await runMigrationsWithClient(client as never, directory, { lockTimeoutMs: 321 })
 
   const sql = client.executedSql
-  const setTimeout = sql.findIndex((statement) => statement.includes("set_config('lock_timeout'") && statement.includes("false"))
+  // The session budget (statement, lock and idle limits all off) runs first;
+  // the session lock limit is its own statement after it.
+  const setTimeout = sql.findIndex((statement) => statement.trim() === "SELECT set_config('lock_timeout', $1, false)")
+  const budget = sql.findIndex((statement) => statement.includes("set_config('statement_timeout'"))
+  assert.ok(budget >= 0 && budget < setTimeout, "the session budget must not override the lock limit")
   const ledger = sql.findIndex((statement) => statement.includes("CREATE TABLE IF NOT EXISTS blumi_migrations"))
   const advisoryLock = sql.findIndex((statement) => statement.includes("pg_advisory_lock"))
   assert.ok(setTimeout >= 0, "a session-level lock_timeout must be set")
