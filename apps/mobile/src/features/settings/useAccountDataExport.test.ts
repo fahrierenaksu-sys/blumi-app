@@ -66,6 +66,11 @@ function mountExport(options: { holdCode?: boolean } = {}) {
           }
         },
         "../session/settingsActionErrorCopy": { getSettingsActionErrorMessageForDisplay: () => "error" },
+        "./accountReauthPhone": {
+          resolveAccountReauthPhone: async (input: { serverPhone?: string; firebasePhone: () => string | null }) =>
+            input.serverPhone ?? input.firebasePhone()
+        },
+        "./pendingPhoneChange": { pendingPhoneChange: { readOrigin: async () => null, clear: async () => {} } },
         "./settingsPresentationModel": { sanitizeVerificationCode: (value: string) => value }
       }
     })
