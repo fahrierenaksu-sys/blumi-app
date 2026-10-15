@@ -1323,6 +1323,37 @@
       ]
     },
     {
+      "scope": "new-collection-art-pending",
+      "productionPublication": false,
+      "itemIdPatterns": [
+        "^dress_girl_butter_square_puff_mini$",
+        "^dress_girl_denim_pinafore_mini$",
+        "^dress_girl_sage_shirred_tiered_mini$",
+        "^dress_girl_wine_gingham_tie$",
+        "^dress_girl_black_corset_flare_mini$",
+        "^dress_girl_cream_one_shoulder_mini$",
+        "^dress_girl_black_corset_slit_maxi$",
+        "^dress_girl_terracotta_patchwork_halter_bias_maxi$",
+        "^dress_girl_cream_one_shoulder_tie_midi$",
+        "^dress_girl_denim_milkmaid_button_midi$",
+        "^jacket_girl_black_crop_blazer$",
+        "^jacket_girl_light_denim_crop$",
+        "^glasses_girl_gold_round$",
+        "^glasses_girl_rose_soft_cateye$",
+        "^glasses_boy_black_soft_rect$",
+        "^glasses_boy_gunmetal_round$",
+        "^hair_girl_bun_wine_bow$",
+        "^hair_girl_caramel_braid_crown$",
+        "^hair_girl_ink_twin_braids$",
+        "^hair_girl_chestnut_butterfly$",
+        "^hair_girl_copper_soft_waves$",
+        "^hair_girl_ink_french_bob$",
+        "^necklace_girl_pearl_drop$",
+        "^bag_girl_camel_mini$",
+        "^clip_girl_pearl_bar_pair$"
+      ]
+    },
+    {
       "scope": "development-and-qa-flags",
       "productionPublication": false,
       "itemIdPatterns": [

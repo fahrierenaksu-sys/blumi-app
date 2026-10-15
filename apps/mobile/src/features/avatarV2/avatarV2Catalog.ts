@@ -7,7 +7,9 @@ import {
   DEFAULT_FEMALE_AVATAR_LOADOUT,
   DEFAULT_MALE_AVATAR_LOADOUT,
   getDefaultOwnedItemIds,
-  isRetiredAvatarItemId
+  isRetiredAvatarItemId,
+  LANDED_NEW_COLLECTION_ITEMS,
+  newCollectionEnglishTitle
 } from "@blumi/domain"
 import type {
   AvatarCatalogItem,
@@ -130,6 +132,21 @@ const GIRL_WARDROBE_PREVIEW_AVATAR_ITEMS: AvatarCatalogItem[] = (["hair", "top",
     layerOrder: AVATAR_V2_LAYER_ORDER[type],
     assets: {}
   })))
+
+/**
+ * The new collection pieces whose art has landed (domain newCollectionItems.ts). Held by the release catalog until its art and receipt land: the
+ * Shop never lists it, and the wardrobe shows a piece only once it has room art (AVATAR_ITEM_ART).
+ */
+const NEW_COLLECTION_AVATAR_ITEMS: AvatarCatalogItem[] = LANDED_NEW_COLLECTION_ITEMS.map((item, index) => ({
+  id: item.itemId,
+  type: item.slot,
+  name: newCollectionEnglishTitle(item.itemId),
+  sortOrder: 40 + index,
+  layerOrder: AVATAR_V2_LAYER_ORDER[item.slot],
+  assets: {},
+  ...(item.accessoryGroup ? { accessoryGroup: item.accessoryGroup } : {}),
+  compatibleBodyIds: [item.bodyId]
+}))
 
 const MALE_PREMIUM_CAPSULE_AVATAR_ITEMS: AvatarCatalogItem[] = MALE_PREMIUM_CAPSULE_RUNTIME.map((item, index) => {
   const type = item.type === "hairFront" ? "hair" : item.type
@@ -310,6 +327,7 @@ const AVATAR_V2_CATALOG_SOURCE: AvatarCatalogItem[] = [
   ...MALE_PREMIUM_CAPSULE_AVATAR_ITEMS,
   ...BOY_WARDROBE_PREVIEW_AVATAR_ITEMS,
   ...GIRL_WARDROBE_PREVIEW_AVATAR_ITEMS,
+  ...NEW_COLLECTION_AVATAR_ITEMS,
   ...FEMALE_SWEET_CAPSULE_AVATAR_ITEMS,
   {
     id: DEFAULT_AVATAR_V2.faceId,

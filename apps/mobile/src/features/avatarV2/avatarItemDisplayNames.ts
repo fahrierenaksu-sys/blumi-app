@@ -1,3 +1,4 @@
+import { NEW_COLLECTION_ITEMS } from "@blumi/domain"
 import type { AppLocale } from "../session/appLocale"
 import type { AvatarCatalogItem } from "./avatarV2.types"
 
@@ -58,7 +59,9 @@ export const AVATAR_ITEM_NAMES_TR: Readonly<Record<string, string>> = {
   avatar_v2_shoes_male_dark_leather_sneakers: "Koyu Deri Sneaker",
   avatar_v2_shoes_male_green_skate_shoes: "Yeşil Kaykay Ayakkabısı",
   avatar_v2_shoes_male_black_clean_sneakers: "Sade Siyah Sneaker",
-  avatar_v2_shoes_male_black_everyday_sneakers: "Günlük Siyah Sneaker"
+  avatar_v2_shoes_male_black_everyday_sneakers: "Günlük Siyah Sneaker",
+  // The new collection (domain newCollectionItems.ts)
+  ...Object.fromEntries(NEW_COLLECTION_ITEMS.map((item) => [item.itemId, item.nameTr]))
 }
 
 /** The name a person reads for a piece: Turkish when the app speaks Turkish and a name exists, else the catalog's. */

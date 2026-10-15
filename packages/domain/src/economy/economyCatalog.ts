@@ -6,6 +6,7 @@ import {
 } from "./roomFurnitureIds"
 import { BOY_WARDROBE_PREVIEW_ALL_IDS } from "../avatar/boyWardrobePreview"
 import { GIRL_WARDROBE_PREVIEW_ALL_IDS } from "../avatar/girlWardrobePreview"
+import { LANDED_NEW_COLLECTION_ITEMS, newCollectionEnglishTitle } from "../avatar/newCollectionItems"
 import { isRetiredAvatarItemId } from "../avatar/retiredAvatarItems"
 
 export type EconomyItemType = "avatar" | "room"
@@ -453,6 +454,9 @@ const BASE_ECONOMY_CATALOG: readonly EconomyCatalogItem[] = [
   // price through their receipt (owner price yes, 2026-10-15); her starters are the avatar_v2 girl starter set above.
   // Rows granted while they were free (2026-10-13) stay owned.
   ...GIRL_WARDROBE_PREVIEW_ALL_IDS.map((itemId) => wardrobePreviewItem(itemId)),
+  // the new collection pieces whose art has landed (newCollectionItems.ts): priced, never owned by default, and held by the release catalog's
+  // `new-collection-art-pending` scope (never sold, listed or granted) until its art and its owner receipt land
+  ...LANDED_NEW_COLLECTION_ITEMS.map((item) => avatarItem(item.itemId, newCollectionEnglishTitle(item.itemId), item.priceCoins)),
 
   // the old flat pieces are retired (legacy registry); the chair keeps its id with layered art, held until §12
   roomItem("room_v2_chair_blush", "Blush Lounge Chair", 0),

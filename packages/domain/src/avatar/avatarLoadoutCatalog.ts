@@ -1,5 +1,6 @@
 import { BOY_WARDROBE_PREVIEW_ITEM_IDS } from "./boyWardrobePreview";
 import { GIRL_WARDROBE_PREVIEW_ITEM_IDS } from "./girlWardrobePreview";
+import { LANDED_NEW_COLLECTION_ITEMS, type NewCollectionItem } from "./newCollectionItems";
 import type {
   AvatarLoadout,
   AvatarLoadoutV1,
@@ -65,6 +66,13 @@ export const dressItem = (
   itemId: string,
   supportedBodyIds: readonly string[] = ["avatar_v2_body_default"],
 ): AvatarLoadoutCatalogItem => ({ itemId, slot: "dress", supportedBodyIds });
+
+function newCollectionLoadoutItem(item: NewCollectionItem): AvatarLoadoutCatalogItem {
+  const bodies = [item.bodyId]
+  if (item.slot === "dress") return dressItem(item.itemId, bodies)
+  if (item.slot === "accessory") return accessoryItem(item.itemId, item.accessoryGroup ?? "eyewear", bodies)
+  return { itemId: item.itemId, slot: item.slot, supportedBodyIds: bodies }
+}
 
 const outfitItems = (
   outfitKey: string,
@@ -359,6 +367,8 @@ export const AVATAR_LOADOUT_CATALOG: readonly AvatarLoadoutCatalogItem[] =
     ...(["hair", "top", "bottom", "shoes"] as const).flatMap((slot) =>
       slotItems(slot, GIRL_WARDROBE_PREVIEW_ITEM_IDS[slot]),
     ),
+    // the new collection pieces whose art has landed (newCollectionItems.ts); held until the owner receipt lands
+    ...LANDED_NEW_COLLECTION_ITEMS.map(newCollectionLoadoutItem),
     accessoryItem("avatar_v2_accessory_ivory_ribbon_beret", "headwear"),
     accessoryItem("avatar_v2_accessory_cherry_bow_headband", "headwear"),
     accessoryItem("avatar_v2_accessory_sage_heart_glasses", "eyewear"),

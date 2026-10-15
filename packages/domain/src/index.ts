@@ -16,6 +16,7 @@ export * from "./avatar/avatarLoadoutCoercion";
 export * from "./avatar/retiredAvatarItems";
 export * from "./avatar/boyWardrobePreview";
 export * from "./avatar/girlWardrobePreview";
+export * from "./avatar/newCollectionItems";
 export * from "./avatar/avatarStills";
 export * from "./avatar/avatarShowcase";
 export * from "./avatar/avatarSwatch";
