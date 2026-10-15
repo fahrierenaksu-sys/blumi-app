@@ -9,7 +9,7 @@ import { GesturePressableScale } from "../../../ui/GesturePressableScale"
 import { animateTo, useMotion } from "../../../ui/motion"
 import { getRoomInviteCreateLabel, type ChatLocale } from "../chatRoomInviteModel"
 import type { ChatDraftTyping } from "../typing/useChatDraftTyping"
-import { readChatComposerDraft, writeChatComposerDraft } from "../chatComposerDraftStore"
+import { CHAT_COMPOSER_MAX_LENGTH, readChatComposerDraft, writeChatComposerDraft } from "../chatComposerDraftStore"
 import type { ChatThreadCopy } from "./chatThreadCopy"
 import { reconcileComposerTextAfterSend } from "./chatComposerDraftModel"
 import { styles } from "./chatThreadStyles"
@@ -160,7 +160,7 @@ export function ChatComposer({
             placeholder={chatCopy.messagePlaceholder}
             placeholderTextColor={uiTheme.colors.textMuted}
             multiline
-            maxLength={500}
+            maxLength={CHAT_COMPOSER_MAX_LENGTH}
           />
         </View>
         <Animated.View style={sendPopStyle}>

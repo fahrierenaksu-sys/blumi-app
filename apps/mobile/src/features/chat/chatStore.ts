@@ -28,7 +28,7 @@ import {
 } from "./chatErrorCopy"
 import { applyReceiptEvent, applyReceiptSnapshot } from "./chatReceiptModel"
 import { keepLocalRenderKey, resetMessageRenderKeys } from "./chatMessageRenderKeys"
-import { clearChatComposerDrafts, resetChatComposerDrafts } from "./chatComposerDraftStore"
+import { clearChatComposerDrafts, keepOnlyChatComposerDrafts, resetChatComposerDrafts } from "./chatComposerDraftStore"
 import { forgetPartnerReceipts, getPartnerReceipts, resetPartnerReceipts, setPartnerReceipts } from "./chatPartnerReceiptsState"
 import { compareMessageOrder, forgetReadHere, getReadHereThrough, noteReadHere, resetReadHere } from "./chatReadHere"
 export { getPartnerReceipts } from "./chatPartnerReceiptsState"
@@ -236,6 +236,8 @@ export function applyChatThreadListed(
   }
   if (!payload.append) {
     unreadCounts = new Map([...unreadCounts].filter(([threadId]) => merged.has(threadId)))
+    // Only a complete list proves a conversation is gone; a first page does not.
+    if (!payload.nextCursor) keepOnlyChatComposerDrafts(new Set(merged.keys()), activeThreadId)
     participantUpdatesByUserId = new Map([...participantUpdatesByUserId]
       .filter(([, update]) => update.sequence > lastAppliedListRequestSequence))
   }
