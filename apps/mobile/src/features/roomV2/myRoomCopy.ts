@@ -102,6 +102,8 @@ export interface MyRoomEditorCopy {
   save: string
   saving: string
   retrySync: string
+  /** Shown when the room holds more placements than the 60 it can show; none is deleted. */
+  roomLimitNotice: (hiddenCount: number) => string
   roomStyle: string
   collectionTitle: string
   showAllPieces: string
@@ -194,6 +196,8 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     save: "Save",
     saving: "Saving…",
     retrySync: "Retry room sync",
+    roomLimitNotice: (hiddenCount) =>
+      `A room can show up to 60 items. ${hiddenCount} more ${hiddenCount === 1 ? "item is" : "items are"} kept safe and will appear when you free up space.`,
     roomStyle: "Room style",
     collectionTitle: "My pieces",
     showAllPieces: "All pieces",
@@ -284,6 +288,8 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     save: "Kaydet",
     saving: "Kaydediliyor…",
     retrySync: "Odayı yeniden eşitle",
+    roomLimitNotice: (hiddenCount) =>
+      `Odanda en fazla 60 eşya gösterilebilir. ${hiddenCount} eşya daha güvende duruyor, yer açtığında görünecek.`,
     roomStyle: "Oda stili",
     collectionTitle: "Eşyalarım",
     showAllPieces: "Tüm eşyalar",

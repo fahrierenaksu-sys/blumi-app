@@ -14,6 +14,8 @@ export interface PersonalRoomDecorSnapshot {
   revision: number
   decor: UserRoomDecor
   updatedAt: string
+  /** Active placements the server holds back because a room shows at most 60 items; they stay stored. */
+  hiddenItemCount?: number
 }
 
 export type SavePersonalRoomDecorResult =
@@ -143,7 +145,10 @@ function normalizeSnapshot(value: unknown): PersonalRoomDecorSnapshot | null {
     userId: value.userId,
     revision: Number(value.revision),
     decor: stored.decor,
-    updatedAt: new Date(value.updatedAt).toISOString()
+    updatedAt: new Date(value.updatedAt).toISOString(),
+    ...(Number.isSafeInteger(value.hiddenItemCount) && Number(value.hiddenItemCount) > 0
+      ? { hiddenItemCount: Number(value.hiddenItemCount) }
+      : {})
   }
 }
 

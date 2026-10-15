@@ -60,6 +60,8 @@ interface RoomV2ContextValue {
   confirmedPersistedRoomDecor?: UserRoomDecor
   persistenceState: "loading" | "ready" | "failed"
   persistenceErrorMessage?: string
+  /** Active placements held back by the 60-item room limit (stored, not shown). 0 when none. */
+  hiddenByLimitCount: number
   retryPersistence: () => void
   setUserRoomDecor: (nextDecor: UserRoomDecor) => boolean
   saveUserRoomDecorConfirmed: (
@@ -121,6 +123,7 @@ export function RoomV2Provider({
   const [confirmedPersistedRoomDecor, setConfirmedPersistedRoomDecor] = useState<
     UserRoomDecor | undefined
   >()
+  const [hiddenByLimitCount, setHiddenByLimitCount] = useState(0)
   const [persistenceState, setPersistenceState] = useState<
     "loading" | "ready" | "failed"
   >("loading")
@@ -291,6 +294,7 @@ export function RoomV2Provider({
     pendingServerDecorRef.current = null
     if (!sameOwner) {
       setConfirmedPersistedRoomDecor(undefined)
+      setHiddenByLimitCount(0)
       setPersistenceState("loading")
       setPersistenceErrorMessage(undefined)
       publishRoomDecor(createDefaultRoomV2Decor())
@@ -421,6 +425,7 @@ export function RoomV2Provider({
         setConfirmedPersistedRoomDecor(
           serverSnapshot ? copyRoomV2Decor(serverSnapshot.decor) : undefined
         )
+        setHiddenByLimitCount(serverSnapshot?.hiddenItemCount ?? 0)
 
         let localCacheWriteFailed = false
         if ((!resolution.needsServerSave || canReplayPendingDraft || preserveConflictedDraft) && syncMetadataKey) {
@@ -559,6 +564,7 @@ export function RoomV2Provider({
           serverRevisionRef.current = snapshot.revision
           lastSyncedDecorJsonRef.current = canonicalDecorJson
           setConfirmedPersistedRoomDecor(canonicalDecor)
+          setHiddenByLimitCount(snapshot.hiddenItemCount ?? 0)
 
           let localCacheWriteFailed = false
           if (syncMetadataKey) {
@@ -848,6 +854,7 @@ export function RoomV2Provider({
       serverRevisionRef.current = snapshot.revision
       lastSyncedDecorJsonRef.current = canonicalDecorJson
       setConfirmedPersistedRoomDecor(canonicalDecor)
+      setHiddenByLimitCount(snapshot.hiddenItemCount ?? 0)
 
       const intentAtResponse = roomDecorIntentRef.current
       const hasNewerLocalEdit = intentAtResponse.storageKey === storageKey &&
@@ -1083,6 +1090,7 @@ export function RoomV2Provider({
           : undefined,
         persistenceState: hasCurrentRoomScope ? persistenceState : "loading",
         persistenceErrorMessage: hasCurrentRoomScope ? persistenceErrorMessage : undefined,
+        hiddenByLimitCount: hasCurrentRoomScope ? hiddenByLimitCount : 0,
         retryPersistence,
         setUserRoomDecor,
         saveUserRoomDecorConfirmed,
@@ -1093,7 +1101,7 @@ export function RoomV2Provider({
         removePlacedItem
       }
     },
-    [storageKey, userRoomDecor, ownershipSanitizedRoomDecor, confirmedPersistedRoomDecor, persistenceState, persistenceErrorMessage, inventoryReadyForRoomEdits, retryPersistence, setUserRoomDecor, saveUserRoomDecorConfirmed, selectRoomShell, resetRoomDecor, addPlacedItem, updatePlacedItem, removePlacedItem]
+    [storageKey, userRoomDecor, ownershipSanitizedRoomDecor, confirmedPersistedRoomDecor, persistenceState, persistenceErrorMessage, hiddenByLimitCount, inventoryReadyForRoomEdits, retryPersistence, setUserRoomDecor, saveUserRoomDecorConfirmed, selectRoomShell, resetRoomDecor, addPlacedItem, updatePlacedItem, removePlacedItem]
   )
 
   return (

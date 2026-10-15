@@ -527,3 +527,81 @@ test("carried placements never make a valid save fail, even past the placement l
     /up to 60/i
   )
 })
+
+// A held item becomes active later: the stored row then holds more active placements than the room limit. The host
+// must still be able to save, the guest and the host must see the same first 60, and nothing is ever deleted.
+async function createServiceWithOverfullStoredRoom(activeCount = 65) {
+  const repository = createInMemoryPersonalRoomDecorRepository()
+  const ids = Array.from({ length: activeCount }, (_, index) => `active_item_${index}`)
+  const place = (itemId: string, index: number) => ({
+    instanceId: `i-${itemId}`, itemId, x: (index % 10) / 10, y: 0.5, rotation: "front" as const
+  })
+  await repository.save({
+    userId: "user_1", expectedRevision: 0,
+    decor: { ...DECOR, placedItems: ids.map(place) },
+    updatedAt: "2026-09-01T00:00:00.000Z"
+  })
+  const service = createPersonalRoomDecorService({
+    repository,
+    getOwnedRoomItemIds: async () => ids,
+    isActiveRoomItemId: (itemId) => itemId.startsWith("active_")
+  })
+  return { service, ids, place }
+}
+
+test("a stored room with more than 60 active placements reads as its first 60 and reports how many are held back", async () => {
+  const { service, ids } = await createServiceWithOverfullStoredRoom()
+  const read = await service.get("user_1")
+  assert.ok(read)
+  assert.deepEqual(read.decor.placedItems.map((item) => item.itemId), ids.slice(0, 60))
+  assert.equal(read.hiddenItemCount, 5)
+  assert.equal(read.revision, 1)
+})
+
+test("the host can always save what it was shown, and the held-back placements stay stored", async () => {
+  const { service, ids, place } = await createServiceWithOverfullStoredRoom()
+  const read = await service.get("user_1")
+  assert.ok(read)
+  const result = await service.save("user_1", { expectedRevision: read.revision, decor: read.decor })
+  assert.equal(result.kind, "saved")
+  if (result.kind !== "saved") return
+  assert.deepEqual((await storedItems(service)).map((item) => item.itemId), ids)
+  assert.equal(result.snapshot.hiddenItemCount, 5)
+
+  // removing a visible placement deletes only that one: a held-back placement takes the free slot, none is lost
+  const removed = await service.save("user_1", {
+    expectedRevision: result.snapshot.revision,
+    decor: { ...read.decor, placedItems: read.decor.placedItems.slice(1).map((item, index) => place(item.itemId, index + 1)) }
+  })
+  assert.equal(removed.kind, "saved")
+  if (removed.kind !== "saved") return
+  assert.equal((await storedItems(service)).length, 64)
+  assert.equal(removed.snapshot.decor.placedItems.length, 60)
+  assert.equal(removed.snapshot.hiddenItemCount, 4)
+})
+
+test("placing an item that is held back replaces its stored placement instead of duplicating it", async () => {
+  const { service, ids, place } = await createServiceWithOverfullStoredRoom()
+  const read = await service.get("user_1")
+  assert.ok(read)
+  const heldBackId = ids[62]!
+  const result = await service.save("user_1", {
+    expectedRevision: read.revision,
+    decor: { ...read.decor, placedItems: [...read.decor.placedItems.slice(1), place(heldBackId, 3)] }
+  })
+  assert.equal(result.kind, "saved")
+  const stored = await storedItems(service)
+  assert.equal(stored.filter((item) => item.itemId === heldBackId).length, 1)
+  assert.equal(new Set(stored.map((item) => item.instanceId)).size, stored.length)
+})
+
+test("a room within the limit reports nothing held back and sending more than 60 placements is still refused", async () => {
+  const { service, ids, place } = await createServiceWithOverfullStoredRoom(60)
+  const read = await service.get("user_1")
+  assert.ok(read)
+  assert.equal("hiddenItemCount" in read, false)
+  await assert.rejects(
+    service.save("user_1", { expectedRevision: read.revision, decor: { ...DECOR, placedItems: [...ids, "active_extra"].map(place) } }),
+    /up to 60/i
+  )
+})

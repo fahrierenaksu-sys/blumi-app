@@ -8,7 +8,7 @@ import {
   type PersonalRoomDecorSnapshot,
   type PersonalRoomRotation
 } from "./personalRoomDecorRepository"
-import { isActiveRoomItemId, projectRoomDecorItems } from "./roomItemProjection"
+import { isActiveRoomItemId } from "./roomItemProjection"
 import type { RoomSnapshotService } from "./roomSnapshotService"
 
 const MAX_PLACED_ITEMS = 60
@@ -19,9 +19,15 @@ const SUPPORTED_PERSONAL_ROOM_SHELL_IDS = new Set([
   "room_v2_shell_blumi_world_v1"
 ])
 
+/**
+ * What a client is shown of a stored room. `hiddenItemCount` is only present when active placements are held back
+ * because a room shows at most 60 items; they stay stored and are never deleted.
+ */
+export type ClientPersonalRoomDecorSnapshot = PersonalRoomDecorSnapshot & { hiddenItemCount?: number }
+
 export interface PersonalRoomDecorService {
   repository: PersonalRoomDecorRepository
-  get(userId: string): Promise<PersonalRoomDecorSnapshot | null>
+  get(userId: string): Promise<ClientPersonalRoomDecorSnapshot | null>
   save(
     userId: string,
     input: { expectedRevision: number; decor: unknown },
@@ -29,11 +35,11 @@ export interface PersonalRoomDecorService {
   ): Promise<
     | {
         kind: "saved"
-        snapshot: PersonalRoomDecorSnapshot
+        snapshot: ClientPersonalRoomDecorSnapshot
         /** Retired items an older client sent; they were left out of the saved room. */
         strippedItemCount: number
       }
-    | { kind: "conflict"; current: PersonalRoomDecorSnapshot }
+    | { kind: "conflict"; current: ClientPersonalRoomDecorSnapshot }
   >
 }
 
@@ -111,8 +117,15 @@ export function createPersonalRoomDecorService(options: {
       const storedOwnedItemIds = options.getStoredOwnedRoomItemIds
         ? new Set(await options.getStoredOwnedRoomItemIds(normalizedUserId))
         : ownedItemIds
+      // An active placement past the room limit (a held item that became active later) is held back from the read the
+      // same way: it is carried too, so a save never deletes it. Placing that same item again replaces its stored
+      // placement, as an item can be placed once.
+      const sentItemIds = new Set(decor.placedItems.map((item) => item.itemId))
+      const heldBack = stored?.revision === input.expectedRevision
+        ? new Set(splitByRoomLimit(stored, ownedItemIds).heldBack.filter((item) => !sentItemIds.has(item.itemId)))
+        : new Set<PersonalRoomDecor["placedItems"][number]>()
       const carried = stored?.revision === input.expectedRevision
-        ? stored.decor.placedItems.filter((item) => isStoredCarried(item.itemId, storedOwnedItemIds))
+        ? stored.decor.placedItems.filter((item) => heldBack.has(item) || isStoredCarried(item.itemId, storedOwnedItemIds))
         : []
       const result = await repository.save({
         userId: normalizedUserId,
@@ -129,7 +142,8 @@ export function createPersonalRoomDecorService(options: {
       const snapshot = toClientRoom(result.snapshot, ownedItemIds)
       if (options.roomSnapshotService) {
         try {
-          await options.roomSnapshotService.publishForRoomSave(snapshot)
+          const { hiddenItemCount: _hiddenItemCount, ...publishable } = snapshot
+          await options.roomSnapshotService.publishForRoomSave(publishable)
         } catch (error) {
           // The canonical room save remains successful. The revision check in
           // Discovery hides the old snapshot until this revision is rendered.
@@ -149,17 +163,25 @@ export function createPersonalRoomDecorService(options: {
     return isRetiredItemId(itemId) || storedOwnedItemIds.has(itemId)
   }
 
-  /** What a client may see of a stored room: active, owned items only; the row and its revision stay as stored. */
+  /**
+   * Active, owned placements in stored order: the first 60 are shown (the guest of a shared room sees the same
+   * first 60), the rest are held back, never deleted.
+   */
+  function splitByRoomLimit(room: PersonalRoomDecorSnapshot, ownedItemIds: ReadonlySet<string>) {
+    const placeable = room.decor.placedItems.filter((item) => isActive(item.itemId) && ownedItemIds.has(item.itemId))
+    return { shown: placeable.slice(0, MAX_PLACED_ITEMS), heldBack: placeable.slice(MAX_PLACED_ITEMS) }
+  }
+
+  /** What a client may see of a stored room: active, owned items only, at most 60; the row and its revision stay as stored. */
   function toClientRoom(
     room: PersonalRoomDecorSnapshot,
     ownedItemIds: ReadonlySet<string>
-  ): PersonalRoomDecorSnapshot {
+  ): ClientPersonalRoomDecorSnapshot {
+    const { shown, heldBack } = splitByRoomLimit(room, ownedItemIds)
     return {
       ...room,
-      decor: projectRoomDecorItems(
-        room.decor,
-        (itemId) => isActive(itemId) && ownedItemIds.has(itemId)
-      )
+      decor: { ...room.decor, placedItems: shown.map((item) => ({ ...item })) },
+      ...(heldBack.length > 0 ? { hiddenItemCount: heldBack.length } : {})
     }
   }
 }

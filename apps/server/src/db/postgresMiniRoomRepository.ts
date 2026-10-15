@@ -1,6 +1,6 @@
 import type { QueryResultRow } from "pg"
 import { cloneMiniRoom } from "../miniRooms/miniRoomRepository"
-import { readSharedDecor } from "../miniRooms/sharedDecorSnapshot"
+import { createOmittedItemsWarning, readSharedDecor } from "../miniRooms/sharedDecorSnapshot"
 import type {
   MiniRoomCompletionIntent,
   MiniRoomInviteRecord,
@@ -437,7 +437,7 @@ function mapMiniRoom(row: QueryResultRow): MiniRoomRecord {
     ],
     livekitRoomName: String(row.livekit_room_name),
     startedAt: new Date(row.started_at).toISOString(),
-    ...(row.shared_decor ? { sharedDecor: readSharedDecorForRoom(row.shared_decor) } : {}),
+    ...(row.shared_decor ? { sharedDecor: readSharedDecorForRoom(String(row.mini_room_id), row.shared_decor) } : {}),
     ...(typeof row.source_thread_id === "string" && row.source_thread_id
       ? { sourceThreadId: row.source_thread_id }
       : {}),
@@ -460,10 +460,10 @@ function mapCompletionIntent(row: QueryResultRow): MiniRoomCompletionIntent {
   }
 }
 
-function readSharedDecorForRoom(value: unknown) {
+const warnOmittedItems = createOmittedItemsWarning()
+
+function readSharedDecorForRoom(miniRoomId: string, value: unknown) {
   const { snapshot, omittedItemCount } = readSharedDecor(value)
-  if (omittedItemCount > 0) {
-    console.warn("Shared room decor exceeded the item cap; extra placements are not shown", { omittedItemCount })
-  }
+  warnOmittedItems(miniRoomId, omittedItemCount)
   return snapshot
 }

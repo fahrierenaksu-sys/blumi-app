@@ -109,3 +109,13 @@ test("personal Room API returns canonical state on conflict and rejects malforme
     /room layout safely/i
   )
 })
+
+test("personal Room API passes on how many placements the server holds back, and nothing when none", async () => {
+  const fetchWith = (extra: Record<string, unknown>) => fetchPersonalRoomDecor(
+    "https://api.blumi.test", "session-token",
+    async () => new Response(JSON.stringify({ roomDecor: { ...SNAPSHOT, ...extra } }), { status: 200 })
+  )
+  assert.equal((await fetchWith({ hiddenItemCount: 5 }))?.hiddenItemCount, 5)
+  assert.equal("hiddenItemCount" in ((await fetchWith({ hiddenItemCount: 0 })) ?? {}), false)
+  assert.equal("hiddenItemCount" in ((await fetchWith({ hiddenItemCount: "many" })) ?? {}), false)
+})

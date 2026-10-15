@@ -868,7 +868,8 @@ export function createConfiguredServerServices(
     chatService,
     livekitTokenService,
     economyService,
-    getPersonalRoomDecor: (userId) => personalRoomDecorService.get(userId)
+    // the stored row, as the accept SQL copies it; the mini room repository projects it on read
+    getPersonalRoomDecor: (userId) => personalRoomDecorService.repository.get(userId)
   })
 
   // In-memory storage has no migrations: receipts depend on the manifest only.

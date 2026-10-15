@@ -4,6 +4,7 @@ import type {
   MiniRoomInviteStatus
 } from "@blumi/contracts"
 import type { PersonalRoomDecorSnapshot } from "../rooms/personalRoomDecorRepository"
+import { readSharedDecor } from "./sharedDecorSnapshot"
 
 export interface MiniRoomInviteRecord extends MiniRoomInvite {
   status: MiniRoomInviteStatus
@@ -92,8 +93,15 @@ export function createInMemoryMiniRoomStore(): InMemoryMiniRoomStore {
 
 export function createInMemoryMiniRoomRepository(
   store: InMemoryMiniRoomStore = createInMemoryMiniRoomStore(),
-  getPersonalRoomDecor?: (userId: string) => Promise<PersonalRoomDecorSnapshot | null>
+  getPersonalRoomDecor?: (userId: string) => Promise<PersonalRoomDecorSnapshot | null>,
+  isActiveRoomItem?: (itemId: string) => boolean
 ): MiniRoomRepository {
+  // Like the Postgres repository: the host's stored row is copied untouched at accept time and projected (inactive
+  // items left out, wire cap applied) on every read, so tests see what production shows.
+  const readView = (miniRoom: MiniRoomRecord): MiniRoomRecord =>
+    miniRoom.sharedDecor
+      ? { ...miniRoom, sharedDecor: readSharedDecor(miniRoom.sharedDecor, isActiveRoomItem).snapshot }
+      : miniRoom
   return {
     async saveInvite(invite) {
       store.invites.set(invite.inviteId, cloneInvite(invite))
@@ -215,14 +223,14 @@ export function createInMemoryMiniRoomRepository(
     },
     async findMiniRoom(miniRoomId) {
       const miniRoom = store.miniRooms.get(miniRoomId)
-      return miniRoom ? cloneMiniRoom(miniRoom) : null
+      return miniRoom ? cloneMiniRoom(readView(miniRoom)) : null
     },
     async findMiniRoomByInviteId(inviteId) {
       const miniRoomId = [...store.roomInviteIds.entries()].find(
         ([, roomInviteId]) => roomInviteId === inviteId
       )?.[0]
       const miniRoom = miniRoomId ? store.miniRooms.get(miniRoomId) : null
-      return miniRoom ? cloneMiniRoom(miniRoom) : null
+      return miniRoom ? cloneMiniRoom(readView(miniRoom)) : null
     },
     async findActiveMiniRoomForUser(userId) {
       const miniRoom =
@@ -230,7 +238,7 @@ export function createInMemoryMiniRoomRepository(
           (entry) =>
             !entry.endedAt && entry.participantUserIds.includes(userId)
         ) ?? null
-      return miniRoom ? cloneMiniRoom(miniRoom) : null
+      return miniRoom ? cloneMiniRoom(readView(miniRoom)) : null
     },
     async anchorMiniRoomCompletion(input) {
       const miniRoom = store.miniRooms.get(input.miniRoomId)
@@ -263,7 +271,7 @@ export function createInMemoryMiniRoomRepository(
         endedByUserId
       }
       store.miniRooms.set(miniRoomId, cloneMiniRoom(endedRoom))
-      return cloneMiniRoom(endedRoom)
+      return cloneMiniRoom(readView(endedRoom))
     },
     async separateUserPair(input) {
       for (const [inviteId, invite] of store.invites) {
@@ -295,7 +303,7 @@ export function createInMemoryMiniRoomRepository(
             endedByUserId: input.actorUserId
           }
           store.miniRooms.set(miniRoomId, cloneMiniRoom(updated))
-          ended.push(cloneMiniRoom(updated))
+          ended.push(cloneMiniRoom(readView(updated)))
         }
       }
       return ended

@@ -56,6 +56,7 @@ import {
 } from "../features/roomV2/editor/useShopPlacementIntent"
 import { useRoomEditorSave } from "../features/roomV2/editor/useRoomEditorSave"
 import { RoomEditorTopBar } from "../features/roomV2/editor/RoomEditorTopBar"
+import { RoomEditorLimitNotice } from "../features/roomV2/editor/RoomEditorLimitNotice"
 import { RoomEditorPersistenceBanner } from "../features/roomV2/editor/RoomEditorPersistenceBanner"
 import { RoomEditorShellPicker } from "../features/roomV2/editor/RoomEditorShellPicker"
 import { RoomEditorStage } from "../features/roomV2/editor/RoomEditorStage"
@@ -89,6 +90,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
     saveUserRoomDecorConfirmed,
     persistenceState,
     persistenceErrorMessage,
+    hiddenByLimitCount,
     retryPersistence
   } = useRoomV2()
   const { inventory, hydrationStatus: inventoryHydrationStatus, ownsRoomItem } = useInventoryStore(
@@ -330,6 +332,10 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
             persistenceErrorMessage={persistenceErrorMessage}
             retryPersistence={retryPersistence}
           />
+        ) : null}
+
+        {hiddenByLimitCount > 0 ? (
+          <RoomEditorLimitNotice copy={copy} hiddenCount={hiddenByLimitCount} />
         ) : null}
 
         <View style={styles.editorContentFlex}>
