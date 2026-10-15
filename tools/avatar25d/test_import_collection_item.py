@@ -42,27 +42,28 @@ class GraftTest(unittest.TestCase):
 class SourceEditTest(unittest.TestCase):
     def test_item_art_entry_lands_in_its_own_rig_block_only(self):
         source = imp.ITEM_ART_TS.read_text()
-        edited = imp.insert_item_art(source, "female", "jacket_girl_light_denim_crop")
+        edited = imp.insert_item_art(source, "female", "piece_girl_test_only")
         female = edited[edited.index("  female: {"):edited.index("  male: {")]
         male = edited[edited.index("  male: {"):]
-        self.assertIn('    jacket_girl_light_denim_crop: "jacket_girl_light_denim_crop"', female)
-        self.assertNotIn("jacket_girl_light_denim_crop", male)
+        self.assertIn('    piece_girl_test_only: "piece_girl_test_only"', female)
+        self.assertNotIn("piece_girl_test_only", male)
         self.assertNotRegex(female, r'"\n    jacket_girl', "the previous entry gets a comma")
         with self.assertRaises(SystemExit):
-            imp.insert_item_art(edited, "female", "jacket_girl_light_denim_crop")
+            imp.insert_item_art(edited, "female", "piece_girl_test_only")
 
     def test_landed_set_gains_the_id_once_and_stays_sorted(self):
         source = imp.COLLECTION_TS.read_text()
-        once = imp.insert_landed(imp.insert_landed(source, "hair_girl_ink_twin_braids"), "bag_girl_camel_mini")
+        once = imp.insert_landed(imp.insert_landed(source, "zz_piece_test_only"), "bag_girl_camel_mini")
         twice = imp.insert_landed(once, "bag_girl_camel_mini")
-        landed = re.search(r"new Set<string>\(\[(.*?)\]\)", twice, re.S).group(1)
-        self.assertEqual(re.findall(r'"([^"]+)"', landed), ["bag_girl_camel_mini", "hair_girl_ink_twin_braids"])
+        ids = lambda text: re.findall(r'"([^"]+)"', re.search(r"new Set<string>\(\[(.*?)\]\)", text, re.S).group(1))
+        before, after = ids(source), ids(twice)
+        self.assertEqual(after, sorted(set(before) | {"bag_girl_camel_mini", "zz_piece_test_only"}))
 
     def test_showcase_pending_gets_the_id_and_a_reason(self):
         source = imp.COVERAGE_TEST_TS.read_text()
-        edited = imp.insert_showcase_pending(source, "male", "glasses_boy_black_soft_rect", "REASON LINE")
+        edited = imp.insert_showcase_pending(source, "male", "piece_boy_test_only", "REASON LINE")
         pending = edited[edited.index("const SHOWCASE_PENDING"):]
-        self.assertRegex(pending, r'male: \[[^\]]*"glasses_boy_black_soft_rect"')
+        self.assertRegex(pending, r'male: \[[^\]]*"piece_boy_test_only"')
         self.assertLess(edited.index("REASON LINE"), edited.index("const SHOWCASE_PENDING"))
 
     def test_every_declared_piece_resolves_to_its_rig(self):

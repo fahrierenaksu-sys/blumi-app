@@ -25,7 +25,7 @@ Steps (each stops the run on failure; nothing is committed, the end prints the f
   6. bake-stills, the blink gate, then typecheck and the affected tests (domain, avatar, wardrobe, shop preview).
 --plan validates the inputs and prints the steps without writing anything.
 """
-import argparse, copy, hashlib, json, os, re, shutil, subprocess, sys
+import argparse, copy, hashlib, json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -176,11 +176,20 @@ def copy_front(args, item_id):
 
 
 def export_rig(rig, rig_path):
+    """Export into a scratch folder first, so a refused export leaves the app's rig files untouched."""
     out_dir = ROOT / "apps/mobile/src/features/avatar/rigs" / RIG_DIRS[rig]
-    for pattern in GENERATED_GLOBS:
-        for path in out_dir.glob(pattern):
-            path.unlink()
-    run([PYTHON, ROOT / "tools/avatar25d/export_rig.py", rig_path, *EXPORT_ARGS[rig], "--out", out_dir, "--astc"], cwd=WORKBENCH)
+    with tempfile.TemporaryDirectory(prefix="blumi-import-") as scratch:
+        staged = Path(scratch) / "out"
+        run([PYTHON, ROOT / "tools/avatar25d/export_rig.py", rig_path, *EXPORT_ARGS[rig], "--out", staged, "--astc"],
+            cwd=WORKBENCH)
+        for pattern in GENERATED_GLOBS:
+            for path in out_dir.glob(pattern):
+                path.unlink()
+        for path in staged.rglob("*"):
+            if path.is_file():
+                target = out_dir / path.relative_to(staged)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(path), target)
     return out_dir
 
 
