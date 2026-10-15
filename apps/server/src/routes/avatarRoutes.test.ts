@@ -7,6 +7,7 @@ import {
 } from "@blumi/domain"
 import { createAuthService } from "../auth/authService"
 import { createBlumiBackendStore } from "../auth/authStore"
+import { createEconomyService } from "../economy/economyService"
 import { createServer } from "../server"
 import {
   createCapabilityService,
@@ -217,9 +218,12 @@ test("avatar PUT gates V2 writes and projects reads from server-resolved client 
   await app.close()
 })
 
-test("a new boy account starts in the curls and the basic_a outfit and can save it, but not his former look", async () => {
+test("a new boy account starts in the curls and the basic_a outfit and can save it, and a save of his retired former look keeps the starter look without granting anything", async () => {
   const authService = createAuthService({ store: createBlumiBackendStore(), codeFactory: () => "482931" })
-  const app = createServer({ authService })
+  const economyService = createEconomyService({
+    getAccountCreatedAt: async (userId) => (await authService.repository.findAccountByUserId(userId))?.createdAt ?? null
+  })
+  const app = createServer({ authService, economyService })
   await app.inject({ method: "POST", url: "/v1/auth/send-code", payload: { phoneNumber: "+905551112266" } })
   const verified = await app.inject({
     method: "POST",
@@ -227,6 +231,7 @@ test("a new boy account starts in the curls and the basic_a outfit and can save 
     payload: { termsAcceptance: { version: "test-terms-v1", locale: "tr" }, phoneNumber: "+905551112266", verificationCode: "482931" }
   })
   const headers = { authorization: `Bearer ${verified.json().session.sessionToken as string}` }
+  const userId = verified.json().session.userId as string
   const boyStarter = {
     hairId: "avatar_v2_hair_male_blue_black_curls",
     topId: "avatar_v2_top_male_white_basic_tee",
@@ -249,6 +254,8 @@ test("a new boy account starts in the curls and the basic_a outfit and can save 
   assert.equal(saved.json().avatar.presetId, DEFAULT_MALE_AVATAR_LOADOUT.bodyId)
   assert.deepEqual({ ...saved.json().avatar.loadout, ...boyStarter }, saved.json().avatar.loadout)
 
+  const inventoryBefore = await economyService.getInventory(userId)
+  assert.ok(inventoryBefore)
   const former = await app.inject({
     method: "PUT",
     url: "/v1/users/me/avatar",
@@ -264,6 +271,30 @@ test("a new boy account starts in the curls and the basic_a outfit and can save 
       revision: 1
     }
   })
-  assert.equal(former.statusCode, 400)
+  // Older builds still send the retired pre-2.5D pieces. The server stores the
+  // starter piece in their place: the save succeeds, but the account neither
+  // wears nor gains a look it does not own.
+  assert.equal(former.statusCode, 200)
+  assert.equal(former.json().avatar.revision, 2)
+  assert.deepEqual({ ...former.json().avatar.loadout, ...boyStarter }, former.json().avatar.loadout)
+
+  const stored = await app.inject({ method: "GET", url: "/v1/users/me", headers })
+  assert.equal(stored.statusCode, 200)
+  const storedLoadout = stored.json().profile.avatar.loadout as Record<string, unknown>
+  assert.deepEqual({ ...storedLoadout, ...boyStarter }, storedLoadout)
+  const retiredIds = [
+    "avatar_v2_hair_male_soft_black_side_part",
+    "avatar_v2_top_male_powder_blue_crew_tee",
+    "avatar_v2_bottom_male_navy_straight_pants",
+    "avatar_v2_shoes_male_milk_tea_court"
+  ]
+  for (const retiredId of retiredIds) {
+    assert.ok(!JSON.stringify(storedLoadout).includes(retiredId), "the retired piece is not stored")
+  }
+  const inventoryAfter = await economyService.getInventory(userId)
+  assert.deepEqual(inventoryAfter, inventoryBefore)
+  for (const retiredId of retiredIds) {
+    assert.ok(!JSON.stringify(inventoryAfter).includes(retiredId), "the retired piece is not granted")
+  }
   await app.close()
 })
