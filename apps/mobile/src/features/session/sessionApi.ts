@@ -226,12 +226,25 @@ export async function verifyFirebaseAccountAction(
   return payload as { confirmationToken: string; expiresAt: string }
 }
 
+const E164_PHONE_PATTERN = /^\+[1-9]\d{6,14}$/
+
+export interface FirebaseAccountActionChallenge {
+  challengeId: string
+  expiresAt: string
+  /**
+   * The phone the account has on the server, for re-authentication purposes
+   * (absent for a new phone and from older servers). The code goes here, not
+   * to whatever Firebase holds.
+   */
+  targetPhoneNumber?: string
+}
+
 export async function requestFirebaseAccountActionChallenge(
   baseHttpUrl: string,
   sessionToken: string,
   input: { purpose: FirebaseAccountActionPurpose; targetPhoneNumber?: string },
   fetcher: typeof fetch = fetch
-): Promise<{ challengeId: string; expiresAt: string }> {
+): Promise<FirebaseAccountActionChallenge> {
   const { response, payload } = await requestJson(baseHttpUrl, "/v1/account/firebase/challenge", {
     method: "POST",
     headers: {
@@ -245,7 +258,14 @@ export async function requestFirebaseAccountActionChallenge(
     typeof (payload as { expiresAt?: unknown } | null)?.expiresAt !== "string") {
     throw new Error(getApiErrorMessage(payload, "We could not start phone verification yet."))
   }
-  return payload as { challengeId: string; expiresAt: string }
+  const { challengeId, expiresAt, targetPhoneNumber } = payload as Record<string, unknown>
+  return {
+    challengeId: challengeId as string,
+    expiresAt: expiresAt as string,
+    ...(typeof targetPhoneNumber === "string" && E164_PHONE_PATTERN.test(targetPhoneNumber)
+      ? { targetPhoneNumber }
+      : {})
+  }
 }
 
 export async function submitAccountRecoveryRequest(

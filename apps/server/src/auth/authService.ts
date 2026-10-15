@@ -91,7 +91,7 @@ export interface AuthService {
     purpose: "account_deletion" | AccountActionPurpose,
     targetPhoneNumber?: string,
     now?: Date
-  ): Promise<{ challengeId: string; expiresAt: string } | null>
+  ): Promise<{ challengeId: string; expiresAt: string; targetPhoneNumber?: string } | null>
   consumeFirebaseActionChallenge(input: {
     sessionToken: string
     purpose: "account_deletion" | AccountActionPurpose
@@ -430,7 +430,12 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
         issuedAt: Math.ceil(now.getTime() / 1000) * 1000,
         expiresAt
       })
-      return { challengeId, expiresAt: new Date(expiresAt).toISOString() }
+      // The account's own phone, told only to its own session: the client
+      // texts it rather than whatever Firebase holds, so an interrupted phone
+      // change can never leave re-authentication aimed at the wrong number.
+      return purpose === "phone_change_new"
+        ? { challengeId, expiresAt: new Date(expiresAt).toISOString() }
+        : { challengeId, expiresAt: new Date(expiresAt).toISOString(), targetPhoneNumber: phoneNumber }
     },
 
     async consumeFirebaseActionChallenge(input) {
