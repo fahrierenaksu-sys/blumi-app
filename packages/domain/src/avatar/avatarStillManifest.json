@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "c7cb38cc586952ed05166cea414fabf099910817247549caace7862ca29ff39f",
+      "rigSha256": "0ebf195d953f5ce4403007ba84c7cf6869eb6cf6af669a1d04243470116299ec",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -888,6 +888,21 @@
             }
           ]
         },
+        "dress_girl_denim_pinafore_mini": {
+          "slot": "dress",
+          "rigItemId": "dress_girl_denim_pinafore_mini",
+          "thumb": "dress_girl_denim_pinafore_mini"
+        },
+        "dress_girl_sage_shirred_tiered_mini": {
+          "slot": "dress",
+          "rigItemId": "dress_girl_sage_shirred_tiered_mini",
+          "thumb": "dress_girl_sage_shirred_tiered_mini"
+        },
+        "dress_girl_black_corset_flare_mini": {
+          "slot": "dress",
+          "rigItemId": "dress_girl_black_corset_flare_mini",
+          "thumb": "dress_girl_black_corset_flare_mini"
+        },
         "clip_girl_pearl_bar_pair": {
           "slot": "accessory",
           "rigItemId": "clip_girl_pearl_bar_pair",
@@ -1143,6 +1158,45 @@
               461,
               31,
               32
+            ]
+          },
+          {
+            "key": "dress_girl_denim_pinafore_mini__o0p45",
+            "owner": "dress_girl_denim_pinafore_mini",
+            "slot": "dress",
+            "order": 0.45,
+            "seq": 5007,
+            "rect": [
+              202,
+              312,
+              56,
+              115
+            ]
+          },
+          {
+            "key": "dress_girl_sage_shirred_tiered_mini__o0p45",
+            "owner": "dress_girl_sage_shirred_tiered_mini",
+            "slot": "dress",
+            "order": 0.45,
+            "seq": 5008,
+            "rect": [
+              214,
+              274,
+              43,
+              86
+            ]
+          },
+          {
+            "key": "dress_girl_black_corset_flare_mini__o0p45",
+            "owner": "dress_girl_black_corset_flare_mini",
+            "slot": "dress",
+            "order": 0.45,
+            "seq": 5008,
+            "rect": [
+              204,
+              462,
+              31,
+              31
             ]
           },
           {
@@ -2977,6 +3031,45 @@
             ]
           },
           {
+            "key": "dress_girl_denim_pinafore_mini__o3p45",
+            "owner": "dress_girl_denim_pinafore_mini",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              195,
+              263,
+              229,
+              343
+            ]
+          },
+          {
+            "key": "dress_girl_sage_shirred_tiered_mini__o3p45",
+            "owner": "dress_girl_sage_shirred_tiered_mini",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              178,
+              263,
+              258,
+              354
+            ]
+          },
+          {
+            "key": "dress_girl_black_corset_flare_mini__o3p45",
+            "owner": "dress_girl_black_corset_flare_mini",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              175,
+              263,
+              258,
+              339
+            ]
+          },
+          {
             "key": "dress_girl_denim_milkmaid_button_midi__o3p45",
             "owner": "dress_girl_denim_milkmaid_button_midi",
             "slot": "dress",
@@ -3409,6 +3502,45 @@
               21,
               43
             ]
+          },
+          {
+            "key": "dress_girl_denim_pinafore_mini__o5p45",
+            "owner": "dress_girl_denim_pinafore_mini",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5003,
+            "rect": [
+              364,
+              288,
+              62,
+              102
+            ]
+          },
+          {
+            "key": "dress_girl_sage_shirred_tiered_mini__o5p45",
+            "owner": "dress_girl_sage_shirred_tiered_mini",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5003,
+            "rect": [
+              364,
+              282,
+              56,
+              211
+            ]
+          },
+          {
+            "key": "dress_girl_black_corset_flare_mini__o5p45",
+            "owner": "dress_girl_black_corset_flare_mini",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5003,
+            "rect": [
+              390,
+              475,
+              15,
+              18
+            ]
           }
         ],
         "bust": [
@@ -3636,6 +3768,32 @@
               158,
               42,
               73
+            ]
+          },
+          {
+            "key": "dress_girl_denim_pinafore_mini__o0p45",
+            "owner": "dress_girl_denim_pinafore_mini",
+            "slot": "dress",
+            "order": 0.45,
+            "seq": 5007,
+            "rect": [
+              61,
+              180,
+              39,
+              75
+            ]
+          },
+          {
+            "key": "dress_girl_sage_shirred_tiered_mini__o0p45",
+            "owner": "dress_girl_sage_shirred_tiered_mini",
+            "slot": "dress",
+            "order": 0.45,
+            "seq": 5008,
+            "rect": [
+              68,
+              156,
+              32,
+              58
             ]
           },
           {
@@ -4254,6 +4412,45 @@
             ]
           },
           {
+            "key": "dress_girl_denim_pinafore_mini__o3p45",
+            "owner": "dress_girl_denim_pinafore_mini",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              71,
+              150,
+              110,
+              106
+            ]
+          },
+          {
+            "key": "dress_girl_sage_shirred_tiered_mini__o3p45",
+            "owner": "dress_girl_sage_shirred_tiered_mini",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              72,
+              150,
+              109,
+              106
+            ]
+          },
+          {
+            "key": "dress_girl_black_corset_flare_mini__o3p45",
+            "owner": "dress_girl_black_corset_flare_mini",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              75,
+              150,
+              103,
+              106
+            ]
+          },
+          {
             "key": "dress_girl_denim_milkmaid_button_midi__o3p45",
             "owner": "dress_girl_denim_milkmaid_button_midi",
             "slot": "dress",
@@ -4672,6 +4869,32 @@
               162,
               32,
               42
+            ]
+          },
+          {
+            "key": "dress_girl_denim_pinafore_mini__o5p45",
+            "owner": "dress_girl_denim_pinafore_mini",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5003,
+            "rect": [
+              160,
+              165,
+              43,
+              67
+            ]
+          },
+          {
+            "key": "dress_girl_sage_shirred_tiered_mini__o5p45",
+            "owner": "dress_girl_sage_shirred_tiered_mini",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5003,
+            "rect": [
+              160,
+              161,
+              39,
+              47
             ]
           }
         ]
