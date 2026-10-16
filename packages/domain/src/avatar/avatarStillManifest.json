@@ -435,10 +435,10 @@
             "under": {
               "key": "avatar_v2_top_coral_wave_polo__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                388,
+                486,
+                399
               ]
             }
           }
@@ -492,10 +492,10 @@
             "under": {
               "key": "avatar_v2_top_white_cute_crop_top__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                388,
+                486,
+                399
               ]
             }
           }
@@ -549,10 +549,10 @@
             "under": {
               "key": "avatar_v2_top_black_cute_crop_top__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                388,
+                486,
+                399
               ]
             }
           }
@@ -573,10 +573,10 @@
             "under": {
               "key": "top_sage_ribbon_knit_jacket__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                388,
+                486,
+                399
               ]
             }
           }
@@ -617,10 +617,10 @@
             "under": {
               "key": "top_powder_blue_ribbon_corset_top__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                388,
+                486,
+                399
               ]
             }
           }
@@ -628,7 +628,26 @@
         "jacket_girl_light_denim_crop": {
           "slot": "top",
           "rigItemId": "jacket_girl_light_denim_crop",
-          "thumb": "jacket_girl_light_denim_crop"
+          "thumb": "jacket_girl_light_denim_crop",
+          "showcase": {
+            "key": "jacket_girl_light_denim_crop__front",
+            "rect": [
+              55,
+              392,
+              496,
+              404
+            ],
+            "order": 3,
+            "under": {
+              "key": "jacket_girl_light_denim_crop__under",
+              "rect": [
+                60,
+                388,
+                486,
+                399
+              ]
+            }
+          }
         },
         "jacket_girl_black_crop_blazer": {
           "slot": "top",
@@ -784,7 +803,26 @@
         "hair_girl_ink_twin_braids": {
           "slot": "hair",
           "rigItemId": "hair_girl_ink_twin_braids",
-          "thumb": "hair_girl_ink_twin_braids"
+          "thumb": "hair_girl_ink_twin_braids",
+          "showcase": {
+            "key": "hair_girl_ink_twin_braids__front",
+            "rect": [
+              140,
+              67,
+              326,
+              515
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_girl_ink_twin_braids__back",
+              "rect": [
+                129,
+                56,
+                347,
+                526
+              ]
+            }
+          }
         },
         "dress_girl_wine_gingham_tie": {
           "slot": "dress",

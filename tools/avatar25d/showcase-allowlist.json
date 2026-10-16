@@ -135,6 +135,23 @@
           "eraseFile": "gpt3_1745/bottom_black_trousers_erase_v2.png",
           "sha256": "692fbdf584dd85310b0e60f44dde07be27c63738259de171c404799878adcc14",
           "eraseSha256": "1a5e3a73e6715f9bc4adf6cd47d3b0523fb4dc6fe2cdb9dacc4cc0405b0d2a13"
+        },
+        "jacket_girl_light_denim_crop": {
+          "slot": "top",
+          "order": 3,
+          "file": "surffix/jacket_girl_light_denim_crop/front.png",
+          "eraseFile": "surffix/jacket_girl_light_denim_crop/erase.png",
+          "tucked": false,
+          "sha256": "2c858b4f93ec2189efe27da3327c29f44ee33dafa083b38c2c4bcfb5c8f86b96",
+          "eraseSha256": "f5cf220a96d26b55267e194153c0ab5fef981818cca8793f9a954e70b7580828"
+        },
+        "hair_girl_ink_twin_braids": {
+          "slot": "hair",
+          "order": 4,
+          "file": "surffix/hair_girl_ink_twin_braids/front.png",
+          "backFile": "surffix/hair_girl_ink_twin_braids/back.png",
+          "sha256": "59ff757670339f15ab6f991af7dcb58194787422b0c3a7c934692b007e272c3b",
+          "backSha256": "6e81c291475009087a28957f94e3441463b844d55413e35ff8b615fc8ee4199c"
         }
       }
     },

@@ -54,10 +54,10 @@
           "under": {
             "key": "avatar_v2_top_coral_wave_polo__under",
             "rect": [
-              113,
-              404,
-              380,
-              325
+              60,
+              388,
+              486,
+              399
             ]
           }
         },
@@ -214,10 +214,10 @@
           "under": {
             "key": "avatar_v2_top_white_cute_crop_top__under",
             "rect": [
-              113,
-              404,
-              380,
-              325
+              60,
+              388,
+              486,
+              399
             ]
           }
         },
@@ -234,10 +234,10 @@
           "under": {
             "key": "avatar_v2_top_black_cute_crop_top__under",
             "rect": [
-              113,
-              404,
-              380,
-              325
+              60,
+              388,
+              486,
+              399
             ]
           }
         },
@@ -254,10 +254,10 @@
           "under": {
             "key": "top_sage_ribbon_knit_jacket__under",
             "rect": [
-              113,
-              404,
-              380,
-              325
+              60,
+              388,
+              486,
+              399
             ]
           }
         },
@@ -274,10 +274,10 @@
           "under": {
             "key": "top_powder_blue_ribbon_corset_top__under",
             "rect": [
-              113,
-              404,
-              380,
-              325
+              60,
+              388,
+              486,
+              399
             ]
           }
         },
@@ -300,14 +300,54 @@
               754
             ]
           }
+        },
+        "jacket_girl_light_denim_crop": {
+          "key": "jacket_girl_light_denim_crop__front",
+          "rect": [
+            55,
+            392,
+            496,
+            404
+          ],
+          "order": 3,
+          "slot": "top",
+          "under": {
+            "key": "jacket_girl_light_denim_crop__under",
+            "rect": [
+              60,
+              388,
+              486,
+              399
+            ]
+          }
+        },
+        "hair_girl_ink_twin_braids": {
+          "key": "hair_girl_ink_twin_braids__front",
+          "rect": [
+            140,
+            67,
+            326,
+            515
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "hair_girl_ink_twin_braids__back",
+            "rect": [
+              129,
+              56,
+              347,
+              526
+            ]
+          }
         }
       },
       "files": {
-        "base__front": "e8d753e9106e4485f9d601c0b859ec2aa9a0ed903e89bd09f0566605fe6d440c",
+        "base__front": "70069546ff6f255df82c83a1ebf6328b90365356b669a0983e2b407a7b4cdc2d",
         "avatar_v2_top_coral_wave_polo__front": "dfdfc464e1234775b7a7ca76543fabbdb12b0ec66cf6bf7accbc60dc65d252b5",
-        "avatar_v2_top_coral_wave_polo__under": "8e3fc5e68057796cae8989ff1c625f7b67fc9776f9d9259fc0104125365951e3",
+        "avatar_v2_top_coral_wave_polo__under": "c534362ac4dadf298b74436ab3992a2341e2e8f392190ac3d9f140959069eeaf",
         "avatar_v2_bottom_coral_wave_pants__front": "239b9a0e231bcec5bee786fb8790efde4f95416fa97953fa6e719ad71ca03437",
-        "avatar_v2_bottom_coral_wave_pants__under": "28a071d8a8055bbab8ab31700e2be8852c41fc2976a477fc90d82d4102cbab1e",
+        "avatar_v2_bottom_coral_wave_pants__under": "0b96accf34998f05d30103c46d551cef98e3e005c59edfe9dcfd054df38e47e9",
         "avatar_v2_shoes_mint_ribbon_court_sneakers__front": "6eeb193d0ca5bf09ceb22b8cdcc32aaf599fe79d31692491f868caed49a3833c",
         "avatar_v2_shoes_mint_ribbon_court_sneakers__under": "6a884c028f30a5dda7c5a852974e1a1e26fc6e156a46827d595103f9eeb44e20",
         "avatar_v2_hair_ink_pageboy_star__front": "76351dc1d6eee23becbb7dbee0fa26a4baf5b8d7741a31c88cb0ed1b935b1353",
@@ -321,15 +361,19 @@
         "avatar_v2_shoes_white_clean_sneakers__front": "248d2599bc906355a80f2a133402e514abc51b6c9c0bc5a86cc4a4a8f324dfce",
         "avatar_v2_shoes_white_clean_sneakers__under": "244bcb336f66dd914ee006f8affcca503f6beaf3c04ed777f677fb314293456d",
         "avatar_v2_top_white_cute_crop_top__front": "3f4d9d111588ec92617d1201944fb64d0be000cc5ea461ca72f07f825afc515e",
-        "avatar_v2_top_white_cute_crop_top__under": "47d646bad69e8d60a7057fa07607e4e087af363488af5cb0ba805103ae447a57",
+        "avatar_v2_top_white_cute_crop_top__under": "26462cae75168609aa1c34336dd10449ff998d550024aabc77ec336428eb5547",
         "avatar_v2_top_black_cute_crop_top__front": "4c5e38553dbe5fa2e0be653030c42987f64efffa89265f67410484baacd43d73",
-        "avatar_v2_top_black_cute_crop_top__under": "ed026ca3b4451318b190de79dabd254f0c59a817962faf182128e22e6315d59b",
+        "avatar_v2_top_black_cute_crop_top__under": "8cd39061d2e33502569353d70bb9144b67332f80fd325135921c016fb70d93e9",
         "top_sage_ribbon_knit_jacket__front": "fa9f0c5723ce51bf43c0ed23218a34aef0032de42504257d928d1ff94c241a09",
-        "top_sage_ribbon_knit_jacket__under": "66c0db03fb517ddca9e59fd6e68ecf8b6d259ce6ae43ce50d7f3d8b7539f65cf",
+        "top_sage_ribbon_knit_jacket__under": "dc044ff6b0d5b93cfa191089a15b949b895dee5cbb88b0d3287f60a9326f6d2f",
         "top_powder_blue_ribbon_corset_top__front": "37f7aba56ea04a275ec5bc2b17d4b301e4a18d577f27e66458e7196914e9154f",
-        "top_powder_blue_ribbon_corset_top__under": "7a8490bf56c5391fcbf9a4d733327e085e503ad021543ac13152bcf669ef582e",
+        "top_powder_blue_ribbon_corset_top__under": "cfbf858875da32fbe011405e43c56aecaf276f2b8f312bf85876440c8212c09b",
         "avatar_v2_bottom_black_highwaist_trousers__front": "5662c55f963758bb49a8f630ad353ca76c33230d3d7c1806f6bd95d9b7fb3c72",
-        "avatar_v2_bottom_black_highwaist_trousers__under": "9d097926e6148aee591933541211cc5e0cdc2b79cc8c6a82dc066a5a57cadbba"
+        "avatar_v2_bottom_black_highwaist_trousers__under": "8093e74333ac694f75e9d1d691cb5e9d799213f7c1879cb6454fc800eb79f372",
+        "jacket_girl_light_denim_crop__front": "400d5d22faffba4171742173691bf13b6966224b7fa21ac1747278946824349a",
+        "jacket_girl_light_denim_crop__under": "5850bb96e17f39da03bbeb5ff1d3cb65cde1b450ef2d0fd278472329081ecb52",
+        "hair_girl_ink_twin_braids__front": "1489ab6d1cb9569cc4592e83269dec632a00934d612c04be845fa69c29506ec6",
+        "hair_girl_ink_twin_braids__back": "fdc06dd3bd4b6f9bb14be16d2f6bb89d9018ca018d6be73494173f1dfcafbe5b"
       }
     },
     "male": {
