@@ -620,6 +620,17 @@ class PoseOnlyTest(unittest.TestCase):
                 ex.pose_only('top_a', 1, {'poseOnly': bad})
 
 
+class PartOrderTest(unittest.TestCase):
+    def test_order_layer_sets_the_draw_order_only_and_a_part_without_it_keeps_its_layer_order(self):
+        ex = load_exporter()
+        orders = {'head': 4, 'nearArm': 5}
+        self.assertEqual(ex.part_order(orders, {'layer': 'head'}), 4)
+        self.assertEqual(ex.part_order(orders, {'layer': 'head', 'orderLayer': 'nearArm'}), 5)
+        self.assertEqual(ex.part_order(orders, {'layer': 'unknown'}), 3)
+        with self.assertRaises(SystemExit):
+            ex.part_order(orders, {'layer': 'head', 'orderLayer': 'nose'})
+
+
 MIXED_BOY = pathlib.Path.home() / 'BlumiArtWorkbench/avatar25-v2/factory/work/boy_pipeline_v8/smoke/basic_a/post/rig.json'
 
 

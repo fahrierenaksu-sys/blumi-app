@@ -793,6 +793,17 @@ def leg_variant_owners(leg_variants, items):
 POSES = ('stand', 'walk', 'sit', 'wave')
 
 
+def part_order(layer_order, part):
+    """An item part's draw order: its layer's, or the layer named by the optional `orderLayer` key. The mask layer stays
+    `layer` (a head-anchored back-wave hair copy keeps layer 'head', so the app does not hide it in the wave like every
+    nearArm range, and draws at nearArm order over the raised arm and the top's wave card). Parts without the key
+    export exactly as before."""
+    name = part.get('orderLayer', part['layer'])
+    if 'orderLayer' in part and name not in layer_order:
+        raise SystemExit(f"bad orderLayer {name!r} (one of {sorted(layer_order)})")
+    return layer_order.get(name, 3)
+
+
 def pose_only(iid, k, part):
     """A part's `poseOnly` as a list, checked: one known pose or a non-empty list of them (the lab, doll25.js, takes
     both: `[].concat(poseOnly)`); the runtime draws the part in those poses only."""
@@ -934,7 +945,7 @@ def export_view(name, v, motion=None):
             # a part drawn in some poses only (factory `poseOnly`, e.g. a bottom's wave-only hip patch over the waving
             # torso's briefs) carries that list; parts without one export exactly as before
             only = {'poseOnly': pose_only(iid, k, p)} if p.get('poseOnly') else {}
-            im.add_range(f'part{k}', layer_order.get(p['layer'], 3) + f,
+            im.add_range(f'part{k}', part_order(layer_order, p) + f,
                          lambda p=p, k=k: im.skinned(p, ir[f'part{k}'], PAGE, bone_idx, page, ARM_CODE.get(p['layer'], 0)),
                          layer=p['layer'], standOnly=stand_only, **only)
         body_layers = {L['name']: L for L in v['layers']}
