@@ -51,7 +51,11 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     bottom_girl_wine_midi_skirt: "bottom_girl_wine_midi_skirt",
     bottom_girl_wide_jeans: "bottom_girl_wide_jeans",
     bottom_girl_ecru_trousers: "bottom_girl_ecru_trousers",
-    shoes_girl_camel_ankle_boots: "shoes_girl_camel_ankle_boots"
+    shoes_girl_camel_ankle_boots: "shoes_girl_camel_ankle_boots",
+    dress_girl_black_corset_slit_maxi: "dress_girl_black_corset_slit_maxi",
+    dress_girl_terracotta_patchwork_halter_bias_maxi: "dress_girl_terracotta_patchwork_halter_bias_maxi",
+    dress_girl_denim_milkmaid_button_midi: "dress_girl_denim_milkmaid_button_midi",
+    dress_girl_cream_one_shoulder_tie_midi: "dress_girl_cream_one_shoulder_tie_midi"
   },
   // the boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts; QA unlock only, no receipts)
   male: {

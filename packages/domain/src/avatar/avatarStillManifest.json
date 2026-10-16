@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "8de698c84266781c52a532e496e9fcb10b42f776a3f6c16606cdc7000cacadf6",
+      "rigSha256": "c7cb38cc586952ed05166cea414fabf099910817247549caace7862ca29ff39f",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -776,6 +776,118 @@
           "rigItemId": "dress_girl_wine_gingham_tie",
           "thumb": "dress_girl_wine_gingham_tie"
         },
+        "dress_girl_black_corset_slit_maxi": {
+          "slot": "dress",
+          "rigItemId": "dress_girl_black_corset_slit_maxi",
+          "thumb": "dress_girl_black_corset_slit_maxi",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoSit"
+            },
+            {
+              "part": "torsoUpper"
+            },
+            {
+              "part": "torsoWalk"
+            },
+            {
+              "part": "sit"
+            }
+          ]
+        },
+        "dress_girl_terracotta_patchwork_halter_bias_maxi": {
+          "slot": "dress",
+          "rigItemId": "dress_girl_terracotta_patchwork_halter_bias_maxi",
+          "thumb": "dress_girl_terracotta_patchwork_halter_bias_maxi",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoSit"
+            },
+            {
+              "part": "torsoUpper"
+            },
+            {
+              "part": "torsoWalk"
+            },
+            {
+              "part": "sit"
+            }
+          ]
+        },
+        "dress_girl_denim_milkmaid_button_midi": {
+          "slot": "dress",
+          "rigItemId": "dress_girl_denim_milkmaid_button_midi",
+          "thumb": "dress_girl_denim_milkmaid_button_midi",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoSit"
+            },
+            {
+              "part": "torsoUpper"
+            },
+            {
+              "part": "torsoWalk"
+            },
+            {
+              "part": "sit"
+            }
+          ]
+        },
+        "dress_girl_cream_one_shoulder_tie_midi": {
+          "slot": "dress",
+          "rigItemId": "dress_girl_cream_one_shoulder_tie_midi",
+          "thumb": "dress_girl_cream_one_shoulder_tie_midi",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoSit"
+            },
+            {
+              "part": "torsoUpper"
+            },
+            {
+              "part": "torsoWalk"
+            },
+            {
+              "part": "sit"
+            }
+          ]
+        },
         "clip_girl_pearl_bar_pair": {
           "slot": "accessory",
           "rigItemId": "clip_girl_pearl_bar_pair",
@@ -1005,6 +1117,19 @@
               313,
               48,
               72
+            ]
+          },
+          {
+            "key": "dress_girl_denim_milkmaid_button_midi__o0p45",
+            "owner": "dress_girl_denim_milkmaid_button_midi",
+            "slot": "dress",
+            "order": 0.45,
+            "seq": 5003,
+            "rect": [
+              195,
+              276,
+              62,
+              112
             ]
           },
           {
@@ -2536,6 +2661,62 @@
             "bodyPart": "torso"
           },
           {
+            "key": "dress_girl_black_corset_slit_maxi__o3__body-torso",
+            "owner": "dress_girl_black_corset_slit_maxi",
+            "slot": "dress",
+            "order": 3,
+            "seq": 5009,
+            "rect": [
+              211,
+              262,
+              196,
+              344
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "dress_girl_terracotta_patchwork_halter_bias_maxi__o3__body-torso",
+            "owner": "dress_girl_terracotta_patchwork_halter_bias_maxi",
+            "slot": "dress",
+            "order": 3,
+            "seq": 5009,
+            "rect": [
+              210,
+              262,
+              198,
+              344
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "dress_girl_cream_one_shoulder_tie_midi__o3__body-torso",
+            "owner": "dress_girl_cream_one_shoulder_tie_midi",
+            "slot": "dress",
+            "order": 3,
+            "seq": 5010,
+            "rect": [
+              210,
+              262,
+              198,
+              344
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "dress_girl_denim_milkmaid_button_midi__o3__body-torso",
+            "owner": "dress_girl_denim_milkmaid_button_midi",
+            "slot": "dress",
+            "order": 3,
+            "seq": 5012,
+            "rect": [
+              210,
+              262,
+              198,
+              344
+            ],
+            "bodyPart": "torso"
+          },
+          {
             "key": "avatar_v2_bottom_coral_wave_pants__o3p3",
             "owner": "avatar_v2_bottom_coral_wave_pants",
             "slot": "bottom",
@@ -2767,6 +2948,58 @@
               263,
               270,
               377
+            ]
+          },
+          {
+            "key": "dress_girl_black_corset_slit_maxi__o3p45",
+            "owner": "dress_girl_black_corset_slit_maxi",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              208,
+              281,
+              225,
+              566
+            ]
+          },
+          {
+            "key": "dress_girl_terracotta_patchwork_halter_bias_maxi__o3p45",
+            "owner": "dress_girl_terracotta_patchwork_halter_bias_maxi",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              124,
+              272,
+              373,
+              583
+            ]
+          },
+          {
+            "key": "dress_girl_denim_milkmaid_button_midi__o3p45",
+            "owner": "dress_girl_denim_milkmaid_button_midi",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5001,
+            "rect": [
+              161,
+              275,
+              321,
+              559
+            ]
+          },
+          {
+            "key": "dress_girl_cream_one_shoulder_tie_midi__o3p45",
+            "owner": "dress_girl_cream_one_shoulder_tie_midi",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5001,
+            "rect": [
+              188,
+              283,
+              251,
+              559
             ]
           },
           {
@@ -3139,6 +3372,32 @@
             ]
           },
           {
+            "key": "dress_girl_denim_milkmaid_button_midi__o5p45",
+            "owner": "dress_girl_denim_milkmaid_button_midi",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5000,
+            "rect": [
+              364,
+              287,
+              72,
+              109
+            ]
+          },
+          {
+            "key": "dress_girl_cream_one_shoulder_tie_midi__o5p45",
+            "owner": "dress_girl_cream_one_shoulder_tie_midi",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5000,
+            "rect": [
+              364,
+              284,
+              44,
+              60
+            ]
+          },
+          {
             "key": "dress_girl_wine_gingham_tie__o5p45",
             "owner": "dress_girl_wine_gingham_tie",
             "slot": "dress",
@@ -3364,6 +3623,19 @@
               180,
               34,
               49
+            ]
+          },
+          {
+            "key": "dress_girl_denim_milkmaid_button_midi__o0p45",
+            "owner": "dress_girl_denim_milkmaid_button_midi",
+            "slot": "dress",
+            "order": 0.45,
+            "seq": 5003,
+            "rect": [
+              57,
+              158,
+              42,
+              73
             ]
           },
           {
@@ -3692,6 +3964,62 @@
             "bodyPart": "torso"
           },
           {
+            "key": "dress_girl_black_corset_slit_maxi__o3__body-torso",
+            "owner": "dress_girl_black_corset_slit_maxi",
+            "slot": "dress",
+            "order": 3,
+            "seq": 5009,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "dress_girl_terracotta_patchwork_halter_bias_maxi__o3__body-torso",
+            "owner": "dress_girl_terracotta_patchwork_halter_bias_maxi",
+            "slot": "dress",
+            "order": 3,
+            "seq": 5009,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "dress_girl_cream_one_shoulder_tie_midi__o3__body-torso",
+            "owner": "dress_girl_cream_one_shoulder_tie_midi",
+            "slot": "dress",
+            "order": 3,
+            "seq": 5010,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "dress_girl_denim_milkmaid_button_midi__o3__body-torso",
+            "owner": "dress_girl_denim_milkmaid_button_midi",
+            "slot": "dress",
+            "order": 3,
+            "seq": 5012,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
+          },
+          {
             "key": "bottom_girl_wine_midi_skirt__o3p3",
             "owner": "bottom_girl_wine_midi_skirt",
             "slot": "bottom",
@@ -3897,6 +4225,58 @@
               150,
               102,
               106
+            ]
+          },
+          {
+            "key": "dress_girl_black_corset_slit_maxi__o3p45",
+            "owner": "dress_girl_black_corset_slit_maxi",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              75,
+              161,
+              99,
+              95
+            ]
+          },
+          {
+            "key": "dress_girl_terracotta_patchwork_halter_bias_maxi__o3p45",
+            "owner": "dress_girl_terracotta_patchwork_halter_bias_maxi",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              75,
+              155,
+              99,
+              101
+            ]
+          },
+          {
+            "key": "dress_girl_denim_milkmaid_button_midi__o3p45",
+            "owner": "dress_girl_denim_milkmaid_button_midi",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5001,
+            "rect": [
+              71,
+              157,
+              103,
+              99
+            ]
+          },
+          {
+            "key": "dress_girl_cream_one_shoulder_tie_midi__o3p45",
+            "owner": "dress_girl_cream_one_shoulder_tie_midi",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5001,
+            "rect": [
+              76,
+              162,
+              99,
+              94
             ]
           },
           {
@@ -4266,6 +4646,32 @@
               166,
               41,
               66
+            ]
+          },
+          {
+            "key": "dress_girl_denim_milkmaid_button_midi__o5p45",
+            "owner": "dress_girl_denim_milkmaid_button_midi",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5000,
+            "rect": [
+              160,
+              164,
+              49,
+              72
+            ]
+          },
+          {
+            "key": "dress_girl_cream_one_shoulder_tie_midi__o5p45",
+            "owner": "dress_girl_cream_one_shoulder_tie_midi",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5000,
+            "rect": [
+              160,
+              162,
+              32,
+              42
             ]
           }
         ]
