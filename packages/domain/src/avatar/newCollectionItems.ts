@@ -108,6 +108,8 @@ export const NEW_COLLECTION_LANDED_ITEM_IDS: ReadonlySet<string> = new Set<strin
   "dress_girl_sage_shirred_tiered_mini",
   "dress_girl_terracotta_patchwork_halter_bias_maxi",
   "dress_girl_wine_gingham_tie",
+  "glasses_boy_black_soft_rect",
+  "glasses_boy_gunmetal_round",
   "hair_girl_bun_wine_bow",
   "hair_girl_chestnut_butterfly",
   "hair_girl_ink_french_bob",

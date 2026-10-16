@@ -4937,7 +4937,7 @@
       }
     },
     "male": {
-      "rigSha256": "9ca96de8515a6f007e7353f61a0f45a7ed3430c00b4ebf5e5d4ec0c293538ca0",
+      "rigSha256": "6450139e53483b57478e394c06715aebfe8a2617d60d0f8441a6adb7528a72db",
       "sheetHeight": 982,
       "canvas": {
         "width": 649,
@@ -5598,6 +5598,16 @@
               ]
             }
           }
+        },
+        "glasses_boy_black_soft_rect": {
+          "slot": "glasses",
+          "rigItemId": "glasses_boy_black_soft_rect",
+          "thumb": "glasses_boy_black_soft_rect"
+        },
+        "glasses_boy_gunmetal_round": {
+          "slot": "glasses",
+          "rigItemId": "glasses_boy_gunmetal_round",
+          "thumb": "glasses_boy_gunmetal_round"
         }
       },
       "layers": {
@@ -10622,6 +10632,32 @@
             ]
           },
           {
+            "key": "glasses_boy_black_soft_rect__o4p5",
+            "owner": "glasses_boy_black_soft_rect",
+            "slot": "glasses",
+            "order": 4.5,
+            "seq": 6000,
+            "rect": [
+              222,
+              156,
+              160,
+              48
+            ]
+          },
+          {
+            "key": "glasses_boy_gunmetal_round__o4p5",
+            "owner": "glasses_boy_gunmetal_round",
+            "slot": "glasses",
+            "order": 4.5,
+            "seq": 6000,
+            "rect": [
+              212,
+              149,
+              168,
+              64
+            ]
+          },
+          {
             "key": "avatar_v2_hair_male_blue_black_curls__o4p6",
             "owner": "avatar_v2_hair_male_blue_black_curls",
             "slot": "hair",
@@ -11011,6 +11047,32 @@
               20,
               120,
               137
+            ]
+          },
+          {
+            "key": "glasses_boy_black_soft_rect__o4p5",
+            "owner": "glasses_boy_black_soft_rect",
+            "slot": "glasses",
+            "order": 4.5,
+            "seq": 6000,
+            "rect": [
+              76,
+              90,
+              102,
+              34
+            ]
+          },
+          {
+            "key": "glasses_boy_gunmetal_round__o4p5",
+            "owner": "glasses_boy_gunmetal_round",
+            "slot": "glasses",
+            "order": 4.5,
+            "seq": 6000,
+            "rect": [
+              70,
+              86,
+              107,
+              44
             ]
           },
           {

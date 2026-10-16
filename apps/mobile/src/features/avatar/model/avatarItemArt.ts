@@ -87,7 +87,9 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     avatar_v2_shoes_male_black_clean_sneakers: "shoes_male_basic_a",
     avatar_v2_top_male_black_basic_tee: "top_male_basic_b",
     avatar_v2_bottom_male_black_pocket_trousers: "bottom_male_basic_b",
-    avatar_v2_shoes_male_black_everyday_sneakers: "shoes_male_basic_b"
+    avatar_v2_shoes_male_black_everyday_sneakers: "shoes_male_basic_b",
+    glasses_boy_black_soft_rect: "glasses_boy_black_soft_rect",
+    glasses_boy_gunmetal_round: "glasses_boy_gunmetal_round"
   }
 }
 
