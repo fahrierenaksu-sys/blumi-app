@@ -78,7 +78,10 @@ class SourceEditTest(unittest.TestCase):
         self.assertLess(edited.index("REASON LINE"), edited.index("const SHOWCASE_PENDING"))
 
     def test_every_declared_piece_resolves_to_its_rig(self):
-        self.assertEqual(imp.declared_item("glasses_boy_gunmetal_round"), ("male", False))
+        # The landed flag moves as pieces land, so the pieces here pin only the rig and that the flag follows the landed set.
+        landed_ids = set(re.findall(r'"([^"]+)"', re.search(r"NEW_COLLECTION_LANDED_ITEM_IDS[^=]*=\s*new Set<string>\(\[(.*?)\]\)", imp.COLLECTION_TS.read_text(), re.S).group(1)))
+        for item_id, rig in (("glasses_boy_gunmetal_round", "male"), ("jacket_girl_black_crop_blazer", "female")):
+            self.assertEqual(imp.declared_item(item_id), (rig, item_id in landed_ids))
         self.assertEqual(imp.declared_item("jacket_girl_black_crop_blazer")[0], "female")
         with self.assertRaises(SystemExit):
             imp.declared_item("top_sage_ribbon_knit_jacket")
