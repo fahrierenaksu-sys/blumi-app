@@ -18,7 +18,9 @@ export const SUPPORTED_MOBILE_CAPABILITIES = [
   // "yazıyor…" in chat and over the partner in the room (2026-10-01).
   "chat_typing",
   // This build draws the 2.5D avatar; the server counts builds that do not declare it (2026-10-10).
-  "avatar_world_25d"
+  "avatar_world_25d",
+  // Sokağım, the Chats tab street (2026-10-17); off until the server stages it.
+  "chat_street"
 ] as const satisfies readonly CapabilityKey[]
 
 /**
@@ -26,7 +28,7 @@ export const SUPPORTED_MOBILE_CAPABILITIES = [
  * them (400) and leaves them out of its map. The build retries once without them and reads a missing one as off,
  * so it keeps every other capability on an older server. Every other key stays required (fail closed).
  */
-export const LATE_DECLARED_CAPABILITIES: readonly CapabilityKey[] = Object.freeze(["avatar_world_25d"])
+export const LATE_DECLARED_CAPABILITIES: readonly CapabilityKey[] = Object.freeze(["avatar_world_25d", "chat_street"])
 
 const HTTP_BAD_REQUEST = 400
 
