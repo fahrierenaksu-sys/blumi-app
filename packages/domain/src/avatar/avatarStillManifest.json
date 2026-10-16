@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "81fccc705e6d8eb7112f195e2b43d5f51f03a1aa75eee7350fc998c30bebf425",
+      "rigSha256": "fd9cef7cf368aac1388dc795ad417962cf5ff74561a7e3f6d32c7b3a42604d8e",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -912,6 +912,11 @@
           "slot": "dress",
           "rigItemId": "dress_girl_cream_one_shoulder_mini",
           "thumb": "dress_girl_cream_one_shoulder_mini"
+        },
+        "glasses_girl_gold_round": {
+          "slot": "glasses",
+          "rigItemId": "glasses_girl_gold_round",
+          "thumb": "glasses_girl_gold_round"
         },
         "clip_girl_pearl_bar_pair": {
           "slot": "accessory",
@@ -3184,6 +3189,19 @@
             ]
           },
           {
+            "key": "glasses_girl_gold_round__o4p5",
+            "owner": "glasses_girl_gold_round",
+            "slot": "glasses",
+            "order": 4.5,
+            "seq": 6000,
+            "rect": [
+              211,
+              155,
+              160,
+              70
+            ]
+          },
+          {
             "key": "avatar_v2_hair_ink_pageboy_star__o4p6",
             "owner": "avatar_v2_hair_ink_pageboy_star",
             "slot": "hair",
@@ -4627,6 +4645,19 @@
               21,
               122,
               136
+            ]
+          },
+          {
+            "key": "glasses_girl_gold_round__o4p5",
+            "owner": "glasses_girl_gold_round",
+            "slot": "glasses",
+            "order": 4.5,
+            "seq": 6000,
+            "rect": [
+              67,
+              84,
+              102,
+              46
             ]
           },
           {
