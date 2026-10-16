@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "26df024f8b9e5704286d1ade7c17caa8fba7dddb1b442c4b8121d0221c7c49f9",
+      "rigSha256": "ef49e719526953f892f81a0b48fddbfd4c07bb420df66e0881198e2ab6c3f9df",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -776,6 +776,11 @@
           "rigItemId": "hair_girl_caramel_braid_crown",
           "thumb": "hair_girl_caramel_braid_crown"
         },
+        "hair_girl_copper_soft_waves": {
+          "slot": "hair",
+          "rigItemId": "hair_girl_copper_soft_waves",
+          "thumb": "hair_girl_copper_soft_waves"
+        },
         "dress_girl_wine_gingham_tie": {
           "slot": "dress",
           "rigItemId": "dress_girl_wine_gingham_tie",
@@ -1326,6 +1331,19 @@
               46,
               213,
               353
+            ]
+          },
+          {
+            "key": "hair_girl_copper_soft_waves__o0p6",
+            "owner": "hair_girl_copper_soft_waves",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              202,
+              46,
+              226,
+              349
             ]
           },
           {
@@ -3342,6 +3360,19 @@
             ]
           },
           {
+            "key": "hair_girl_copper_soft_waves__o4p6",
+            "owner": "hair_girl_copper_soft_waves",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              185,
+              47,
+              286,
+              336
+            ]
+          },
+          {
             "key": "clip_girl_pearl_bar_pair__o4p7",
             "owner": "clip_girl_pearl_bar_pair",
             "slot": "accessory",
@@ -4040,6 +4071,19 @@
               17,
               134,
               221
+            ]
+          },
+          {
+            "key": "hair_girl_copper_soft_waves__o0p6",
+            "owner": "hair_girl_copper_soft_waves",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              61,
+              17,
+              143,
+              218
             ]
           },
           {
@@ -4837,6 +4881,19 @@
               18,
               165,
               213
+            ]
+          },
+          {
+            "key": "hair_girl_copper_soft_waves__o4p6",
+            "owner": "hair_girl_copper_soft_waves",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              51,
+              18,
+              179,
+              210
             ]
           },
           {
