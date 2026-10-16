@@ -1,6 +1,6 @@
 /**
  * The room pet is off unless EXPO_PUBLIC_BLUMI_ROOM_PET is exactly "1".
- * Nothing renders the pet yet; the flag gates the future renderer hook.
+ * Off: My Room builds no pet map, runs no pet timer and draws no pet slot.
  */
 export function isRoomPetEnabled(rawValue: string | undefined): boolean {
   return rawValue?.trim() === "1"
