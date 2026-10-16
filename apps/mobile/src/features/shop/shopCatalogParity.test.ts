@@ -152,7 +152,7 @@ test("demo Shop lists Room products even when none are owned", () => {
   const roomProducts = products.filter((product) => product.sectionId === "room")
   // every piece but the held ones (pricing pending), which no build lists
   assert.equal(roomProducts.length, STAND_IN_ROOM_CATALOG.filter((item) => !isReleaseCatalogItemHeld(item.id)).length)
-  assert.equal(roomProducts.length, 1)
+  assert.ok(roomProducts.length > 0, "the demo Shop shows at least one room product")
   assert.ok(roomProducts.some((product) => !product.owned))
   assert.ok(roomProducts.every((product) => product.roomItem))
 })
@@ -639,10 +639,16 @@ test("every room piece the Shop can list has a Turkish name, shown on the Turkis
 });
 
 test("a held piece the server inventory owns is listed only under the local QA override, and never offered for sale", () => {
-  // a landed new-collection piece the release catalog still holds until its receipt
-  const heldShoesId = "shoes_girl_camel_ankle_boots";
+  // a piece the release catalog still holds (the female wardrobe promotion hold; the new collection is receipted)
+  const heldShoesId = "avatar_v2_top_cherry_heart_milkmaid_blouse";
   assert.equal(isReleaseCatalogItemHeld(heldShoesId), true);
-  const publishedCatalog = resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG);
+  // R1 drops held pieces from its published economy, so the held piece's own economy row is added back here:
+  // the override, not the catalog, is what must keep it off the shelf.
+  const heldRow = ECONOMY_CATALOG.find((item) => item.itemId === heldShoesId);
+  assert.ok(heldRow, "the held piece has an economy row");
+  const publishedCatalog = [...resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG), heldRow];
+  // its art is hidden from the Shop today; show it here so only the release hold decides the listing
+  const avatarCatalog = AVATAR_V2_CATALOG.map((item) => (item.id === heldShoesId ? { ...item, hiddenFromShop: false } : item));
   const listedHeldShoes = (ownedAvatarItemIds: string[], showHeldOwnedItems?: boolean) =>
     buildShopCatalogItems({
       avatar: resolveInitialAvatarV2("avatar_v2_body_default"),
@@ -655,7 +661,8 @@ test("a held piece the server inventory owns is listed only under the local QA o
       },
       roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
       economyCatalog: publishedCatalog,
-      publishedItemIds: publishedCatalog.map((item) => item.itemId),
+      avatarCatalog,
+      publishedItemIds: publishedCatalog.map((item) => item.itemId).filter((itemId) => itemId !== heldShoesId),
       showHeldOwnedItems,
     }).filter((product) => product.sourceItemId === heldShoesId);
 
