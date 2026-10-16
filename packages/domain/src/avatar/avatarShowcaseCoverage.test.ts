@@ -33,9 +33,10 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * 2026-10-15 19:37 (OWNER_DECISIONS): the hip fix landed (trousers front v2 + erase v2, Workbench integration/gpt3_1745)
  * and the owner approved polo front v7, so the black trousers are allowlisted and baked and their entry is gone.
  * new collection: jacket_girl_light_denim_crop landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
+ * new collection: jacket_girl_black_crop_blazer landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: ["jacket_girl_light_denim_crop"],
+  female: ["jacket_girl_light_denim_crop", "jacket_girl_black_crop_blazer"],
   male: [],
 };
 

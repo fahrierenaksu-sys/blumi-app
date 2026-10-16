@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "c2745c0d7ad4eb88915ded3da0080c4fd96324300a8b93d0b85896dbdf93bf43",
+      "rigSha256": "bb2737eda628c110225f871e8b0b576898406cf590f4c42462ee19af686fb9b8",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -403,6 +403,11 @@
           "rigItemId": "jacket_girl_light_denim_crop",
           "thumb": "jacket_girl_light_denim_crop"
         },
+        "jacket_girl_black_crop_blazer": {
+          "slot": "top",
+          "rigItemId": "jacket_girl_black_crop_blazer",
+          "thumb": "jacket_girl_black_crop_blazer"
+        },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
@@ -593,6 +598,19 @@
               307,
               93,
               180
+            ]
+          },
+          {
+            "key": "jacket_girl_black_crop_blazer__o0p45",
+            "owner": "jacket_girl_black_crop_blazer",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              146,
+              306,
+              112,
+              218
             ]
           },
           {
@@ -1260,6 +1278,19 @@
             ]
           },
           {
+            "key": "jacket_girl_black_crop_blazer__o3p45",
+            "owner": "jacket_girl_black_crop_blazer",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              215,
+              257,
+              197,
+              239
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1429,6 +1460,19 @@
               97,
               220
             ]
+          },
+          {
+            "key": "jacket_girl_black_crop_blazer__o5p45",
+            "owner": "jacket_girl_black_crop_blazer",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              364,
+              282,
+              111,
+              255
+            ]
           }
         ],
         "bust": [
@@ -1523,6 +1567,19 @@
               180,
               52,
               76
+            ]
+          },
+          {
+            "key": "jacket_girl_black_crop_blazer__o0p45",
+            "owner": "jacket_girl_black_crop_blazer",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              46,
+              179,
+              54,
+              77
             ]
           },
           {
@@ -1758,6 +1815,19 @@
             ]
           },
           {
+            "key": "jacket_girl_black_crop_blazer__o3p45",
+            "owner": "jacket_girl_black_crop_blazer",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              69,
+              149,
+              115,
+              107
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1926,6 +1996,19 @@
               165,
               53,
               91
+            ]
+          },
+          {
+            "key": "jacket_girl_black_crop_blazer__o5p45",
+            "owner": "jacket_girl_black_crop_blazer",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              160,
+              164,
+              56,
+              92
             ]
           }
         ]

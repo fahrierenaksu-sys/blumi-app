@@ -34,7 +34,8 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     avatar_v2_bottom_black_highwaist_trousers: "bottom_black_highwaist_straight",
     top_sage_ribbon_knit_jacket: "top_sage_ribbon_knit_jacket",
     top_powder_blue_ribbon_corset_top: "top_powder_blue_ribbon_corset_top",
-    jacket_girl_light_denim_crop: "jacket_girl_light_denim_crop"
+    jacket_girl_light_denim_crop: "jacket_girl_light_denim_crop",
+    jacket_girl_black_crop_blazer: "jacket_girl_black_crop_blazer"
   },
   // the boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts; QA unlock only, no receipts)
   male: {

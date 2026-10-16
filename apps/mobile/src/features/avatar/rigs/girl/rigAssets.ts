@@ -8,6 +8,7 @@ export const ROOM_AVATAR_25D_TEXTURES: Record<string, number> = {
   "back_page5.png": require("./back_page5.png"),
   "back_page6.png": require("./back_page6.png"),
   "back_page7.png": require("./back_page7.png"),
+  "back_page8.png": require("./back_page8.png"),
   "front_page0.png": require("./front_page0.png"),
   "front_page1.png": require("./front_page1.png"),
   "front_page2.png": require("./front_page2.png"),
@@ -16,4 +17,5 @@ export const ROOM_AVATAR_25D_TEXTURES: Record<string, number> = {
   "front_page5.png": require("./front_page5.png"),
   "front_page6.png": require("./front_page6.png"),
   "front_page7.png": require("./front_page7.png"),
+  "front_page8.png": require("./front_page8.png"),
 }

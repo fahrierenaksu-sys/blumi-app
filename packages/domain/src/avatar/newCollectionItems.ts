@@ -84,6 +84,7 @@ export const NEW_COLLECTION_ITEM_IDS: readonly string[] = Object.freeze(NEW_COLL
  * as its art; the release catalog hold stays until the lead lands the owner's receipt.
  */
 export const NEW_COLLECTION_LANDED_ITEM_IDS: ReadonlySet<string> = new Set<string>([
+  "jacket_girl_black_crop_blazer",
   "jacket_girl_light_denim_crop",
 ])
 
