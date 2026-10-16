@@ -1,6 +1,6 @@
 /**
  * The new collection (2026-10-15, factory design collection_2140 + dresses v2): 10 girl dresses, 2 girl jackets,
- * 4 glasses (2 girl, 2 boy), 6 girl hairs, 3 girl accessories, 3 girl bottoms and 1 pair of girl boots. Every ID is NEW (no old ID is renamed or reused).
+ * 4 glasses (2 girl, 2 boy), 6 girl hairs, 3 girl accessories, 3 girl bottoms, 1 pair of girl boots and 5 girl tops. Every ID is NEW (no old ID is renamed or reused).
  *
  * Each piece is declared once here. It joins the loadout, economy and mobile catalogs once its art has landed
  * (`NEW_COLLECTION_LANDED_ITEM_IDS`), and until its owner-approved receipt lands the release catalog's held scope
@@ -10,7 +10,8 @@
  *
  * Prices: the dresses carry the owner-approved prices (OWNER_DECISIONS 2026-10-15 21:35, sheet_2110 ONAY.html); the
  * bottoms and boots were approved on 2026-10-16 10:09 (OWNER_DECISIONS), and every other piece at the PRICES_TR
- * proposal (economy_0910, export_2320 REPORT (a)) on 2026-10-16 09:09 (owner: "tamam fiyat da").
+ * proposal (economy_0910, export_2320 REPORT (a)) on 2026-10-16 09:09 (owner: "tamam fiyat da"). The girl tops are
+ * priced by the lead at the PRICES_TR top tier, 220 (OWNER_DECISIONS 2026-10-16 10:09 delegation, 14:18 correction).
  * `nameTr` fits the wardrobe card's two 13-character lines; `sheetNameTr` is the longer name shown on the owner sheet.
  */
 export type NewCollectionSlot = "hair" | "top" | "bottom" | "shoes" | "dress" | "accessory"
@@ -79,6 +80,11 @@ export const NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze(
   piece("bottom_girl_wide_jeans", "bottom", "Bol Paça Kot", 220),
   piece("bottom_girl_ecru_trousers", "bottom", "Ekru Pantolon", 220),
   piece("shoes_girl_camel_ankle_boots", "shoes", "Deve Tüyü Bot", 180),
+  piece("top_girl_camel_vest_tee", "top", "Yelek Tişört", 220),
+  piece("top_girl_white_poplin_shirt", "top", "Poplin Gömlek", 220),
+  piece("top_girl_rose_pearl_cardigan", "top", "Gül Hırka", 220),
+  piece("top_girl_breton_stripe", "top", "Bretan Bluz", 220),
+  piece("top_girl_sage_knit_polo", "top", "Triko Polo", 220),
 ].map((item) => Object.freeze(item)))
 
 export const NEW_COLLECTION_ITEM_IDS: readonly string[] = Object.freeze(NEW_COLLECTION_ITEMS.map((item) => item.itemId))
