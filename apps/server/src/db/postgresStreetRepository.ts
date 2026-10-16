@@ -6,7 +6,7 @@ interface QueryExecutor {
   query(text: string, values?: readonly unknown[]): Promise<{ rows: QueryResultRow[] }>
 }
 
-/** Migration 079. Callers check the street schema probe before any call. */
+/** Migration 080. Callers check the street schema probe before any call. */
 export function createPostgresStreetRepository(pool: QueryExecutor): StreetRepository {
   return Object.freeze({
     async readMany(userIds: readonly string[]) {

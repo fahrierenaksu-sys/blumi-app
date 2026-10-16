@@ -165,9 +165,9 @@ interface CreateServerOptions {
   /** Push sender pictures; must be the instance the notification service links to. */
   notificationPortraits?: NotificationPortraitService
   capabilityService?: CapabilityService
-  /** Sokağım storage (migration 079); in-memory by default. */
+  /** Sokağım storage (migration 080); in-memory by default. */
   streetRepository?: StreetRepository
-  /** Whether migration 079 is applied; in-memory storage is always ready. */
+  /** Whether migration 080 is applied; in-memory storage is always ready. */
   streetSchema?: StreetSchemaProbe
   /** Side effects that responses do not wait for; drained when the app closes. */
   afterResponseTasks?: AfterResponseTasks

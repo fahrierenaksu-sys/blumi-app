@@ -46,7 +46,7 @@ test("only independently guarded additive features are optional for readiness", 
     // Only the beta reset script uses it, and that script refuses to apply without it.
     "076_beta_reset_runs.sql",
     // Sokağım probes its own ledger row; the chat_street capability stays off until it is applied.
-    "079_street.sql"
+    "080_street.sql"
   ])
 })
 

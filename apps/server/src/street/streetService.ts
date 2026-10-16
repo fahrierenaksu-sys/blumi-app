@@ -28,7 +28,7 @@ interface StreetRoomSource {
 
 export interface StreetServiceDependencies {
   repository: StreetRepository
-  /** Whether migration 079 is applied (fail closed). */
+  /** Whether migration 080 is applied (fail closed). */
   isSchemaReady(): Promise<boolean>
   /** The viewer's visible chat threads, newest first, blocks already removed. */
   listThreads(viewerUserId: string, limit: number): Promise<readonly ChatThread[]>

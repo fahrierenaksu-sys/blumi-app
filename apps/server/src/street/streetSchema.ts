@@ -5,8 +5,8 @@ import {
   type MigrationLedgerProbeOptions
 } from "../chat/chatReceiptSchema"
 
-/** The street table arrives with migration 079; until its ledger row exists the street stays off. */
-export const STREET_MIGRATION_ID = "079_street.sql"
+/** The street table arrives with migration 080; until its ledger row exists the street stays off. */
+export const STREET_MIGRATION_ID = "080_street.sql"
 
 export type StreetSchemaProbe = ChatReceiptSchemaProbe
 

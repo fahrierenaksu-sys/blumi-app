@@ -127,7 +127,7 @@ test("a street-off partner is closed and a non-match is absent", async () => {
   assert.equal(result.windows[0]?.room, null)
 })
 
-test("the street refuses to read before migration 079 and a save never fails because of it", async () => {
+test("the street refuses to read before migration 080 and a save never fails because of it", async () => {
   const { street } = service({ threads: [], mutual: [], isSchemaReady: async () => false })
   await assert.rejects(street.read(VIEWER), StreetUnavailableError)
   await street.recordLookSave("ece", LOOK, { ...LOOK, hairId: "h2" }, new Date())

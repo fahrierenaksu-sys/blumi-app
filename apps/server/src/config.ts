@@ -206,7 +206,7 @@ export interface ConfiguredServerServices {
   capabilityService: CapabilityService
   /** Whether migration 070 is applied; warmed at startup. */
   chatReceiptSchema: ChatReceiptSchemaProbe
-  /** Sokağım storage and whether migration 079 is applied (the `chat_street` runtime gate). */
+  /** Sokağım storage and whether migration 080 is applied (the `chat_street` runtime gate). */
   streetRepository: StreetRepository
   streetSchema: StreetSchemaProbe
   discoverySnapshots: DiscoverySnapshotService
@@ -948,7 +948,7 @@ function createConfiguredCapabilityService(
     defaultRollouts: DEFAULT_CAPABILITY_ROLLOUTS,
     runtimeGates: {
       chat_read_receipts: () => chatReceiptSchema.peek(),
-      // Off unless the manifest stages it; never before migration 079.
+      // Off unless the manifest stages it; never before migration 080.
       chat_street: () => streetSchema.peek(),
       chat_typing: () => chatTypingOn
     }
