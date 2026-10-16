@@ -110,6 +110,9 @@ const sourceFiles = [
   "src/features/roomWorld/myRoomInteractionModel.test.ts",
   "src/features/roomWorld/roomWorldRoomV2Projection.ts",
   "src/features/roomWorld/roomWorldRoomV2Projection.test.ts",
+  "src/features/roomPet/roomPetEngine.test.ts",
+  "src/features/roomPet/roomPetRoomAdapter.test.ts",
+  "src/features/roomPet/roomPetRoomScene.test.ts",
 ]
 
 try {
@@ -204,6 +207,9 @@ try {
       join(outputDirectory, "features/roomWorld/roomTapMarkerModel.test.js"),
       join(outputDirectory, "features/roomWorld/myRoomInteractionModel.test.js"),
       join(outputDirectory, "features/roomWorld/roomWorldRoomV2Projection.test.js"),
+      join(outputDirectory, "features/roomPet/roomPetEngine.test.js"),
+      join(outputDirectory, "features/roomPet/roomPetRoomAdapter.test.js"),
+      join(outputDirectory, "features/roomPet/roomPetRoomScene.test.js"),
     ],
     {
       cwd: workspaceRoot,
