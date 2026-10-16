@@ -41,6 +41,8 @@ import { groupMiniRoomSpeechBySpeaker } from "./miniRoomSpeechStack"
 import { resolveMiniRoomAvatarOpacity } from "./miniRoomPresentation"
 import { RoomSpeechBubbleStack, type RoomSpeechBubblePlacement } from "./RoomSpeechBubbleStack"
 import { RoomTypingBubble } from "./RoomTypingBubble"
+import { MiniRoomEmoteBurst } from "./MiniRoomEmoteBurst"
+import type { MiniRoomEmote, MiniRoomEmotes } from "../emotes/miniRoomEmoteModel"
 import { useMiniRoomAvatarLoops } from "./useMiniRoomAvatarLoops"
 
 const NO_BUBBLES: readonly SpeechBubble[] = []
@@ -63,6 +65,8 @@ interface AvatarLayerProps {
   depthScene?: MiniRoomDepthScene
   /** 2.5D avatars: keep their GPU surface unmounted while the stage is still fading in. */
   holdGpuSurfaces?: boolean
+  /** Chat emotes (EXPO_PUBLIC_BLUMI_CHAT_EMOTES): one per speaker, over their chibi. */
+  emotes?: MiniRoomEmotes
 }
 
 type BubblePlacement = RoomSpeechBubblePlacement
@@ -79,7 +83,8 @@ export const AvatarLayer = memo(function AvatarLayer(props: AvatarLayerProps) {
     partnerJustJoined,
     motionPolicy,
     typingUserId,
-    depthScene = EMPTY_MINI_ROOM_DEPTH_SCENE
+    depthScene = EMPTY_MINI_ROOM_DEPTH_SCENE,
+    emotes
   } = props
   const sortedAvatars = useMemo(() => Object.values(avatars).sort((a, b) => a.y - b.y), [avatars])
   const committedBubbleGroups = useRef<Readonly<Record<string, readonly SpeechBubble[]>>>({})
@@ -157,6 +162,7 @@ export const AvatarLayer = memo(function AvatarLayer(props: AvatarLayerProps) {
             localUserLabel={localUserLabel}
             motionPolicy={motionPolicy}
             typing={avatar.userId === typingUserId}
+            emote={emotes?.[avatar.userId]}
           />
         )
       })}
@@ -469,6 +475,7 @@ interface AvatarOverlayProps {
   localUserLabel: string
   motionPolicy: MiniRoomMotionPolicy
   typing: boolean
+  emote?: MiniRoomEmote
 }
 
 /** Speech, typing dots and the name plate: always readable, above any furniture. */
@@ -486,11 +493,17 @@ const AvatarOverlay = memo(function AvatarOverlay(props: AvatarOverlayProps) {
     isLocal,
     localUserLabel,
     motionPolicy,
-    typing
+    typing,
+    emote
   } = props
   return (
     <AvatarAnchor avatar={avatar} position={position} stageWidth={stageWidth} stageHeight={stageHeight}
       zIndex={OVERLAY_Z_INDEX} pointerEvents="box-none">
+      {/* Drawn under the speech lines, on the side away from them, so a line stays readable. */}
+      {emote ? (
+        <MiniRoomEmoteBurst key={emote.key} emote={emote.emote} side={bubblePlacement === "right" ? "left" : "right"}
+          reduceMotion={!motionPolicy.animateBubble} />
+      ) : null}
       <RoomSpeechBubbleStack
         bubbles={bubbles}
         placement={bubblePlacement}

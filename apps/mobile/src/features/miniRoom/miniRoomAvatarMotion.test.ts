@@ -50,12 +50,23 @@ test("walking and sitting are drawable when the renderer resolves that pose (pro
   }
 })
 
-test("poses that are not walking or sitting are asked for as the standing idle pose", () => {
+test("speaking is asked for as the standing idle pose", () => {
   const asked = installDrawable(["idle"])
 
   assert.equal(canMiniRoomAvatarUseMotion({ appearance, motion: "speaking", facing: "front" }), true)
-  getMiniRoomAvatar25dSpec({ appearance, motion: "emoting", facing: "front" })
+  getMiniRoomAvatar25dSpec({ appearance, motion: "speaking", facing: "front" })
   assert.ok(asked.every((input) => input.state === "idle"))
+})
+
+test("a greeting emote is drawn as the rig's wave, and as standing when the wave has no art", () => {
+  const asked = installDrawable(["idle", "waving"])
+  assert.equal(getMiniRoomAvatar25dSpec({ appearance, motion: "emoting", facing: "left" }), SPEC)
+  assert.deepEqual(asked, [{ loadout: LOADOUT, state: "waving", direction: "left" }])
+
+  restoreSeam?.()
+  const standingOnly = installDrawable(["idle"])
+  assert.equal(getMiniRoomAvatar25dSpec({ appearance, motion: "emoting", facing: "front" }), SPEC)
+  assert.deepEqual(standingOnly.map((input) => input.state), ["waving", "idle"])
 })
 
 test("an avatar missing art for one pose keeps the others: only that pose is refused", () => {

@@ -172,4 +172,6 @@ export interface MiniRoomStore {
   /** Presents an arrived batch together; every line retains its own lifetime. */
   sayPhrases: (messages: readonly { speakerUserId: string; body: string; tone?: SpeechBubbleTone }[]) => void
   dismissSpeechBubble: (bubbleId: string) => void
+  /** Chat emotes: an idle figure waves for `durationMs` (presentation only, never sent). */
+  playWaveGesture: (userId: string, durationMs: number) => void
 }

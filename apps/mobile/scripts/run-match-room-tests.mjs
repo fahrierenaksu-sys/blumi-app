@@ -257,6 +257,9 @@ try {
       "src/features/notifications/useFocusedConversation.test.ts",
       "src/features/miniRoom/scene/roomSpeechBubbleStack.test.ts",
       "src/features/miniRoom/scene/RoomTapFeedback.test.ts",
+      // Chat emotes (EXPO_PUBLIC_BLUMI_CHAT_EMOTES): the hook's timing and gate, and the overlay's still badge
+      "src/features/miniRoom/emotes/useMiniRoomChatEmotes.test.ts",
+      "src/features/miniRoom/scene/MiniRoomEmoteBurst.test.ts",
       "src/features/miniRoom/scene/miniRoomSceneStoreLifecycle.test.ts",
       "src/features/miniRoom/scene/miniRoomAvatarPositions.test.ts",
       "src/features/miniRoom/scene/useMiniRoomScrollToLatest.test.ts",

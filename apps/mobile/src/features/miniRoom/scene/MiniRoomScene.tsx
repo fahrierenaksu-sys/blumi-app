@@ -43,6 +43,8 @@ import { useMiniRoomMotionPresentation } from "./useMiniRoomMotionPresentation"
 import { useMiniRoomScrollToLatest } from "./useMiniRoomScrollToLatest"
 import { useMiniRoomKeyboardPreference } from "../useMiniRoomKeyboardPreference"
 import type { MiniRoomPoseInput } from "./miniRoomTransitionModel"
+import { MINI_ROOM_EMOTE_LIFETIME_MS, useMiniRoomChatEmotes } from "../emotes/useMiniRoomChatEmotes"
+import type { ChatEmote } from "../emotes/chatEmoteMapper"
 
 interface MiniRoomSceneProps {
   roomMotion?: ReturnType<typeof import("../useMiniRoomMotion").useMiniRoomMotion>
@@ -203,8 +205,16 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     moveLocalAvatar,
     moveLocalAvatarToHotspot,
     sayPhrase,
-    sayPhrases
+    sayPhrases,
+    playWaveGesture
   } = store
+  // Chat emotes (EXPO_PUBLIC_BLUMI_CHAT_EMOTES, off by default): derived here from the lines this phone shows.
+  // A greeting also plays the rig's wave, except under Reduce Motion, where the badge stays still.
+  const animateEmoteGesture = motionPolicy.animateSpeaking
+  const handleEmote = useCallback((speakerUserId: string, emote: ChatEmote): void => {
+    if (emote === "wave" && animateEmoteGesture) playWaveGesture(speakerUserId, MINI_ROOM_EMOTE_LIFETIME_MS)
+  }, [animateEmoteGesture, playWaveGesture])
+  const { emotes, noteChatMessage } = useMiniRoomChatEmotes({ onEmote: handleEmote })
 
   const [partnerJustJoined, setPartnerJustJoined] = useState(false)
   // The scene follows the keyboard down: nothing collapses ahead of it.
@@ -242,9 +252,12 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   useEffect(() => {
     if (inRoomMessages.length === 0) return
     sayPhrases(inRoomMessages.map((message) => ({ speakerUserId: message.senderUserId, body: message.body, tone: "chat" })))
+    for (const message of inRoomMessages) {
+      noteChatMessage({ senderUserId: message.senderUserId, body: message.body, sentAtMs: message.sentAt })
+    }
     if (consumeInRoomMessages) consumeInRoomMessages(inRoomMessages.map((message) => message.messageId))
     else for (const message of inRoomMessages) consumeInRoomMessage(message.messageId)
-  }, [consumeInRoomMessage, consumeInRoomMessages, inRoomMessages, sayPhrases])
+  }, [consumeInRoomMessage, consumeInRoomMessages, inRoomMessages, noteChatMessage, sayPhrases])
 
   // Floor gestures are already mapped into room coordinates by RoomFloorTapLayer.
   // Moving avatars never move the camera; the fixed room frame only adapts to
@@ -263,12 +276,13 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const handleSubmitComposer = useCallback((body: string, retryClientMessageId?: string): boolean => {
     if (!onSendRoomMessage(body, retryClientMessageId)) return false
     sayPhrase(localUser.userId, body, "chat")
+    noteChatMessage({ senderUserId: localUser.userId, body })
     // The keyboard stays up for the next message; the input returns to one line.
     setComposerLines(1)
     // Once the keyboard is down, the transcript shows this message.
     noteMessageSent()
     return true
-  }, [localUser.userId, noteMessageSent, onSendRoomMessage, sayPhrase])
+  }, [localUser.userId, noteChatMessage, noteMessageSent, onSendRoomMessage, sayPhrase])
 
   const handleToggleHistory = useCallback((): void => {
     handleCloseKeyboard()
@@ -341,6 +355,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       motionPolicy={motionPolicy}
       depthScene={depthScene}
       holdGpuSurfaces={!stageRevealed}
+      emotes={emotes}
     />
   )
 

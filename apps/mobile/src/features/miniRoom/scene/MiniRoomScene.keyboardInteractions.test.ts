@@ -12,6 +12,8 @@ import type * as ComposerModule from "./RoomChatComposer"
 
 type Element = { type: unknown; props: Record<string, any> }
 
+const STABLE_CHAT_EMOTES = Object.freeze({ emotes: Object.freeze({}), noteChatMessage: () => undefined })
+
 function findAll(node: unknown, match: (element: Element) => boolean, found: Element[] = []): Element[] {
   if (Array.isArray(node)) {
     for (const child of node) findAll(child, match, found)
@@ -70,6 +72,11 @@ function mountTypingScene(messages: { messageId: string; senderUserId: string; b
     "./MiniRoomRoomDecorLayer": { MiniRoomRoomDecorLayer: roomDecorLayer },
     "./RoomChatComposer": { MAX_ROOM_MESSAGE_LENGTH: 140, RoomChatComposer: composer },
     "./miniRoomSceneStore": { useMiniRoomSceneStore: () => store },
+    "../emotes/useMiniRoomChatEmotes": {
+      MINI_ROOM_EMOTE_LIFETIME_MS: 1_500,
+      // Stable like the real hook (its callback only changes with the flag).
+      useMiniRoomChatEmotes: () => STABLE_CHAT_EMOTES
+    },
     "./miniRoomDepthModel": { createMiniRoomDepthScene: () => ({ occluderIds: [] }) },
     "./miniRoomReducedMotion": { MINI_ROOM_PARTNER_ARRIVAL_MS: 100, resolveMiniRoomMotionPolicy: () => ({ animateJoin: false }) },
     "./miniRoomPresentation": { shouldAnnouncePartnerJoin: () => false },
