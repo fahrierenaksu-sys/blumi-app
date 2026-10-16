@@ -103,6 +103,11 @@ import {
   type NotificationService
 } from "./notifications/notificationService"
 import { createNotificationDeliveryHooks } from "./notifications/notificationDeliveryContext"
+import { createInMemoryCatTripRepository } from "./catTrips/catTripRepository"
+import { createCatTripSchemaProbe } from "./catTrips/catTripSchema"
+import type { CatTripService } from "./catTrips/catTripService"
+import { createConfiguredCatTripService, resolveCatTripsConfig } from "./catTrips/catTripWiring"
+import { createPostgresCatTripRepository } from "./db/postgresCatTripRepository"
 import { resolvePublicApiOrigin } from "./notifications/notificationPortraitLinks"
 import {
   createNotificationPortraitService,
@@ -203,6 +208,7 @@ export interface ConfiguredServerServices {
   capabilityService: CapabilityService
   /** Whether migration 070 is applied; warmed at startup. */
   chatReceiptSchema: ChatReceiptSchemaProbe
+  catTripService: CatTripService
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
   authRateLimiter?: SharedRateBudget
@@ -625,7 +631,7 @@ export function createConfiguredServerServices(
       pushProvider,
       // Removal and account deletion wait for the dispatch's locks under lock_timeout.
       lockedSendTimeoutMs: resolveLockedSendTimeoutMs(DEFAULT_PUSH_PROVIDER_TIMEOUT_MS, config.databasePool),
-      ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }), notificationPortraits)
+      ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService, catTripService }), notificationPortraits)
     })
     const authService = createAuthService({
       repository: createPostgresAuthRepository(pool),
@@ -709,11 +715,19 @@ export function createConfiguredServerServices(
       livekitTokenService,
       economyService
     })
+    const catTripService = createConfiguredCatTripService({
+      config: resolveCatTripsConfig(process.env, config.nodeEnv),
+      repository: createPostgresCatTripRepository(pool),
+      schema: createCatTripSchemaProbe(pool),
+      authService, chatService, matchService, safetyService, notificationService,
+      report: reportCatTripEvent
+    })
     return {
       afterResponseTasks,
       onVerifiedPhone,
       capabilityService,
       chatReceiptSchema,
+      catTripService,
       authService,
       chatService,
       economyService,
@@ -779,7 +793,7 @@ export function createConfiguredServerServices(
 
   const notificationService = createNotificationService({
     pushProvider,
-    ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }), notificationPortraits)
+    ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService, catTripService }), notificationPortraits)
   })
   const authService = createAuthService({
     smsProvider,
@@ -787,6 +801,8 @@ export function createConfiguredServerServices(
     otpHmacSecret: config.otpHmacSecret,
     sessionCacheTtlMs: config.sessionCacheTtlMs,
     accountDeletionHandlers: [
+      // In-memory storage has no foreign keys: erase the account's cat trips and souvenirs explicitly.
+      (account) => catTripService.deleteUserData(account.userId).then(() => undefined),
       (account) => notificationService.repository.removeAllDevices(account.userId)
     ]
   })
@@ -887,10 +903,17 @@ export function createConfiguredServerServices(
 
   // In-memory storage has no migrations: receipts depend on the manifest only.
   const chatReceiptSchema = createStaticChatReceiptSchema(true)
+  const catTripService = createConfiguredCatTripService({
+    config: resolveCatTripsConfig(process.env, config.nodeEnv),
+    repository: createInMemoryCatTripRepository(),
+    authService, chatService, matchService, safetyService, notificationService,
+    report: reportCatTripEvent
+  })
   return {
     afterResponseTasks,
     capabilityService: createConfiguredCapabilityService(chatReceiptSchema),
     chatReceiptSchema,
+    catTripService,
     authService,
     chatService,
     economyService,
@@ -1090,4 +1113,9 @@ function isSha256Fingerprint(value: string): boolean {
 
 function isLoopbackHost(value: string): boolean {
   return value === "127.0.0.1" || value === "localhost" || value === "::1"
+}
+
+/** Counts and outcome codes only: never a user, a trip, a match or a pet name. */
+function reportCatTripEvent(event: string, fields: Record<string, number | string> = {}): void {
+  console.info(event, fields)
 }

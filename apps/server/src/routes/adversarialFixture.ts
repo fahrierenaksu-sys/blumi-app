@@ -66,6 +66,7 @@ export function createAdversarialServer(options: {
   /** Receipt suites pin the `chat_read_receipts` rollout and the chat schema state. */
   capabilityService?: CapabilityService
   chatRepository?: ChatRepository
+  catTripService?: import("../catTrips/catTripService").CatTripService
 } = {}) {
   // An injected service lets a suite run the same routes on the PostgreSQL repository.
   const authService = options.authService ?? createAuthService()
@@ -90,6 +91,7 @@ export function createAdversarialServer(options: {
   const app = createServer({
     authService,
     capabilityService: options.capabilityService,
+    catTripService: options.catTripService,
     chatService,
     safetyService,
     matchService,

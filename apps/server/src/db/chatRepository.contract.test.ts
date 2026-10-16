@@ -76,6 +76,32 @@ runRepositoryContract<ChatRepository>({
       assert.deepEqual(await backend.repository.listChatPartnerUserIds(backend.id("nobody")), [])
     },
 
+    "countMessagesByPartnerBetween counts a window per partner without reading bodies": async (backend) => {
+      const [ada, bo, cem, dan] = ["ada", "bo", "cem", "dan"].map((name) => backend.id(name)) as [string, string, string, string]
+      const withBo = thread(backend, "c1", "2026-09-30T08:00:00.000Z", [ada, bo])
+      const withCem = thread(backend, "c2", "2026-09-30T08:00:00.000Z", [cem, ada])
+      const other = thread(backend, "c3", "2026-09-30T08:00:00.000Z", [dan, bo])
+      for (const value of [withBo, withCem, other]) await backend.repository.saveThread(value)
+      const sent = (value: ChatThread, id: string, at: string, sender: string) =>
+        backend.repository.createMessage(message(value, id, at, "private text", sender))
+      await sent(withBo, "m0", "2026-09-30T09:59:59.000Z", ada)
+      await sent(withBo, "m1", "2026-09-30T10:00:00.000Z", ada)
+      await sent(withBo, "m2", "2026-09-30T11:00:00.000Z", bo)
+      await sent(withBo, "m3", "2026-09-30T12:00:00.000Z", ada)
+      await sent(withBo, "m4", "2026-09-30T12:00:01.000Z", ada)
+      await sent(withCem, "m5", "2026-09-30T11:30:00.000Z", cem)
+      await sent(other, "m6", "2026-09-30T11:30:00.000Z", dan)
+      const counts = await backend.repository.countMessagesByPartnerBetween(
+        ada, new Date("2026-09-30T10:00:00.000Z"), new Date("2026-09-30T12:00:00.000Z")
+      )
+      assert.deepEqual(counts.sort((a, b) => a.partnerUserId.localeCompare(b.partnerUserId)), [
+        { partnerUserId: bo, messageCount: 3 },
+        { partnerUserId: cem, messageCount: 1 }
+      ].sort((a, b) => a.partnerUserId.localeCompare(b.partnerUserId)), "both senders count, bounds are inclusive")
+      assert.deepEqual(await backend.repository.countMessagesByPartnerBetween(
+        ada, new Date("2026-10-01T00:00:00.000Z"), new Date("2026-10-02T00:00:00.000Z")), [])
+    },
+
     "findMessage returns one message of its own thread only": async (backend) => {
       const chat = thread(backend, "find", "2026-09-30T10:00:00.000Z")
       const other = thread(backend, "find_other", "2026-09-30T10:00:00.000Z")

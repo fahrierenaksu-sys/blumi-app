@@ -16,7 +16,11 @@ export const PUSH_ROUTED_TYPES = [
   "discovery.like",
   "discovery.watch_match",
   "connection.matched",
-  "mini_room.invite"
+  "mini_room.invite",
+  // The traveling cat's teasers. They never name the match or the pet: the
+  // reveal in the app does (owner decision 2026-10-16, "merak duygusu").
+  "cat.trip_owner",
+  "cat.trip_host"
 ] as const
 
 export type PushRoutedType = typeof PUSH_ROUTED_TYPES[number]
@@ -31,7 +35,9 @@ const PUSH_COPY: Record<PushLocale, Record<PushRoutedType, PushCopy>> = {
     "discovery.like": { title: "Someone likes your vibe", body: "Open Blumi to see where this could go." },
     "discovery.watch_match": { title: "A new vibe match is here", body: "Someone who fits your vibe is ready to meet." },
     "connection.matched": { title: "Blumi", body: "You have a new match!" },
-    "mini_room.invite": { title: "Blumi", body: "Someone wants to meet you." }
+    "mini_room.invite": { title: "Blumi", body: "Someone wants to meet you." },
+    "cat.trip_owner": { title: "Where’s your cat?", body: "Not home yet… whose place did it nap at, do you think? 🐾" },
+    "cat.trip_host": { title: "A tiny guest is at your place", body: "A little visitor is napping at your place 🐾" }
   },
   tr: {
     "chat.message": { title: "Blumi", body: "Yeni bir mesajın var." },
@@ -40,7 +46,9 @@ const PUSH_COPY: Record<PushLocale, Record<PushRoutedType, PushCopy>> = {
     "discovery.like": { title: "Biri vibe'ını beğendi", body: "Nereye varacağını görmek için Blumi'yi aç." },
     "discovery.watch_match": { title: "Yeni bir vibe eşleşmesi var", body: "Vibe'ına uyan biri tanışmaya hazır." },
     "connection.matched": { title: "Blumi", body: "Yeni bir eşleşmen var!" },
-    "mini_room.invite": { title: "Blumi", body: "Biri seninle tanışmak istiyor." }
+    "mini_room.invite": { title: "Blumi", body: "Biri seninle tanışmak istiyor." },
+    "cat.trip_owner": { title: "Kedin nerede?", body: "Eve dönmedi… Kimin evinde uyudu dersin? 🐾" },
+    "cat.trip_host": { title: "Evinde minik bir misafir var", body: "Evinde minik bir misafir uyuyor 🐾" }
   }
 }
 
@@ -52,7 +60,9 @@ const ROUTING_KEYS: Record<PushRoutedType, readonly string[]> = {
   "discovery.like": [],
   "discovery.watch_match": [],
   "connection.matched": ["miniRoomId"],
-  "mini_room.invite": ["inviteId", "roomId"]
+  "mini_room.invite": ["inviteId", "roomId"],
+  "cat.trip_owner": ["tripId"],
+  "cat.trip_host": ["tripId"]
 }
 
 const DAY_SECONDS = 24 * 60 * 60
