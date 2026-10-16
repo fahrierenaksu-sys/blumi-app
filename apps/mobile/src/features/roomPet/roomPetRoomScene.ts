@@ -5,7 +5,7 @@ import { createMyRoomAvatarDepthNeighbours, getMyRoomAvatarDepthIndex } from "..
 import type { RoomPetAvatar, RoomPetCell, RoomPetEvent, RoomPetFacing, RoomPetMap, RoomPetState } from "./roomPet.types"
 import { isSameRoomPetCell } from "./roomPetGrid"
 import {
-  getRoomPetClipForPose,
+  getRoomPetClipForHop,
   getRoomPetDrawnHeading,
   getRoomPetSpriteHeading,
   type RoomPetClipName,
@@ -87,7 +87,7 @@ export function resolveRoomPetDraw(input: {
   const isMoving = state.pose === "walk" || state.pose === "run"
   return {
     foot,
-    clip: state.mode === "greet" && state.pose === "happy" ? "greet" : getRoomPetClipForPose(state.pose),
+    clip: state.mode === "greet" && state.pose === "happy" ? "greet" : getRoomPetClipForHop(state.pose, state.goal?.kind === "hop" ? state.goal.phase : null),
     heading: drawn.heading,
     mirrored: drawn.mirrored,
     emote: state.emote,

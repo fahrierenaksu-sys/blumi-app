@@ -19,6 +19,7 @@ import { getRoomPetBeforeRenderId, getRoomPetNextWakeMs, getRoomPetOwnerEvents, 
 import {
   getRoomPetClipForPose,
   getRoomPetDrawnHeading,
+  getRoomPetRootMotionFoot,
   getRoomPetSpriteCell,
   getRoomPetSpriteHeading,
   getRoomPetSpriteSheetProblems
@@ -202,4 +203,35 @@ test("the white cat sheet image has exactly the cell grid its layout reads", () 
   const sheet = ROOM_PET_CAT_WHITE_SHEET_LAYOUT
   assert.equal(png.readUInt32BE(16), sheet.columns * sheet.cellWidth)
   assert.equal(png.readUInt32BE(20), sheet.rows * sheet.cellHeight)
+})
+
+test("a hop plays hopUp onto the seat, hopDown back to the floor, and the hop trick plays hopPlay", () => {
+  const pet = petAt(walkableCellNear(0, 2))
+  const draw = (state: RoomPetState) => resolveRoomPetDraw({ isEnabled: true, projection: PROJECTION, map: MAP, state, renderItems: SCENE })
+  const up: RoomPetState = { ...pet, pose: "hop", goal: { kind: "hop", spotId: "sofa_1", phase: "up" } }
+  const down: RoomPetState = { ...pet, pose: "hop", goal: { kind: "hop", spotId: "sofa_1", phase: "down" } }
+  assert.equal(draw(up)?.clip, "hopUp")
+  assert.equal(draw(down)?.clip, "hopDown")
+  assert.equal(getRoomPetClipForPose("trickHop"), "hopPlay")
+})
+
+test("hop root motion: the feet start on the floor point, land on the seat point and arc above the line between", () => {
+  const sheet = ROOM_PET_CAT_WHITE_SHEET_LAYOUT
+  const floor = { x: 0.4, y: 0.7 }
+  const seat = { x: 0.45, y: 0.62 }
+  for (const name of ["hopUp", "hopDown"] as const) {
+    const motion = sheet.clips[name].rootMotion
+    assert.ok(motion, `${name} carries root motion`)
+    const last = motion.travel.length - 1
+    assert.deepEqual(getRoomPetRootMotionFoot(floor, seat, motion, 0, 0.001), floor)
+    assert.deepEqual(getRoomPetRootMotionFoot(floor, seat, motion, last, 0.001), seat)
+    const airborne = motion.travel.findIndex((travel) => travel > 0 && travel < 1)
+    const foot = getRoomPetRootMotionFoot(floor, seat, motion, airborne, 0.001)
+    const onLine = floor.y + (seat.y - floor.y) * motion.travel[airborne]!
+    assert.ok(foot.y < onLine, `${name} arcs above the straight line`)
+  }
+  const play = sheet.clips.hopPlay.rootMotion
+  assert.ok(play && play.travel.every((travel) => travel === 0) && Math.max(...play.arcShellPx) > 0, "the play hop jumps in place")
+  const broken = { ...sheet, clips: { ...sheet.clips, hopUp: { ...sheet.clips.hopUp, rootMotion: { travel: [0, 1], arcShellPx: [0, 0] } } } }
+  assert.ok(getRoomPetSpriteSheetProblems(broken).length > 0, "root motion with the wrong frame count is refused")
 })

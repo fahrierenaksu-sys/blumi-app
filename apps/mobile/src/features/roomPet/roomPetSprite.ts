@@ -1,3 +1,4 @@
+import type { RoomPoint2D } from "../roomV2/roomV2.types"
 import type { RoomPetPose } from "./roomPet.types"
 
 /**
@@ -9,7 +10,7 @@ import type { RoomPetPose } from "./roomPet.types"
  * The sheet draws only those two; 315 and 225 are the same frames mirrored,
  * so the art must be mirror-safe (no one-sided markings).
  */
-export type RoomPetClipName = "idle" | "walk" | "sit" | "sleep" | "happy" | "greet"
+export type RoomPetClipName = "idle" | "walk" | "sit" | "sleep" | "happy" | "greet" | "hopUp" | "hopDown" | "hopPlay"
 export type RoomPetSpriteHeading = 45 | 135 | 225 | 315
 export type RoomPetDrawnHeading = 45 | 135
 
@@ -19,6 +20,20 @@ export interface RoomPetSpriteClip {
   /** A looping clip plays frames before this index once (sit down, curl up), then loops from it. */
   readonly loopFrom: number
   readonly frames: Readonly<Record<RoomPetDrawnHeading, readonly number[]>>
+  /** Hop clips only: where the feet are on each frame (the cells hold the body pose, not the jump). */
+  readonly rootMotion?: RoomPetRootMotion
+}
+
+/**
+ * Root motion of a hop, one entry per frame (same for both headings).
+ * The feet stand at lerp(from, to, travel[i]) and then arcShellPx[i] room
+ * shell pixels higher. `from`/`to` are the floor point and the seat point
+ * (hopUp), the reverse (hopDown), or the same point (hopPlay, travel all 0).
+ * The seat height comes from the furniture's seat point, never from the art.
+ */
+export interface RoomPetRootMotion {
+  readonly travel: readonly number[]
+  readonly arcShellPx: readonly number[]
 }
 
 export interface RoomPetSpriteSheetLayout {
@@ -33,26 +48,62 @@ export interface RoomPetSpriteSheetLayout {
   readonly clips: Readonly<Record<RoomPetClipName, RoomPetSpriteClip>>
 }
 
-export const ROOM_PET_CLIP_NAMES: readonly RoomPetClipName[] = ["idle", "walk", "sit", "sleep", "happy", "greet"]
+export const ROOM_PET_CLIP_NAMES: readonly RoomPetClipName[] = ["idle", "walk", "sit", "sleep", "happy", "greet", "hopUp", "hopDown", "hopPlay"]
 
-/** Every engine pose plays one clip; P2/P3 poses fall back to the nearest P1 clip until their art exists. */
+/** Every engine pose plays one clip; P3 tricks without art fall back to the nearest clip. A hop down picks hopDown by its phase. */
 const CLIP_BY_POSE: Readonly<Record<RoomPetPose, RoomPetClipName>> = {
   stand: "idle",
   walk: "walk",
   run: "walk",
-  hop: "walk",
+  hop: "hopUp",
   sit: "sit",
   perch: "sit",
   curl: "sleep",
   sleep: "sleep",
   happy: "happy",
   trickRoll: "happy",
-  trickHop: "happy",
+  trickHop: "hopPlay",
   trickWave: "happy"
 }
 
 export function getRoomPetClipForPose(pose: RoomPetPose): RoomPetClipName {
   return CLIP_BY_POSE[pose]
+}
+
+/** The clip for a pose; a hop plays hopDown on its way back to the floor. */
+export function getRoomPetClipForHop(pose: RoomPetPose, hopPhase: "approach" | "up" | "perch" | "down" | null): RoomPetClipName {
+  return pose === "hop" && hopPhase === "down" ? "hopDown" : getRoomPetClipForPose(pose)
+}
+
+/** The feet of a hopping pet on frame `frameIndex`, in shell-canvas units (`shellPxToStage` converts the arc). */
+export function getRoomPetRootMotionFoot(
+  from: RoomPoint2D,
+  to: RoomPoint2D,
+  motion: RoomPetRootMotion,
+  frameIndex: number,
+  shellPxToStage: number
+): RoomPoint2D {
+  const last = motion.travel.length - 1
+  if (last < 0) return from
+  const index = Math.min(Math.max(0, Math.floor(frameIndex)), last)
+  const travel = motion.travel[index]!
+  const lift = (motion.arcShellPx[index] ?? 0) * shellPxToStage
+  return { x: from.x + (to.x - from.x) * travel, y: from.y + (to.y - from.y) * travel - lift }
+}
+
+function getRootMotionProblems(name: string, clip: RoomPetSpriteClip): string[] {
+  const motion = clip.rootMotion
+  if (!motion) return []
+  const problems: string[] = []
+  const lengths = [clip.frames[45]?.length ?? 0, clip.frames[135]?.length ?? 0]
+  if (lengths.some((length) => length !== motion.travel.length || length !== motion.arcShellPx.length)) {
+    problems.push(`clip ${name} root motion needs one entry per frame`)
+  }
+  if (motion.travel.some((value, index) => !(value >= 0 && value <= 1) || (index > 0 && value < motion.travel[index - 1]!))) {
+    problems.push(`clip ${name} root motion travel must rise from 0 to 1`)
+  }
+  if (motion.arcShellPx.some((value) => !(Number.isFinite(value) && value >= 0))) problems.push(`clip ${name} root motion arc must be 0 or more`)
+  return problems
 }
 
 /** The heading for a screen-space direction (dy > 0 is down the screen, toward the camera). */
@@ -116,6 +167,7 @@ export function getRoomPetSpriteSheetProblems(layout: RoomPetSpriteSheetLayout):
         problems.push(`clip ${name} heading ${heading} points outside the sheet`)
       }
     }
+    problems.push(...getRootMotionProblems(name, clip))
   }
   return problems
 }
