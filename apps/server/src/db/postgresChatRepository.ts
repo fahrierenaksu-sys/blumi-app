@@ -198,6 +198,21 @@ export function createPostgresChatRepository(
       return result.rows.map((row) => String(row.user_id))
     },
 
+    async countMessagesByPartnerBetween(userId, since, until) {
+      const result = await pool.query(
+        `SELECT partner.user_id AS partner_user_id, count(message.message_id)::int AS message_count
+           FROM blumi_chat_thread_participants AS mine
+           JOIN blumi_chat_thread_participants AS partner
+             ON partner.thread_id = mine.thread_id AND partner.user_id <> mine.user_id
+           JOIN blumi_chat_messages AS message
+             ON message.thread_id = mine.thread_id AND message.sent_at >= $2 AND message.sent_at <= $3
+          WHERE mine.user_id = $1
+          GROUP BY partner.user_id`,
+        [userId, since, until]
+      )
+      return result.rows.map((row) => ({ partnerUserId: String(row.partner_user_id), messageCount: Number(row.message_count) }))
+    },
+
     async saveThread(thread) {
       // One statement: participants are written only when this call created
       // the thread, so a concurrent or repeated save can never add or rename

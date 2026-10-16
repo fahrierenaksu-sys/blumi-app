@@ -27,6 +27,8 @@ export interface CatTripRepository {
     plannedAt: string
     trips: readonly NewCatTrip[]
   }): Promise<{ created: boolean }>
+  /** Whether `planDay` already stored a plan (even an empty one) for this owner and day. */
+  isDayPlanned(ownerUserId: string, dayKey: string): Promise<boolean>
   findTrip(tripId: string): Promise<CatTripRecord | null>
   /** The owner's trips that end after `endsAfter`, earliest start first. */
   listOwnerTrips(ownerUserId: string, endsAfter: string): Promise<CatTripRecord[]>
@@ -83,6 +85,9 @@ export function createInMemoryCatTripRepository(): CatTripRepository {
         trips.set(trip.tripId, { ...rest, ...(returnState ? { returnState } : {}), status: "scheduled" })
       }
       return { created: true }
+    },
+    async isDayPlanned(ownerUserId, dayKey) {
+      return days.has(`${ownerUserId}|${dayKey}`)
     },
     async findTrip(tripId) {
       const trip = trips.get(tripId)

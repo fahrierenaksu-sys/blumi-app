@@ -64,6 +64,13 @@ export function createPostgresCatTripRepository(pool: TransactionalQueryExecutor
         return { created: true }
       })
     },
+    async isDayPlanned(ownerUserId, dayKey) {
+      const result = await pool.query(
+        "SELECT 1 FROM blumi_cat_trip_days WHERE owner_user_id = $1 AND day_key = $2",
+        [ownerUserId, dayKey]
+      )
+      return result.rows.length > 0
+    },
     async findTrip(tripId) {
       const result = await pool.query(`SELECT ${TRIP_COLUMNS} FROM blumi_cat_trips WHERE trip_id = $1`, [tripId])
       return result.rows[0] ? mapTrip(result.rows[0]) : null

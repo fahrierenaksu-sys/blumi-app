@@ -57,7 +57,10 @@ runRepositoryContract<CatTripRepository>({
     "a day with no destination is remembered, so the cat is not planned twice": async (backend) => {
       const owner = backend.id("owner")
       await backend.ensureUsers(owner)
+      assert.equal(await backend.repository.isDayPlanned(owner, DAY), false)
       assert.deepEqual(await plan(backend, owner, []), { created: true })
+      assert.equal(await backend.repository.isDayPlanned(owner, DAY), true)
+      assert.equal(await backend.repository.isDayPlanned(owner, "2026-10-17"), false)
       assert.deepEqual(await plan(backend, owner, []), { created: false })
       assert.deepEqual(await backend.repository.listOwnerTrips(owner, at(0)), [])
     },
