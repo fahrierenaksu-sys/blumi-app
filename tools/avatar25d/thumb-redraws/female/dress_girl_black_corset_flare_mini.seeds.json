@@ -1,0 +1,149 @@
+{
+ "item": "dress_girl_black_corset_flare_mini",
+ "source": "front cut pinned in thumb-fronts.json",
+ "input": "tools/avatar25d/thumb-fronts/female/dress_girl_black_corset_flare_mini.webp",
+ "input_sha256": "207411eba595d0358f7668d45d4672853fb1ed33cf1e2d5dfca8854fb49cd868",
+ "min_island_px": 8,
+ "seeds": [
+  {
+   "x": 64,
+   "y": 16,
+   "r": 14,
+   "dE": 25,
+   "note": "skin inside the straps"
+  },
+  {
+   "x": 145,
+   "y": 12,
+   "r": 14,
+   "dE": 25,
+   "note": "skin inside the straps"
+  },
+  {
+   "x": 144,
+   "y": 27,
+   "r": 14,
+   "dE": 25,
+   "note": "skin inside the straps"
+  },
+  {
+   "x": 65,
+   "y": 31,
+   "r": 8,
+   "dE": 25,
+   "note": "skin inside the straps"
+  },
+  {
+   "x": 141,
+   "y": 34,
+   "r": 8,
+   "dE": 25,
+   "note": "skin inside the straps"
+  },
+  {
+   "x": 102,
+   "y": 47,
+   "r": 10,
+   "dE": 20,
+   "note": "skin at the sweetheart dip"
+  },
+  {
+   "x": 112,
+   "y": 243,
+   "r": 12,
+   "dE": 25,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 94,
+   "y": 250,
+   "r": 6,
+   "dE": 25,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 33,
+   "y": 240,
+   "r": 6,
+   "dE": 25,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 171,
+   "y": 239,
+   "r": 6,
+   "dE": 25,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 178,
+   "y": 239,
+   "r": 6,
+   "dE": 25,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 55,
+   "y": 240,
+   "r": 6,
+   "dE": 25,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 143,
+   "y": 27,
+   "r": 14,
+   "dE": 25,
+   "note": "skin inside the straps (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 65,
+   "y": 30,
+   "r": 8,
+   "dE": 25,
+   "note": "skin inside the straps (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 102,
+   "y": 48,
+   "r": 10,
+   "dE": 20,
+   "note": "skin at the sweetheart dip (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 113,
+   "y": 246,
+   "r": 12,
+   "dE": 25,
+   "note": "leg skin under the hem (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 98,
+   "y": 252,
+   "r": 6,
+   "dE": 25,
+   "note": "leg skin under the hem (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 32,
+   "y": 240,
+   "r": 6,
+   "dE": 25,
+   "note": "leg skin under the hem (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 169,
+   "y": 238,
+   "r": 6,
+   "dE": 25,
+   "note": "leg skin under the hem (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 178,
+   "y": 240,
+   "r": 6,
+   "dE": 25,
+   "note": "leg skin under the hem (deepest pixel of the residue patch)"
+  }
+ ]
+}

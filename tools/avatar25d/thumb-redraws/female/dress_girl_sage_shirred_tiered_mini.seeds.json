@@ -1,0 +1,295 @@
+{
+ "item": "dress_girl_sage_shirred_tiered_mini",
+ "source": "front cut pinned in thumb-fronts.json",
+ "input": "tools/avatar25d/thumb-fronts/female/dress_girl_sage_shirred_tiered_mini.webp",
+ "input_sha256": "25c143abe02e6361ba81758ab2a778cf159cce8029fb3fb6f36b75c54e0e8ea7",
+ "min_island_px": 8,
+ "seeds": [
+  {
+   "x": 29,
+   "y": 37,
+   "r": 16,
+   "dE": 16,
+   "note": "armpit skin under the flutter sleeves"
+  },
+  {
+   "x": 172,
+   "y": 36,
+   "r": 16,
+   "dE": 16,
+   "note": "armpit skin under the flutter sleeves"
+  },
+  {
+   "x": 42,
+   "y": 53,
+   "r": 10,
+   "dE": 16,
+   "note": "armpit skin"
+  },
+  {
+   "x": 157,
+   "y": 55,
+   "r": 10,
+   "dE": 16,
+   "note": "armpit skin"
+  },
+  {
+   "x": 49,
+   "y": 63,
+   "r": 20,
+   "dE": 16,
+   "note": "skin beside the bodice"
+  },
+  {
+   "x": 49,
+   "y": 86,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 46,
+   "y": 94,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 40,
+   "y": 107,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 38,
+   "y": 114,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 37,
+   "y": 120,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 35,
+   "y": 128,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 33,
+   "y": 136,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 29,
+   "y": 145,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 19,
+   "y": 161,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 9,
+   "y": 177,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 5,
+   "y": 184,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 3,
+   "y": 188,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 152,
+   "y": 86,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 157,
+   "y": 98,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 158,
+   "y": 101,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 162,
+   "y": 110,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 165,
+   "y": 123,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 175,
+   "y": 150,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 188,
+   "y": 170,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 192,
+   "y": 177,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 37,
+   "y": 240,
+   "r": 6,
+   "dE": 14,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 167,
+   "y": 243,
+   "r": 6,
+   "dE": 14,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 138,
+   "y": 245,
+   "r": 6,
+   "dE": 14,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 95,
+   "y": 252,
+   "r": 6,
+   "dE": 14,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 108,
+   "y": 252,
+   "r": 6,
+   "dE": 14,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 85,
+   "y": 247,
+   "r": 6,
+   "dE": 14,
+   "note": "leg skin under the hem"
+  },
+  {
+   "x": 34,
+   "y": 42,
+   "r": 16,
+   "dE": 16,
+   "note": "armpit skin under the flutter sleeves (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 167,
+   "y": 41,
+   "r": 16,
+   "dE": 16,
+   "note": "armpit skin under the flutter sleeves (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 158,
+   "y": 54,
+   "r": 10,
+   "dE": 16,
+   "note": "armpit skin (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 49,
+   "y": 71,
+   "r": 20,
+   "dE": 16,
+   "note": "skin beside the bodice (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 168,
+   "y": 244,
+   "r": 6,
+   "dE": 14,
+   "note": "leg skin under the hem (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 94,
+   "y": 253,
+   "r": 6,
+   "dE": 14,
+   "note": "leg skin under the hem (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 108,
+   "y": 253,
+   "r": 6,
+   "dE": 14,
+   "note": "leg skin under the hem (deepest pixel of the residue patch)"
+  }
+ ]
+}

@@ -514,13 +514,27 @@ const THUMB_EDGE_CLEAN = {
  *  pearl clip: the room art is 34x30 px, too small for a card; the thumb is cropped from its QA-passed showcase front
  *  (glassacc_2030 acc/sc_clip_layer.png, lossless, uncropped scale). Pearl necklace: same, the room chain is 1 px thin
  *  (acc/sc_neck_layer.png, cropped, at most 256 px). Camel mini bag: the room art bakes to a ragged 76x256 strap
- *  sliver; the thumb is the bag body cropped from its showcase front (strap ring down, at most 256 px). */
+ *  sliver; the thumb is the bag body cropped from its showcase front (strap ring down, at most 256 px).
+ *  Two jackets: the room-rig thumb from 5f0ea360 (its front cut keeps wrist and collar skin; the room thumb was LOW only,
+ *  frontqa_1730). Nine more: seed-clean-thumbs.mjs output, residue cleared by hand-placed seeds (<item>.seeds.json) from
+ *  the front cut (the cream mini from its 5f0ea360 room thumb, whose front cut holes the skirt), thumbs_1745 round 5. */
 const THUMB_REDRAWS = {
   female: {
     avatar_v2_shoes_white_clean_sneakers: "6b2e11f3e5bba4a1efc29e596877d3d938db4bf01a028307d11784b983064765",
     clip_girl_pearl_bar_pair: "71296b2fa7aae1b4370ce0333bb44e60cd3698198b9ab39758c09346935ac9bf",
     necklace_girl_pearl_drop: "9d351a3d9e2a470726989440298cad3ad2510ecc33c5b2f95c8e4c9b44814681",
-    bag_girl_camel_mini: "dddd1910ec3b44a0aab35cfd013d56496cdb27b789ddd6dfc465a70472c91fc7"
+    bag_girl_camel_mini: "dddd1910ec3b44a0aab35cfd013d56496cdb27b789ddd6dfc465a70472c91fc7",
+    dress_girl_black_corset_flare_mini: "b997417e270a3053a5386eb39e1f3af30515fefe3cfaeac7023aaacaea522d4b",
+    dress_girl_butter_square_puff_mini: "d4726aadf3e2e0d82bd8315d8d98d72aa3eed412af4ab670428a17f1e0ef54ee",
+    dress_girl_cream_one_shoulder_mini: "69544e567363415d649450d9d6a2022389fa60a5056b8ce592c55ab58259f751",
+    dress_girl_sage_shirred_tiered_mini: "f11610a3b43b3cdb428e69e1144000448eb1074fe1697410736f3c64d4f1dec5",
+    dress_girl_wine_gingham_tie: "5fa01b2cd56b133b128cb4692ce93a4848ac256ee5bc1165716af93f4cb8d4e7",
+    hair_girl_ink_twin_braids: "d2f195279a964e40acbb724abf5e0c82b4fc2ca19439155375b8527e09fb72b5",
+    jacket_girl_black_crop_blazer: "44bbbe7a4f775d02dfd8df623eaa74e501e24b1619d30c944c33d5321f362ef3",
+    jacket_girl_light_denim_crop: "b8134c4186983c4bf1fc43a9227072857697413f4cd265a3c3ccb1e28731009f",
+    top_girl_camel_vest_tee: "69ce986958f14f779b4867bef646cf6b7431acb5646ab66c2977688e47ed6bee",
+    top_girl_sage_knit_polo: "b99bf278d90a9d2f7c269596847994516c936e91663f108dea21dbec788861ba",
+    top_girl_white_poplin_shirt: "49f684d41aa39089ea2702dc8adf3349125416936cccfe4b3dd1144092393bb8"
   },
   male: {
     avatar_v2_shoes_male_brown_loafers: "2b5075873bbd3161a501d50e86cf058242c3d0d64243487c386b0d67a317f897",

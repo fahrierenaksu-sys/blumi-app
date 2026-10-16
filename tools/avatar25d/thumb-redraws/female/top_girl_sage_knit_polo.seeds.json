@@ -1,0 +1,269 @@
+{
+ "item": "top_girl_sage_knit_polo",
+ "source": "front cut pinned in thumb-fronts.json",
+ "input": "tools/avatar25d/thumb-fronts/female/top_girl_sage_knit_polo.webp",
+ "input_sha256": "4b284f03da3bf3718613a3dffb8ee135ff0e683d148a9d96c55da64c0152b6f0",
+ "min_island_px": 8,
+ "seeds": [
+  {
+   "x": 8,
+   "y": 127,
+   "r": 40,
+   "dE": 16,
+   "note": "armpit skin under the sleeves"
+  },
+  {
+   "x": 247,
+   "y": 126,
+   "r": 40,
+   "dE": 16,
+   "note": "armpit skin under the sleeves"
+  },
+  {
+   "x": 100,
+   "y": 13,
+   "r": 5,
+   "dE": 12,
+   "note": "neck skin at the collar tips"
+  },
+  {
+   "x": 97,
+   "y": 18,
+   "r": 5,
+   "dE": 12,
+   "note": "neck skin at the collar tips"
+  },
+  {
+   "x": 158,
+   "y": 19,
+   "r": 5,
+   "dE": 12,
+   "note": "neck skin at the collar tips"
+  },
+  {
+   "x": 51,
+   "y": 224,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 55,
+   "y": 225,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 65,
+   "y": 227,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 77,
+   "y": 230,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 89,
+   "y": 231,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 97,
+   "y": 232,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 106,
+   "y": 233,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 111,
+   "y": 234,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 167,
+   "y": 233,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 184,
+   "y": 230,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 190,
+   "y": 229,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 203,
+   "y": 227,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 213,
+   "y": 224,
+   "r": 6,
+   "dE": 14,
+   "note": "peach line under the hem"
+  },
+  {
+   "x": 42,
+   "y": 143,
+   "r": 40,
+   "dE": 16,
+   "note": "armpit skin under the sleeves (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 213,
+   "y": 145,
+   "r": 40,
+   "dE": 16,
+   "note": "armpit skin under the sleeves (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 5,
+   "y": 127,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 12,
+   "y": 131,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 17,
+   "y": 135,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 27,
+   "y": 140,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 29,
+   "y": 141,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 51,
+   "y": 143,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 47,
+   "y": 144,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 42,
+   "y": 147,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 46,
+   "y": 147,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 251,
+   "y": 125,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 235,
+   "y": 137,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 232,
+   "y": 138,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 226,
+   "y": 141,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 214,
+   "y": 148,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 216,
+   "y": 148,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  }
+ ]
+}

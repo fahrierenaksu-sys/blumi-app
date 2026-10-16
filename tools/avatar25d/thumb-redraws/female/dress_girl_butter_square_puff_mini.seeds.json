@@ -1,0 +1,281 @@
+{
+ "item": "dress_girl_butter_square_puff_mini",
+ "source": "front cut pinned in thumb-fronts.json",
+ "input": "tools/avatar25d/thumb-fronts/female/dress_girl_butter_square_puff_mini.webp",
+ "input_sha256": "ec220eba1f2fd684fefa33593884b6f8aca5715ee860f3dd18b080f5aff5c79b",
+ "min_island_px": 8,
+ "seeds": [
+  {
+   "x": 50,
+   "y": 82,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 49,
+   "y": 85,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 46,
+   "y": 93,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 43,
+   "y": 101,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 42,
+   "y": 103,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 40,
+   "y": 109,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 39,
+   "y": 113,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 38,
+   "y": 118,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 38,
+   "y": 121,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 34,
+   "y": 133,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 31,
+   "y": 140,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 18,
+   "y": 160,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 10,
+   "y": 173,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 5,
+   "y": 183,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 152,
+   "y": 82,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 154,
+   "y": 87,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 156,
+   "y": 92,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 159,
+   "y": 100,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 161,
+   "y": 105,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 164,
+   "y": 113,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 165,
+   "y": 121,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 166,
+   "y": 126,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 168,
+   "y": 132,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 182,
+   "y": 157,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 188,
+   "y": 166,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 191,
+   "y": 171,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 198,
+   "y": 185,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the bodice and skirt"
+  },
+  {
+   "x": 37,
+   "y": 67,
+   "r": 8,
+   "dE": 10,
+   "note": "skin under the puff sleeves"
+  },
+  {
+   "x": 24,
+   "y": 62,
+   "r": 8,
+   "dE": 10,
+   "note": "skin under the puff sleeves"
+  },
+  {
+   "x": 32,
+   "y": 76,
+   "r": 8,
+   "dE": 10,
+   "note": "skin under the puff sleeves"
+  },
+  {
+   "x": 35,
+   "y": 77,
+   "r": 8,
+   "dE": 10,
+   "note": "skin under the puff sleeves"
+  },
+  {
+   "x": 164,
+   "y": 67,
+   "r": 8,
+   "dE": 10,
+   "note": "skin under the puff sleeves"
+  },
+  {
+   "x": 170,
+   "y": 65,
+   "r": 8,
+   "dE": 10,
+   "note": "skin under the puff sleeves"
+  },
+  {
+   "x": 182,
+   "y": 61,
+   "r": 8,
+   "dE": 10,
+   "note": "skin under the puff sleeves"
+  },
+  {
+   "x": 185,
+   "y": 56,
+   "r": 8,
+   "dE": 10,
+   "note": "skin under the puff sleeves"
+  }
+ ]
+}

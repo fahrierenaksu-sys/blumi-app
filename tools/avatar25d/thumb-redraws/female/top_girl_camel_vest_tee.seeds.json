@@ -1,0 +1,215 @@
+{
+ "item": "top_girl_camel_vest_tee",
+ "source": "front cut pinned in thumb-fronts.json",
+ "input": "tools/avatar25d/thumb-fronts/female/top_girl_camel_vest_tee.webp",
+ "input_sha256": "a12ba589dbd76824dd5ca8eab28610105e2bf1ab53f6fb28e74f07661bd41426",
+ "min_island_px": 8,
+ "seeds": [
+  {
+   "x": 17,
+   "y": 100,
+   "r": 40,
+   "dE": 14,
+   "minL": 68,
+   "note": "armpit skin under the tee sleeves"
+  },
+  {
+   "x": 236,
+   "y": 102,
+   "r": 40,
+   "dE": 14,
+   "minL": 68,
+   "note": "armpit skin under the tee sleeves"
+  },
+  {
+   "x": 98,
+   "y": 223,
+   "r": 4,
+   "dE": 10,
+   "note": "hem specks"
+  },
+  {
+   "x": 160,
+   "y": 223,
+   "r": 4,
+   "dE": 10,
+   "note": "hem specks"
+  },
+  {
+   "x": 12,
+   "y": 97,
+   "r": 8,
+   "dE": 25,
+   "minL": 60,
+   "note": "skin fringe under the left tee sleeve"
+  },
+  {
+   "x": 25,
+   "y": 109,
+   "r": 8,
+   "dE": 25,
+   "minL": 60,
+   "note": "skin fringe under the left tee sleeve"
+  },
+  {
+   "x": 50,
+   "y": 117,
+   "r": 40,
+   "dE": 14,
+   "minL": 68,
+   "note": "armpit skin under the tee sleeves (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 205,
+   "y": 116,
+   "r": 40,
+   "dE": 14,
+   "minL": 68,
+   "note": "armpit skin under the tee sleeves (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 16,
+   "y": 103,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 22,
+   "y": 107,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 26,
+   "y": 109,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 29,
+   "y": 110,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 32,
+   "y": 111,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 37,
+   "y": 113,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 42,
+   "y": 115,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 238,
+   "y": 104,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 234,
+   "y": 107,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 227,
+   "y": 110,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 224,
+   "y": 111,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 219,
+   "y": 113,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 214,
+   "y": 115,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 212,
+   "y": 116,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 208,
+   "y": 122,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 207,
+   "y": 125,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 203,
+   "y": 127,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 204,
+   "y": 129,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  }
+ ]
+}

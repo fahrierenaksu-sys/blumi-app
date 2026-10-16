@@ -1,0 +1,97 @@
+{
+ "item": "dress_girl_wine_gingham_tie",
+ "source": "front cut pinned in thumb-fronts.json",
+ "input": "tools/avatar25d/thumb-fronts/female/dress_girl_wine_gingham_tie.webp",
+ "input_sha256": "47a4c05eaff0e3777a68725bf6f772c8a417a9d11ff2cd7c731fd00cfc5b1c5c",
+ "min_island_px": 8,
+ "seeds": [
+  {
+   "x": 51,
+   "y": 77,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 39,
+   "y": 111,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 35,
+   "y": 127,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 153,
+   "y": 89,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 155,
+   "y": 95,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 158,
+   "y": 102,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 162,
+   "y": 120,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 165,
+   "y": 129,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 169,
+   "y": 137,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 184,
+   "y": 161,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  },
+  {
+   "x": 193,
+   "y": 179,
+   "r": 14,
+   "dE": 40,
+   "thin": true,
+   "note": "arm outline strokes beside the skirt"
+  }
+ ]
+}

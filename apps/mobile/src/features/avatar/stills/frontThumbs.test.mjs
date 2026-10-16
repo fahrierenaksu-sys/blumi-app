@@ -1,16 +1,20 @@
 // Card thumbs cut from the showcase front (tools/avatar25d/front-thumbs.mjs): an unpublished item's Shop and
 // Wardrobe thumb is its front cut, a published item keeps its receipt-locked rig thumb, and the cut only removes
-// the body a front layer carries, never fabric inside the item's outline.
+// the body a front layer carries, never fabric inside the item's outline. A hand redraw (thumb-redraws/) wins over the
+// front cut; a seeded cleanup redraw (seed-clean-thumbs.mjs) is reproducible from its seeds and only removes pixels.
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
-import { readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import test from "node:test"
+import sharp from "sharp"
+import { seedClean } from "../../../../../../tools/avatar25d/seed-clean-thumbs.mjs"
 import { premultipliedResize, readFrontThumbPins, thumbSource, withoutCarriedBody } from "../../../../../../tools/avatar25d/front-thumbs.mjs"
 
 const ROOT = resolve(import.meta.dirname, "../../../../../..")
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex")
 const MANIFEST = JSON.parse(readFileSync(join(ROOT, "packages/domain/src/avatar/avatarStillManifest.json"), "utf8"))
+const REDRAWS = join(ROOT, "tools/avatar25d/thumb-redraws")
 const PUBLISHED = new Set(JSON.parse(readFileSync(join(ROOT, "packages/domain/src/release/blumiR1ReleaseCatalog.json"), "utf8")).publishedItems.map((i) => i.itemId))
 
 test("an unpublished item with a front pin ships exactly its front cut as the card thumb", () => {
@@ -22,6 +26,11 @@ test("an unpublished item with a front pin ships exactly its front cut as the ca
       const item = MANIFEST.bodies[rig]?.items[itemId]
       if (!item) continue // pinned ahead of its rig art: baked once the item lands
       const thumb = readFileSync(join(ROOT, "apps/mobile/src/features/avatar/stills/layers", rig, "thumb", `${item.thumb}.webp`))
+      const redraw = join(REDRAWS, rig, `${itemId}.webp`)
+      if (existsSync(redraw)) {
+        assert.equal(sha256(thumb), sha256(readFileSync(redraw)), `${rig}/${itemId}: the card thumb is not its hand redraw (run bake-stills.mjs)`)
+        continue
+      }
       assert.equal(sha256(thumb), pin.sha256, `${rig}/${itemId}: the card thumb is not its front cut (run bake-stills.mjs)`)
       checked++
     }
@@ -76,4 +85,43 @@ test("the thumb downscale is premultiplied: a soft edge never darkens toward tra
     assert.ok(out[i] >= 250 && out[i + 1] <= 3 && out[i + 2] <= 3, `pixel ${i / 4} darkened or tinted: ${[...out.slice(i, i + 4)]}`)
   }
   assert.ok(edge > 0, "no soft edge pixel was checked")
+})
+
+test("a seeded cleanup redraw is its seeds applied to its input, and only clears pixels", async () => {
+  let checked = 0
+  for (const rig of ["female", "male"]) {
+    const dir = join(REDRAWS, rig)
+    if (!existsSync(dir)) continue
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".seeds.json"))) {
+      const spec = JSON.parse(readFileSync(join(dir, file), "utf8"))
+      const input = readFileSync(join(ROOT, spec.input))
+      assert.equal(sha256(input), spec.input_sha256, `${file}: its input changed`)
+      const src = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      const out = await sharp(join(dir, file.replace(/\.seeds\.json$/, ".webp"))).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      assert.deepEqual([out.info.width, out.info.height], [src.info.width, src.info.height], `${file}: size changed`)
+      const { data } = seedClean(src.data, src.info.width, src.info.height, spec.seeds, spec.min_island_px)
+      // lossless WebP keeps every visible pixel exactly (the RGB under alpha 0 is not kept, and not shown)
+      for (let p = 0; p < data.length; p += 4) {
+        assert.equal(out.data[p + 3], data[p + 3], `${file}: pixel ${p / 4} is not its seeds applied (run seed-clean-thumbs.mjs)`)
+        if (out.data[p + 3] === 0) continue
+        assert.ok(out.data.subarray(p, p + 4).equals(src.data.subarray(p, p + 4)), `${file}: pixel ${p / 4} was repainted`)
+      }
+      checked++
+    }
+  }
+  assert.ok(checked > 0, "no seeded redraw was checked")
+})
+
+test("a seed floods only similar colour within its radius, and a thin seed never enters the garment body", () => {
+  const w = 20, h = 10, rgba = Buffer.alloc(w * h * 4)
+  const put = (x, y, c) => rgba.set([...c, 255], (y * w + x) * 4)
+  for (let y = 0; y < h; y++) for (let x = 0; x < 10; x++) put(x, y, FABRIC)
+  for (let y = 0; y < h; y++) for (let x = 10; x < 14; x++) put(x, y, SKIN)
+  for (let x = 14; x < 20; x++) put(x, 5, SKIN)
+  const { data } = seedClean(rgba, w, h, [{ x: 11, y: 5, r: 30, dE: 10 }], 0)
+  for (let y = 0; y < h; y++) for (let x = 0; x < 10; x++) assert.equal(data[(y * w + x) * 4 + 3], 255, "fabric kept")
+  for (let x = 10; x < 20; x++) assert.equal(data[(5 * w + x) * 4 + 3], 0, "skin cleared")
+  assert.throws(() => seedClean(rgba, w, h, [{ x: 4, y: 5, r: 5, dE: 10, thin: true }], 0), /inside the garment body/)
+  const near = seedClean(rgba, w, h, [{ x: 11, y: 5, r: 1, dE: 10 }], 0).data
+  assert.equal(near[(5 * w + 16) * 4 + 3], 255, "outside the radius kept")
 })

@@ -1,0 +1,171 @@
+{
+ "item": "top_girl_white_poplin_shirt",
+ "source": "front cut pinned in thumb-fronts.json",
+ "input": "tools/avatar25d/thumb-fronts/female/top_girl_white_poplin_shirt.webp",
+ "input_sha256": "347ff0e7f01ba744fa7f18110dd82b5ed4cb9b55b905a6ab28e94f572c23a245",
+ "min_island_px": 8,
+ "seeds": [
+  {
+   "x": 15,
+   "y": 129,
+   "r": 40,
+   "dE": 28,
+   "note": "armpit skin under the sleeves"
+  },
+  {
+   "x": 244,
+   "y": 125,
+   "r": 40,
+   "dE": 28,
+   "note": "armpit skin under the sleeves"
+  },
+  {
+   "x": 132,
+   "y": 225,
+   "r": 5,
+   "dE": 20,
+   "note": "red band stub under the hem"
+  },
+  {
+   "x": 132,
+   "y": 230,
+   "r": 5,
+   "dE": 20,
+   "note": "red band stub under the hem"
+  },
+  {
+   "x": 42,
+   "y": 144,
+   "r": 40,
+   "dE": 28,
+   "note": "armpit skin under the sleeves (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 212,
+   "y": 143,
+   "r": 40,
+   "dE": 28,
+   "note": "armpit skin under the sleeves (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 12,
+   "y": 131,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 13,
+   "y": 135,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 11,
+   "y": 135,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 26,
+   "y": 138,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 54,
+   "y": 144,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 35,
+   "y": 145,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 37,
+   "y": 146,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 49,
+   "y": 147,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 44,
+   "y": 150,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 246,
+   "y": 128,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 245,
+   "y": 134,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 204,
+   "y": 143,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 213,
+   "y": 146,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 216,
+   "y": 146,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  },
+  {
+   "x": 213,
+   "y": 148,
+   "r": 10,
+   "dE": 25,
+   "thin": true,
+   "note": "skin stroke under the sleeve hem"
+  }
+ ]
+}
