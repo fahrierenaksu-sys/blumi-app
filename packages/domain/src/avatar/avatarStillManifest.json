@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "b4ca18df78b87f894228659da2f481a8a05b289e971702080c3dcd0e2fdda154",
+      "rigSha256": "07e9212beea00f74d6270d2ca38cda69b13be5ee8c9782dc14f10b8f0b56e5b2",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -428,6 +428,11 @@
           "rigItemId": "top_girl_breton_stripe",
           "thumb": "top_girl_breton_stripe"
         },
+        "top_girl_sage_knit_polo": {
+          "slot": "top",
+          "rigItemId": "top_girl_sage_knit_polo",
+          "thumb": "top_girl_sage_knit_polo"
+        },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
@@ -703,6 +708,19 @@
               315,
               65,
               107
+            ]
+          },
+          {
+            "key": "top_girl_sage_knit_polo__o0p45",
+            "owner": "top_girl_sage_knit_polo",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              205,
+              313,
+              48,
+              72
             ]
           },
           {
@@ -1474,6 +1492,19 @@
             ]
           },
           {
+            "key": "top_girl_sage_knit_polo__o3p45",
+            "owner": "top_girl_sage_knit_polo",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              219,
+              259,
+              166,
+              240
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1760,6 +1791,19 @@
               69,
               129
             ]
+          },
+          {
+            "key": "top_girl_sage_knit_polo__o5p45",
+            "owner": "top_girl_sage_knit_polo",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              364,
+              290,
+              59,
+              100
+            ]
           }
         ],
         "bust": [
@@ -1919,6 +1963,19 @@
               181,
               44,
               71
+            ]
+          },
+          {
+            "key": "top_girl_sage_knit_polo__o0p45",
+            "owner": "top_girl_sage_knit_polo",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              63,
+              180,
+              34,
+              49
             ]
           },
           {
@@ -2258,6 +2315,19 @@
             ]
           },
           {
+            "key": "top_girl_sage_knit_polo__o3p45",
+            "owner": "top_girl_sage_knit_polo",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              71,
+              147,
+              103,
+              109
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -2543,6 +2613,19 @@
               166,
               47,
               84
+            ]
+          },
+          {
+            "key": "top_girl_sage_knit_polo__o5p45",
+            "owner": "top_girl_sage_knit_polo",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              160,
+              166,
+              41,
+              66
             ]
           }
         ]
