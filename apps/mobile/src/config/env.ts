@@ -74,6 +74,18 @@ export const BLUMI_PROFILE_CHARACTER_REACTION_USER_APPROVED_FLAG =
 export const BLUMI_QA_UNLOCK_AVATAR_ITEMS_FLAG =
   process.env.EXPO_PUBLIC_BLUMI_QA_UNLOCK_AVATAR_ITEMS
 
+/**
+ * Prototype: chat lines make the sender's chibi react in the shared room
+ * (hearts, laugh, thought, wave, sparkles, sleepy). Off unless set to "1".
+ */
+export function resolveBlumiChatEmotesEnabled(rawFlag: string | undefined): boolean {
+  return rawFlag?.trim() === "1"
+}
+
+export const IS_BLUMI_CHAT_EMOTES_ENABLED = resolveBlumiChatEmotesEnabled(
+  process.env.EXPO_PUBLIC_BLUMI_CHAT_EMOTES
+)
+
 export const BLUMI_SENTRY_DSN =
   process.env.EXPO_PUBLIC_SENTRY_DSN?.trim() || undefined
 
