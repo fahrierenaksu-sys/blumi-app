@@ -83,6 +83,12 @@ export interface BuildShopCatalogItemsInput {
   roomFurnitureCatalog?: readonly FurnitureItem[]
   /** Development-only ownership granted by an isolated QA catalog. */
   qaOwnedRoomItemIds?: readonly string[]
+  /**
+   * Simulator QA only (the local QA environment): list a held avatar piece the server inventory already owns, so the
+   * QA accounts see the pieces the memory server's QA clothing grant gives them. It never lists an unowned held piece,
+   * never prices one and never decides ownership.
+   */
+  showHeldOwnedItems?: boolean
   /** The app language; avatar and room piece names are Turkish when it is "tr". Omitted = the catalog's own names. */
   locale?: AppLocale
 }
@@ -115,7 +121,7 @@ export function buildShopCatalogItems(
 
 export function buildAvatarShopItems(input: Pick<
   BuildShopCatalogItemsInput,
-  "avatar" | "economyCatalog" | "publishedItemIds" | "avatarCatalog" | "locale"
+  "avatar" | "economyCatalog" | "publishedItemIds" | "avatarCatalog" | "showHeldOwnedItems" | "locale"
 > & { inventory: Pick<BlumiInventorySnapshot, "ownedAvatarItemIds"> }): ShopCatalogItem[] {
   const avatarInventory = {
     ownedItemIds: input.inventory.ownedAvatarItemIds
@@ -123,6 +129,10 @@ export function buildAvatarShopItems(input: Pick<
   const publishedItemIds = input.publishedItemIds
     ? new Set(input.publishedItemIds)
     : undefined
+  const isQaHeldOwnedItem = (item: AvatarCatalogItem): boolean =>
+    input.showHeldOwnedItems === true &&
+    isReleaseCatalogItemHeld(item.id) &&
+    avatarInventory.ownedItemIds.includes(item.id)
 
   return getAvatarV2ShopItemsCompatibleWithBody(
     input.avatarCatalog ?? AVATAR_V2_CATALOG,
@@ -130,7 +140,7 @@ export function buildAvatarShopItems(input: Pick<
   )
     .filter((item) => SHOP_AVATAR_TYPES.has(item.type))
     .filter((item) => item.hiddenFromShop !== true)
-    .filter((item) => !publishedItemIds || publishedItemIds.has(item.id))
+    .filter((item) => !publishedItemIds || publishedItemIds.has(item.id) || isQaHeldOwnedItem(item))
     .map((item) =>
       buildAvatarShopCatalogItem({
         item,

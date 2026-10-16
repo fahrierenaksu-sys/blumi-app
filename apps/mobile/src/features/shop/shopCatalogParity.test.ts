@@ -637,3 +637,35 @@ test("every room piece the Shop can list has a Turkish name, shown on the Turkis
     assert.ok(FURNITURE_NAMES_TR[item.id], `${item.id} has a Turkish name`);
   }
 });
+
+test("a held piece the server inventory owns is listed only under the local QA override, and never offered for sale", () => {
+  // a landed new-collection piece the release catalog still holds until its receipt
+  const heldShoesId = "shoes_girl_camel_ankle_boots";
+  assert.equal(isReleaseCatalogItemHeld(heldShoesId), true);
+  const publishedCatalog = resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG);
+  const listedHeldShoes = (ownedAvatarItemIds: string[], showHeldOwnedItems?: boolean) =>
+    buildShopCatalogItems({
+      avatar: resolveInitialAvatarV2("avatar_v2_body_default"),
+      inventory: {
+        coins: 1_250,
+        ownedAvatarItemIds,
+        ownedRoomItemIds: [],
+        unlockedFeatureIds: [],
+        updatedAt: "2026-10-16T00:00:00.000Z",
+      },
+      roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
+      economyCatalog: publishedCatalog,
+      publishedItemIds: publishedCatalog.map((item) => item.itemId),
+      showHeldOwnedItems,
+    }).filter((product) => product.sourceItemId === heldShoesId);
+
+  // release bundles and Node never pass the override: owned or not, a held piece stays off the shelf
+  assert.equal(listedHeldShoes([heldShoesId]).length, 0);
+  assert.equal(listedHeldShoes([heldShoesId], false).length, 0);
+  // the override never offers a held piece the server has not granted
+  assert.equal(listedHeldShoes([], true).length, 0);
+  const [granted] = listedHeldShoes([heldShoesId], true);
+  assert.ok(granted, "the QA account sees the held piece its inventory owns");
+  assert.equal(granted.owned, true);
+  assert.equal(granted.actionType, "avatarEquip");
+});

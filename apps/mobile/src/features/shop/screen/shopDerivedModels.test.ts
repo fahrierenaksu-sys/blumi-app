@@ -280,6 +280,8 @@ function mountCatalog() {
           buildAvatarShopItems: (input: Parameters<typeof realShopCatalog.buildAvatarShopItems>[0]) =>
             realShopCatalog.buildAvatarShopItems({ ...input, avatarCatalog: [...AVATAR_V2_CATALOG, ...standInAvatarItems] })
         },
+        // the release-bundle value: no local QA override of the held-piece shelf
+        "../../session/localQaEnvironment": { IS_LOCAL_QA_ENVIRONMENT: false },
         // Supply the native locale, retaining the real sort and presentation rules.
         "./shopAvatarProductOrder": {
           ...avatarProductOrder,

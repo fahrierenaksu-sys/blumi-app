@@ -9,6 +9,7 @@ import { isAvatarItemSavable } from "../../avatarV2/avatarDressWriteGate"
 import type { BlumiInventorySnapshot } from "../../inventory/inventoryStore"
 import type { FurnitureItem, UserRoomDecor } from "../../roomV2/roomV2.types"
 import type { AppLocale } from "../../session/appLocale"
+import { IS_LOCAL_QA_ENVIRONMENT } from "../../session/localQaEnvironment"
 import { buildAvatarShopItems, buildRoomShopItems, type ShopCatalogItem } from "../shopCatalog"
 import type { ShopMode } from "../ShopNavigationControls"
 import {
@@ -79,6 +80,8 @@ export function useShopCatalogProducts(input: {
         avatar,
         economyCatalog: productionEconomyCatalog,
         publishedItemIds,
+        // Simulator QA only: the held clothing the memory server's QA grant owns (false in every release bundle)
+        showHeldOwnedItems: IS_LOCAL_QA_ENVIRONMENT,
         locale
       }),
     [
