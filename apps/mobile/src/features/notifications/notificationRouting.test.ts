@@ -43,3 +43,10 @@ test("malformed or unknown notification data is ignored", () => {
   assert.equal(resolveNotificationDestination({ type: "marketing.unknown" }), null)
   assert.equal(resolveNotificationDestination(null), null)
 })
+
+test("a cat teaser opens My Room, where the reveal waits; its trip id is not needed", () => {
+  for (const type of ["cat.trip_owner", "cat.trip_host"]) {
+    assert.deepEqual(resolveNotificationDestination({ type, tripId: "trip_1" }), { route: "MyRoom" })
+    assert.deepEqual(resolveNotificationDestination({ type }), { route: "MyRoom" })
+  }
+})

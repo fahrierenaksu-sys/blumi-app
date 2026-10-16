@@ -84,6 +84,10 @@ import {
 } from "../features/roomWorld/myRoomAvatarWalkModel"
 import { useMyRoomAvatarWalk } from "../features/roomWorld/useMyRoomAvatarWalk"
 import { useMyRoomPetSlot } from "../features/roomPet/useMyRoomPetSlot"
+import { IS_BLUMI_ROOM_PET_ENABLED } from "../features/roomPet/roomPetFlag"
+import { useCatTrips } from "../features/catTrips/useCatTrips"
+import { CatTripRevealOverlay } from "../features/catTrips/CatTripRevealOverlay"
+import { CatRoomStrip } from "../features/catTrips/CatSouvenirShelf"
 import {
   INITIAL_ROOM_TAP_MARKER_STATE,
   reduceRoomTapMarker
@@ -380,7 +384,10 @@ export function MyRoomScreen({
     const pose = readAvatarPose()
     return { point: { x: pose.x, y: pose.y }, seatFurnitureId: seatedFurnitureRenderIdRef.current ?? null }
   }, [readAvatarPose])
+  // Traveling cat (flag EXPO_PUBLIC_BLUMI_CAT_TRIPS, off by default): while it is away the basket is empty.
+  const catTrips = useCatTrips({ sessionActor, isFocused: useIsFocused() })
   const petDepthSlot = useMyRoomPetSlot({
+    isEnabled: IS_BLUMI_ROOM_PET_ENABLED && !catTrips.isOwnCatAway,
     shell: baseRoomScene.shell,
     sceneItems: baseRoomScene.renderItems,
     renderItems,
@@ -1017,6 +1024,21 @@ export function MyRoomScreen({
           </View>
         </View>
       </View>
+      {catTrips.isEnabled ? (
+        <CatRoomStrip souvenirs={catTrips.souvenirs} isOwnCatAway={catTrips.isOwnCatAway} hasGuest={catTrips.hasGuest} />
+      ) : null}
+      {catTrips.reveal ? (
+        <CatTripRevealOverlay
+          key={catTrips.reveal.role === "owner" ? catTrips.reveal.trip.tripId : catTrips.reveal.guest.tripId}
+          reveal={catTrips.reveal}
+          onAcknowledge={catTrips.acknowledge}
+          onDismiss={(tripId) => {
+            catTrips.dismiss(tripId)
+            void catTrips.refresh()
+          }}
+          onOpenChat={(threadId) => navigation.navigate("ChatThread", { threadId })}
+        />
+      ) : null}
     </SafeAreaView>
   )
 }

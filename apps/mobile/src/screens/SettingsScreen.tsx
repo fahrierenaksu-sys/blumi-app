@@ -25,6 +25,7 @@ import { SettingsAccountSection } from "../features/settings/SettingsAccountSect
 import { SettingsAboutSection, SettingsLegalSection } from "../features/settings/SettingsInfoSections"
 import { SettingsMatchingSection } from "../features/settings/SettingsMatchingSection"
 import { SettingsNotificationsSection } from "../features/settings/SettingsNotificationsSection"
+import { SettingsCatTripsSection } from "../features/catTrips/SettingsCatTripsSection"
 import { SettingsPrivacySection } from "../features/settings/SettingsPrivacySection"
 import { SettingsSafetySection } from "../features/settings/SettingsSafetySection"
 import { settingsStyles as styles } from "../features/settings/settingsStyles"
@@ -183,6 +184,8 @@ export function SettingsScreen(props: SettingsScreenProps) {
               notifications={notifications}
             />
           ) : null}
+
+          <SettingsCatTripsSection sessionActor={sessionActor} />
 
           <SettingsSafetySection
             copy={copy}
