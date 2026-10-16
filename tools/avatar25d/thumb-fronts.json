@@ -1,0 +1,541 @@
+{
+  "female": {
+    "bottom_girl_ecru_trousers": {
+      "sha256": "65275d6bdf19597ab4ff68a6b55e0629f59c30083952974f92a06c3e92ed4a43",
+      "size": [
+        107,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_bottom.png",
+          "sha256": "cf6306b7c4cf533d43ca61fdf253e1bef147231b819af02c92e87d8a70cad2b7"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "bottom_girl_wide_jeans": {
+      "sha256": "a84ac14ae017dd01db83ebab5d0152ce9db83de3e64b96d42e6b9706e2535cf1",
+      "size": [
+        136,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_bottom.png",
+          "sha256": "2c6462daaa30a2bb69c550a3b55904218b1ed79d2ba073bc245a0472d73921a5"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "bottom_girl_wine_midi_skirt": {
+      "sha256": "ae26d1b7537c34b6950713767ae278c38f9383ff57238c27c60cd0215a0b90c4",
+      "size": [
+        256,
+        255
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "49e798d617349db04334e0719e86c0ec92245ed0a0cacf2abf524810347cc79d"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_black_corset_flare_mini": {
+      "sha256": "207411eba595d0358f7668d45d4672853fb1ed33cf1e2d5dfca8854fb49cd868",
+      "size": [
+        210,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_dress.png",
+          "sha256": "007e2b6baf2be631d7fd2c47e81c4a53b5db08b53bdb70e3f146fdd1ea4ef11a"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_black_corset_slit_maxi": {
+      "sha256": "21508f8f15cbfed8e4957f5a11cad83b41bedbbb3b00ea41299c9095915e2438",
+      "size": [
+        89,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_dress.png",
+          "sha256": "8fc79a7eecc8d90d9d5f68f1db3d12144114be42123e1ef8a7e5e9375021112a"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_butter_square_puff_mini": {
+      "sha256": "ec220eba1f2fd684fefa33593884b6f8aca5715ee860f3dd18b080f5aff5c79b",
+      "size": [
+        202,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_dress.png",
+          "sha256": "32a93a284d94075cb0b24a05b5d70b4c65325cc9d1482153d947332d1df35c48"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_cream_one_shoulder_mini": {
+      "sha256": "52520a7261ded1f0c68c8a711079d4464deed23da4de8174ea5919c5d125be6a",
+      "size": [
+        200,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_dress.png",
+          "sha256": "15c68cada018a8131d63c1c54caf9007c42d4ee5a0fc7ac3e3b61a4b25fec1db"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_cream_one_shoulder_tie_midi": {
+      "sha256": "c87cfbfb675be7fb232fe6b516462eb357b2700cc6ca5428e0c7a531eb5ee1b7",
+      "size": [
+        117,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_dress.png",
+          "sha256": "4450f41fca4b7b42cb5ca7d857e68df0798de69bbee930c536f9a27dd08fda01"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_denim_milkmaid_button_midi": {
+      "sha256": "d9427a97502efbeed5e88cc670434ed10c9b1c7ed21966ba1a791bc932e5b8a3",
+      "size": [
+        151,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_dress.png",
+          "sha256": "c479c36d3a76078126bf451931cfdf9dbf34fb18e486a2c07dab381537d74c86"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_denim_pinafore_mini": {
+      "sha256": "16f4e98bd810201f8e9312f408c449f4c34bed3c31841071a1dd6206d024f920",
+      "size": [
+        184,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_dress.png",
+          "sha256": "8e1a8372bfe807ed88c71389357108419e605878dde1748f57fe971e1476df74"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_sage_shirred_tiered_mini": {
+      "sha256": "25c143abe02e6361ba81758ab2a778cf159cce8029fb3fb6f36b75c54e0e8ea7",
+      "size": [
+        201,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_dress.png",
+          "sha256": "d1ab5f81569f6eb41c057add10f3076d2e2b3329a76ea4f0a758169075f119a5"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_terracotta_patchwork_halter_bias_maxi": {
+      "sha256": "92d2fad8c89461af340e9b19dd6334621662d0517c72186d17498c57519496cf",
+      "size": [
+        157,
+        256
+      ],
+      "sources": [
+        {
+          "file": "girl_dress.png",
+          "sha256": "52b36ecaac56b49e9687c3d7ce35d0e510921cc6cffae8d6c721a8f20f15e0db"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "dress_girl_wine_gingham_tie": {
+      "sha256": "47a4c05eaff0e3777a68725bf6f772c8a417a9d11ff2cd7c731fd00cfc5b1c5c",
+      "size": [
+        198,
+        256
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "6e54f9afbea45d7d3356fec6e0b8da7c36a7fa2b25e7d453be75f76998c9c064"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "glasses_girl_gold_round": {
+      "sha256": "e78ba65489700ac3da999be135180d06f711d5542001f9947ffb829ff6d53add",
+      "size": [
+        256,
+        92
+      ],
+      "sources": [
+        {
+          "file": "sc_g1_layer.png",
+          "sha256": "55c4acee1789f35ff94d504cd27b4f69916d54589f11165feeaad15dab2cbcbb"
+        }
+      ]
+    },
+    "glasses_girl_rose_soft_cateye": {
+      "sha256": "c507c7c08e4a3948fd1e750d3f5833a69772af0ad9694adf596c750c42b994fc",
+      "size": [
+        256,
+        77
+      ],
+      "sources": [
+        {
+          "file": "sc_g2_layer.png",
+          "sha256": "63235b04014f858da855d6d662970430c7b51d993118930ec8051d35e2f96a24"
+        }
+      ]
+    },
+    "hair_girl_bun_wine_bow": {
+      "sha256": "84d85cb894d625218543c48bbe6a97e4c443d5679f096d87af5c089725e8af3b",
+      "size": [
+        200,
+        256
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "011368770afc9217dfef0ccdb142dbc99e47a0d31b165baec873cb9d06feb211"
+        },
+        {
+          "file": "back.png",
+          "sha256": "e8ff6692530b3766e30e05cbf7a1275743aa3f9bc02b8eeba8e921bdc982a081"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "hair_girl_caramel_braid_crown": {
+      "sha256": "ba41188c75db4fb31977051d7cd4cbfa9f5158d892dc35727a1aba2f54d7ae7d",
+      "size": [
+        244,
+        256
+      ],
+      "sources": [
+        {
+          "file": "hair_girl_caramel_braid_crown_showcase_front.png",
+          "sha256": "3aaa203f51d854d52f70dd372ef4340c59ea87e58e3d37bc8a632345408c29e3"
+        },
+        {
+          "file": "hair_girl_caramel_braid_crown_showcase_back.png",
+          "sha256": "a8160580a0009f14cb2cd767878db182dedcf5f8d0925b7c953b0f197566dbe9"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "hair_girl_chestnut_butterfly": {
+      "sha256": "056fc84f0ac69811eb63affdc9efff6a9c8a6dde03b296cdeaa7f73daa05d9ce",
+      "size": [
+        256,
+        218
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "c1ade688896215d09df36f5667c38a5c3c736c0a8aed3872bbce0e677ed82b4b"
+        },
+        {
+          "file": "back.png",
+          "sha256": "c0f1a022a2efd607c8dadbc43b57f64220e02523f724ca4ca5ee8a99989f502f"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "hair_girl_copper_soft_waves": {
+      "sha256": "2ae570125c952054a4968c836f8669a544044bae55e355a69f756e670a058532",
+      "size": [
+        230,
+        256
+      ],
+      "sources": [
+        {
+          "file": "hair_girl_copper_soft_waves_showcase_front.png",
+          "sha256": "82685608601954bbb7902d0b4741a0ad20a42525f33bfb4b223b525ab327a7b6"
+        },
+        {
+          "file": "hair_girl_copper_soft_waves_showcase_back.png",
+          "sha256": "df313be5b83d561d2e47376f165bc8eb2bd379f18cc4a6802d41d07f4874acc8"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "hair_girl_ink_french_bob": {
+      "sha256": "f1fbd6e863e04afa88c52d2e3899f4cd9682c5195acfedfa3de7481b052afa29",
+      "size": [
+        256,
+        229
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "5e78bc39cb7eba098f87abf8e676f04fc5fa119cf4e3c882c948efb716ee069d"
+        },
+        {
+          "file": "back.png",
+          "sha256": "3af16bf23867a8badc8149ee121ef712c0a410933cc1657dd7b22c43ba0f9ba0"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "hair_girl_ink_twin_braids": {
+      "sha256": "c638f8bcf6d1c30bc8dbb292ca326ebe2b30ccc0a26e522cc62ae5bac28b999f",
+      "size": [
+        168,
+        256
+      ],
+      "sources": [
+        {
+          "file": "hair_girl_ink_twin_braids_showcase_front.png",
+          "sha256": "59ff757670339f15ab6f991af7dcb58194787422b0c3a7c934692b007e272c3b"
+        },
+        {
+          "file": "hair_girl_ink_twin_braids_showcase_back.png",
+          "sha256": "b06331d0bb41c4a43e46dd93b174d4cd8e0c19ae076732e7b389dfb2813f6a27"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "jacket_girl_black_crop_blazer": {
+      "sha256": "58d8e24c3ead6d31b47da480b65e2e79f55c68eefec775a26a16aa4b83d6fcfb",
+      "size": [
+        256,
+        201
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "18133652aae3dba6ad48cfb1c8b2055cffd9509b4088f80f1e3c28422eba463b"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "jacket_girl_light_denim_crop": {
+      "sha256": "50b8c8bcb322b3fb4b461a25eb8a8a13da6449e5111b1e0ba62c590ab82f9483",
+      "size": [
+        256,
+        204
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "2c858b4f93ec2189efe27da3327c29f44ee33dafa083b38c2c4bcfb5c8f86b96"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "shoes_girl_camel_ankle_boots": {
+      "sha256": "2d1c64949d31ae812e54e0bfb7f07b1e0676fb96e72d5385768be963033b92eb",
+      "size": [
+        256,
+        175
+      ],
+      "sources": [
+        {
+          "file": "girl_shoes.png",
+          "sha256": "483ecb8d59e56b996fcb63f04680e2d8292856d04ad9ef4da05d08c3b399afe7"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "top_girl_breton_stripe": {
+      "sha256": "b7a23a3b8c1922265c4925a3a2b3d800cb4b426e2d4ed75ee26c6d6926eabde6",
+      "size": [
+        256,
+        192
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "ff72aac6b20164f3076c853136ba42fc606028b2a3524854c147b07063a74d51"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "top_girl_camel_vest_tee": {
+      "sha256": "a12ba589dbd76824dd5ca8eab28610105e2bf1ab53f6fb28e74f07661bd41426",
+      "size": [
+        256,
+        224
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "0f60d4ce60126322fc2fd026a2d4b5ef3ea7ad4f3b82894cb57b90f6b97e9af0"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "top_girl_rose_pearl_cardigan": {
+      "sha256": "2f9ba282d934eb7ea0b50f550514645ce54b5763ae9e8bf6716f506a8051e3a1",
+      "size": [
+        256,
+        219
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "7124f993801d4d203d18f967c0a2bda7e8b45a169595e1dd02eef6536fe2db82"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "top_girl_sage_knit_polo": {
+      "sha256": "4b284f03da3bf3718613a3dffb8ee135ff0e683d148a9d96c55da64c0152b6f0",
+      "size": [
+        256,
+        235
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "4b495c05c94b037dcca416b1f0f0a6af109feadb8e52810491b2118861e0b3d0"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    },
+    "top_girl_white_poplin_shirt": {
+      "sha256": "347ff0e7f01ba744fa7f18110dd82b5ed4cb9b55b905a6ab28e94f572c23a245",
+      "size": [
+        256,
+        232
+      ],
+      "sources": [
+        {
+          "file": "front.png",
+          "sha256": "cd5d045d97009bb861240c345cdf2e7ca8a2c2e73be416abf9b415154e74cc89"
+        },
+        {
+          "file": "girl_a.png",
+          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+        }
+      ]
+    }
+  },
+  "male": {
+    "glasses_boy_black_soft_rect": {
+      "sha256": "4f87d98eba278546d95a7bbe55feb24eb9b50cd61967e070092968482e97d2aa",
+      "size": [
+        256,
+        70
+      ],
+      "sources": [
+        {
+          "file": "sc_g3_layer.png",
+          "sha256": "7830092ee03c426afa8a72617c835eeb8f85078ceeba2bb8c135d8f716ff2008"
+        }
+      ]
+    },
+    "glasses_boy_gunmetal_round": {
+      "sha256": "ca8b5c0ffd171ee15f55be6a9d2c3a354bcf0bd07452a39670547625537c1429",
+      "size": [
+        256,
+        89
+      ],
+      "sources": [
+        {
+          "file": "sc_g4_layer.png",
+          "sha256": "0625cd31cb0b10f0b09e932ce32c609a10669ae5064934ef4e50d43a9aaeb1b7"
+        }
+      ]
+    }
+  }
+}
