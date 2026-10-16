@@ -72,6 +72,9 @@ import { createAccountRecoveryService, type AccountRecoveryService } from "./acc
 import { createReferralService, type ReferralService } from "./referrals/referralService"
 import { registerReferralRoutes } from "./routes/referralRoutes"
 import { registerPersonalRoomDecorRoutes } from "./routes/personalRoomDecorRoutes"
+import { registerCatTripRoutes } from "./routes/catTripRoutes"
+import { createDisabledCatTripService } from "./catTrips/catTripWiring"
+import type { CatTripService } from "./catTrips/catTripService"
 import {
   createCapabilityService,
   isCapabilityRolledOut,
@@ -156,6 +159,8 @@ interface CreateServerOptions {
   accountRecoveryService?: AccountRecoveryService
   referralService?: ReferralService
   personalRoomDecorService?: PersonalRoomDecorService
+  /** The traveling cat (BLUMI_CAT_TRIPS_ENABLED); default: disabled. */
+  catTripService?: CatTripService
   roomSnapshotService?: RoomSnapshotService
   /** Push sender pictures; must be the instance the notification service links to. */
   notificationPortraits?: NotificationPortraitService
@@ -223,6 +228,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       isActiveRoomItemId: economyService.isActiveRoomItemId,
       roomSnapshotService
     })
+  const catTripService = options.catTripService ?? createDisabledCatTripService()
   const capabilityService = options.capabilityService ?? createCapabilityService({
     manifest: parseCapabilityManifest(process.env.BLUMI_CAPABILITY_MANIFEST).manifest
   })
@@ -359,6 +365,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     referralService,
     personalRoomDecorService,
     roomSnapshotService,
+    catTripService,
     capabilityService,
     chatReceiptService,
     accountRecoveryService,
@@ -410,6 +417,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     await registerChatPreferencesRoutes(instance, routeServices)
     await registerReferralRoutes(instance, routeServices)
     await registerPersonalRoomDecorRoutes(instance, routeServices)
+    await registerCatTripRoutes(instance, routeServices)
     await registerRoomSnapshotRoutes(instance, routeServices)
     await registerNotificationPortraitRoutes(instance, {
       notificationPortraits: options.notificationPortraits ?? createNotificationPortraitService({})
