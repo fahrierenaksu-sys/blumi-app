@@ -73,6 +73,10 @@ import { createPostgresPresenceRepository } from "./db/postgresPresenceRepositor
 import { createPostgresReactionRepository } from "./db/postgresReactionRepository"
 import { createPostgresRoomRepository } from "./db/postgresRoomRepository"
 import { createPostgresPersonalRoomDecorRepository } from "./db/postgresPersonalRoomDecorRepository"
+import { createPostgresRoomPetRepository } from "./db/postgresRoomPetRepository"
+import { createInMemoryRoomPetRepository } from "./roomPets/roomPetRepository"
+import { createRoomPetSchemaProbe } from "./roomPets/roomPetSchema"
+import { createRoomPetService, isRoomPetEnabled, type RoomPetService } from "./roomPets/roomPetService"
 import { createPostgresRoomSnapshotRepository } from "./db/postgresRoomSnapshotRepository"
 import { createPostgresSafetyRepository } from "./db/postgresSafetyRepository"
 import {
@@ -209,6 +213,8 @@ export interface ConfiguredServerServices {
   /** Whether migration 070 is applied; warmed at startup. */
   chatReceiptSchema: ChatReceiptSchemaProbe
   catTripService: CatTripService
+  /** Present only when BLUMI_ROOM_PET_ENABLED=1 (default off: no pet routes). */
+  roomPetService?: RoomPetService
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
   authRateLimiter?: SharedRateBudget
@@ -722,12 +728,21 @@ export function createConfiguredServerServices(
       authService, chatService, matchService, safetyService, notificationService,
       report: reportCatTripEvent
     })
+    // The pet row goes with the account through its foreign key (078).
+    const roomPetService = isRoomPetEnabled(process.env)
+      ? createRoomPetService({
+        repository: createPostgresRoomPetRepository(pool),
+        schema: createRoomPetSchemaProbe(pool),
+        report: reportRoomPetEvent
+      })
+      : undefined
     return {
       afterResponseTasks,
       onVerifiedPhone,
       capabilityService,
       chatReceiptSchema,
       catTripService,
+      roomPetService,
       authService,
       chatService,
       economyService,
@@ -803,9 +818,14 @@ export function createConfiguredServerServices(
     accountDeletionHandlers: [
       // In-memory storage has no foreign keys: erase the account's cat trips and souvenirs explicitly.
       (account) => catTripService.deleteUserData(account.userId).then(() => undefined),
+      // In-memory storage has no foreign keys: erase the account's room pet explicitly.
+      (account) => roomPetService?.deleteUserData(account.userId).then(() => undefined) ?? Promise.resolve(),
       (account) => notificationService.repository.removeAllDevices(account.userId)
     ]
   })
+  const roomPetService = isRoomPetEnabled(process.env)
+    ? createRoomPetService({ repository: createInMemoryRoomPetRepository(), report: reportRoomPetEvent })
+    : undefined
   const accountRecoveryService = createAccountRecoveryService({ authService })
   const safetyService = createSafetyService({
     isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
@@ -914,6 +934,7 @@ export function createConfiguredServerServices(
     capabilityService: createConfiguredCapabilityService(chatReceiptSchema),
     chatReceiptSchema,
     catTripService,
+    roomPetService,
     authService,
     chatService,
     economyService,
@@ -1117,5 +1138,10 @@ function isLoopbackHost(value: string): boolean {
 
 /** Counts and outcome codes only: never a user, a trip, a match or a pet name. */
 function reportCatTripEvent(event: string, fields: Record<string, number | string> = {}): void {
+  console.info(event, fields)
+}
+
+/** Counts and outcome codes only: never a user id, a room id or a pet name. */
+function reportRoomPetEvent(event: string, fields: Record<string, number | string> = {}): void {
   console.info(event, fields)
 }

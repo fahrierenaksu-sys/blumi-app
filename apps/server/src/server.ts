@@ -75,6 +75,8 @@ import { registerPersonalRoomDecorRoutes } from "./routes/personalRoomDecorRoute
 import { registerCatTripRoutes } from "./routes/catTripRoutes"
 import { createDisabledCatTripService } from "./catTrips/catTripWiring"
 import type { CatTripService } from "./catTrips/catTripService"
+import { registerRoomPetRoutes } from "./routes/roomPetRoutes"
+import type { RoomPetService } from "./roomPets/roomPetService"
 import {
   createCapabilityService,
   isCapabilityRolledOut,
@@ -161,6 +163,8 @@ interface CreateServerOptions {
   personalRoomDecorService?: PersonalRoomDecorService
   /** The traveling cat (BLUMI_CAT_TRIPS_ENABLED); default: disabled. */
   catTripService?: CatTripService
+  /** The room pet, only when BLUMI_ROOM_PET_ENABLED=1; absent means its routes do not exist. */
+  roomPetService?: RoomPetService
   roomSnapshotService?: RoomSnapshotService
   /** Push sender pictures; must be the instance the notification service links to. */
   notificationPortraits?: NotificationPortraitService
@@ -418,6 +422,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     await registerReferralRoutes(instance, routeServices)
     await registerPersonalRoomDecorRoutes(instance, routeServices)
     await registerCatTripRoutes(instance, routeServices)
+    if (options.roomPetService) {
+      await registerRoomPetRoutes(instance, { authService, roomPetService: options.roomPetService })
+    }
     await registerRoomSnapshotRoutes(instance, routeServices)
     await registerNotificationPortraitRoutes(instance, {
       notificationPortraits: options.notificationPortraits ?? createNotificationPortraitService({})

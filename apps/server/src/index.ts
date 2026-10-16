@@ -162,6 +162,7 @@ const app = createServer({
   accountRecoveryService: services.accountRecoveryService,
   personalRoomDecorService: services.personalRoomDecorService,
   catTripService: services.catTripService,
+  roomPetService: services.roomPetService,
   roomSnapshotService: services.roomSnapshotService,
   logger: config.nodeEnv !== "test",
   nodeEnv: config.nodeEnv,

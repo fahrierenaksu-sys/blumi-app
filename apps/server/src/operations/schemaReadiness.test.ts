@@ -46,7 +46,9 @@ test("only independently guarded additive features are optional for readiness", 
     // Only the beta reset script uses it, and that script refuses to apply without it.
     "076_beta_reset_runs.sql",
     // The cat trip service probes this ledger row and answers enabled:false until it is applied.
-    "077_cat_trips.sql"
+    "077_cat_trips.sql",
+    // The room pet service probes this ledger row; its routes answer 409 until it is applied.
+    "078_room_pets.sql"
   ])
 })
 
