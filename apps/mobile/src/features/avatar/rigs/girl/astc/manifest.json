@@ -86,9 +86,9 @@
     }
    ],
    "packed": {
-    "bytes": 5517012,
+    "bytes": 5511020,
     "encoding": "sparse-astc-v1",
-    "sha256": "680dd1ebb87a705c0ca67658810594bb819b6ac43ff64b23b46898ffb9fb9d1e"
+    "sha256": "d1b4bc81a7f0f10856e2aefaed239ea111ea5cb996d1af14ce93bf3d921ae63d"
    },
    "pages": [
     "back_page0.png",
@@ -116,10 +116,10 @@
     "back_page22.png",
     "back_page23.png"
    ],
-   "sha256": "7b4d16743348d0e3fa4c9f1d942093167dac67b9b06ccdfa9122f24190f090a8",
+   "sha256": "7df69c172a3a30ec9cbb8cd83cafa6a9f6c438e7bf233e70329c95ec27110324",
    "sourceSha256": {
     "back_page0.png": "069bae74ce5ae6e59bcc71fb8684d6301b55a99cac637a09e40e335d13bd3e97",
-    "back_page1.png": "e73b45f6b6ab9dfe4747d70545fc3592669f5b528ffb421ad92b82d00f8688ce",
+    "back_page1.png": "c03547a0a19a936cc73e8abee5ea7ad02fc7f3c9274e7f209b7eb9c5d04c281d",
     "back_page10.png": "1f88cca3e8f8422f37abafde6d358ad65d57e16f8f4d76437bbb6287ccb2a3d6",
     "back_page11.png": "47738ef7506104aa87f267ca8732d471282830e6e5cf78f13de8d486427d0cb5",
     "back_page12.png": "d78742f578144e96778faa62ad78887f50cd20b598ad332ca859aeedff2cec20",
@@ -136,11 +136,11 @@
     "back_page22.png": "8e76d57c62e7b4a20db6d20539e35fb9892b54fed0189a87c9b9dd0a6d47736d",
     "back_page23.png": "6ab385e2f643a55a13a9a1d1bd52e5ebb55a1880d2d5f21524b7aaaca4b0a760",
     "back_page3.png": "e78bcb473b0a66635ea640552622b0ace697b16cf02ebc6bfd23ff553308f570",
-    "back_page4.png": "62ca5359ed5bfa5c92b05835e73eb86901dec089a5735c6672c1aa4d0016e3a7",
+    "back_page4.png": "36d39531c36ef97c61261b1717cb97133899fad8f3f13305a814f4ace8cd48e9",
     "back_page5.png": "d7b4022a16c2213a52fa3cd7b89f1f017c65855b7a6f1278d8503623d060ce94",
     "back_page6.png": "59595b4d26a2f42673578c4e3b6dd57c99cb162557bdd1286b283546f1a0e02d",
     "back_page7.png": "f45b08dddcfbd6ea1555ac628a9f263f0ecd3e2e6ba310c98cb196153c8a2fbe",
-    "back_page8.png": "76848370fc241e65454df9e1e7996fcd15c07380e60e781833443e434719b219",
+    "back_page8.png": "384148dbe1fea2bf71b873fbe4d7c42366c7fa1ac3d613e8ceebadf5c02f4454",
     "back_page9.png": "d9e2779443aff213c68fb8e2ecd196779a7784966abcff1c4a16c6fcba8229d0"
    },
    "width": 1024
@@ -220,9 +220,9 @@
     }
    ],
    "packed": {
-    "bytes": 5451076,
+    "bytes": 5444436,
     "encoding": "sparse-astc-v1",
-    "sha256": "7b6afe9f34c0acb2724c57d1377957210a2b8eb012ac882be9bf1eb30affcb97"
+    "sha256": "cfff05d4bc154a660587f6115d1427c502782728ceb5209f8d2f1afba7378c75"
    },
    "pages": [
     "front_page0.png",
@@ -250,10 +250,10 @@
     "front_page22.png",
     "front_page23.png"
    ],
-   "sha256": "8002c326d614f219b09badb80523eda049cd73f8272a8b031165628ae4696cc7",
+   "sha256": "24a2a280207182010b3adbc3841bd5a94d3094616a40ab1b62350345d46a6852",
    "sourceSha256": {
     "front_page0.png": "cf141a6e3dd49404c4cdc9e580b5e7eb191b8270eebcce8954e035a597f01580",
-    "front_page1.png": "bcbe0609336450ef0fb362ade1eb5fb56cf9915b107c9083fbb728e4091aff5b",
+    "front_page1.png": "cf12283dc41844cc3b014fe80786f63148f6882bbf150dcd39117759030e0c2b",
     "front_page10.png": "487887fe7d11111314270d40a982e584863a3a4e150aa17938780231a356b922",
     "front_page11.png": "79db67b729d008067165bf9acf9bb245702beb0e8a53c2145f8367ebc6524683",
     "front_page12.png": "4d715681096bdf5ec9fc31264ce90576e0ec137d6e8de4dda2e3d8291a509640",
@@ -271,10 +271,10 @@
     "front_page23.png": "9cf33a61639cd6d5c1d6b6f8e2d758925ec61c86670e4ba11747daff416a48a2",
     "front_page3.png": "7c10d7d079dd8beee5432752829d19369779aa4177d3cec21e79a498c0bb5fb5",
     "front_page4.png": "678b4129dc3179dac95627739fea803d1568a79d16be067d4b1f12be3769ba9a",
-    "front_page5.png": "8e9b33987d54bfc0924117a995a8c8ac9bdab0679891ed7f4feca240fa81e568",
+    "front_page5.png": "b8407f671fe8deedd78abfd389214536c06c06dc865af9bdc494040566e9f189",
     "front_page6.png": "f6a242fe3a6ae96500283171ae3e5e5a4f776499b70d401c97117b68217d8638",
     "front_page7.png": "96d084c72eae546a1212c7d2f5360569a94938912e51cf0a5744a286f7ab04d3",
-    "front_page8.png": "2bcddf683e0ec378c2a1a4aa5e3b5110b0f5c20cacd8530f3ecddded9979a156",
+    "front_page8.png": "ab2eec4f572d136bb4b812fe193b74ee93a61bb9f41aef641845d646373eb200",
     "front_page9.png": "f3588e1f91e41f9c68b4ca0852bd8f23aa69f0bdcc314f3b2a6be4a0c5e90504"
    },
    "width": 1024
