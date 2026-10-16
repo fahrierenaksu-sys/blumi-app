@@ -67,3 +67,42 @@ test("with the feature on, the state is planned by the server and a stranger can
     await server.app.close()
   }
 })
+
+test("cat switches: own only, strict body, disabled while the feature is off", async () => {
+  const off = createAdversarialServer()
+  await off.app.ready()
+  try {
+    const ada = await off.createAccount("ada")
+    assert.equal((await off.call("GET", "/v1/cat/prefs")).statusCode, 401)
+    assert.deepEqual((await off.call("GET", "/v1/cat/prefs", { token: ada.sessionToken })).json(), { enabled: false })
+    const put = await off.call("PUT", "/v1/cat/prefs", { token: ada.sessionToken, payload: { travelEnabled: false } })
+    assert.equal(put.statusCode, 409)
+  } finally {
+    await off.app.close()
+  }
+
+  const catTripService = createCatTripService({
+    repository: createInMemoryCatTripRepository(), world: openWorld(), enabled: true, seedSecret: "route-test-secret"
+  })
+  const server = createAdversarialServer({ catTripService })
+  await server.app.ready()
+  try {
+    const ada = await server.createAccount("ada")
+    const bora = await server.createAccount("bora")
+    const defaults = await server.call("GET", "/v1/cat/prefs", { token: ada.sessionToken })
+    assert.deepEqual(defaults.json(), { enabled: true, prefs: { travelEnabled: true, hostEnabled: true, pushEnabled: false } })
+    for (const body of [{}, { travelEnabled: "no" }]) {
+      const bad = await server.call("PUT", "/v1/cat/prefs", { token: ada.sessionToken, payload: body })
+      assert.equal(bad.statusCode, 400, JSON.stringify(body))
+    }
+    // A smuggled user id is ignored: the switch is always the caller's own.
+    await server.call("PUT", "/v1/cat/prefs", { token: ada.sessionToken, payload: { userId: bora.userId, travelEnabled: false } })
+    const saved = await server.call("PUT", "/v1/cat/prefs", { token: ada.sessionToken, payload: { hostEnabled: false, pushEnabled: true } })
+    assert.equal(saved.statusCode, 200, saved.body)
+    assert.deepEqual(saved.json().prefs, { travelEnabled: false, hostEnabled: false, pushEnabled: true })
+    const boraPrefs = await server.call("GET", "/v1/cat/prefs", { token: bora.sessionToken })
+    assert.deepEqual(boraPrefs.json().prefs, { travelEnabled: true, hostEnabled: true, pushEnabled: false }, "another member is untouched")
+  } finally {
+    await server.app.close()
+  }
+})

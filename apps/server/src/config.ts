@@ -109,6 +109,8 @@ import {
 import { createNotificationDeliveryHooks } from "./notifications/notificationDeliveryContext"
 import { createInMemoryCatTripRepository } from "./catTrips/catTripRepository"
 import { createCatTripSchemaProbe } from "./catTrips/catTripSchema"
+import { createCatTripPrefsSchemaProbe, createCatTripPrefsStore } from "./catTrips/catTripPrefs"
+import { createPostgresCatTripPrefsRepository } from "./db/postgresCatTripPrefsRepository"
 import type { CatTripService } from "./catTrips/catTripService"
 import { createConfiguredCatTripService, resolveCatTripsConfig } from "./catTrips/catTripWiring"
 import { createPostgresCatTripRepository } from "./db/postgresCatTripRepository"
@@ -733,6 +735,7 @@ export function createConfiguredServerServices(
       config: resolveCatTripsConfig(process.env, config.nodeEnv),
       repository: createPostgresCatTripRepository(pool),
       schema: createCatTripSchemaProbe(pool),
+      prefs: createCatTripPrefsStore(createPostgresCatTripPrefsRepository(pool), createCatTripPrefsSchemaProbe(pool)),
       authService, chatService, matchService, safetyService, notificationService,
       catOwnership: createRoomCatOwnership(roomPetService),
       report: reportCatTripEvent

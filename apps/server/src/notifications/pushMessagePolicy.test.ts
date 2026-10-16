@@ -158,3 +158,27 @@ test("without a known sender the neutral copy is sent, and other types never tak
   assert.equal(like.data?.senderImage, undefined)
   assert.equal(like.delivery?.categoryId, undefined)
 })
+
+test("cat trip teasers name no one: no person, no cat name, no picture, only the trip id", () => {
+  for (const type of ["cat.trip_owner", "cat.trip_host"] as const) {
+    for (const locale of ["tr", "en"] as const) {
+      const copy = resolvePushCopy(type, locale)
+      assert.ok(copy, `${type} ${locale} has server copy`)
+      const outgoing = toOutgoingPushNotification({
+        userId: "user_recipient",
+        locale,
+        notification: {
+          ...copy!,
+          data: { type, tripId: "trip_1", ownerUserId: "user_owner", hostUserId: "user_host", name: "Ece", petName: "Pamuk" }
+        },
+        sender: { displayName: "Ece", imageUrl: "https://api.example.test/p", messageText: "Pamuk" }
+      })
+      assert.deepEqual([outgoing.title, outgoing.body], [copy!.title, copy!.body])
+      for (const leaked of ["Ece", "Pamuk", "user_owner", "user_host"]) {
+        assert.equal(JSON.stringify(outgoing).includes(leaked), false, `${type} ${locale} leaks ${leaked}`)
+      }
+      assert.deepEqual(Object.keys(outgoing.data ?? {}).sort(), ["recipientUserId", "tripId", "type"])
+      assert.equal(outgoing.delivery?.imageUrl, undefined)
+    }
+  }
+})

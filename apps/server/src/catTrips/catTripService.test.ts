@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { createCatTripPrefsStore, createInMemoryCatTripPrefsRepository, DEFAULT_CAT_TRIP_PREFS, type CatTripPrefsStore } from "./catTripPrefs"
 import { createInMemoryCatTripRepository } from "./catTripRepository"
 import { createCatTripService, type CatTripServiceOptions, type CatTripWorld } from "./catTripService"
 import { CAT_PUSHES_PER_DAY, CAT_TRIPS_PER_DAY, type CatTripRecord } from "./catTripTypes"
@@ -226,7 +227,7 @@ test("a stranger cannot reveal or learn about someone else's trip", async () => 
 })
 
 test("teaser pushes name no one, respect quiet hours and never exceed the daily cap", async () => {
-  const h = harness({}, { "host-a": 9 })
+  const h = harness({ prefs: everyoneOptedIn() }, { "host-a": 9 })
   h.world.quietHours = { startMinute: 22 * 60, endMinute: 8 * 60 }
   // Several owners all send their cat to the same host on the same day.
   for (let index = 0; index < 8; index += 1) await h.service.getState(`owner-${index}`)
@@ -267,4 +268,94 @@ test("retention and account erasure run with the flag off, and stop without the 
   const missingTables = harness({ schema: { isReady: async () => false } })
   assert.equal(await missingTables.service.deleteUserData(OWNER), 0)
   assert.equal(await missingTables.service.purgeExpired(), 0)
+})
+
+/** A switch store where every member chose "Kedi haberleri" (teasers are opt-in). */
+function everyoneOptedIn(): CatTripPrefsStore {
+  return {
+    async read() { return { ...DEFAULT_CAT_TRIP_PREFS, pushEnabled: true } },
+    async write() { return null },
+    async deleteUser() { return 0 }
+  }
+}
+
+async function storeWith(rows: Record<string, Partial<typeof DEFAULT_CAT_TRIP_PREFS>> = {}): Promise<CatTripPrefsStore> {
+  const store = createCatTripPrefsStore(createInMemoryCatTripPrefsRepository())
+  for (const [userId, patch] of Object.entries(rows)) await store.write(userId, patch, new Date(START).toISOString())
+  return store
+}
+
+/** The time of the first trip's middle, when the cat is away. */
+async function firstTripMidpoint(h: Harness): Promise<{ trip: CatTripRecord; atMs: number }> {
+  await h.service.getState(OWNER)
+  const [trip] = await h.trips()
+  assert.ok(trip, "a trip was planned")
+  return { trip, atMs: (Date.parse(trip.startsAt) + Date.parse(trip.endsAt)) / 2 }
+}
+
+test("teaser pushes are off until the member turns cat news on", async () => {
+  const h = harness({ prefs: await storeWith() })
+  await h.service.getState(OWNER)
+  assert.ok((await h.trips()).length > 0, "the cat still travels")
+  assert.deepEqual(h.world.teasers, [], "no push without the opt-in")
+  assert.ok(h.events.includes("cat_push_dropped"))
+
+  const optedIn = harness({ prefs: await storeWith({ [OWNER]: { pushEnabled: true } }) })
+  await optedIn.service.getState(OWNER)
+  assert.ok(optedIn.world.teasers.some((teaser) => teaser.userId === OWNER && teaser.role === "owner"))
+  assert.ok(optedIn.world.teasers.every((teaser) => teaser.userId === OWNER), "hosts did not opt in")
+})
+
+test("a queued teaser is dropped at send time once the member turned cat news off", async () => {
+  const prefs = await storeWith({ [OWNER]: { pushEnabled: true } })
+  const h = harness({ prefs })
+  const { trip, atMs } = await firstTripMidpoint(h)
+  h.setNow(atMs)
+  assert.equal(await h.service.isTeaserCurrent(OWNER, trip.tripId, "owner"), true)
+  await h.service.updatePrefs(OWNER, { pushEnabled: false })
+  assert.equal(await h.service.isTeaserCurrent(OWNER, trip.tripId, "owner"), false)
+})
+
+test("an owner who turns travel off plans no trips, and a cat that is away comes home", async () => {
+  const off = harness({ prefs: await storeWith({ [OWNER]: { travelEnabled: false } }) })
+  await off.service.getState(OWNER)
+  assert.deepEqual(await off.trips(), [])
+
+  const h = harness({ prefs: await storeWith() })
+  const { trip, atMs } = await firstTripMidpoint(h)
+  h.setNow(atMs)
+  const result = await h.service.updatePrefs(OWNER, { travelEnabled: false })
+  assert.deepEqual(result, { outcome: "saved", prefs: { travelEnabled: false, hostEnabled: true, pushEnabled: false } })
+  assert.equal((await h.repository.findTrip(trip.tripId))?.status, "cancelled")
+  const state = await h.service.getState(OWNER)
+  assert.ok(state.enabled && state.currentTrip === null, "the cat is home")
+})
+
+test("a host who refuses guests is never picked, and a guest that is there leaves", async () => {
+  const refusing = harness({ prefs: await storeWith({ "host-a": { hostEnabled: false } }) })
+  for (let day = 0; day < 5; day += 1) {
+    refusing.setNow(START + day * 24 * 60 * 60_000)
+    await refusing.service.getState(OWNER)
+  }
+  const hosts = new Set((await refusing.trips()).map((trip) => trip.hostUserId))
+  assert.ok(hosts.size > 0 && !hosts.has("host-a"), "only host-b receives the cat")
+
+  const h = harness({ prefs: await storeWith() })
+  const { trip, atMs } = await firstTripMidpoint(h)
+  h.setNow(atMs)
+  assert.equal((await h.service.listGuests(trip.hostUserId)).enabled, true)
+  await h.service.updatePrefs(trip.hostUserId, { hostEnabled: false })
+  assert.deepEqual(await h.service.listGuests(trip.hostUserId), { enabled: true, guests: [] })
+})
+
+test("switches answer disabled with the flag off and cannot be saved before migration 079", async () => {
+  const off = harness({ enabled: false })
+  assert.deepEqual(await off.service.getPrefs(OWNER), { enabled: false })
+  assert.deepEqual(await off.service.updatePrefs(OWNER, { travelEnabled: false }), { outcome: "disabled" })
+
+  const noTable = harness({ prefs: createCatTripPrefsStore(createInMemoryCatTripPrefsRepository(), { isReady: async () => false }) })
+  assert.deepEqual(await noTable.service.getPrefs(OWNER), { enabled: true, prefs: { ...DEFAULT_CAT_TRIP_PREFS } })
+  assert.deepEqual(await noTable.service.updatePrefs(OWNER, { pushEnabled: true }), { outcome: "unavailable" })
+  await noTable.service.getState(OWNER)
+  assert.deepEqual(noTable.world.teasers, [], "defaults keep teasers off")
 })

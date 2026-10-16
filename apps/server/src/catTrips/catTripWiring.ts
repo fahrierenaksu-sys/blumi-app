@@ -4,6 +4,7 @@ import type { MatchService } from "../matches/matchService"
 import type { NotificationService } from "../notifications/notificationService"
 import type { SafetyService } from "../safety/safetyService"
 import type { RoomCatOwnership } from "../roomPets/roomPetService"
+import type { CatTripPrefsStore } from "./catTripPrefs"
 import type { CatTripRepository } from "./catTripRepository"
 import type { CatTripSchemaProbe } from "./catTripSchema"
 import { createCatTripService, type CatTripService, type CatTripWorld } from "./catTripService"
@@ -36,6 +37,8 @@ export function resolveCatTripsConfig(env: NodeJS.ProcessEnv, nodeEnv: string): 
 export function createDisabledCatTripService(): CatTripService {
   return {
     async isEnabled() { return false },
+    async getPrefs() { return { enabled: false } },
+    async updatePrefs() { return { outcome: "disabled" } },
     async getState() { return { enabled: false } },
     async getCurrentTrip() { return { enabled: false } },
     async listGuests() { return { enabled: false } },
@@ -72,6 +75,8 @@ export function createConfiguredCatTripService(input: {
   notificationService: NotificationService
   /** The room pet record; see createCatTripCatCheck. */
   catOwnership: RoomCatOwnership
+  /** The members' switches (migration 079); in-memory when omitted. */
+  prefs?: CatTripPrefsStore
   report?: (event: string, fields?: Record<string, number | string>) => void
 }): CatTripService {
   const { authService, chatService, matchService, safetyService, notificationService } = input
@@ -108,6 +113,7 @@ export function createConfiguredCatTripService(input: {
     enabled: input.config.enabled,
     seedSecret: input.config.seedSecret,
     schema: input.schema,
+    ...(input.prefs ? { prefs: input.prefs } : {}),
     report: input.report
   })
 }

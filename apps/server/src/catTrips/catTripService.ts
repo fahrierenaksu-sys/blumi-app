@@ -9,6 +9,14 @@ import {
   planTripWindows,
   pushJitterMs
 } from "./catTripPlanner"
+import {
+  createCatTripPrefsStore,
+  createInMemoryCatTripPrefsRepository,
+  pickPrefs,
+  type CatTripPrefs,
+  type CatTripPrefsPatch,
+  type CatTripPrefsStore
+} from "./catTripPrefs"
 import type { CatTripRepository, NewCatTrip } from "./catTripRepository"
 import { createCatTripSeed, type CatTripSeed } from "./catTripSeed"
 import {
@@ -68,7 +76,15 @@ export interface CatTripServiceOptions {
   createId?: () => string
   /** Counts and outcome codes only. */
   report?: (event: string, fields?: Record<string, number | string>) => void
+  /** The members' own switches (migration 079). Default: an in-memory store. */
+  prefs?: CatTripPrefsStore
 }
+
+export type CatPrefsResult = { enabled: false } | { enabled: true; prefs: CatTripPrefs }
+export type CatPrefsUpdateResult =
+  | { outcome: "disabled" }
+  | { outcome: "unavailable" }
+  | { outcome: "saved"; prefs: CatTripPrefs }
 
 export interface CatSouvenirView { key: string; rarity: CatSouvenirRarity }
 
@@ -115,6 +131,9 @@ export type CatRevealResult =
 
 export interface CatTripService {
   isEnabled(): Promise<boolean>
+  getPrefs(userId: string): Promise<CatPrefsResult>
+  /** Turning travel or hosting off sends any cat that is away right now home. */
+  updatePrefs(userId: string, patch: CatTripPrefsPatch): Promise<CatPrefsUpdateResult>
   getState(userId: string): Promise<CatStateResult>
   getCurrentTrip(userId: string): Promise<{ enabled: false } | { enabled: true; currentTrip: CatOwnerTripView | null }>
   listGuests(userId: string): Promise<{ enabled: false } | { enabled: true; guests: CatGuestView[] }>
@@ -134,6 +153,7 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
   const now = options.now ?? (() => new Date())
   const createId = options.createId ?? (() => `cat_${randomUUID()}`)
   const report = options.report ?? (() => undefined)
+  const prefs = options.prefs ?? createCatTripPrefsStore(createInMemoryCatTripPrefsRepository())
   /** Days this process knows are planned, so a read costs no query. */
   const plannedDays = new Set<string>()
 
@@ -159,6 +179,8 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
     if (!(await world.isUserActive(ownerUserId, at)) || !(await world.isUserActive(hostUserId, at))) return "account"
     if (!(await world.isMutualMatch(ownerUserId, hostUserId))) return "unmatch"
     if (!(await world.hasCat(ownerUserId)) || !(await world.hasCat(hostUserId))) return "ineligible"
+    // The owner turned travel off, or the host turned guests off: silently not eligible.
+    if (!(await prefs.read(ownerUserId)).travelEnabled || !(await prefs.read(hostUserId)).hostEnabled) return "ineligible"
     return null
   }
 
@@ -183,6 +205,8 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
       return
     }
     if (!(await world.isUserActive(ownerUserId, at)) || !(await world.hasCat(ownerUserId))) return
+    // Travel off: nothing is planned, so turning it back on later today still plans the day.
+    if (!(await prefs.read(ownerUserId)).travelEnabled) return
 
     const seed = createCatTripSeed(options.seedSecret, ownerUserId, dayKey)
     const dayStartMs = clock.dayStartMs(dayKey)
@@ -238,6 +262,10 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
     ]
     for (const side of sides) {
       try {
+        if (!(await prefs.read(side.userId)).pushEnabled) {
+          report("cat_push_dropped", { reason: "opted_out" })
+          continue
+        }
         const { clock, settings } = await clockFor(side.userId)
         const deferred = deferPastQuietHours(side.wantedMs, settings.quietHours, clock.minuteOfDay)
         if (deferred >= side.mustBeBeforeMs || deferred < at.getTime() - STALE_TEASER_MS) {
@@ -317,6 +345,25 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
 
   return {
     isEnabled: isReady,
+
+    async getPrefs(userId) {
+      if (!(await isReady())) return { enabled: false }
+      return { enabled: true, prefs: await prefs.read(userId) }
+    },
+
+    async updatePrefs(userId, patch) {
+      if (!(await isReady())) return { outcome: "disabled" }
+      const at = now()
+      const saved = await prefs.write(userId, pickPrefs(patch), at.toISOString())
+      if (!saved) return { outcome: "unavailable" }
+      if (!saved.travelEnabled || !saved.hostEnabled) {
+        // Revalidating ends every trip the new switch no longer allows.
+        const owned = saved.travelEnabled ? [] : await repository.listOwnerTrips(userId, at.toISOString())
+        const hosted = saved.hostEnabled ? [] : await repository.listHostTrips(userId, at.toISOString())
+        for (const trip of [...owned, ...hosted]) await revalidate(trip, at)
+      }
+      return { outcome: "saved", prefs: saved }
+    },
 
     async getState(userId) {
       if (!(await isReady())) return { enabled: false }
@@ -398,6 +445,8 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
       const found = await repository.findTrip(tripId)
       const party = role === "owner" ? found?.ownerUserId : found?.hostUserId
       if (!found || party !== userId) return false
+      // Checked again at send time: the member may have turned cat news off since.
+      if (!(await prefs.read(userId)).pushEnabled) return false
       const at = now()
       const trip = await revalidate(found, at)
       const phase = deriveCatTripPhase(trip, at.getTime())
@@ -419,7 +468,8 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
 
     async deleteUserData(userId) {
       if (!(await tablesExist())) return 0
-      return repository.deleteUserData(userId)
+      const removed = await repository.deleteUserData(userId)
+      return removed + await prefs.deleteUser(userId)
     }
   }
 }

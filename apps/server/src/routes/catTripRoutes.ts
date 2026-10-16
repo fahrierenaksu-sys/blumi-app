@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify"
 import { authenticatedErrorResponses, successResponseJsonSchema } from "@blumi/contracts"
 import type { AuthService } from "../auth/authService"
+import type { CatTripPrefsPatch } from "../catTrips/catTripPrefs"
 import type { CatTripService } from "../catTrips/catTripService"
 import { resolveProductSession, schemaValidationFailed } from "./routeHelpers"
 
@@ -46,6 +47,50 @@ export async function registerCatTripRoutes(
     return catTripService.listGuests(resolved.account.userId)
   })
 
+  app.get("/v1/cat/prefs", {
+    config: { rateLimit: READ_LIMIT },
+    schema: { response: { 200: successResponseJsonSchema, ...authenticatedErrorResponses } }
+  }, async (request, reply) => {
+    const resolved = await resolveProductSession({ request, reply, authService })
+    if (!resolved) return
+    return catTripService.getPrefs(resolved.account.userId)
+  })
+
+  app.put("/v1/cat/prefs", {
+    attachValidation: true,
+    config: { requestValidation: "enforced", rateLimit: ACK_LIMIT },
+    schema: {
+      body: {
+        type: "object",
+        minProperties: 1,
+        properties: {
+          travelEnabled: { type: "boolean" },
+          hostEnabled: { type: "boolean" },
+          pushEnabled: { type: "boolean" }
+        },
+        additionalProperties: false
+      },
+      response: { 200: successResponseJsonSchema, ...authenticatedErrorResponses }
+    }
+  }, async (request, reply) => {
+    const resolved = await resolveProductSession({ request, reply, authService })
+    if (!resolved) return
+    const body = request.body as Record<string, unknown> | undefined
+    const patch = readPrefsPatch(body)
+    if (!patch || schemaValidationFailed(request)) {
+      return reply.code(400).send({ error: "Choose a setting first." })
+    }
+    const result = await catTripService.updatePrefs(resolved.account.userId, patch)
+    switch (result.outcome) {
+      case "disabled":
+        return reply.code(409).send({ code: "CAT_TRIPS_DISABLED", error: "This is not available yet." })
+      case "unavailable":
+        return reply.code(409).send({ code: "CAT_PREFS_UNAVAILABLE", error: "This setting is not available yet." })
+      case "saved":
+        return { enabled: true, prefs: result.prefs }
+    }
+  })
+
   app.post("/v1/cat/trips/:tripId/reveal-ack", {
     attachValidation: true,
     config: { requestValidation: "enforced", rateLimit: ACK_LIMIT },
@@ -77,4 +122,19 @@ export async function registerCatTripRoutes(
         return { tripId: result.tripId, role: result.role, counterpartUserId: result.counterpartUserId }
     }
   })
+}
+
+/** Only the three known switches, each a boolean; null when none is given or any is malformed. */
+function readPrefsPatch(body: Record<string, unknown> | undefined): CatTripPrefsPatch | null {
+  if (!body || typeof body !== "object") return null
+  const keys = Object.keys(body)
+  if (keys.length === 0) return null
+  const patch: CatTripPrefsPatch = {}
+  for (const key of keys) {
+    const value = body[key]
+    if (key !== "travelEnabled" && key !== "hostEnabled" && key !== "pushEnabled") return null
+    if (typeof value !== "boolean") return null
+    patch[key] = value
+  }
+  return patch
 }

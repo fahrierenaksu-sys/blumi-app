@@ -718,8 +718,10 @@ function resolveNotificationPolicy(
       return policyFor("message", eventKey("lobby-invite", notification.data?.inviteId), queuedAt)
     case "connection.matched":
       return policyFor("match", eventKey("connection", notification.data?.miniRoomId), queuedAt)
-    // One teaser per trip and side. Shares the matches preference until a
-    // dedicated, default-off cat bucket exists (needs a notification_type migration).
+    // One teaser per trip and side. Its own opt-in ("Kedi haberleri",
+    // push_enabled, default off, migration 079) is checked by the cat trip
+    // service when it queues and again at send time; the policy row stays
+    // "match" so the notification_type CHECKs (036) need no change.
     case "cat.trip_owner":
     case "cat.trip_host":
       return policyFor("match", eventKey(type, notification.data?.tripId), queuedAt)

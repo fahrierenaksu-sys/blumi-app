@@ -69,6 +69,8 @@ const ROUTE_MATRIX: Record<string, RouteEntry> = {
   "PUT /v1/users/me/room-decor": { auth: "bearer", ids: "-", crossAccount: "caller only" },
   "GET /v1/cat/state": { auth: "bearer", ids: "-", crossAccount: "caller only (the destination stays hidden while the cat is away)" },
   "GET /v1/cat/trip/current": { auth: "bearer", ids: "-", crossAccount: "caller only" },
+  "GET /v1/cat/prefs": { auth: "bearer", ids: "-", crossAccount: "caller's own switches only" },
+  "PUT /v1/cat/prefs": { auth: "bearer", ids: "-", crossAccount: "caller's own switches only (body has no user id)" },
   "GET /v1/cat/guests": { auth: "bearer", ids: "-", crossAccount: "caller's hosted trips only; the owner is hidden until the host taps" },
   "POST /v1/cat/trips/:tripId/reveal-ack": { auth: "bearer", ids: "path tripId", crossAccount: "a stranger gets 404 (catTripRoutes.test)" },
   "GET /v1/users/me/pet": { auth: "bearer", ids: "-", crossAccount: "caller only (roomPetRoutes.test)" },
