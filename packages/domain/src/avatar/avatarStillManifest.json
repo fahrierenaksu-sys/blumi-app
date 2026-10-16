@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "7d062deb3ea7cec52a2b79595d570f9407ae29c9599cedd06c6cf5e2a5fe0875",
+      "rigSha256": "0fc2a62385c1393abb0b7643f714cf22ec3d49d0b3eb8d35266038539f8d0464",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -558,6 +558,11 @@
           "slot": "accessory",
           "rigItemId": "necklace_girl_pearl_drop",
           "thumb": "necklace_girl_pearl_drop"
+        },
+        "bag_girl_camel_mini": {
+          "slot": "accessory",
+          "rigItemId": "bag_girl_camel_mini",
+          "thumb": "bag_girl_camel_mini"
         }
       },
       "layers": {
@@ -1554,6 +1559,19 @@
             ]
           },
           {
+            "key": "bag_girl_camel_mini__o3p7",
+            "owner": "bag_girl_camel_mini",
+            "slot": "accessory",
+            "order": 3.7,
+            "seq": 7000,
+            "rect": [
+              344,
+              282,
+              94,
+              352
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -2413,6 +2431,19 @@
               153,
               41,
               33
+            ]
+          },
+          {
+            "key": "bag_girl_camel_mini__o3p7",
+            "owner": "bag_girl_camel_mini",
+            "slot": "accessory",
+            "order": 3.7,
+            "seq": 7000,
+            "rect": [
+              148,
+              161,
+              36,
+              95
             ]
           },
           {
