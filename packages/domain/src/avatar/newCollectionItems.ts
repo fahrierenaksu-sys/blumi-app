@@ -11,7 +11,8 @@
  * Prices: the economy v1 lead prices (Workbench economy_2025/LEAD/PRICES.tsv), set by the lead under the owner's
  * delegation of the whole economy (OWNER_DECISIONS 2026-10-16 20:23 and 20:39). 16 of them differ from the earlier
  * owner-seen proposals (economy_0910 PRICES_TR, sheet_2110); the owner can still change any of them on the approval
- * page before the receipts land. `isPriceOwnerApproved` is unchanged by that repricing.
+ * page before the receipts land. `isPriceOwnerApproved` is true only while a piece's price still equals the figure the
+ * owner approved for it himself (`OWNER_APPROVED_PRICE_COINS`); a lead-set price is never shown as owner-approved.
  * `nameTr` fits the wardrobe card's two 13-character lines; `sheetNameTr` is the longer name shown on the owner sheet.
  */
 export type NewCollectionSlot = "hair" | "top" | "bottom" | "shoes" | "dress" | "accessory"
@@ -31,8 +32,44 @@ export interface NewCollectionItem {
 const GIRL = "avatar_v2_body_default" as const
 const BOY = "avatar_v2_body_male_light" as const
 
+/**
+ * The prices the owner approved one by one: the ten dresses on 2026-10-15 21:35 (sheet_2110) and the other pieces on
+ * 2026-10-16 09:09 (export_2320/REPORT.md). The lead set every other figure, and a repricing ends the approval, so a
+ * piece is owner-approved only while its price equals the figure here. Never add a row the owner has not approved.
+ */
+export const OWNER_APPROVED_PRICE_COINS: Readonly<Record<string, number>> = Object.freeze({
+  dress_girl_butter_square_puff_mini: 220,
+  dress_girl_denim_pinafore_mini: 220,
+  dress_girl_sage_shirred_tiered_mini: 220,
+  dress_girl_wine_gingham_tie: 360,
+  dress_girl_black_corset_flare_mini: 360,
+  dress_girl_cream_one_shoulder_mini: 360,
+  dress_girl_cream_one_shoulder_tie_midi: 360,
+  dress_girl_denim_milkmaid_button_midi: 360,
+  dress_girl_black_corset_slit_maxi: 520,
+  dress_girl_terracotta_patchwork_halter_bias_maxi: 520,
+  jacket_girl_black_crop_blazer: 320,
+  jacket_girl_light_denim_crop: 200,
+  glasses_girl_gold_round: 150,
+  glasses_girl_rose_soft_cateye: 150,
+  glasses_boy_black_soft_rect: 80,
+  glasses_boy_gunmetal_round: 150,
+  hair_girl_bun_wine_bow: 300,
+  hair_girl_caramel_braid_crown: 450,
+  hair_girl_ink_twin_braids: 300,
+  hair_girl_chestnut_butterfly: 300,
+  hair_girl_copper_soft_waves: 300,
+  hair_girl_ink_french_bob: 150,
+  necklace_girl_pearl_drop: 150,
+  bag_girl_camel_mini: 250,
+  clip_girl_pearl_bar_pair: 80,
+})
+
+const isOwnerApprovedPrice = (itemId: string, priceCoins: number): boolean =>
+  OWNER_APPROVED_PRICE_COINS[itemId] === priceCoins
+
 const dress = (itemId: string, nameTr: string, sheetNameTr: string, priceCoins: number): NewCollectionItem =>
-  ({ itemId, slot: "dress", bodyId: GIRL, nameTr, sheetNameTr, priceCoins, isPriceOwnerApproved: true })
+  ({ itemId, slot: "dress", bodyId: GIRL, nameTr, sheetNameTr, priceCoins, isPriceOwnerApproved: isOwnerApprovedPrice(itemId, priceCoins) })
 
 const piece = (
   itemId: string,
@@ -47,7 +84,7 @@ const piece = (
   bodyId: extra.bodyId ?? GIRL,
   nameTr,
   priceCoins,
-  isPriceOwnerApproved: true,
+  isPriceOwnerApproved: isOwnerApprovedPrice(itemId, priceCoins),
 })
 
 export const NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze([

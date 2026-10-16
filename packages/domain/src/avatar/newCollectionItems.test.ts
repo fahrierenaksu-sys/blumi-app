@@ -1,7 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { AVATAR_LOADOUT_CATALOG } from "./avatarLoadoutCatalog"
-import { NEW_COLLECTION_ITEMS, NEW_COLLECTION_ITEM_IDS, NEW_COLLECTION_LANDED_ITEM_IDS } from "./newCollectionItems"
+import {
+  NEW_COLLECTION_ITEMS,
+  NEW_COLLECTION_ITEM_IDS,
+  NEW_COLLECTION_LANDED_ITEM_IDS,
+  OWNER_APPROVED_PRICE_COINS
+} from "./newCollectionItems"
 import { isRetiredAvatarItemId } from "./retiredAvatarItems"
 import { ECONOMY_CATALOG, getDefaultOwnedItemIds } from "../economy/economyCatalog"
 import {
@@ -66,5 +71,17 @@ test("every new collection Turkish name fits the wardrobe card's two lines", () 
     const lines = wrapName(item.nameTr)
     assert.ok(lines.length <= 2 && lines.every((line) => line.length <= WARDROBE_NAME_LINE_CHARS),
       `${item.itemId}: "${item.nameTr}" does not fit two card lines`)
+  }
+})
+
+test("a new collection price is marked owner-approved only while it equals the figure the owner approved", () => {
+  assert.ok(NEW_COLLECTION_ITEMS.length > 0, "the guard scanned the collection")
+  for (const itemId of Object.keys(OWNER_APPROVED_PRICE_COINS)) {
+    assert.ok(NEW_COLLECTION_ITEM_IDS.includes(itemId), `${itemId}: an owner approval names a declared piece`)
+  }
+  for (const item of NEW_COLLECTION_ITEMS) {
+    const approved = OWNER_APPROVED_PRICE_COINS[item.itemId]
+    assert.equal(item.isPriceOwnerApproved, approved === item.priceCoins,
+      `${item.itemId}: ${item.priceCoins} coins is ${approved === undefined ? "lead-set" : `owner-approved at ${approved}`}`)
   }
 })
