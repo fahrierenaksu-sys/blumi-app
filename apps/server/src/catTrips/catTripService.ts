@@ -119,6 +119,8 @@ export interface CatTripService {
   getCurrentTrip(userId: string): Promise<{ enabled: false } | { enabled: true; currentTrip: CatOwnerTripView | null }>
   listGuests(userId: string): Promise<{ enabled: false } | { enabled: true; guests: CatGuestView[] }>
   acknowledgeReveal(userId: string, tripId: string): Promise<CatRevealResult>
+  /** Right before a queued teaser goes out: is the trip it announces still on? */
+  isTeaserCurrent(userId: string, tripId: string, role: CatTripRole): Promise<boolean>
   /** Block, unmatch or removal: the cat comes home at once. Safe to call when the feature is off. */
   endTripsBetween(userAId: string, userBId: string, reason: CatTripEndReason): Promise<number>
   purgeExpired(): Promise<number>
@@ -381,6 +383,18 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
       if (await pairProblem(trip.ownerUserId, trip.hostUserId, at) !== null) return { outcome: "not_found" }
       await repository.markRevealed({ tripId, role, at: at.toISOString() })
       return { outcome: "revealed", tripId, role, counterpartUserId }
+    },
+
+    async isTeaserCurrent(userId, tripId, role) {
+      if (!(await isReady())) return false
+      const found = await repository.findTrip(tripId)
+      const party = role === "owner" ? found?.ownerUserId : found?.hostUserId
+      if (!found || party !== userId) return false
+      const at = now()
+      const trip = await revalidate(found, at)
+      const phase = deriveCatTripPhase(trip, at.getTime())
+      // The guest is announced only while the cat is there; the owner's note only for a trip that happened.
+      return role === "host" ? phase === "away" : phase === "home" || phase === "away"
     },
 
     async endTripsBetween(userAId, userBId, reason) {
