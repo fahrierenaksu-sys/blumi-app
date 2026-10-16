@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "b2fef6fa193190fd207fc8ba625d96df7313f7a50e8fd88c070c2f28b66fd7c1",
+      "rigSha256": "ad0f15c6c04a4bd9876afe9017b8e08298ac581deedae40e89526e991ca134d0",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -408,6 +408,11 @@
           "rigItemId": "jacket_girl_black_crop_blazer",
           "thumb": "jacket_girl_black_crop_blazer"
         },
+        "top_girl_camel_vest_tee": {
+          "slot": "top",
+          "rigItemId": "top_girl_camel_vest_tee",
+          "thumb": "top_girl_camel_vest_tee"
+        },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
@@ -631,6 +636,19 @@
               311,
               112,
               218
+            ]
+          },
+          {
+            "key": "top_girl_camel_vest_tee__o0p45",
+            "owner": "top_girl_camel_vest_tee",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              202,
+              309,
+              51,
+              77
             ]
           },
           {
@@ -1350,6 +1368,19 @@
             ]
           },
           {
+            "key": "top_girl_camel_vest_tee__o3p45",
+            "owner": "top_girl_camel_vest_tee",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              219,
+              256,
+              175,
+              255
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1584,6 +1615,19 @@
               111,
               255
             ]
+          },
+          {
+            "key": "top_girl_camel_vest_tee__o5p45",
+            "owner": "top_girl_camel_vest_tee",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              364,
+              287,
+              64,
+              108
+            ]
           }
         ],
         "bust": [
@@ -1691,6 +1735,19 @@
               179,
               54,
               77
+            ]
+          },
+          {
+            "key": "top_girl_camel_vest_tee__o0p45",
+            "owner": "top_girl_camel_vest_tee",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              61,
+              178,
+              36,
+              52
             ]
           },
           {
@@ -1978,6 +2035,19 @@
             ]
           },
           {
+            "key": "top_girl_camel_vest_tee__o3p45",
+            "owner": "top_girl_camel_vest_tee",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              71,
+              145,
+              104,
+              111
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -2211,6 +2281,19 @@
               164,
               56,
               92
+            ]
+          },
+          {
+            "key": "top_girl_camel_vest_tee__o5p45",
+            "owner": "top_girl_camel_vest_tee",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              160,
+              165,
+              44,
+              70
             ]
           }
         ]

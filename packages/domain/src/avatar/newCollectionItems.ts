@@ -101,6 +101,7 @@ export const NEW_COLLECTION_LANDED_ITEM_IDS: ReadonlySet<string> = new Set<strin
   "hair_girl_ink_french_bob",
   "jacket_girl_black_crop_blazer",
   "jacket_girl_light_denim_crop",
+  "top_girl_camel_vest_tee",
 ])
 
 export const LANDED_NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze(
