@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "0b579104cf4f8b620f19fc5b49298bb482a5c7a004e73ab2ca7ea8c3ca500ce5",
+      "rigSha256": "c2745c0d7ad4eb88915ded3da0080c4fd96324300a8b93d0b85896dbdf93bf43",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -398,6 +398,11 @@
             }
           }
         },
+        "jacket_girl_light_denim_crop": {
+          "slot": "top",
+          "rigItemId": "jacket_girl_light_denim_crop",
+          "thumb": "jacket_girl_light_denim_crop"
+        },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
@@ -575,6 +580,19 @@
               275,
               65,
               167
+            ]
+          },
+          {
+            "key": "jacket_girl_light_denim_crop__o0p45",
+            "owner": "jacket_girl_light_denim_crop",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              165,
+              307,
+              93,
+              180
             ]
           },
           {
@@ -1229,6 +1247,19 @@
             ]
           },
           {
+            "key": "jacket_girl_light_denim_crop__o3p45",
+            "owner": "jacket_girl_light_denim_crop",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              218,
+              253,
+              183,
+              239
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1385,6 +1416,19 @@
               22,
               33
             ]
+          },
+          {
+            "key": "jacket_girl_light_denim_crop__o5p45",
+            "owner": "jacket_girl_light_denim_crop",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              364,
+              284,
+              97,
+              220
+            ]
           }
         ],
         "bust": [
@@ -1466,6 +1510,19 @@
               160,
               44,
               96
+            ]
+          },
+          {
+            "key": "jacket_girl_light_denim_crop__o0p45",
+            "owner": "jacket_girl_light_denim_crop",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              48,
+              180,
+              52,
+              76
             ]
           },
           {
@@ -1688,6 +1745,19 @@
             ]
           },
           {
+            "key": "jacket_girl_light_denim_crop__o3p45",
+            "owner": "jacket_girl_light_denim_crop",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              71,
+              147,
+              113,
+              109
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1843,6 +1913,19 @@
               162,
               18,
               25
+            ]
+          },
+          {
+            "key": "jacket_girl_light_denim_crop__o5p45",
+            "owner": "jacket_girl_light_denim_crop",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              160,
+              165,
+              53,
+              91
             ]
           }
         ]

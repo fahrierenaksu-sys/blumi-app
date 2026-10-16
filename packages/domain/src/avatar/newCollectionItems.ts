@@ -83,7 +83,9 @@ export const NEW_COLLECTION_ITEM_IDS: readonly string[] = Object.freeze(NEW_COLL
  * economy and mobile catalogs, so every catalog ID stays drawable. The import script adds an ID here in the same commit
  * as its art; the release catalog hold stays until the lead lands the owner's receipt.
  */
-export const NEW_COLLECTION_LANDED_ITEM_IDS: ReadonlySet<string> = new Set<string>([])
+export const NEW_COLLECTION_LANDED_ITEM_IDS: ReadonlySet<string> = new Set<string>([
+  "jacket_girl_light_denim_crop",
+])
 
 export const LANDED_NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze(
   NEW_COLLECTION_ITEMS.filter((item) => NEW_COLLECTION_LANDED_ITEM_IDS.has(item.itemId)),
