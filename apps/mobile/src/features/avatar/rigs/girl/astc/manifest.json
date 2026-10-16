@@ -13,63 +13,63 @@
  "sets": {
   "back": {
    "file": "back.astc-packed.zip",
-   "fileBytes": 52966656,
-   "gpuBytes": 52966656,
-   "height": 1616,
+   "fileBytes": 60303360,
+   "gpuBytes": 60303360,
+   "height": 1840,
    "layers": 24,
    "levels": [
     {
-     "bh": 404,
+     "bh": 460,
      "bw": 256,
-     "h": 1616,
+     "h": 1840,
      "w": 1024
     },
     {
-     "bh": 202,
+     "bh": 230,
      "bw": 128,
-     "h": 808,
+     "h": 920,
      "w": 512
     },
     {
-     "bh": 101,
+     "bh": 115,
      "bw": 64,
-     "h": 404,
+     "h": 460,
      "w": 256
     },
     {
-     "bh": 51,
+     "bh": 58,
      "bw": 32,
-     "h": 202,
+     "h": 230,
      "w": 128
     },
     {
-     "bh": 26,
+     "bh": 29,
      "bw": 16,
-     "h": 101,
+     "h": 115,
      "w": 64
     },
     {
-     "bh": 13,
+     "bh": 15,
      "bw": 8,
-     "h": 50,
+     "h": 57,
      "w": 32
     },
     {
      "bh": 7,
      "bw": 4,
-     "h": 25,
+     "h": 28,
      "w": 16
     },
     {
-     "bh": 3,
+     "bh": 4,
      "bw": 2,
-     "h": 12,
+     "h": 14,
      "w": 8
     },
     {
      "bh": 2,
      "bw": 1,
-     "h": 6,
+     "h": 7,
      "w": 4
     },
     {
@@ -86,9 +86,9 @@
     }
    ],
    "packed": {
-    "bytes": 5182116,
+    "bytes": 5517012,
     "encoding": "sparse-astc-v1",
-    "sha256": "3abf1359a4d276a054c5df6bb84be31752fc538622c034c383d5a08834916f6d"
+    "sha256": "680dd1ebb87a705c0ca67658810594bb819b6ac43ff64b23b46898ffb9fb9d1e"
    },
    "pages": [
     "back_page0.png",
@@ -116,94 +116,94 @@
     "back_page22.png",
     "back_page23.png"
    ],
-   "sha256": "da90e837ed0527a8afaf8f27c933e8d0ee605302b913189181abada2e080fc37",
+   "sha256": "7b4d16743348d0e3fa4c9f1d942093167dac67b9b06ccdfa9122f24190f090a8",
    "sourceSha256": {
-    "back_page0.png": "b7a5b3d4d8f3521db75ff5f58473e1dc6b37e0ad0fa089222d3904b6d8cd317c",
-    "back_page1.png": "d144fd1d3440e763b69faa5d70dd5508d17c636931430365ce91fbc791538725",
-    "back_page10.png": "ff765bd3a4619026a6c7f3d9aefe92d2d7e66cc82d5cf5e93bdf2635d2d322ac",
-    "back_page11.png": "5aa30543b5ae594a5f9d16422854b22b527404c0e1a5d2e97e6ae1ea0a4c265a",
-    "back_page12.png": "228bbf2f07983d45cd677b31a46a87112221347a959186610c25ca855dc74090",
-    "back_page13.png": "3f6abf6fb14a42254ef5f9b9bf8956e26132dd90d7452ba2d2df4cf4c1d4c4c2",
-    "back_page14.png": "149a7a3551a4d52b07436499c46ad72711cf6ca83bb6991cc1857552c4b4cea6",
-    "back_page15.png": "b998ac0c89dd897b3bc001c895671e0a5a43368505ca466a0f91b62cbb12c746",
-    "back_page16.png": "7d6244b2082cfd63230d02fcbd5ab521a6ad6149c32824bd0eaf4d335bd100cf",
-    "back_page17.png": "cfe81ec2f32ac4aefd478ef961772b089594cdbfa723cc08431ea2839ba6e535",
-    "back_page18.png": "90cb1766e0304ec9e1d67c2796cb5ce4394ae1ca35ff707d39c29df1b65c8f8d",
-    "back_page19.png": "f21455c4ceef90a61947b76dafa5b8cf313a9201e9dc0ad13c2a4a37f6e4cde1",
-    "back_page2.png": "55e0648dcdb00f4b5a060424da456b8dd551a2af20038f6ec66f0ca3d16175d2",
-    "back_page20.png": "6845ce37c5d4a854545670967b12b305debbb4b6b6869134f2b03fbad7f58cbd",
-    "back_page21.png": "d88c8f8304c6a03b4495f842e89f373cc7a8fa84c7b69ce97dd9fbb5d25fdb81",
-    "back_page22.png": "3b77564c68feefa7df90cffaff7725e4850d7dbdd50557fcf8fccdd872d6ec87",
-    "back_page23.png": "ad3d6675235b6fea0afa3a378fd1b152d46ee895fab417eabe26fd0630fe3e90",
-    "back_page3.png": "7aef06235abf7fdd17b49e0061b2be2447c3d695cf57a8c49044a71aa9c2571f",
-    "back_page4.png": "a635e04551e51479187bf69233b8945dc5412bf1d7a090678fcfad9656d4b873",
-    "back_page5.png": "6d9ed2347430531a1d1d44018b3a35a8e3adebee2419d3f64a7f199c4191fa85",
-    "back_page6.png": "b30c5a12514bafce80a69afb006270d56c867fb05e23431e7f38c0a461fa1149",
-    "back_page7.png": "b7eb1351ee9ab5663b8dc40d1c42cd718ee621a0414eefb8646043c103599bc0",
-    "back_page8.png": "7b8b88428887f434d6d6e145b72788406d8a3f9b746ac7794d4ce0286c1c9bf0",
-    "back_page9.png": "e9d84830e4efc1bdb3c4559ffb8f437b119a96707b5f9c12576a87310d145f15"
+    "back_page0.png": "069bae74ce5ae6e59bcc71fb8684d6301b55a99cac637a09e40e335d13bd3e97",
+    "back_page1.png": "e73b45f6b6ab9dfe4747d70545fc3592669f5b528ffb421ad92b82d00f8688ce",
+    "back_page10.png": "1f88cca3e8f8422f37abafde6d358ad65d57e16f8f4d76437bbb6287ccb2a3d6",
+    "back_page11.png": "47738ef7506104aa87f267ca8732d471282830e6e5cf78f13de8d486427d0cb5",
+    "back_page12.png": "d78742f578144e96778faa62ad78887f50cd20b598ad332ca859aeedff2cec20",
+    "back_page13.png": "7dc42de9439b0ec6434cc4989372a3f839d9cb5b395d391d40f90b5f74991642",
+    "back_page14.png": "25670a8a58b1bef1689602d681c2f2b691c979bf12fe3afc56bf945524f83cf2",
+    "back_page15.png": "353dc93e9b5441dfbbdb35a4be4fc78ee0b72c146cb2eae5116cdedeac4220b2",
+    "back_page16.png": "71988c605de139fb263f0a51d89c55d5d9ef1e8a7281cade11b533176309a732",
+    "back_page17.png": "a30c6f9ae491a650372f68b5efb66d9e94da00ae8467764b17bce836b9a127a4",
+    "back_page18.png": "e9de910a430d1594485da1016c6ba8eed96e5ab0a6255414d38257b1244c172e",
+    "back_page19.png": "1211328984d2c9ce64cbfd146411e315250e26a607d34754b925089b5febe115",
+    "back_page2.png": "f75d153af04e3db2df1e9932ddb6e21ee995280bc12abbae8ac85fa0fccda3f3",
+    "back_page20.png": "a8defa5d869e7769bda98937605afd0f3172accabe8572080c096539e2e0fe8d",
+    "back_page21.png": "b14f693bf46276e8fd64214e0b4f656024d24566e38c00b996369d47e2bda859",
+    "back_page22.png": "8e76d57c62e7b4a20db6d20539e35fb9892b54fed0189a87c9b9dd0a6d47736d",
+    "back_page23.png": "6ab385e2f643a55a13a9a1d1bd52e5ebb55a1880d2d5f21524b7aaaca4b0a760",
+    "back_page3.png": "e78bcb473b0a66635ea640552622b0ace697b16cf02ebc6bfd23ff553308f570",
+    "back_page4.png": "62ca5359ed5bfa5c92b05835e73eb86901dec089a5735c6672c1aa4d0016e3a7",
+    "back_page5.png": "d7b4022a16c2213a52fa3cd7b89f1f017c65855b7a6f1278d8503623d060ce94",
+    "back_page6.png": "59595b4d26a2f42673578c4e3b6dd57c99cb162557bdd1286b283546f1a0e02d",
+    "back_page7.png": "f45b08dddcfbd6ea1555ac628a9f263f0ecd3e2e6ba310c98cb196153c8a2fbe",
+    "back_page8.png": "76848370fc241e65454df9e1e7996fcd15c07380e60e781833443e434719b219",
+    "back_page9.png": "d9e2779443aff213c68fb8e2ecd196779a7784966abcff1c4a16c6fcba8229d0"
    },
    "width": 1024
   },
   "front": {
    "file": "front.astc-packed.zip",
-   "fileBytes": 51914496,
-   "gpuBytes": 51914496,
-   "height": 1584,
+   "fileBytes": 59003904,
+   "gpuBytes": 59003904,
+   "height": 1800,
    "layers": 24,
    "levels": [
     {
-     "bh": 396,
+     "bh": 450,
      "bw": 256,
-     "h": 1584,
+     "h": 1800,
      "w": 1024
     },
     {
-     "bh": 198,
+     "bh": 225,
      "bw": 128,
-     "h": 792,
+     "h": 900,
      "w": 512
     },
     {
-     "bh": 99,
+     "bh": 113,
      "bw": 64,
-     "h": 396,
+     "h": 450,
      "w": 256
     },
     {
-     "bh": 50,
+     "bh": 57,
      "bw": 32,
-     "h": 198,
+     "h": 225,
      "w": 128
     },
     {
-     "bh": 25,
+     "bh": 28,
      "bw": 16,
-     "h": 99,
+     "h": 112,
      "w": 64
     },
     {
-     "bh": 13,
+     "bh": 14,
      "bw": 8,
-     "h": 49,
+     "h": 56,
      "w": 32
     },
     {
-     "bh": 6,
+     "bh": 7,
      "bw": 4,
-     "h": 24,
+     "h": 28,
      "w": 16
     },
     {
-     "bh": 3,
+     "bh": 4,
      "bw": 2,
-     "h": 12,
+     "h": 14,
      "w": 8
     },
     {
      "bh": 2,
      "bw": 1,
-     "h": 6,
+     "h": 7,
      "w": 4
     },
     {
@@ -220,9 +220,9 @@
     }
    ],
    "packed": {
-    "bytes": 5229172,
+    "bytes": 5451076,
     "encoding": "sparse-astc-v1",
-    "sha256": "e390c8cb872d09aeb3a4dde3f1bdb275585011fe7187afa229384b4a04f96c18"
+    "sha256": "7b6afe9f34c0acb2724c57d1377957210a2b8eb012ac882be9bf1eb30affcb97"
    },
    "pages": [
     "front_page0.png",
@@ -250,32 +250,32 @@
     "front_page22.png",
     "front_page23.png"
    ],
-   "sha256": "a78d953b99da9e5ed35807aef01f99d5747cc55eeb57d57bbfcbe32f4e697062",
+   "sha256": "8002c326d614f219b09badb80523eda049cd73f8272a8b031165628ae4696cc7",
    "sourceSha256": {
-    "front_page0.png": "53f48e3c8cde459fac6cd465934968b86acee71ad3b1feffc626990cd5d6da9f",
-    "front_page1.png": "efea9e86f8d715deaaa3bb21e914106c05aa33a872b5562997c4a2e43ac2633a",
-    "front_page10.png": "8baecb545741249aab8cda8f80014bb04c9dd33ec5fb4d14230bce15c6c56a32",
-    "front_page11.png": "38ab1501480735ee2dfc4e51850370a25b144b3031ebf97f8ce0887f476157a1",
-    "front_page12.png": "e317bb16c58b21b7019c6d9daae08dbedb2f89109d074a8dc55ae32290b84946",
-    "front_page13.png": "e6faa23232f715ca4e96f0ecbf949cf1573c5f2934bc129a3234a45ecbb1448c",
-    "front_page14.png": "c0a441364a00b55a70055312ee9d3fdef584338d931b037b3837bc6eb93a0e05",
-    "front_page15.png": "1023fe666d740ab51d4f14dc990e3aa2c583be0b336fc0cb7198b8b2aafe3485",
-    "front_page16.png": "4c53957a90fed33288e074ba87ac4746e2ada6d32a28a3abb4008536f83f9885",
-    "front_page17.png": "86eb395b15cbb402d1dbc1a226ca4cedf0edf56175f5001cf5d32db9abcddf45",
-    "front_page18.png": "c0f39378c428ccf5058afd8ba88f5912af5a2e4fba140fcaf8b7a7c74ad667cd",
-    "front_page19.png": "c5fa8b2e827b8db34bfebf4c44bf6131832b3d0461f9da6e656bc49f588f7281",
-    "front_page2.png": "a1d187849082cf20b7b814ea9bb355409d669a05c2f21b4509f2610509405491",
-    "front_page20.png": "f797ab49796be4bbf4b80739e7649186827447cf612d4f25cb68dc2e914059ef",
-    "front_page21.png": "f7bc10c2d3aba1d2e85a02823698f52ed73b8187813df06e342c6a12ff82b230",
-    "front_page22.png": "38e81221821f0cfe81d340bf54d3ed0374a8672855a77bd8e43ed81227b1690d",
-    "front_page23.png": "fc702aed024107ee2270949f85f2cfb49e4d0bc1b14fbdc6a9a7e2bd1c3762e2",
-    "front_page3.png": "83702e97765c1c2e42f6ebe015847a2ba5513ac1e456c5b0d93d91237b9caced",
-    "front_page4.png": "ce49cdbeb0f7b7d332f0cef17ca456ccd210abcc8459f56f258e93b6a1ffbc3c",
-    "front_page5.png": "d683c553a0f8eb7bf0e48478e8fc63496c2f720c84cd4865194e03f4f0891606",
-    "front_page6.png": "80cbc0c506312eef72fd72dd32e65ce889a21f9f06785aa9657d4960d97b4c0e",
-    "front_page7.png": "901a30ca59c38d773543976ca2eb479c14a894ae065645cf8ffd2675488a93f5",
-    "front_page8.png": "094686478281611efc7e00aa112f1c51c7019908068e4786ce0268424bb4228e",
-    "front_page9.png": "478807c6786c5797965d3628811229c4ea977e3b21dc8327e73efcbe802d3420"
+    "front_page0.png": "cf141a6e3dd49404c4cdc9e580b5e7eb191b8270eebcce8954e035a597f01580",
+    "front_page1.png": "bcbe0609336450ef0fb362ade1eb5fb56cf9915b107c9083fbb728e4091aff5b",
+    "front_page10.png": "487887fe7d11111314270d40a982e584863a3a4e150aa17938780231a356b922",
+    "front_page11.png": "79db67b729d008067165bf9acf9bb245702beb0e8a53c2145f8367ebc6524683",
+    "front_page12.png": "4d715681096bdf5ec9fc31264ce90576e0ec137d6e8de4dda2e3d8291a509640",
+    "front_page13.png": "e3bff56321d1f3cd1645f62916c3118eacca7d8085c2e78f0b010c14c980afa2",
+    "front_page14.png": "8c3aa13defde424d3eefa01415b3a9dcc64ae9c3606015bbd0407a82bf3a7f01",
+    "front_page15.png": "c496b3e67868ee26853748b33dc0bf106ebde9586dd456d3a4cc1d189ec28a98",
+    "front_page16.png": "44b25c195e46f612b855cdf3e586366863ed4cb15af9ee52b7d1ac33abbadae9",
+    "front_page17.png": "4169b0188a1cdf1c696883d9b22d176bbdec2c999d81f3f7dac0aaa82593547f",
+    "front_page18.png": "e106568799d412406eb648cf0cc18d4fcd1f233d96e90d9058718e7f91c390b3",
+    "front_page19.png": "cf38623c4417d2e88f0f0d4a40a03b45c3cf0829827394dfa84f181d154adbec",
+    "front_page2.png": "2d56002c2b9a0a8783ba9220811ff77e203edf23277e51bff34973045f53c43e",
+    "front_page20.png": "279d0d1317c60c862fa519bcaa3339c7af7342875fe701186e3f8844a6f362a8",
+    "front_page21.png": "31135080dcaef32e7b69f91f8dee11785751b06c60d11821ed51f9fd1d906761",
+    "front_page22.png": "86ed962c5907d37c91e4862339f7f35adfbfcf8fd2eeabe1eb6ae2eb82db595a",
+    "front_page23.png": "9cf33a61639cd6d5c1d6b6f8e2d758925ec61c86670e4ba11747daff416a48a2",
+    "front_page3.png": "7c10d7d079dd8beee5432752829d19369779aa4177d3cec21e79a498c0bb5fb5",
+    "front_page4.png": "678b4129dc3179dac95627739fea803d1568a79d16be067d4b1f12be3769ba9a",
+    "front_page5.png": "8e9b33987d54bfc0924117a995a8c8ac9bdab0679891ed7f4feca240fa81e568",
+    "front_page6.png": "f6a242fe3a6ae96500283171ae3e5e5a4f776499b70d401c97117b68217d8638",
+    "front_page7.png": "96d084c72eae546a1212c7d2f5360569a94938912e51cf0a5744a286f7ab04d3",
+    "front_page8.png": "2bcddf683e0ec378c2a1a4aa5e3b5110b0f5c20cacd8530f3ecddded9979a156",
+    "front_page9.png": "f3588e1f91e41f9c68b4ca0852bd8f23aa69f0bdcc314f3b2a6be4a0c5e90504"
    },
    "width": 1024
   }
