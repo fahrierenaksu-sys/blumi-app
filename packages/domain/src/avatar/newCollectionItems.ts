@@ -102,6 +102,7 @@ export const NEW_COLLECTION_LANDED_ITEM_IDS: ReadonlySet<string> = new Set<strin
   "hair_girl_ink_french_bob",
   "jacket_girl_black_crop_blazer",
   "jacket_girl_light_denim_crop",
+  "necklace_girl_pearl_drop",
   "top_girl_breton_stripe",
   "top_girl_camel_vest_tee",
   "top_girl_rose_pearl_cardigan",

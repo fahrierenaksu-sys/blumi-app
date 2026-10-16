@@ -45,7 +45,8 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     top_girl_rose_pearl_cardigan: "top_girl_rose_pearl_cardigan",
     top_girl_breton_stripe: "top_girl_breton_stripe",
     top_girl_sage_knit_polo: "top_girl_sage_knit_polo",
-    dress_girl_wine_gingham_tie: "dress_girl_wine_gingham_tie"
+    dress_girl_wine_gingham_tie: "dress_girl_wine_gingham_tie",
+    necklace_girl_pearl_drop: "necklace_girl_pearl_drop"
   },
   // the boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts; QA unlock only, no receipts)
   male: {

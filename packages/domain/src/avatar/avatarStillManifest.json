@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "5dbd003d63a06584547ef3412771d8eb281db26f0a46573a343bd8827d0d8345",
+      "rigSha256": "7d062deb3ea7cec52a2b79595d570f9407ae29c9599cedd06c6cf5e2a5fe0875",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -553,6 +553,11 @@
           "slot": "accessory",
           "rigItemId": "clip_girl_pearl_bar_pair",
           "thumb": "clip_girl_pearl_bar_pair"
+        },
+        "necklace_girl_pearl_drop": {
+          "slot": "accessory",
+          "rigItemId": "necklace_girl_pearl_drop",
+          "thumb": "necklace_girl_pearl_drop"
         }
       },
       "layers": {
@@ -1536,6 +1541,19 @@
             ]
           },
           {
+            "key": "necklace_girl_pearl_drop__o3p7",
+            "owner": "necklace_girl_pearl_drop",
+            "slot": "accessory",
+            "order": 3.7,
+            "seq": 7000,
+            "rect": [
+              287,
+              269,
+              59,
+              46
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -2382,6 +2400,19 @@
               150,
               102,
               106
+            ]
+          },
+          {
+            "key": "necklace_girl_pearl_drop__o3p7",
+            "owner": "necklace_girl_pearl_drop",
+            "slot": "accessory",
+            "order": 3.7,
+            "seq": 7000,
+            "rect": [
+              113,
+              153,
+              41,
+              33
             ]
           },
           {
