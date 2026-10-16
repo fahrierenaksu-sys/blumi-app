@@ -1586,6 +1586,35 @@
             "legVariant": "bottom"
           },
           {
+            "key": "avatar_v2_bottom_coral_wave_pants__o1__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              243,
+              887,
+              50,
+              29
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "avatar_v2_bottom_coral_wave_pants__o1__bottom-cut",
+              "rect": [
+                0,
+                0,
+                50,
+                29
+              ],
+              "sheet": [
+                50,
+                29
+              ]
+            }
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o1__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -2179,6 +2208,35 @@
             ],
             "leg": "nearLeg",
             "legVariant": "bottom"
+          },
+          {
+            "key": "avatar_v2_bottom_coral_wave_pants__o2__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              349,
+              911,
+              50,
+              20
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "avatar_v2_bottom_coral_wave_pants__o2__bottom-cut",
+              "rect": [
+                0,
+                0,
+                50,
+                20
+              ],
+              "sheet": [
+                50,
+                20
+              ]
+            }
           },
           {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o2__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",

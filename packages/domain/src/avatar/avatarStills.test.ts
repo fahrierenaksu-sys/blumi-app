@@ -127,11 +127,15 @@ test("a boy pair without a baked cell draws the bottom's legs uncut; one piece a
   assert.deepEqual(legsOf([]), ["male/full/body__o1", "male/full/body__o2"]);
 });
 
-test("the girl keeps her QA'd pair drawing; only a bottom without a pair drawing has composed (sheet) legs", () => {
+test("the girl keeps her QA'd pair drawing with her sneakers; other shoes compose her pants (no bare foot past a boot)", () => {
   const girl = AVATAR_STILL_MANIFEST.bodies.female;
-  // her starter pants own the QA'd pair drawing, so they never need a composed leg; the black trousers do with her sneakers
-  const composed = new Set([...girl.layers.full, ...girl.layers.bust].filter((e) => e.gatedBy !== undefined || e.source !== undefined).map((e) => e.owner));
-  assert.ok(!composed.has("avatar_v2_bottom_coral_wave_pants"));
+  // her starter pants own the QA'd pair drawing, fitted to her sneakers: they are never cut by those sneakers, but an
+  // ankle boot cuts them (the pair's bare foot would show past the boot); the black trousers compose with her sneakers
+  const all = [...girl.layers.full, ...girl.layers.bust];
+  const composed = new Set(all.filter((e) => e.gatedBy !== undefined || e.source !== undefined).map((e) => e.owner));
+  const pantsCuts = all.filter((e) => e.owner === "avatar_v2_bottom_coral_wave_pants" && e.gatedBy !== undefined);
+  assert.ok(pantsCuts.length > 0);
+  assert.ok(pantsCuts.every((e) => e.gatedBy !== girl.starter.shoes), pantsCuts.map((e) => e.gatedBy).join());
   assert.ok([...composed].every((owner) => girl.items[owner]?.slot === "bottom"), [...composed].join());
   const layers = resolveAvatarStillLayers(GIRL_RIG_OUTFIT, "full").layers;
   assert.ok(layers.every((l) => l.source === undefined));

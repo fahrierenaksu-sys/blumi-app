@@ -534,6 +534,21 @@ test("legs: shoes missing the drawing for one leg degrade that one avatar to the
   assert.ok(warnings.every((m) => !m.includes("bottom_b") && !m.includes("shoes_b")), "no item IDs in the log")
 })
 
+test("legs: other shoes with the pair-drawing pants compose, so no bare foot shows past an ankle boot", () => {
+  const boots = "shoes_girl_camel_ankle_boots"
+  for (const name of ["front", "back"] as const) {
+    const worn = [boots, PANTS]
+    assert.deepEqual(legPlan(rig.views[name], worn), { set: 2, key: "bottom", mask: 1 })
+    if (name !== "front") continue
+    const compiled = compileAvatar(rig, name, worn)
+    const shown = drawnVertices(compiled, VARIANT_STAND)
+    for (const leg of LEGS) {
+      const cut = rangeVertices(rig, worn, 2, `${leg}@bottom`)
+      assert.ok(every(cut, (i) => shown.has(i) && maskAt(compiled.vertexData, i).on === 1), leg)
+    }
+  }
+})
+
 test("legs: the girl's QA'd pair drawing is drawn as before, with no gate", () => {
   for (const name of ["front", "back"] as const) {
     const worn = [SNEAKERS, PANTS]

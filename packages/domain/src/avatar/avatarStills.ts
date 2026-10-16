@@ -199,10 +199,9 @@ export function avatarStillDrawnKey(drawn: ReadonlyMap<AvatarStillDrawSlot, stri
 }
 
 /**
- * The item leg drawings drawn for the drawn items, as the room renderer picks them (avatar25Legs.legPlan): a legacy
- * pair drawing when either worn piece owns one (the girl); else the bottom's own drawing gated by the worn shoes (a
- * composed cell); a pair with no baked cell yet draws the bottom's drawing uncut (never the bare legs); one piece
- * alone draws its own drawing.
+ * The item leg drawings drawn for the drawn items, as the room renderer picks them (avatar25Legs.legPlan): the bottom's
+ * drawing cut by the worn shoes when that cell is baked, else a legacy pair drawing when either worn piece owns one (the
+ * girl); with neither the bottom's drawing is drawn uncut (never the bare legs); one piece alone draws its own drawing.
  */
 export function avatarStillLegLayers(
   all: readonly AvatarStillLayerEntry[],
@@ -214,10 +213,11 @@ export function avatarStillLegLayers(
   const own = (owner: string | undefined, variant: string) =>
     all.filter((entry) => owner !== undefined && entry.owner === owner && entry.legVariant === variant && entry.gatedBy === undefined);
   if (bottom && shoes) {
-    const pair = all.filter((entry) => (entry.owner === bottom || entry.owner === shoes) && entry.legVariant === "bottom+shoes");
-    if (pair.length > 0) return pair;
+    // a baked composed cell means the renderer composes these shoes (a pair drawing only fits the shoes it was drawn for)
     const composed = all.filter((entry) => entry.owner === bottom && entry.legVariant === "bottom" && entry.gatedBy === shoes);
     if (composed.length > 0) return composed;
+    const pair = all.filter((entry) => (entry.owner === bottom || entry.owner === shoes) && entry.legVariant === "bottom+shoes");
+    if (pair.length > 0) return pair;
   }
   const alone = own(bottom, "bottom");
   return alone.length > 0 ? alone : own(shoes, "shoes");
