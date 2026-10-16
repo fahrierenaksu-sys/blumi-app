@@ -148,6 +148,217 @@
    "dE": 100,
    "minL": 45,
    "note": "base tank and shoulder chunk beside the braids (deepest pixel of the residue patch)"
+  },
+  {
+   "x": 69,
+   "y": 64,
+   "r": 4,
+   "dE": 22,
+   "minL": 62,
+   "note": "peach skin tip at the top of the gap between two bang strands"
+  },
+  {
+   "x": 96,
+   "y": 66,
+   "r": 4,
+   "dE": 22,
+   "minL": 62,
+   "note": "peach skin tip at the top of the gap between two bang strands"
+  },
+  {
+   "x": 109,
+   "y": 62,
+   "r": 6,
+   "dE": 20,
+   "minL": 62,
+   "note": "peach skin rim along the outer edge of a side bang strand"
+  },
+  {
+   "x": 110,
+   "y": 65,
+   "r": 6,
+   "dE": 20,
+   "minL": 62,
+   "note": "peach skin rim along the outer edge of a side bang strand"
+  },
+  {
+   "x": 112,
+   "y": 69,
+   "r": 6,
+   "dE": 20,
+   "minL": 62,
+   "note": "peach skin rim along the outer edge of a side bang strand"
+  },
+  {
+   "x": 112,
+   "y": 73,
+   "r": 6,
+   "dE": 20,
+   "minL": 62,
+   "note": "peach skin rim along the outer edge of a side bang strand"
+  },
+  {
+   "x": 56,
+   "y": 62,
+   "r": 6,
+   "dE": 20,
+   "minL": 62,
+   "note": "peach skin rim along the outer edge of a side bang strand"
+  },
+  {
+   "x": 55,
+   "y": 65,
+   "r": 6,
+   "dE": 20,
+   "minL": 62,
+   "note": "peach skin rim along the outer edge of a side bang strand"
+  },
+  {
+   "x": 54,
+   "y": 67,
+   "r": 6,
+   "dE": 20,
+   "minL": 62,
+   "note": "peach skin rim along the outer edge of a side bang strand"
+  },
+  {
+   "x": 51,
+   "y": 73,
+   "r": 6,
+   "dE": 20,
+   "minL": 62,
+   "note": "peach skin rim along the outer edge of a side bang strand"
+  }
+ ],
+ "regions": [
+  {
+   "polygon": [
+    [
+     49,
+     162
+    ],
+    [
+     67,
+     161
+    ],
+    [
+     67,
+     180
+    ],
+    [
+     56,
+     188
+    ],
+    [
+     49,
+     188
+    ]
+   ],
+   "note": "striped base-tank fragment on the inner side of the left braid"
+  },
+  {
+   "polygon": [
+    [
+     102.5,
+     165.5
+    ],
+    [
+     116.5,
+     162.5
+    ],
+    [
+     119,
+     167.5
+    ],
+    [
+     119,
+     185
+    ],
+    [
+     116,
+     186
+    ],
+    [
+     112,
+     185.5
+    ],
+    [
+     102.5,
+     181.5
+    ]
+   ],
+   "note": "striped base-tank fragment on the inner side of the right braid"
+  },
+  {
+   "polygon": [
+    [
+     99.5,
+     164
+    ],
+    [
+     103,
+     164
+    ],
+    [
+     103,
+     176
+    ],
+    [
+     99.5,
+     176
+    ]
+   ],
+   "note": "pale stripe sliver left of the right fragment"
+  },
+  {
+   "polygon": [
+    [
+     104,
+     183
+    ],
+    [
+     116,
+     184
+    ],
+    [
+     120,
+     188
+    ],
+    [
+     120,
+     190
+    ],
+    [
+     112,
+     189.5
+    ],
+    [
+     104,
+     186
+    ]
+   ],
+   "note": "dark wedge and grey tip under the right fragment"
+  },
+  {
+   "polygon": [
+    [
+     107,
+     159.5
+    ],
+    [
+     114.5,
+     160.5
+    ],
+    [
+     114.5,
+     165
+    ],
+    [
+     107,
+     165
+    ]
+   ],
+   "note": "reddish top edge of the right fragment"
   }
  ]
 }

@@ -529,7 +529,7 @@ const THUMB_REDRAWS = {
     dress_girl_cream_one_shoulder_mini: "69544e567363415d649450d9d6a2022389fa60a5056b8ce592c55ab58259f751",
     dress_girl_sage_shirred_tiered_mini: "f11610a3b43b3cdb428e69e1144000448eb1074fe1697410736f3c64d4f1dec5",
     dress_girl_wine_gingham_tie: "5fa01b2cd56b133b128cb4692ce93a4848ac256ee5bc1165716af93f4cb8d4e7",
-    hair_girl_ink_twin_braids: "d2f195279a964e40acbb724abf5e0c82b4fc2ca19439155375b8527e09fb72b5",
+    hair_girl_ink_twin_braids: "47a69d11b3773cd217c4ce151f511dffd98cd719161cb1cfe23397da956aa797",
     jacket_girl_black_crop_blazer: "44bbbe7a4f775d02dfd8df623eaa74e501e24b1619d30c944c33d5321f362ef3",
     jacket_girl_light_denim_crop: "b8134c4186983c4bf1fc43a9227072857697413f4cd265a3c3ccb1e28731009f",
     top_girl_camel_vest_tee: "69ce986958f14f779b4867bef646cf6b7431acb5646ab66c2977688e47ed6bee",

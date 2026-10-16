@@ -99,7 +99,7 @@ test("a seeded cleanup redraw is its seeds applied to its input, and only clears
       const src = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
       const out = await sharp(join(dir, file.replace(/\.seeds\.json$/, ".webp"))).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
       assert.deepEqual([out.info.width, out.info.height], [src.info.width, src.info.height], `${file}: size changed`)
-      const { data } = seedClean(src.data, src.info.width, src.info.height, spec.seeds, spec.min_island_px)
+      const { data } = seedClean(src.data, src.info.width, src.info.height, spec.seeds, spec.min_island_px, spec.regions)
       // lossless WebP keeps every visible pixel exactly (the RGB under alpha 0 is not kept, and not shown)
       for (let p = 0; p < data.length; p += 4) {
         assert.equal(out.data[p + 3], data[p + 3], `${file}: pixel ${p / 4} is not its seeds applied (run seed-clean-thumbs.mjs)`)
@@ -124,4 +124,16 @@ test("a seed floods only similar colour within its radius, and a thin seed never
   assert.throws(() => seedClean(rgba, w, h, [{ x: 4, y: 5, r: 5, dE: 10, thin: true }], 0), /inside the garment body/)
   const near = seedClean(rgba, w, h, [{ x: 11, y: 5, r: 1, dE: 10 }], 0).data
   assert.equal(near[(5 * w + 16) * 4 + 3], 255, "outside the radius kept")
+})
+
+test("a region polygon clears the visible pixels whose centre is inside it and nothing else", () => {
+  const w = 12, h = 8, rgba = Buffer.alloc(w * h * 4)
+  for (let p = 0; p < w * h; p++) rgba.set([...FABRIC, 255], p * 4)
+  const { data, removed } = seedClean(rgba, w, h, [], 0, [{ polygon: [[2, 2], [6, 2], [6, 5], [2, 5]] }])
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const inside = x >= 2 && x < 6 && y >= 2 && y < 5
+    assert.equal(data[(y * w + x) * 4 + 3], inside ? 0 : 255, `pixel ${x},${y}`)
+    assert.equal(removed[y * w + x], inside ? 1 : 0)
+  }
+  assert.throws(() => seedClean(rgba, w, h, [], 0, [{ polygon: [[0, 0], [1, 1]] }]), /at least 3 points/)
 })

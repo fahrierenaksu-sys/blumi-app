@@ -9,7 +9,10 @@
  *
  * Input  tools/avatar25d/thumb-redraws/<rig>/<item>.seeds.json
  *          { "input": "<repo path of the thumb to clean>", "input_sha256": "...", "min_island_px": 8,
- *            "seeds": [{ "x", "y", "r", "dE", "thin"?, "minL"?, "note"? }] }
+ *            "seeds": [{ "x", "y", "r", "dE", "thin"?, "minL"?, "note"? }],
+ *            "regions"?: [{ "polygon": [[x, y], ...], "note"? }] }
+ *        A region clears every visible pixel whose centre lies inside its polygon (pixel coordinates), for residue that
+ *        has the same colour as the garment next to it and so cannot be told apart by a colour seed.
  *        A seed floods 4-connected from (x, y) over visible pixels within r px of it whose CIELAB colour is within dE of
  *        the seed pixel's. thin: only pixels outside the 5 px-thick body of the thumb (strokes, never the garment).
  *        minL: only pixels at least that light (keeps dark hair next to a light residue chunk).
@@ -56,8 +59,18 @@ export function thickCore(visible, width, height, k = CORE_RADIUS) {
   return pass(pass(visible, "all"), "any")
 }
 
-/** Remove-only seeded cleanup of straight RGBA: returns { data, removed } (removed: 1 seed flood, 2 island). */
-export function seedClean(rgba, width, height, seeds, minIslandPx = DEFAULT_MIN_ISLAND_PX) {
+/** Even-odd test of a point against a polygon given as [[x, y], ...]. */
+export function pointInPolygon(px, py, polygon) {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i], [xj, yj] = polygon[j]
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+/** Remove-only seeded cleanup of straight RGBA: returns { data, removed } (removed: 1 seed or region, 2 island). */
+export function seedClean(rgba, width, height, seeds, minIslandPx = DEFAULT_MIN_ISLAND_PX, regions = []) {
   const n = width * height
   const out = Buffer.from(rgba)
   const visible = new Uint8Array(n)
@@ -90,6 +103,13 @@ export function seedClean(rgba, width, height, seeds, minIslandPx = DEFAULT_MIN_
       }
     }
   }
+  for (const { polygon } of regions) {
+    if (!Array.isArray(polygon) || polygon.length < 3) throw new Error("a region needs a polygon of at least 3 points")
+    for (let p = 0; p < n; p++) {
+      const px = p % width
+      if (visible[p] && pointInPolygon(px + 0.5, (p - px) / width + 0.5, polygon)) removed[p] = 1
+    }
+  }
   for (let p = 0; p < n; p++) if (removed[p]) out.fill(0, p * 4, p * 4 + 4)
   const seen = new Uint8Array(n)
   for (let p = 0; p < n; p++) {
@@ -115,7 +135,7 @@ async function cleanOne(rig, file, evidence) {
   const input = readFileSync(join(ROOT, spec.input))
   if (sha256(input) !== spec.input_sha256) throw new Error(`${rig}/${itemId}: ${spec.input} differs from input_sha256`)
   const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  const { data: clean, removed } = seedClean(data, info.width, info.height, spec.seeds, spec.min_island_px ?? DEFAULT_MIN_ISLAND_PX)
+  const { data: clean, removed } = seedClean(data, info.width, info.height, spec.seeds, spec.min_island_px ?? DEFAULT_MIN_ISLAND_PX, spec.regions ?? [])
   const webp = await sharp(clean, { raw: { width: info.width, height: info.height, channels: 4 } }).webp({ lossless: true, effort: 6 }).toBuffer()
   writeFileSync(join(REDRAWS_DIR, rig, `${itemId}.webp`), webp)
   if (evidence) {
