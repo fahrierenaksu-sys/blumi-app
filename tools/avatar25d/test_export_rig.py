@@ -193,8 +193,9 @@ class ExportLifeTest(unittest.TestCase):
                 tiles.append(box)
                 self.assertIsNone(old.crop(box).getbbox(), 'the frame went into space that held nothing')
                 art = Image.open(io.BytesIO(base64.b64decode(src['frames'][frame].split(',', 1)[1]))).convert('RGBA')
-                # exact REPLACE of the rect, alpha included
-                self.assertEqual(new.crop((x + dx, y + dy, x + dx + w, y + dy + h)).tobytes(), art.tobytes())
+                # exact REPLACE of the rect, alpha included, drawn only where the open head draws (alpha <= open)
+                expected = ex.blink_frame_in_head(art, head_img.crop((rx, ry, rx + w, ry + h)))
+                self.assertEqual(new.crop((x + dx, y + dy, x + dx + w, y + dy + h)).tobytes(), expected.tobytes())
                 # around it: the same pixels the head has around its own rect
                 around_frame = new.crop(box)
                 around_head = new.crop((x - M, y - M, x + w + M, y + h + M))
