@@ -9,8 +9,8 @@
  * lands one piece (graft, export, bake, map, mark landed, test); the lead lifts the hold together with the receipt.
  *
  * Prices: the dresses carry the owner-approved prices (OWNER_DECISIONS 2026-10-15 21:35, sheet_2110 ONAY.html); the
- * bottoms and boots were approved on 2026-10-16 10:09 (OWNER_DECISIONS). Every
- * other price is a PROPOSAL by the PRICES_TR table (economy_0910) and needs the owner's yes before the hold is lifted.
+ * bottoms and boots were approved on 2026-10-16 10:09 (OWNER_DECISIONS), and every other piece at the PRICES_TR
+ * proposal (economy_0910, export_2320 REPORT (a)) on 2026-10-16 09:09 (owner: "tamam fiyat da").
  * `nameTr` fits the wardrobe card's two 13-character lines; `sheetNameTr` is the longer name shown on the owner sheet.
  */
 export type NewCollectionSlot = "hair" | "top" | "bottom" | "shoes" | "dress" | "accessory"
@@ -33,7 +33,7 @@ const BOY = "avatar_v2_body_male_light" as const
 const dress = (itemId: string, nameTr: string, sheetNameTr: string, priceCoins: number): NewCollectionItem =>
   ({ itemId, slot: "dress", bodyId: GIRL, nameTr, sheetNameTr, priceCoins, isPriceOwnerApproved: true })
 
-const proposed = (
+const piece = (
   itemId: string,
   slot: NewCollectionSlot,
   nameTr: string,
@@ -46,11 +46,8 @@ const proposed = (
   bodyId: extra.bodyId ?? GIRL,
   nameTr,
   priceCoins,
-  isPriceOwnerApproved: false,
+  isPriceOwnerApproved: true,
 })
-
-const approved = (itemId: string, slot: NewCollectionSlot, nameTr: string, priceCoins: number): NewCollectionItem =>
-  ({ ...proposed(itemId, slot, nameTr, priceCoins), isPriceOwnerApproved: true })
 
 export const NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze([
   dress("dress_girl_butter_square_puff_mini", "Sarı Balon Kol Elbise", "Sarı Kare Yakalı Balon Kol Mini Elbise", 220),
@@ -63,25 +60,25 @@ export const NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze(
   dress("dress_girl_terracotta_patchwork_halter_bias_maxi", "Patchwork Maxi Elbise", "Kiremit Patchwork Halter Maxi Elbise", 520),
   dress("dress_girl_cream_one_shoulder_tie_midi", "Krem Tek Omuz Midi Elbise", "Krem Tek Omuz Bağcıklı Midi Elbise", 360),
   dress("dress_girl_denim_milkmaid_button_midi", "Kot Düğmeli Midi Elbise", "Kot Düğmeli Milkmaid Midi Elbise", 360),
-  proposed("jacket_girl_black_crop_blazer", "top", "Siyah Kısa Blazer", 320),
-  proposed("jacket_girl_light_denim_crop", "top", "Açık Kot Ceket", 200),
-  proposed("glasses_girl_gold_round", "accessory", "Altın Yuvarlak", 150, { accessoryGroup: "eyewear" }),
-  proposed("glasses_girl_rose_soft_cateye", "accessory", "Gül Kurusu Kedi Göz", 150, { accessoryGroup: "eyewear" }),
-  proposed("glasses_boy_black_soft_rect", "accessory", "Mat Siyah Dikdörtgen", 80, { accessoryGroup: "eyewear", bodyId: BOY }),
-  proposed("glasses_boy_gunmetal_round", "accessory", "Füme Metal Yuvarlak", 150, { accessoryGroup: "eyewear", bodyId: BOY }),
-  proposed("hair_girl_bun_wine_bow", "hair", "Fiyonklu Topuz", 300),
-  proposed("hair_girl_caramel_braid_crown", "hair", "Örgü Taç", 450),
-  proposed("hair_girl_ink_twin_braids", "hair", "Koyu Çift Örgü", 300),
-  proposed("hair_girl_chestnut_butterfly", "hair", "Kelebek Katlı", 300),
-  proposed("hair_girl_copper_soft_waves", "hair", "Bakır Dalgalar", 300),
-  proposed("hair_girl_ink_french_bob", "hair", "Gece Mavisi Fransız Bob", 150),
-  proposed("necklace_girl_pearl_drop", "accessory", "İnci Damla Kolye", 150, { accessoryGroup: "neck" }),
-  proposed("bag_girl_camel_mini", "accessory", "Deve Tüyü Omuz Çantası", 250, { accessoryGroup: "bag" }),
-  proposed("clip_girl_pearl_bar_pair", "accessory", "İnci Toka İkilisi", 80, { accessoryGroup: "hairClip" }),
-  approved("bottom_girl_wine_midi_skirt", "bottom", "Bordo Midi Etek", 220),
-  approved("bottom_girl_wide_jeans", "bottom", "Bol Paça Kot", 220),
-  approved("bottom_girl_ecru_trousers", "bottom", "Ekru Pantolon", 220),
-  approved("shoes_girl_camel_ankle_boots", "shoes", "Deve Tüyü Bot", 180),
+  piece("jacket_girl_black_crop_blazer", "top", "Siyah Kısa Blazer", 320),
+  piece("jacket_girl_light_denim_crop", "top", "Açık Kot Ceket", 200),
+  piece("glasses_girl_gold_round", "accessory", "Altın Yuvarlak", 150, { accessoryGroup: "eyewear" }),
+  piece("glasses_girl_rose_soft_cateye", "accessory", "Gül Kurusu Kedi Göz", 150, { accessoryGroup: "eyewear" }),
+  piece("glasses_boy_black_soft_rect", "accessory", "Mat Siyah Dikdörtgen", 80, { accessoryGroup: "eyewear", bodyId: BOY }),
+  piece("glasses_boy_gunmetal_round", "accessory", "Füme Metal Yuvarlak", 150, { accessoryGroup: "eyewear", bodyId: BOY }),
+  piece("hair_girl_bun_wine_bow", "hair", "Fiyonklu Topuz", 300),
+  piece("hair_girl_caramel_braid_crown", "hair", "Örgü Taç", 450),
+  piece("hair_girl_ink_twin_braids", "hair", "Koyu Çift Örgü", 300),
+  piece("hair_girl_chestnut_butterfly", "hair", "Kelebek Katlı", 300),
+  piece("hair_girl_copper_soft_waves", "hair", "Bakır Dalgalar", 300),
+  piece("hair_girl_ink_french_bob", "hair", "Gece Mavisi Fransız Bob", 150),
+  piece("necklace_girl_pearl_drop", "accessory", "İnci Damla Kolye", 150, { accessoryGroup: "neck" }),
+  piece("bag_girl_camel_mini", "accessory", "Deve Tüyü Omuz Çantası", 250, { accessoryGroup: "bag" }),
+  piece("clip_girl_pearl_bar_pair", "accessory", "İnci Toka İkilisi", 80, { accessoryGroup: "hairClip" }),
+  piece("bottom_girl_wine_midi_skirt", "bottom", "Bordo Midi Etek", 220),
+  piece("bottom_girl_wide_jeans", "bottom", "Bol Paça Kot", 220),
+  piece("bottom_girl_ecru_trousers", "bottom", "Ekru Pantolon", 220),
+  piece("shoes_girl_camel_ankle_boots", "shoes", "Deve Tüyü Bot", 180),
 ].map((item) => Object.freeze(item)))
 
 export const NEW_COLLECTION_ITEM_IDS: readonly string[] = Object.freeze(NEW_COLLECTION_ITEMS.map((item) => item.itemId))
