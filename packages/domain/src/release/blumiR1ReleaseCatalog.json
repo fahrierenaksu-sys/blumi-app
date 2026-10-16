@@ -1304,62 +1304,3004 @@
           }
         ]
       }
+    },
+    {
+      "itemId": "dress_girl_butter_square_puff_mini",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_butter_square_puff_mini__o0p45.webp",
+            "sha256": "043785a3f2baad527e4cdf99ad58521d0dd92450755b17706dd4b84a9ef05f42"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_butter_square_puff_mini__o3p45.webp",
+            "sha256": "5d6204f4d8703b376c2dc69cccb16ef02b184914c37002af24af72ca11082b1b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_butter_square_puff_mini__o5p45.webp",
+            "sha256": "c0650240fcef5bcd05b8141b2922f764f3c9788abfafc097949e6931024a102f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_butter_square_puff_mini__o0p45.webp",
+            "sha256": "c24a50d92b68e8a3c3ed875c98b6b8081add153915207885a25a8c256752bb95"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_butter_square_puff_mini__o3p45.webp",
+            "sha256": "89fabac53d1d3f999fd6f632e941c0a03271ef67668d3e758b8cc8ce1e66e984"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_butter_square_puff_mini__o5p45.webp",
+            "sha256": "260e73b7cc10a1336b5191000fe2038dc77a1678dd3212d223ac1a519462d4a8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_butter_square_puff_mini__front.webp",
+            "sha256": "e7225be8768e75d7960f552b559df645704592787b151a1e4b86ff65fa0280e3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_butter_square_puff_mini__under.webp",
+            "sha256": "f74d6a13cc83a2ee23c686310e9cfb1ff2262d090354c55d1b2d090992392e6e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_butter_square_puff_mini.webp",
+            "sha256": "d4726aadf3e2e0d82bd8315d8d98d72aa3eed412af4ab670428a17f1e0ef54ee"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "dress_girl_denim_pinafore_mini",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_denim_pinafore_mini__o0p45.webp",
+            "sha256": "5a84db86cc73432778e8258b71e7f522e6effd787f5ad8bf166c5ed4876bcdfc"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_denim_pinafore_mini__o3p45.webp",
+            "sha256": "7b77632905ba59f498b93fe408ce73315fbf5dd39cbf29f0debae52ad3216310"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_denim_pinafore_mini__o5p45.webp",
+            "sha256": "3a8a96098c5585da291e28c595dc87279ef681efb555ec7f94123bbe5783a12f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_denim_pinafore_mini__o0p45.webp",
+            "sha256": "980345651809d5944163445cb3bab83c430a7cc1ab060243c105c6d3b9209d08"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_denim_pinafore_mini__o3p45.webp",
+            "sha256": "6c688b86e24544bf3c330ea0889a2d817409bb540f11d1e1631d40fed3a84ad6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_denim_pinafore_mini__o5p45.webp",
+            "sha256": "2caaf736cd79d0bb99510f49f99b7eaf669422ded72fb3069c787cc1660c04b8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_denim_pinafore_mini__front.webp",
+            "sha256": "81627c75e6ae1fc4435c52224b9ffa6c1e9158799b2da3eab9faf3d5e69b0c94"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_denim_pinafore_mini__under.webp",
+            "sha256": "e148c6223ffe73e6207496f7f8c78a8efee480a97c83beb832bf2d974d4b81c5"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_denim_pinafore_mini.webp",
+            "sha256": "16f4e98bd810201f8e9312f408c449f4c34bed3c31841071a1dd6206d024f920"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "dress_girl_sage_shirred_tiered_mini",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_sage_shirred_tiered_mini__o0p45.webp",
+            "sha256": "3dc5c39fc5fc64f78ccfbbb22a0fe54a105ec2f6398d5b5bb12e00bc37515c9a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_sage_shirred_tiered_mini__o3p45.webp",
+            "sha256": "d5554fc029c29123adfc7f5d155b4e86540011c3d74f031c8738ab0705550147"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_sage_shirred_tiered_mini__o5p45.webp",
+            "sha256": "89b8b9f0839319b1c3e9ab5fcf32bb1f6cd57783574f5bd6c057beb6016ea5fc"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_sage_shirred_tiered_mini__o0p45.webp",
+            "sha256": "c76a5badbdcb1abe3c288af45428d46f30d186bdd115ec6fbed258ef8180321d"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_sage_shirred_tiered_mini__o3p45.webp",
+            "sha256": "66aaaa6aa81a00eec0ce06927afc5ac13edfd897ae9d770e96ef1f10e465540e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_sage_shirred_tiered_mini__o5p45.webp",
+            "sha256": "fe9bc4dc36ed39b55796ba2c19aa19354b63fef385202cc3f9eaa7aa9d0f6b19"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_sage_shirred_tiered_mini__front.webp",
+            "sha256": "0eb27d6337c293db5a0852de850d57462e7ba4a819f69bb03a57d2eaf67c1d5a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_sage_shirred_tiered_mini__under.webp",
+            "sha256": "e3fda1a6eda315635425e4641ad9fbc6feb124be8871d53134d61c8300810d75"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_sage_shirred_tiered_mini.webp",
+            "sha256": "f11610a3b43b3cdb428e69e1144000448eb1074fe1697410736f3c64d4f1dec5"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "dress_girl_wine_gingham_tie",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_wine_gingham_tie__o3p45.webp",
+            "sha256": "f9e9a22c81cec6ac4dbcdaebb882fff7442464c1d912226a2950fb891bab67fe"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_wine_gingham_tie__o0p45.webp",
+            "sha256": "4cd88310c2be5f4d128b39224bf940d9a098a788d2d81181c8248769fe7eb615"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_wine_gingham_tie__o3p45.webp",
+            "sha256": "914c96dc208a39434eaa0ef5efe54b78040c90e9ce816936fb9199e17ff5d275"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_wine_gingham_tie__o5p45.webp",
+            "sha256": "c5b02d78efa7ee5a31b9457494c0baedb2d85844afdc610baab58133a3fec674"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_wine_gingham_tie__front.webp",
+            "sha256": "2a3e0113b4c7fe7ab9f8ea87be4bb380793347837dff78ac6b9a3e14a2eaf396"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_wine_gingham_tie__under.webp",
+            "sha256": "98ebbd9f176f06984898e48d48ce17e7f91af8e55bd7d4e82bab36d0bd74d1c1"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_wine_gingham_tie.webp",
+            "sha256": "5fa01b2cd56b133b128cb4692ce93a4848ac256ee5bc1165716af93f4cb8d4e7"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "dress_girl_black_corset_flare_mini",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_black_corset_flare_mini__o3p45.webp",
+            "sha256": "cb6c3414b91b145a9edc77984b0f3c451ca6604dcabc1f71da428e6c06d15aaa"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_black_corset_flare_mini__o0p45.webp",
+            "sha256": "8fc987ed98ec163740c2b701b42584a7c26abef06a73a5c2461ad1943671e53b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_black_corset_flare_mini__o3p45.webp",
+            "sha256": "d0550cb6c66bfb032a693fdda92724bc9a281972d4c21807badbbabfe8cdafb9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_black_corset_flare_mini__o5p45.webp",
+            "sha256": "6a0cb9e5559696fe8047f23c444bc1168c36a1111ad79f256bee990ffff5380f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_black_corset_flare_mini__front.webp",
+            "sha256": "6b858edd7ce82b2939e3879e1eb4de2a0bc6d89b2c9ced53159d226bcc9e2f78"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_black_corset_flare_mini__under.webp",
+            "sha256": "c0fe0421679a411dd9a8d50f18ebc99bf4ba28dd9f75ebab88995a82bd9601c0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_black_corset_flare_mini.webp",
+            "sha256": "b997417e270a3053a5386eb39e1f3af30515fefe3cfaeac7023aaacaea522d4b"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "dress_girl_cream_one_shoulder_mini",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_cream_one_shoulder_mini__o3p45.webp",
+            "sha256": "8c90983af34d9fd3d9939f0782d0909eb6eb01f4577ef3981217ed9465f6d528"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_cream_one_shoulder_mini__o5p45.webp",
+            "sha256": "4df9258caf4c58d31b5a7b3f314c226eacaa4bee27fd790ef443f2741e6ed77d"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_cream_one_shoulder_mini__o3p45.webp",
+            "sha256": "f46e076b0e479cb3790a459cbb4d0114f081613c351eb0b8c3c70c2c754031fc"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_cream_one_shoulder_mini__o5p45.webp",
+            "sha256": "3f2da811eaf392dd7ebec4c5b53ef1ec0e8e9983b597aa7010bff217da194098"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_cream_one_shoulder_mini__front.webp",
+            "sha256": "fc66120641b1e425d94c8122e2d161e713b96f93706d119f2b7738ceeae71562"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_cream_one_shoulder_mini__under.webp",
+            "sha256": "6cb6ca6ce7ba07fc892a41ddb79a481e8f506c3f21d6199bb60aa0be250126b8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_cream_one_shoulder_mini.webp",
+            "sha256": "797ad0884f5fa3ef2e8fc6bbf577f52cf32c14233c70d5d4f53f289e88655ce2"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "dress_girl_black_corset_slit_maxi",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_black_corset_slit_maxi__o3__body-torso.webp",
+            "sha256": "c958766a51f664b23dacc1e0a4f94d4fee669215b38b0f78e693e3658cb51133"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_black_corset_slit_maxi__o3p45.webp",
+            "sha256": "0eb22cba5b67579bf1bedcb226c1f9c7303829971fa396bd88f81181c75c5fcf"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_black_corset_slit_maxi__o3__body-torso.webp",
+            "sha256": "32ccdb3b17cc72215e4295196b4cc1b960a6fb76b76696c87546c8a6e6784b1f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_black_corset_slit_maxi__o3p45.webp",
+            "sha256": "1e91e0d9afcc4b866f180a389382e3dd76ec35715bb90cf3b810a53150ed7731"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_black_corset_slit_maxi__front.webp",
+            "sha256": "223ff90cec11b5a762bd7e889a9f499110ed40716e6f7db23d2ce3993d0856cb"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_black_corset_slit_maxi__under.webp",
+            "sha256": "1270fd740633e7145132098d68833160c901009f0c59676fd404ee356f40968b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_black_corset_slit_maxi.webp",
+            "sha256": "21508f8f15cbfed8e4957f5a11cad83b41bedbbb3b00ea41299c9095915e2438"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "dress_girl_terracotta_patchwork_halter_bias_maxi",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_terracotta_patchwork_halter_bias_maxi__o3__body-torso.webp",
+            "sha256": "274028092bed4bf075a05b022b2dfc98988b6860ba956cb27ffeb4b49675a73b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_terracotta_patchwork_halter_bias_maxi__o3p45.webp",
+            "sha256": "5c160b1752d2a6b66f684fe0234b76675bf563791da1d44bb865c34a0c0f519e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_terracotta_patchwork_halter_bias_maxi__o3__body-torso.webp",
+            "sha256": "a2a436b598a4c698e4de0acde14e58bc7925331818645226aa907d840b9d7f6f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_terracotta_patchwork_halter_bias_maxi__o3p45.webp",
+            "sha256": "92919128e3efa41aada820b98ecf012b3d11eb055712f3c5cee618814b0a5498"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_terracotta_patchwork_halter_bias_maxi__front.webp",
+            "sha256": "b5bb7225edd28ab1634d087e923e934fb1c04a6702b72aed8e11d4a2b15d0a2b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_terracotta_patchwork_halter_bias_maxi__under.webp",
+            "sha256": "9d41274175747efd0ea5feb1d7e34994177ae3d56023ab874b42dd5e4d7d3a15"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_terracotta_patchwork_halter_bias_maxi.webp",
+            "sha256": "92d2fad8c89461af340e9b19dd6334621662d0517c72186d17498c57519496cf"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "dress_girl_cream_one_shoulder_tie_midi",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_cream_one_shoulder_tie_midi__o3__body-torso.webp",
+            "sha256": "d60b87c332a648c89fc02aad563b219df1070e02a9a28fc06ef57faed368105b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_cream_one_shoulder_tie_midi__o3p45.webp",
+            "sha256": "b47a1dda30f714c9140f2f7eb90f0dee9d10f3077232d57f061d76faae99e0db"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_cream_one_shoulder_tie_midi__o5p45.webp",
+            "sha256": "ab19185bc731208dc353b5f6bf6088693ac0449cfbea1b39ad9239bb984ced74"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_cream_one_shoulder_tie_midi__o3__body-torso.webp",
+            "sha256": "9f60382e133a2bbe0306f32daabab0f1158d3a504d01775646d9d383ef2229b5"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_cream_one_shoulder_tie_midi__o3p45.webp",
+            "sha256": "a009705b406b1c12def08d6bdbfba63bbc06a666010b714f513c0afc1cc1a32f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_cream_one_shoulder_tie_midi__o5p45.webp",
+            "sha256": "6c19aecdf3b5c8a5dc487503d434b0340deb0ef0a429119fc3fe95142094f14b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_cream_one_shoulder_tie_midi__front.webp",
+            "sha256": "540f09a1962a11167d21977fd9c577c6b135554d0f0e6bfd8e308305aa2e9fa7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_cream_one_shoulder_tie_midi__under.webp",
+            "sha256": "cc41dda4e9343f61e8e55552ade41a5524120b576fa812c96da2896104ccd327"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_cream_one_shoulder_tie_midi.webp",
+            "sha256": "c87cfbfb675be7fb232fe6b516462eb357b2700cc6ca5428e0c7a531eb5ee1b7"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "dress_girl_denim_milkmaid_button_midi",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_denim_milkmaid_button_midi__o0p45.webp",
+            "sha256": "1afa7bc9dc6793b624c58b8783eeefeafca1fdb2c48a30ae4b654a1c5ca1adf8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_denim_milkmaid_button_midi__o3__body-torso.webp",
+            "sha256": "83477cd29f3a783633c37f7db0d0b9b1cdcf1c099b74a205b205ebe2eb6dc35f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_denim_milkmaid_button_midi__o3p45.webp",
+            "sha256": "2bd1073663fb30b73cb3c14d0a45ebdbb28150eb094e7d61070890736d2b75b7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/dress_girl_denim_milkmaid_button_midi__o5p45.webp",
+            "sha256": "535dd937b3129311b00b4b35a820dd9c7214c1d1559954aebb98eb09dcea4927"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_denim_milkmaid_button_midi__o0p45.webp",
+            "sha256": "d3f84f0392721a1a788f6afd957e4afa661927925c46b3c9fb8981eb4f0d4135"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_denim_milkmaid_button_midi__o3__body-torso.webp",
+            "sha256": "bdb58824c03e7968f4ad3161a1ca42116f8ba48104ecff0124b8278b5f6dd278"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_denim_milkmaid_button_midi__o3p45.webp",
+            "sha256": "72f60515ec41eea27f5b4a1754cdc4f1c75c8916eef74825c1e4369a65ff6110"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/dress_girl_denim_milkmaid_button_midi__o5p45.webp",
+            "sha256": "0aa1aa951e92391fc00fa837453834f4131acd913b26ecdbcec9daacc25b79d7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_denim_milkmaid_button_midi__front.webp",
+            "sha256": "79a658e56cf68019a92af569ecb154a91d9def232bd9bed6dbc426466e0aefc2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_denim_milkmaid_button_midi__under.webp",
+            "sha256": "5628cf0248c3ed2075027d1a82225fa5a239f6ae27069807989182c2bb81d773"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_denim_milkmaid_button_midi.webp",
+            "sha256": "d9427a97502efbeed5e88cc670434ed10c9b1c7ed21966ba1a791bc932e5b8a3"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "jacket_girl_black_crop_blazer",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/jacket_girl_black_crop_blazer__o0p45.webp",
+            "sha256": "b9fc369de0aac4ff942b74b3767a004c37c4e71c45b29f5c304fbace95ad8ec3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/jacket_girl_black_crop_blazer__o3p45.webp",
+            "sha256": "2f5b7cee651d19c96ef138a5d88bb02fe6961f5ca632c92b64fa619c7a9a63d8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/jacket_girl_black_crop_blazer__o5p45.webp",
+            "sha256": "781b9d0f0b8422657a7d96b3cd3522746c22d6645af8597c06be5b26ce33a2d6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/jacket_girl_black_crop_blazer__o0p45.webp",
+            "sha256": "83117fd8b0fbab82c079d3944579913580b9cef5516af9b91f68a5258595110a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/jacket_girl_black_crop_blazer__o3p45.webp",
+            "sha256": "2667a6276c1ebaabe519323b9696d3105a8420d5a26da1ffc1f3b5d5bd69f190"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/jacket_girl_black_crop_blazer__o5p45.webp",
+            "sha256": "eb6e39cca7a03404026d3222766ce8002bfe15aba5fe0fa101c9bde214348948"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/jacket_girl_black_crop_blazer__front.webp",
+            "sha256": "0decd89b5d67ebd1f1ed5914be734b8bbdb73e46c7e61ca84b82601c685702d9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/jacket_girl_black_crop_blazer__under.webp",
+            "sha256": "93b1d43924f1a015daecec69286d29780cfcbbbbc1f4e60957275ccd5c2df956"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/jacket_girl_black_crop_blazer.webp",
+            "sha256": "58d8e24c3ead6d31b47da480b65e2e79f55c68eefec775a26a16aa4b83d6fcfb"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "jacket_girl_light_denim_crop",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/jacket_girl_light_denim_crop__o0p45.webp",
+            "sha256": "86ebb95ba81f1a69174690af61304b3317e7f0d58d6708cfc8294102c194277f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/jacket_girl_light_denim_crop__o3p45.webp",
+            "sha256": "0692973c99f295e4393115f84a285d2950acbdac391196e7b001ea211e1a1d63"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/jacket_girl_light_denim_crop__o5p45.webp",
+            "sha256": "dda9d4002f9ae6939d094435489b2da3e154187757643a380b07054d19324eb9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/jacket_girl_light_denim_crop__o0p45.webp",
+            "sha256": "970896db194607a93cfaaf782148b144a13ad1de6ae26d52db2a17484f998bfe"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/jacket_girl_light_denim_crop__o3p45.webp",
+            "sha256": "b473331af24562a819987a777424249730f711bc9aa87364abcba9fd16ccc6d4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/jacket_girl_light_denim_crop__o5p45.webp",
+            "sha256": "34476bbdec96be19792a805332e666d1671e6ea41c8d4c48b12567936bef89dd"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/jacket_girl_light_denim_crop__front.webp",
+            "sha256": "400d5d22faffba4171742173691bf13b6966224b7fa21ac1747278946824349a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/jacket_girl_light_denim_crop__under.webp",
+            "sha256": "50fe94678f2f705bc58bb7af57394b88cfdc803e08b0734f0a698442f9e2f8d8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/jacket_girl_light_denim_crop.webp",
+            "sha256": "50b8c8bcb322b3fb4b461a25eb8a8a13da6449e5111b1e0ba62c590ab82f9483"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "glasses_girl_gold_round",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/glasses_girl_gold_round__o4p5.webp",
+            "sha256": "81b91eb203315364adeeee8f4c20a450766887de4bbc6b4dee1061b60ec0c8e2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/glasses_girl_gold_round__o4p5.webp",
+            "sha256": "cabd6b26ea128c032500e62fa8b89630edc0d49833dade35d8df5b44efe64f96"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/glasses_girl_gold_round__front.webp",
+            "sha256": "dee1459b7e5ba0e4561eb410fde25c42b4fb5effa989ef99bcfa0239ec3e1470"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/glasses_girl_gold_round.webp",
+            "sha256": "e78ba65489700ac3da999be135180d06f711d5542001f9947ffb829ff6d53add"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "glasses_girl_rose_soft_cateye",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/glasses_girl_rose_soft_cateye__o4p5.webp",
+            "sha256": "92aa6422cc7ce7ac6706056219d6e5833935225407785b8b1c506c1d0c0e7434"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/glasses_girl_rose_soft_cateye__o4p5.webp",
+            "sha256": "bca35f36be6aecfc7489ea8ee4afc9284f2ae392f352f4cb54774388414538e7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/glasses_girl_rose_soft_cateye__front.webp",
+            "sha256": "92c7f36a26b4916eb9e68ed83bc9aa1981a78d74ba5c682901f05a75e1474827"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/glasses_girl_rose_soft_cateye.webp",
+            "sha256": "c507c7c08e4a3948fd1e750d3f5833a69772af0ad9694adf596c750c42b994fc"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "glasses_boy_black_soft_rect",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/glasses_boy_black_soft_rect__o4p5.webp",
+            "sha256": "b4abaefd4c40d6a4341d8a837fe8b84807967fd0987669f1add598659f96be31"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/glasses_boy_black_soft_rect__o4p5.webp",
+            "sha256": "a98fa57613b63acb5050226d44d37318bcfed069e790504d9e8be01cab85673b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/glasses_boy_black_soft_rect__front.webp",
+            "sha256": "789877fe519a9a8f9aad9af32deae8ad89442c43eb2b69912314a98b8325a0a0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/glasses_boy_black_soft_rect.webp",
+            "sha256": "4f87d98eba278546d95a7bbe55feb24eb9b50cd61967e070092968482e97d2aa"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "glasses_boy_gunmetal_round",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/glasses_boy_gunmetal_round__o4p5.webp",
+            "sha256": "45e7eebc9ba17a1f6bdd2611c9f5b601dbbb1b7f165ba95f5ec4a2b52ba7592c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/glasses_boy_gunmetal_round__o4p5.webp",
+            "sha256": "a03e4700b490f9e8f663e0972856d17801d2038589a123d94db1d862ad2780ac"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/glasses_boy_gunmetal_round__front.webp",
+            "sha256": "d16c83ca33acd264f633cce55c58a4b80e04136dc3251d5b5e66330d87de06d7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/glasses_boy_gunmetal_round.webp",
+            "sha256": "ca8b5c0ffd171ee15f55be6a9d2c3a354bcf0bd07452a39670547625537c1429"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_girl_bun_wine_bow",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_bun_wine_bow__o0p6.webp",
+            "sha256": "085ec8df63a983ab69553a1d57116b488fee4a6c10dcd8cf25271fe6d471e972"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_bun_wine_bow__o4p6.webp",
+            "sha256": "1e053da595c085e31410c18211df39095d01cfe90bb4a62a528ffcaa4bd52769"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_bun_wine_bow__o0p6.webp",
+            "sha256": "5401dabe84bcfd2746a7876d6479003d673bc6d4705b51f1c8a000d5c11b222b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_bun_wine_bow__o4p6.webp",
+            "sha256": "72359d915de2972799a8a7a6f93bcc624e46514287e1a50c0a46c480d4024a5c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_bun_wine_bow__back.webp",
+            "sha256": "695066104674d251fc95704027e616a8c68920a64060c680820b71b27ef1be9f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_bun_wine_bow__front.webp",
+            "sha256": "8fd99c6d5cb4d4d5920abc627b12538e8dd1d2be721ee6818b7e148654986e13"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_bun_wine_bow.webp",
+            "sha256": "84d85cb894d625218543c48bbe6a97e4c443d5679f096d87af5c089725e8af3b"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_girl_caramel_braid_crown",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_caramel_braid_crown__o0p6.webp",
+            "sha256": "d928bbf472b847afb1732944e1e2a0e9cb0dd0464c91ecb93a5e958d59b958fc"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_caramel_braid_crown__o4p6.webp",
+            "sha256": "eb6d0eec530855d5c636f8b97d6310f8f7bf7e0bd510dde68a3d73f9e604ca6c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_caramel_braid_crown__o0p6.webp",
+            "sha256": "4c9af734141580b3d1e4c6d1446198b5ba74595a53ff7ea91d8c92f70d492bbd"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_caramel_braid_crown__o4p6.webp",
+            "sha256": "fbe05f105cbdfa0e7291b96c2b19d561f85d7bcbd00b15b893501a2bf897a90b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_caramel_braid_crown__back.webp",
+            "sha256": "8868c859a8c71f6d3ad30611d3b9c9cda0b420fb0d5d486cdd7555d6d3ff7999"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_caramel_braid_crown__front.webp",
+            "sha256": "da229470e0117513debaeb97bd46c44a363fd70cbb9f79d71fd4b5a68ead140b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_caramel_braid_crown.webp",
+            "sha256": "ba41188c75db4fb31977051d7cd4cbfa9f5158d892dc35727a1aba2f54d7ae7d"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_girl_ink_twin_braids",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_ink_twin_braids__o0p6.webp",
+            "sha256": "435748a320f9f5236d58a1e27bfd5d8aebd37a3ea43523e30b44ba34e174a123"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_ink_twin_braids__o4p6.webp",
+            "sha256": "843454b5a3db9c23843847adc321dfe369b361ba71afd96e19f9661c575bce68"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_ink_twin_braids__o0p6.webp",
+            "sha256": "7cc3b026735d0103a8e2017ac2690bcf913e4d77c94552b84b20d3befd1b4295"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_ink_twin_braids__o4p6.webp",
+            "sha256": "b3c0a31f6db4e4980df7e762ab03884dbf19db913979e31152c5fb5164c9813a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_ink_twin_braids__back.webp",
+            "sha256": "fdc06dd3bd4b6f9bb14be16d2f6bb89d9018ca018d6be73494173f1dfcafbe5b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_ink_twin_braids__front.webp",
+            "sha256": "1489ab6d1cb9569cc4592e83269dec632a00934d612c04be845fa69c29506ec6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_ink_twin_braids.webp",
+            "sha256": "47a69d11b3773cd217c4ce151f511dffd98cd719161cb1cfe23397da956aa797"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_girl_chestnut_butterfly",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_chestnut_butterfly__o0p6.webp",
+            "sha256": "75a628d4af6e5aec068d9f0010330199ac2225b10bc916e85b22bbd24734608b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_chestnut_butterfly__o4p6.webp",
+            "sha256": "df1e9001307905dd9493b752e7cda5dbd9d8d90628b8592918c5d77506981791"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_chestnut_butterfly__o0p6.webp",
+            "sha256": "ae7f177b39a453904543232b698631f8ebf613d6e159eff7b6a5cb3d2b5f4318"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_chestnut_butterfly__o4p6.webp",
+            "sha256": "0a7487f0bb4c206697b7e7ee585068c901b58b876b8560e73c35f711d54bb725"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_chestnut_butterfly__back.webp",
+            "sha256": "132b0b425d166c4f16cecf0427d7dd663cbfce977e57e693688aa1c9443f9b9e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_chestnut_butterfly__front.webp",
+            "sha256": "71a6bcf0898673ea20c20d26d7dd00a8677a2850c6c54616e99ff51c50a2daaa"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_chestnut_butterfly.webp",
+            "sha256": "056fc84f0ac69811eb63affdc9efff6a9c8a6dde03b296cdeaa7f73daa05d9ce"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_girl_copper_soft_waves",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_copper_soft_waves__o0p6.webp",
+            "sha256": "ec7781afa880f2c00e98f70bf7ad1341898760d78ca4a7b757e12f1e56f940f1"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_copper_soft_waves__o4p6.webp",
+            "sha256": "18ba7ad0bbde800804b6ccb503e20152c8fa8d6e174d4de1e46050b8e682732c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_copper_soft_waves__o0p6.webp",
+            "sha256": "c3a71442e156569db538962cf589abd306438e08a8f9ff7190fca3c7fe9e2420"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_copper_soft_waves__o4p6.webp",
+            "sha256": "96524ffbdd46124cfcb7cffbc873a902324fdb85c336f1303490f50b3c5f145c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_copper_soft_waves__back.webp",
+            "sha256": "f8b164b9c2fb54c207f6b7b4cdc8718d151f75fbb5ceb838d6ecdc1703a0b343"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_copper_soft_waves__front.webp",
+            "sha256": "49100f4455682c9d0aa1c92eca6a7343685b946fc70f35d5c735eefbee7a5e66"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_copper_soft_waves.webp",
+            "sha256": "2ae570125c952054a4968c836f8669a544044bae55e355a69f756e670a058532"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_girl_ink_french_bob",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_ink_french_bob__o0p6.webp",
+            "sha256": "7041ad5889a43d7407bb6a14785fad2cdefae2ec1069a1a7f7b2f71a15eba0d6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/hair_girl_ink_french_bob__o4p6.webp",
+            "sha256": "dbee56b2f901a01a853fee45f967378315d257d0764ac4ad1ec771e42e7b1b42"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_ink_french_bob__o0p6.webp",
+            "sha256": "5f01d624c116d5d5a69af8136e34a6e54ee142409d269739686dcf6a7b1454d6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/hair_girl_ink_french_bob__o4p6.webp",
+            "sha256": "d6d3589ae8eb36004310a360d768c19fa74d5af47dd6e3eb6e848b6949330e8a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_ink_french_bob__back.webp",
+            "sha256": "1598999fabc600890f81663b2e76dcab3a7a0cce9750bd85d1d85dbc3840961a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/hair_girl_ink_french_bob__front.webp",
+            "sha256": "a8d1cc7e64628c80f6022d7483997365c0b369c0cc3a31e787616118c97f4f03"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/hair_girl_ink_french_bob.webp",
+            "sha256": "f1fbd6e863e04afa88c52d2e3899f4cd9682c5195acfedfa3de7481b052afa29"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "necklace_girl_pearl_drop",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/necklace_girl_pearl_drop__o3p7.webp",
+            "sha256": "e9c9eede28ea5f77933085a0fad6f5208bfa8773fe99bc462456b22e4bbf60a7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/necklace_girl_pearl_drop__o3p7.webp",
+            "sha256": "cceae53cfbd37dd1875465b5b9b41bd205f4470edeb631099b81e7ea0135f3c0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/necklace_girl_pearl_drop__front.webp",
+            "sha256": "bcd7560179c1e982a1363ee0d112c3b4db92ba81da5dbd2ce324c2e3236fd6ad"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/necklace_girl_pearl_drop.webp",
+            "sha256": "9d351a3d9e2a470726989440298cad3ad2510ecc33c5b2f95c8e4c9b44814681"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "bag_girl_camel_mini",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bag_girl_camel_mini__o3p7.webp",
+            "sha256": "3e3e5c534a56fd14461d81f1f6650113187598721b6f94598b779fbd10fe8998"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bag_girl_camel_mini__o3p7.webp",
+            "sha256": "0da54ab1826aa323e902ce9d5c92a5b7b627feb9bf015b5a376e0c2d6a33c7b8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bag_girl_camel_mini__front.webp",
+            "sha256": "4ec56a8ddd209983daaf2bb10375566b37f51dcd34875621fa34291057835b4b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/bag_girl_camel_mini.webp",
+            "sha256": "dddd1910ec3b44a0aab35cfd013d56496cdb27b789ddd6dfc465a70472c91fc7"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "clip_girl_pearl_bar_pair",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/clip_girl_pearl_bar_pair__o4p7.webp",
+            "sha256": "b1d07dcbf52741d1ead8c5ae171606c406ee99cbc7017aa81bb1890674749cf7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/clip_girl_pearl_bar_pair__o4p7.webp",
+            "sha256": "feb95240b4bc395a1afd749f040bbd654a24b55847de5a84608150ebb461c004"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/clip_girl_pearl_bar_pair__front.webp",
+            "sha256": "b408c83b609b4e5c463d66c3d9d703a20e0645ebbb08cc94d02b8ac4bccdf5f0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/clip_girl_pearl_bar_pair.webp",
+            "sha256": "71296b2fa7aae1b4370ce0333bb44e60cd3698198b9ab39758c09346935ac9bf"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "bottom_girl_wine_midi_skirt",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wine_midi_skirt__o0__body-farArm.webp",
+            "sha256": "e5e6f45f4265e065b9445a52025c6c8a53c741d9a114a58fa0ad41271f3e58a6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wine_midi_skirt__o3__body-torso-with-avatar_v2_top_black_cute_crop_top.webp",
+            "sha256": "c20ac573f4b4072e5d3da730854ab7b30e877d505426a3547e578c944194a2a1"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wine_midi_skirt__o3__body-torso-with-avatar_v2_top_white_cute_crop_top.webp",
+            "sha256": "9e9e1be677badd53b064375c49f730e2b8b3f7c08194c240ecf20e9de395ab90"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wine_midi_skirt__o3__body-torso.webp",
+            "sha256": "2c258a29dfd2f1d4ef1f123d1e6df12e3788bbe1a4effc665e77664361c88a6d"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wine_midi_skirt__o3p3.webp",
+            "sha256": "1f318dbc9ef7967379d502886d55539179c523dc7a656a98edd0c95069fe5515"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wine_midi_skirt__o5__body-nearArm.webp",
+            "sha256": "c213ec7582a0bf33fbc535e4da9c2c3e9845c3c91d7d6405b7e231188f892c4b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o0__body-farArm.webp",
+            "sha256": "9941f05062730494f38ddc0d6f9148f756022ac92e653ce1441d72c4897f30fd"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o1__bottom-cut.webp",
+            "sha256": "280138d0cd28b0f4668b5aab1adb41ef7f63c2c7ca983e72ff7e55b05d555db3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o1__bottom.webp",
+            "sha256": "93a31b3c93e496ae4811cf93c0d9aec2d611260c8db1cc2dbcde61e68763f2a1"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o2__bottom-cut.webp",
+            "sha256": "f4c4c907d22ab090315980ea3a6d148e7fb33303ce0834d58034be6180278dad"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o2__bottom.webp",
+            "sha256": "bbe45a9dfcc11cbe254f4f81ce38aa85aa77b8a93cfea37d60b85a4cfe7034d9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o3__body-torso-with-avatar_v2_top_black_cute_crop_top.webp",
+            "sha256": "28427d90f520c01721988e6a325dabdb3729f93bfb3337cfecb94b3a0511af84"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o3__body-torso-with-avatar_v2_top_white_cute_crop_top.webp",
+            "sha256": "5dfd5e9c0a606062f518ae4de31ebde31618ada7ec3baec271ff87b7fdec4503"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o3__body-torso.webp",
+            "sha256": "ce0e409f97a4d5653336bed75444a74bcb16210a529648d2a0bf223c276ea9c2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o3p3.webp",
+            "sha256": "f6c909c82eae3b9b11c2c3f06d0537c842da01e34542b2e043b4705d509d6f18"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wine_midi_skirt__o5__body-nearArm.webp",
+            "sha256": "699f4e7add0c919c9a74a7c6f722340abf0927f43e6c2b75665cb1cf65dafe68"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bottom_girl_wine_midi_skirt__front.webp",
+            "sha256": "106f0340967b65e1686f833108443169461bf047696f52379c2a0ab7c23c9945"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bottom_girl_wine_midi_skirt__under.webp",
+            "sha256": "e79d28cac29301cef73231d55eb3a9462a13975584593cba8cfea289d34f5739"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/bottom_girl_wine_midi_skirt.webp",
+            "sha256": "ae26d1b7537c34b6950713767ae278c38f9383ff57238c27c60cd0215a0b90c4"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "bottom_girl_wide_jeans",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wide_jeans__o0__body-farArm.webp",
+            "sha256": "e5e6f45f4265e065b9445a52025c6c8a53c741d9a114a58fa0ad41271f3e58a6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wide_jeans__o3__body-torso-with-avatar_v2_top_black_cute_crop_top.webp",
+            "sha256": "c20ac573f4b4072e5d3da730854ab7b30e877d505426a3547e578c944194a2a1"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wide_jeans__o3__body-torso-with-avatar_v2_top_white_cute_crop_top.webp",
+            "sha256": "9e9e1be677badd53b064375c49f730e2b8b3f7c08194c240ecf20e9de395ab90"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wide_jeans__o3__body-torso.webp",
+            "sha256": "2c258a29dfd2f1d4ef1f123d1e6df12e3788bbe1a4effc665e77664361c88a6d"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wide_jeans__o3p3.webp",
+            "sha256": "18ef9e350ca28bcd78b09e18696a517d66e8087e4f30f74aed4dbeeed3bdbfb6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_wide_jeans__o5__body-nearArm.webp",
+            "sha256": "c213ec7582a0bf33fbc535e4da9c2c3e9845c3c91d7d6405b7e231188f892c4b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o0__body-farArm.webp",
+            "sha256": "9941f05062730494f38ddc0d6f9148f756022ac92e653ce1441d72c4897f30fd"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o1__bottom-cut.webp",
+            "sha256": "cb3f8ef5bdb465c4c19fb4cbe7a06c668b003a722e92395280b13a8b54dd74b5"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o1__bottom.webp",
+            "sha256": "a3af891e011ce34b0c98f67c7bb2fae3fb2dd6fc2270b424107dc39460d9be06"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o1p3.webp",
+            "sha256": "e6454d6335e7c8b97fc7a78ba31a137a17c49e3f4129fa08b440958cd6defa92"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o2__bottom-cut.webp",
+            "sha256": "8c8872eecfdafbd9fc8505b5b1c93b20ede79d01370b709b0f66e3042c4c6bfa"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o2__bottom.webp",
+            "sha256": "a854a56136033ae1304aefa1e8078e5d5b6a5b9d4f64b08e2a66783ce057e451"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o2p3.webp",
+            "sha256": "a2b1da6d035a000928ae52f79ec82a237927d8b5bba65f8c2ee28a748b807d50"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o3__body-torso-with-avatar_v2_top_black_cute_crop_top.webp",
+            "sha256": "10ac788fea2873cbcceb2c353bb1b1e5f6839d8477a77ed88dc616bc7b3a6d67"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o3__body-torso-with-avatar_v2_top_white_cute_crop_top.webp",
+            "sha256": "0e7f0e9946c0638d8a0171a5a2bd1ae032830d77b5a11a571a72d15dea48ba52"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o3__body-torso.webp",
+            "sha256": "a08230bb3841b16338e21936b106d0f999c5711cca2029a18eb8dfbb15d365b7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o3p3.webp",
+            "sha256": "75b25da0dcdc793ef6f9c74ee81ba4f097be070da8af1c9a0fb6e353d2cbbaff"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_wide_jeans__o5__body-nearArm.webp",
+            "sha256": "699f4e7add0c919c9a74a7c6f722340abf0927f43e6c2b75665cb1cf65dafe68"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bottom_girl_wide_jeans__front.webp",
+            "sha256": "900bed50fe1c9ce1faf31f5969a88a16f3a829fd06884ab319cee37f2c64a597"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bottom_girl_wide_jeans__under.webp",
+            "sha256": "726796e46552414482fa60695895f1b579bda92f8fe280a362509e998724c4cc"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/bottom_girl_wide_jeans.webp",
+            "sha256": "a84ac14ae017dd01db83ebab5d0152ce9db83de3e64b96d42e6b9706e2535cf1"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "bottom_girl_ecru_trousers",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_ecru_trousers__o0__body-farArm.webp",
+            "sha256": "28393162d6e07cfe535699a07694c751990061bcd25f55c31c3cc049ba331882"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_ecru_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top.webp",
+            "sha256": "ed51f410fa70ed497c3ca8e4198e9b49bce779f8c91ef43dce5a8111d425766e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_ecru_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top.webp",
+            "sha256": "be75a52d15e775d705155d547e28de2616b51143b29e58b321ce755774accb1c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_ecru_trousers__o3__body-torso.webp",
+            "sha256": "8e323cdbe55f64dc48267e1fdfd7979db222187f77318f87e6b75df29e6824b1"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_ecru_trousers__o3p3.webp",
+            "sha256": "0a813f17ba3b5c3ee30ed12c761ebd03fb0580a1944cb2037f461058e4338b8f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/bottom_girl_ecru_trousers__o5__body-nearArm.webp",
+            "sha256": "c213ec7582a0bf33fbc535e4da9c2c3e9845c3c91d7d6405b7e231188f892c4b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o0__body-farArm.webp",
+            "sha256": "95783ae0091caa2625aadf49a0078e44124533e610db566c8def63e94a82ebe1"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o1__bottom-cut.webp",
+            "sha256": "8d018229f6e601cd97d0bfd18efaab45d32d1c6089f5a712332b2c251b109c7d"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o1__bottom.webp",
+            "sha256": "bd826acacc187526f0d59462c4da56ad14cbe08191c33418b805efb82f8b3cfb"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o1p3.webp",
+            "sha256": "7ce27303867af44ad85b3ec32947d82f4b053fafa316023b01bb7459e362c447"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o2__bottom-cut.webp",
+            "sha256": "d0dbc44dd944e4adde1872fdaba8c689afac663a83662f42d980772c36d6895e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o2__bottom.webp",
+            "sha256": "dfcdb132dda0d265b0f552bb9262a783a02c2643c809e14f85721053ec811cb0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o2p3.webp",
+            "sha256": "47a5cadc30289ba829401c842fc33c79c268f95fee1a798a4d4723c442c34c45"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top.webp",
+            "sha256": "36e20aa676738b25320fa2a67aea5a0422c8d5c0497dda28a509d47e48b9bc21"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top.webp",
+            "sha256": "4946110e72860534f83fbf21b1131a1a71064c8cab806eefa8b3592d4a461fc7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o3__body-torso.webp",
+            "sha256": "b7dc72ce1a7d9ca1aeea984f0ed48cb247fd3edf359f441621d87d9f2387ff89"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o3p3.webp",
+            "sha256": "cc28fc2c80db0f2220a4319245314765651f0e89a957e0ec3426dea9ba3543ad"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/bottom_girl_ecru_trousers__o5__body-nearArm.webp",
+            "sha256": "699f4e7add0c919c9a74a7c6f722340abf0927f43e6c2b75665cb1cf65dafe68"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bottom_girl_ecru_trousers__front.webp",
+            "sha256": "c9dd800ea84dbdba1ce75be216d7c53a616facbce56550b9d7d8be3fae3caa99"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bottom_girl_ecru_trousers__under.webp",
+            "sha256": "475e89961e4fa173efc07d27e0bde0e79b9fb900a2c8d30f2d3afdaf0aa04e6a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/bottom_girl_ecru_trousers.webp",
+            "sha256": "65275d6bdf19597ab4ff68a6b55e0629f59c30083952974f92a06c3e92ed4a43"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "shoes_girl_camel_ankle_boots",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/shoes_girl_camel_ankle_boots__o1__shoes.webp",
+            "sha256": "e04b6ef410d6cefaea83641b4a17a4afe6d79d34b32f6e926aa57b66ce9bb367"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/shoes_girl_camel_ankle_boots__o1p15.webp",
+            "sha256": "6f0d5ec5a987cfcad0c0c9b3c3d765c2fef481cb10b878b9798342a8cfb004b8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/shoes_girl_camel_ankle_boots__o2__shoes.webp",
+            "sha256": "e24423377566a20760658a8ef665f7265edebdc84d1f3f1ff91cd90afd021f1a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/shoes_girl_camel_ankle_boots__o2p15.webp",
+            "sha256": "065b910615a46aec1d784ef85a69bd9aca6484243627e57f890fbef21cb7ad24"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/shoes_girl_camel_ankle_boots__front.webp",
+            "sha256": "1d4e4d3132b2612dfc6baac4c6aa38f3e8f71e9d5b4d9f4df1afe009554cbefc"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/shoes_girl_camel_ankle_boots__under.webp",
+            "sha256": "11adb197f9bbf887ec00034a9aeaeb5bcc179600d4712fda9d5300cf324551bb"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/shoes_girl_camel_ankle_boots.webp",
+            "sha256": "2d1c64949d31ae812e54e0bfb7f07b1e0676fb96e72d5385768be963033b92eb"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "top_girl_camel_vest_tee",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_camel_vest_tee__o0p45.webp",
+            "sha256": "8363efc363ae52b3936dd3d251e2a45b4c58ef77d531631ac29a0b1660f74f7c"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_camel_vest_tee__o3p45.webp",
+            "sha256": "193113bb7eb778eef7e470bc2b8f3d0955675b0e601517b552331867b35aebc4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_camel_vest_tee__o5p45.webp",
+            "sha256": "a0744a585f7efee41997dc9b6080088bb97158fdcdcbcd96d5ec9bec8143ad00"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_camel_vest_tee__o0p45.webp",
+            "sha256": "25ab08455367c8ef2ad129a3f777e381a224a552097bb76a66118deef6efc86f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_camel_vest_tee__o3p45.webp",
+            "sha256": "d30596476cc067c5dcd7fe1ca19f1bc46dec62148264266a7ec98ae1197ec3ef"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_camel_vest_tee__o5p45.webp",
+            "sha256": "b92ac4de80636b459f1296c834d69c42a69fd8cf7f3383683e5a080e10e9cca8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_camel_vest_tee__front.webp",
+            "sha256": "ffad1c60a8e4bae9f5815dd1df598fc2da8c9e886c1b1f0d6d95f8900fa828b0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_camel_vest_tee__under.webp",
+            "sha256": "89413d3ba65aa1491589f0fbf2c3699e8fda2c7eaea075f6baf3f521228024e7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/top_girl_camel_vest_tee.webp",
+            "sha256": "69ce986958f14f779b4867bef646cf6b7431acb5646ab66c2977688e47ed6bee"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "top_girl_white_poplin_shirt",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_white_poplin_shirt__o0p45.webp",
+            "sha256": "aeecccb1521ca6eb96ce596ecd9ec473c86fb13231fd58e4a507ab732f5ba2cf"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_white_poplin_shirt__o3p45.webp",
+            "sha256": "35a1b5590296f45a15174734402158254500dba2f05f5d7b84cbd0fa837a3525"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_white_poplin_shirt__o5p45.webp",
+            "sha256": "da8f38f5af78469a020923baa338856fba2dc0e99cecc828ae1153a2708c65f4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_white_poplin_shirt__o0p45.webp",
+            "sha256": "233d944cc4c6bab4797bd26288c22bfbe03613e0368e9f170fea4269227329b0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_white_poplin_shirt__o3p45.webp",
+            "sha256": "d840c97b6c170199a8fee22cc2938342da6ecdd76de3db9dc847944d869fec6f"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_white_poplin_shirt__o5p45.webp",
+            "sha256": "844a1f17571495794197d04519746c03a5c96ec20821bd58f7055803d87914fb"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_white_poplin_shirt__front.webp",
+            "sha256": "d3218f20285e19737baf5a6300fc2de4d35e01b5bf9b2b3cb17ae0bd9276d7d1"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_white_poplin_shirt__under.webp",
+            "sha256": "8e289736cdb5d1a91e2d07c9cad926762068a373e5fd31b875d55cedc0b4f858"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/top_girl_white_poplin_shirt.webp",
+            "sha256": "49f684d41aa39089ea2702dc8adf3349125416936cccfe4b3dd1144092393bb8"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "top_girl_rose_pearl_cardigan",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_rose_pearl_cardigan__o0p45.webp",
+            "sha256": "878a4e304a56412f2a75fca467da8c38eebe75c45cfa18b4c70668180678215b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_rose_pearl_cardigan__o3p45.webp",
+            "sha256": "66562325b5c78a668b5c196246833a8b9f13b14169bd6f59370b446c94010bf3"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_rose_pearl_cardigan__o5p45.webp",
+            "sha256": "6ffb14a149a61bdb64b5fe8cec52a2f0f247fbb21f217a20d0058bfa09b07cea"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_rose_pearl_cardigan__o0p45.webp",
+            "sha256": "bc2b7fb006ded901cabe21f40223a9a3d89ee8d1dee2b0968e0e4fa8ef8418aa"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_rose_pearl_cardigan__o3p45.webp",
+            "sha256": "7bef1eba4795f2faced63c718ac64ced129e8c919c876b75d310a84b7c17bf91"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_rose_pearl_cardigan__o5p45.webp",
+            "sha256": "6f6a5ecd9c5c74a7596a5e163a853a4a1f1e0d8194bce72e839095cf739e1c5a"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_rose_pearl_cardigan__front.webp",
+            "sha256": "059c1d91b6c2c77f3c3f51ca0f5ac81fc39a2d70519e849f87bb56cd33b44cd1"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_rose_pearl_cardigan__under.webp",
+            "sha256": "e89cff27df5aa1eb08b671f33aa9bd5ad20420e5997a5bbc327ff52b8e397f1b"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/top_girl_rose_pearl_cardigan.webp",
+            "sha256": "2f9ba282d934eb7ea0b50f550514645ce54b5763ae9e8bf6716f506a8051e3a1"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "top_girl_breton_stripe",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_breton_stripe__o0p45.webp",
+            "sha256": "188eb14fab8e9b940d28b6a062e9d9a1e14ab9afd8e71c3368364bcfdbef8db5"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_breton_stripe__o3p45.webp",
+            "sha256": "609b7b66a66ac90da9a1626863d1de70704ba4b51ffefefeba67cc46edf96038"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_breton_stripe__o5p45.webp",
+            "sha256": "50b81e9cab25759b8819e923e9bb530da44738097306357989e418edd33cab19"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_breton_stripe__o0p45.webp",
+            "sha256": "0b26444d464746dce3f50ec6fae41f0c275ba81eaa09992af2ad31c99e5fdf19"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_breton_stripe__o3p45.webp",
+            "sha256": "531f8663b29c1d5a1b4a60783ccf65cf2acf2526c9535524087332adc6a10095"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_breton_stripe__o5p45.webp",
+            "sha256": "806a29dcb26093e7cdef6c3bbf48e2931efcc88314ec07fb912aa786b2248c00"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_breton_stripe__front.webp",
+            "sha256": "2bf309c772db4ec547767a69dd892d726fba3cd2b09ad6a106db80bc6dd6daf9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_breton_stripe__under.webp",
+            "sha256": "71e2b222e71256848be2caac11d1a7627f535ed03c9ad1593c4a9c7f70f99fb8"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/top_girl_breton_stripe.webp",
+            "sha256": "b7a23a3b8c1922265c4925a3a2b3d800cb4b426e2d4ed75ee26c6d6926eabde6"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "top_girl_sage_knit_polo",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_sage_knit_polo__o0p45.webp",
+            "sha256": "672fba6178771a969355c9bb0edc807469755e8b7cdb249ec6fe61b4506c7184"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_sage_knit_polo__o3p45.webp",
+            "sha256": "5f5af95f08d9de238545b36913a2a56423512aa5a43f2e33313dfbc227b961f9"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/top_girl_sage_knit_polo__o5p45.webp",
+            "sha256": "85cbf477fc982554cd628a5f506dfbf4a930f68521077fb03026a84548a66eff"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_sage_knit_polo__o0p45.webp",
+            "sha256": "5f8ae8ab82ca4a5ef883f49aada8f57fb6868f77ae41257cc1857145af318658"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_sage_knit_polo__o3p45.webp",
+            "sha256": "55834fcdec1f9cab9aee1617d0fc8728736882c72526dd3981a97fa895325c41"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/full/top_girl_sage_knit_polo__o5p45.webp",
+            "sha256": "daedb0a0dae50b4d529dbf510dec7958fc41427dc91838fe2c6431ba9f3fff05"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_sage_knit_polo__front.webp",
+            "sha256": "df423d5dbf26b38972dc4ed6b4c7311fcaec4b44e28d7c9d646961599b0d0286"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/top_girl_sage_knit_polo__under.webp",
+            "sha256": "64d231e76383b94b11e68db005060274d2a814b234695baed1009908fac57c6d"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/top_girl_sage_knit_polo.webp",
+            "sha256": "b99bf278d90a9d2f7c269596847994516c936e91663f108dea21dbec788861ba"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v2_chair_blush",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r0_back.png",
+            "sha256": "cb1f2b3073755a6307d068cda2dac6ed34a651a4f973338f0842fbb1f2756779"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r0_front.png",
+            "sha256": "9dbae620f701c4c248f22d1f189b70b2b360556f3eeff058c943d5d32d6f77e1"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r0_shadow.png",
+            "sha256": "a09eaa7d03dbce8da1c20c97ffc5b06b671acc7c6e0a288465ea92c53ecd9a96"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r1_back.png",
+            "sha256": "bdcc1c7683e5c9e3c4ea6c01478f0465999d86e5c41f3181dec09630d29346a1"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r1_front.png",
+            "sha256": "14d6c7a5d8f39e95f62de5f85170de58837bdf464e41ce3a865960ab1fb23454"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r1_shadow.png",
+            "sha256": "7d56a52fe6df1fe1d5b38d75f4bf891f9ac4aa54f6da22b6bbe0ff2eecf138f9"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r2_back.png",
+            "sha256": "99014001ac4751d2cdfff81ce66f4540bdba9fdfd3a2543080056e761961c81e"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r2_front.png",
+            "sha256": "77b4091847dcc70fe5b33d1352719d98a308f1fcde397b42a56fe05570eebc32"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r2_shadow.png",
+            "sha256": "80e9951d6b4218a323cc747596c7c76cbac3abd575cc62011c85d3be74154cf6"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r3_back.png",
+            "sha256": "acc24279e4777ca696b4778498df11dd1f2bc67520747602ba89f650dcff3275"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r3_front.png",
+            "sha256": "563d9c3e4f2e3cad272dbd27135e4b51bd131e507cf8609de4db8f6aae36ac20"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r3_shadow.png",
+            "sha256": "bae5fb2acd86654eb7f99dedf1cbbfddb38459ea0789c8afb96cd222a365c1f6"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_sofa_japon_cream",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r0_back.png",
+            "sha256": "acd144e89e80ae8dded0870e3391881496422fb4bb69269514620951c0274bd9"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r0_front.png",
+            "sha256": "03d8c36984d7ede514375bfd4e6a921340bce643bf7ddd7b1d2376f6cbf9d008"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r0_shadow.png",
+            "sha256": "447cdc5f336ae9e9d6222812e4ffc41d764efb85ba700355c14861b40328b079"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r1_back.png",
+            "sha256": "88538b98a5360aaa7557a18093b4ae8a13ecb994de4a471dd49bfb43209995ea"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r1_front.png",
+            "sha256": "6f5458a1c3c8c50ab14b38a6688a736279452a67285490fece5c4dab3345b5fe"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r1_shadow.png",
+            "sha256": "7b83542825157ea288bc43389cf38ddea1a40b2c11be645bd9836fc33211bfe6"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r2_back.png",
+            "sha256": "67df1bf7cae156b6b520d5174c457d776adcffbd5b6db1c05c7874ca12010e2c"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r2_front.png",
+            "sha256": "839f3131f598c85b9a95a2d34ab1b533bbdf3529cad21dc2e28a8e5946031d4f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r2_shadow.png",
+            "sha256": "170bfa4b29a2785cce05ed887953339f0c3d35f13731fe4b7312b81f67ad0dbe"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r3_back.png",
+            "sha256": "fabfc6e7e8988960daf68a5cc93911ece0d752ed0f10e07c9e4b26a1cdb03c4e"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r3_front.png",
+            "sha256": "407ec7d80e8ec9250e745dc458bbf6469155ae7aee8af281391bd1689676a665"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_sofa_japon_cream/r3_shadow.png",
+            "sha256": "1860acb364094de9da85f9de3a1bfdaf8dd327a170038b0a48693f6d6023af86"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_armchair_japon_cream",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r0_back.png",
+            "sha256": "e2dc537b8b4e96463e1611fee1a5b73c0222fd4ab521189c67ae5f486b0d9397"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r0_front.png",
+            "sha256": "bd2130a080385282f66cf9f2ade54d94c389650a2786aef18067a18734c6a8a1"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r0_shadow.png",
+            "sha256": "d528be4d5ec6da211a25154aad7a8256d58921710975b023d0b6fa81ff722dc3"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r1_back.png",
+            "sha256": "4964e84d73b252c13222319d9aa8224b77e83b4d9dfbf484df7ee3ab731573ba"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r1_front.png",
+            "sha256": "dd1be0147862193c3b8590a75c2709bd8a99ecf4a38413722c65f583da4c0a56"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r1_shadow.png",
+            "sha256": "362f86dcc121d885c69c7e0fb8bdff76e47c1e35e728d50752296279f48d5e44"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r2_back.png",
+            "sha256": "e4afabf4b990e07846f97e935a4a930f63f3b209e574ead698cac9aace64d1d7"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r2_front.png",
+            "sha256": "44edf26ec023195607b6f3fa944c6ad3923638f615539b5bbdd2394139cc8153"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r2_shadow.png",
+            "sha256": "186fa20004e2a11a9564532357653d5f306775fddebc3db77c510a1f3be4fd2a"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r3_back.png",
+            "sha256": "357127638304af72f0e268854263fba3245765b8f2408df45179fd915433f140"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r3_front.png",
+            "sha256": "6d559a9e3ea23b4a7bc5ecd9dac645f5eea4e98536e5bb441a02d097239dc8ff"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_armchair_japon_cream/r3_shadow.png",
+            "sha256": "2e057142840a5474fec76016de5f5dae4382c372f4f08ea1d01f84b98c7359ee"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_bed_japon_sakura",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r0_back.png",
+            "sha256": "a11d114ca53e4d986cf7efff8c55a066493d4f5cbb288f688c6787f23ab5c831"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r0_shadow.png",
+            "sha256": "32757ccafc3ec4182d3e7bc511b7150829170879bea8369f12de91d43cd8d5c5"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r1_back.png",
+            "sha256": "ee649ccb2af32c1901999bb8f1787e9340e896ad69c044bd666ba0f8793d9702"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r1_front.png",
+            "sha256": "4093cbedc3fe73d880b5c32e559aef4c6a26a747b742f2f43398d132cd48a677"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r1_shadow.png",
+            "sha256": "72483cd022deff99bf501208d1447eabee6a370fa3cfb1c0323dd2e9074222f1"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r2_back.png",
+            "sha256": "d5d782184e7c72a8b5a2690814e5124c7bfc046269402518c0c2759a431a906f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r2_front.png",
+            "sha256": "e77be09c8071ab5ce482f805c6119317fd5c115399630e5566fd2cd3058acf49"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r2_shadow.png",
+            "sha256": "aa5b95c0fb79bdd56b24ac44dccc31f232ace02b80759f48a527d7b1a4252067"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r3_back.png",
+            "sha256": "1b1ac307dfff89171074f62903fc0a0402d1f1f607f60f9fb0d64a5a9b6ae4bf"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r3_front.png",
+            "sha256": "95281f2fa2fe3b3dd2c69903c782a30e7fc3b769d8da4bbafa1ef9ef33497479"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_japon_sakura/r3_shadow.png",
+            "sha256": "25efafe2439cb7e3e2647860adc08bcf84d35be7c435542bba395c7fe6cf4c4d"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_coffeetable_japon_round",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_coffeetable_japon_round/r0_back.png",
+            "sha256": "63cccd082eab7e73b1a242af29c4c422d34e7074676ad4a8787ab32974a098d3"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_coffeetable_japon_round/r0_shadow.png",
+            "sha256": "fa2d61c96048388cedeb1ccc368ccb1aea7a1a182a8a4f867bbccc7cd280e045"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_nightstand_japon_cedar",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_japon_cedar/r0_back.png",
+            "sha256": "d92fca88c67cb22b43bb8082df9a06b977629c150066a32f03e4dcb50c33aaf1"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_japon_cedar/r0_shadow.png",
+            "sha256": "1dfe2dfe0a34f4d889ebe357c94451dc0e55e59d7152b654c7df5131ce52e8ba"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_japon_cedar/r1_back.png",
+            "sha256": "962e5d51c60bd571b664c65b571900c305347010ef5afd40f1a70d5c7d5d1ef4"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_japon_cedar/r1_shadow.png",
+            "sha256": "a89fc10389711fa94520e8b82c324c0b1538a45ae944f0f8edd8482d478c6299"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_japon_cedar/r2_back.png",
+            "sha256": "8105c79bfa94122c67155c778914d4fb42224615f2d10557092032185d46dd24"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_japon_cedar/r2_shadow.png",
+            "sha256": "5f642b57aa960e0f2233acc041813ff749804cc430454760c8087bc22ffaacb1"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_japon_cedar/r3_back.png",
+            "sha256": "182266d05b83b7c94b04d46182fa71a3fd958c31386cbcdebf67f5609ebc3ccc"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_japon_cedar/r3_shadow.png",
+            "sha256": "276c64c0debfaef3b4617a9289fa3980d5fe4c1e42c588d0d1bf74d27d678cec"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_bookshelf_japon_rattan",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_japon_rattan/r0_back.png",
+            "sha256": "1d65d433124a09477fbae5c42e4f735972bcbf92f8d7676247207bf9d4f22ea4"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_japon_rattan/r0_shadow.png",
+            "sha256": "9d6ea0a2373efa084e444a1df4ed766b2cd3c61dc9a4e7fb7e644cf13f22c925"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_japon_rattan/r1_back.png",
+            "sha256": "a30eea1892ff86cb785ce5e5683f5fbdce119f74d9706fe8e76b8d4bc8eecbcc"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_japon_rattan/r1_shadow.png",
+            "sha256": "a6326a66127324348a7e76d8ec427369ec7ee8c75b866c92f402fa2ac7002431"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_japon_rattan/r2_back.png",
+            "sha256": "c848dccd9189fa24f6a17ae6a16e07360b7348441fb54241c958c44f8aa5881c"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_japon_rattan/r2_shadow.png",
+            "sha256": "648d22bf8595f95a77af0a74427946a2f7051a78263188e3986515b8de8e627f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_japon_rattan/r3_back.png",
+            "sha256": "99b3286ff6c5e9a7d028fe010bf4cedc16c5d3ca2ad0a01e747d06de52a64364"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_japon_rattan/r3_shadow.png",
+            "sha256": "8586bd7d867b3f28339c41d65c9cb08ca6554495b74840a4daca6a46d51f5a6e"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_clothesrack_japon_bamboo",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clothesrack_japon_bamboo/r0_back.png",
+            "sha256": "4d9598d3ad775bbbc7b4fe52e4e1d0bee2b439a4b7d16e8226a1bf78a04fe8b0"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clothesrack_japon_bamboo/r0_shadow.png",
+            "sha256": "79b142eb47aa57c40cbdd71f0a87cff48f09e1b318eed150567fef22438ddd40"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clothesrack_japon_bamboo/r1_back.png",
+            "sha256": "9cda7ccfde3ddbcd191e7604e17889c676b04274c970d70c8f6854eb6f755c20"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clothesrack_japon_bamboo/r1_shadow.png",
+            "sha256": "f0ce23faa5e9119f7e9340b1a8f6bbbfb8cebf5109b00df1c50cf8a35931a54c"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clothesrack_japon_bamboo/r2_back.png",
+            "sha256": "6981755956409331d37bf28c7c19444bf712710e0b70115051031cf3a67dc57e"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clothesrack_japon_bamboo/r2_shadow.png",
+            "sha256": "a72c93c733ca0ce8849d08f2ac3a37bab53c0e5d65415a5168371c3646818aba"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clothesrack_japon_bamboo/r3_back.png",
+            "sha256": "add10610fc13e0f80126bc0b1ea4033a29bfad6fd37dfca4728fdcccf90ee05c"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clothesrack_japon_bamboo/r3_shadow.png",
+            "sha256": "e4af9447551955ffb78b252f37259b4cf8e27b3133ed9fb850628fb952727912"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_rug_japon_botanic",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_japon_botanic/r0_back.png",
+            "sha256": "bd4d573932aeb5b47c9fc005cd1703c99f9596b53eed527669c90517dd3cfec9"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_japon_botanic/r1_back.png",
+            "sha256": "d0c989c24c214b9f9594c8057e51f4c9035edaa8790523d55b0f1dceb1fcf2e5"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_japon_botanic/r2_back.png",
+            "sha256": "3a6533536614caf64f822d3572fc86f8aa12e14b34ddb127260b1a960991cd51"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_japon_botanic/r3_back.png",
+            "sha256": "386cf36ca6ec7b4c165d86537bc9fb303fd28e84362a69e9b6d9c50069bda128"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_rug_japon_tea",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_japon_tea/r0_back.png",
+            "sha256": "00036fd8fa24be97bd595ec9033971ff3b357e139c1ad590437c500d99f97472"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_japon_tea/r1_back.png",
+            "sha256": "e0af2e0ddef0b6d76a5cebd5699aaddffddfede7945ba2359031b6b8a9eac8d6"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_japon_tea/r2_back.png",
+            "sha256": "de3561081cc537e4a1c4cbaf1eb9da238e6d987f164f486f7c0b0d596895fc8f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_japon_tea/r3_back.png",
+            "sha256": "a39f0ba766d64ea0f29eaeba13d14ed2efca4d38ca3368adfb9481976bd6b1a2"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_teaset_japon_zaisu",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_japon_zaisu/r0_back.png",
+            "sha256": "626650942c393d915f7d94abcaa20d3c5aec329d915a71e5a273a106afca4096"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_japon_zaisu/r0_shadow.png",
+            "sha256": "8594d120cd4ccce32080f0ca61245e880709fe3684e7e989f0b789fd8b1a7faa"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_japon_zaisu/r1_back.png",
+            "sha256": "52327735364b951ac3bdf4aba48811c85131c4abc30aa9b0a843c34583e8207a"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_japon_zaisu/r1_shadow.png",
+            "sha256": "40928be836aee340b8322396f0043b81bf670c69626472636aaa365f728ffe0e"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_japon_zaisu/r2_back.png",
+            "sha256": "b556583f9f503030a7af72bc3776badeb6a6a23610c52a9189b9922d22c23c90"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_japon_zaisu/r2_shadow.png",
+            "sha256": "0a1837b3b8f3646c56df6b1301bf1908623a062e48c75296d532d235e51f9ee2"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_japon_zaisu/r3_back.png",
+            "sha256": "49563f2a990158c745a5a5b519346565e8438c39978262736e6a8cc9e8a011ef"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_japon_zaisu/r3_shadow.png",
+            "sha256": "0f4736d85807e203b072179c58f02f4bc074c091cdc371d7df8a5a97380130c6"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_tvunit_japon_rattan",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_japon_rattan/r0_back.png",
+            "sha256": "378f30a1469c7422320e566314902c494f7c14083c5a4b0bab210a2cec65eaa9"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_japon_rattan/r0_shadow.png",
+            "sha256": "bac3e5678bcb30f63316fb2af33bf7a7ac5d61640ecdeff51ebf82c13887313e"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_japon_rattan/r1_back.png",
+            "sha256": "9897c7be0c7223fb9b0f8973b3f737bbba96d3dceda32b85bba4d8866e68a1c3"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_japon_rattan/r1_shadow.png",
+            "sha256": "a7e1b50b1797f5c81da9d2efbdefe404824092b53e82482e146f0d36805c74eb"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_japon_rattan/r2_back.png",
+            "sha256": "a27641332aa8debcb9817f16c68a84e54a12125c760b387de897ca36cf9f1d76"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_japon_rattan/r2_shadow.png",
+            "sha256": "790ab8b6caccc29e4b3e35ab7d18e1aba49e57b6d1e9870eda0d9f8d4749f179"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_japon_rattan/r3_back.png",
+            "sha256": "34b61e253c1a245d6d8a2887ccdff5deb76b98731023d5bfd024a25bff12e2b7"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_japon_rattan/r3_shadow.png",
+            "sha256": "b1f398fc1e52505c3f1d58dfc22171c03a4758929db1a81d4b211d5a83626775"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_frame_japon_sakura",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_frame_japon_sakura/left_back.png",
+            "sha256": "b98240516a32d187a69e03b19a331d2029670f17426497b609472a965689d6d5"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_frame_japon_sakura/left_shadow.png",
+            "sha256": "60442241dc98304506044485e3fbe0682392758fa713ab975a7b34384f281a89"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_frame_japon_sakura/right_back.png",
+            "sha256": "254ff0e42dbc7182e258143deeceda55d104201ef44852e63ec5c69bc76b73e6"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_frame_japon_sakura/right_shadow.png",
+            "sha256": "6b58cb2d3aca8d30090b3bfe5f764d6585d9655642c97876b91457a624e638af"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_clock_japon_flower",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clock_japon_flower/left_back.png",
+            "sha256": "bb963a37a20da76c9628550ad3fa6f19cade91307d1f8fc2afe2b1385723e573"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clock_japon_flower/left_shadow.png",
+            "sha256": "f0bec5f2ea32920b04b7b06bf91ef11b0f444b475ce30c776c22fe95489eccd0"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clock_japon_flower/right_back.png",
+            "sha256": "81d02947ff20fb0845fc7d9ec3bbe0e5dfda21b6fbd0e22da80b210dd5ac0bd7"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_clock_japon_flower/right_shadow.png",
+            "sha256": "1320df6b3eb50dc96816a7c6c7f9d66a81746683f8d5a4f8fae37c4783da6a07"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_bed_oyun_gingham",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_oyun_gingham/r0_back.png",
+            "sha256": "3766bdafa669f127e025c374b3e349044eddd2192da505b55fbcef35a8103658"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_oyun_gingham/r0_shadow.png",
+            "sha256": "688534c38c173335cc8d28deeb52b83103a8d33b0e3c07748df56affba95995e"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_oyun_gingham/r1_back.png",
+            "sha256": "a7fe0bcba02b11323a1a6e181a193b3dda89dfd955c6b9751223d366290ea582"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_oyun_gingham/r1_shadow.png",
+            "sha256": "3d0dc63a774218ccc6685d088fa3896e48a50279b40d0537b22440e18c2bf155"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_oyun_gingham/r2_back.png",
+            "sha256": "397bddafd3f8f46d3a30d1544f79dbf13bf67ba0fa0eda9ab527d194e96931d1"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_oyun_gingham/r2_shadow.png",
+            "sha256": "00b9069cfea10d7a5c1b725c2551ebc8dc7a68ad26db2a6a648059c01905a873"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_oyun_gingham/r3_back.png",
+            "sha256": "78d08349568a4fd7bb1e19cc159501751efa1dc2c0f50f88ae80a1d4979e64e8"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bed_oyun_gingham/r3_shadow.png",
+            "sha256": "b0d76459ea6f58401fff3c666936a062b2329b0ee1cff599f6545a34c8e03991"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_bookshelf_oyun_cream",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_oyun_cream/r0_back.png",
+            "sha256": "c23bd26ed1a3fc196362c549881d861679af1000c584d28f208df7aa8f64415c"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_oyun_cream/r0_shadow.png",
+            "sha256": "b2ed0a06e2182c6384d854b2d61fdd99788473b2b42a07dfeb14eab1740377d0"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_oyun_cream/r1_back.png",
+            "sha256": "2c170777ff961acc86225450ce040d588fd69d3cc014e414c02b3d20a4b82a4b"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_oyun_cream/r1_shadow.png",
+            "sha256": "0ae82a100490d181f8eaf14be0e939c8dbd65bafea55ef4f521960cb263b03bf"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_oyun_cream/r2_back.png",
+            "sha256": "386c9c7624cad215efb52622aa38252543e30608738f8cff1ac9fb1c0544496f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_oyun_cream/r2_shadow.png",
+            "sha256": "58029bb68856f374eab6fe54ee287048ac733ac68d0a507eb8ad8a75bb2b3b56"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_oyun_cream/r3_back.png",
+            "sha256": "846c014a5d95a9b0ec27722cbb09eb91fe87924fc06e74c314900d067aecff06"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_bookshelf_oyun_cream/r3_shadow.png",
+            "sha256": "ca310ddf737cbb794cca0e862c540237187166aaba9de500157abf6fcf964e14"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_dresser_oyun_honey",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_dresser_oyun_honey/r0_back.png",
+            "sha256": "199745acd535e8db0e44ed13e99de9a6168e26df7b4bf6f74cd2cc9c347ac5f5"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_dresser_oyun_honey/r0_shadow.png",
+            "sha256": "3831e52602ab0ff54dd9d775671b38e6c79e6c092405b9c1a5ec33baa2fe1c32"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_dresser_oyun_honey/r1_back.png",
+            "sha256": "687e4c756d1e46095f6b4da7082b96269ed97937d646fb19f6f37c5e169d72fc"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_dresser_oyun_honey/r1_shadow.png",
+            "sha256": "bba08489120acf3cbeb7e0e998cd0aec90d1c0f744a734a6c066aaa7ccf50a08"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_dresser_oyun_honey/r2_back.png",
+            "sha256": "00c99fd256e1b2387b72a0b8c78128f920aadf29f2564d521b9d07f4e35d6dac"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_dresser_oyun_honey/r2_shadow.png",
+            "sha256": "ddf7ba3d80b990e2f178318bec7557d0f1aa927b524395c1c7312478d7fc699d"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_dresser_oyun_honey/r3_back.png",
+            "sha256": "5d12b8cc0aefabd9b6c40db526f653239d7f52fd715941791fbd9318e13dd03b"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_dresser_oyun_honey/r3_shadow.png",
+            "sha256": "af1a5ba9849ec39f63adf77758cd3c892d4cd6a74b6969874d1f86115e60a47a"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_nightstand_oyun_honey",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_oyun_honey/r0_back.png",
+            "sha256": "320f56a67108cb948d5be42cddf3ea21541cb8857de31fc2dd638f4da8be1147"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_oyun_honey/r0_shadow.png",
+            "sha256": "01c962257546d3b9a139561dccac1e5670f6fe45f101db9045c886721f81aa61"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_oyun_honey/r1_back.png",
+            "sha256": "efc838d67ddccafbda5b451526f351ae1947089816e8ac252703e7ffe1e1937c"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_oyun_honey/r1_shadow.png",
+            "sha256": "f043634ccbf5e230c12a0e524da8ce6ade21a5cbbbbe200659861a81a6414fe5"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_oyun_honey/r2_back.png",
+            "sha256": "5bf4db833359e1f40821bc28e4951ddc5ca67ff6927ddd80078cd0cd3d714dc7"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_oyun_honey/r2_shadow.png",
+            "sha256": "2756c2f90aab5dea47926d0171577e4d26281d205f60f14760dfb9332c6ce2db"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_oyun_honey/r3_back.png",
+            "sha256": "7d86a3910b0b2eefda35507ef38db19672d4c415e5ce024f92a13bfea735a6bd"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_nightstand_oyun_honey/r3_shadow.png",
+            "sha256": "561a0ca1435aba83954be68597bed056ccf02151d6749389db5e00d81afae9a4"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_snacktable_oyun_round",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_snacktable_oyun_round/r0_back.png",
+            "sha256": "c792e93bcb7fa01e5b5a4e32dfd238f70e18191192f4543dc172514e3df67fff"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_snacktable_oyun_round/r0_shadow.png",
+            "sha256": "713d2c630b51cbcbf6d7a3f48d587419e9280332c9074af69bb6d65416cbdc54"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_snacktable_oyun_round/r1_back.png",
+            "sha256": "c792e93bcb7fa01e5b5a4e32dfd238f70e18191192f4543dc172514e3df67fff"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_snacktable_oyun_round/r1_shadow.png",
+            "sha256": "713d2c630b51cbcbf6d7a3f48d587419e9280332c9074af69bb6d65416cbdc54"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_snacktable_oyun_round/r2_back.png",
+            "sha256": "c792e93bcb7fa01e5b5a4e32dfd238f70e18191192f4543dc172514e3df67fff"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_snacktable_oyun_round/r2_shadow.png",
+            "sha256": "713d2c630b51cbcbf6d7a3f48d587419e9280332c9074af69bb6d65416cbdc54"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_snacktable_oyun_round/r3_back.png",
+            "sha256": "c792e93bcb7fa01e5b5a4e32dfd238f70e18191192f4543dc172514e3df67fff"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_snacktable_oyun_round/r3_shadow.png",
+            "sha256": "713d2c630b51cbcbf6d7a3f48d587419e9280332c9074af69bb6d65416cbdc54"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_teaset_oyun_flower",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r0_back.png",
+            "sha256": "67b8e0abf500648f1ed47a0df95187144784bdaf5c6c0e8d9792d7ebdd439d92"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r0_front.png",
+            "sha256": "aaacb9f56c520c0a3b2b58668edb67cba43fb80591ac4de52a41e81f7e425224"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r0_shadow.png",
+            "sha256": "25e0310c65ac5f7b0f6b153a76805d0e84bf598dedefd2c57f00344b9ea460a2"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r1_back.png",
+            "sha256": "0a10062be75f2c8c05eb260fc0710d49cd640f9454c0810b4bd869b2e9e2bcb4"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r1_front.png",
+            "sha256": "6644553aa09ce3dc420f48223e732e7e513c6cb5d1b31a839e3259c4a4a9bb8d"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r1_shadow.png",
+            "sha256": "427ab8ff87712d3a9d9a3f6a6667db783d68d48015cae2e7d8babca524c1d9ae"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r2_back.png",
+            "sha256": "9e663b12bfa84d1c6eb69c2d7826264587180dd0420b42782909153957c011d8"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r2_front.png",
+            "sha256": "106d19dfe33d871359e7733489532f82b2efadb3d1d3f979eb8f9a999bd34ce6"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r2_shadow.png",
+            "sha256": "8d849fcd7a925cf1b372a1442998cf95f623b5291ce2aa5c1ba91e101f9ccb4f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r3_back.png",
+            "sha256": "6d080f91bb58dea5c6fcb00f1ee056b7fdcabe1178b5b8d8dc25d2110901a8cc"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r3_front.png",
+            "sha256": "b17b71084226ad8eb08f592e104bb03d4ebb2506b71a18e3d57130f11e31224e"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_teaset_oyun_flower/r3_shadow.png",
+            "sha256": "ce9164cb65bf5d62374f5a1c865fc2a8eaacd707dbbfe3d0073d1755918bdad7"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_tvunit_oyun_game",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_oyun_game/r0_back.png",
+            "sha256": "b99eb08414c0e3844ac5b7ad409db33f8a4370f7252b1cbfd8e6c0552e110f58"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_oyun_game/r0_shadow.png",
+            "sha256": "b6de6f54fb473256f9704b3373723a66cc9e56218ff848a3654031f8cfbe7c7f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_oyun_game/r1_back.png",
+            "sha256": "c5d8cfbe51ae5643534132532449aa0a8102e06fbe9effd846e39e22e4f623c6"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_oyun_game/r1_shadow.png",
+            "sha256": "6d88a6adafae54ea7fadefc8992b01cd6ce643a04cded0c421e4dd43cd4e67d3"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_oyun_game/r2_back.png",
+            "sha256": "510e635f9651cd0f1f659526a9f3882fae7489fe7d05989be5a4f6f36df9ec7a"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_oyun_game/r2_shadow.png",
+            "sha256": "3576a387245bb72b4b1ee3ed7ee05001889faefa8410db4c3e4220cff7d5043f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_oyun_game/r3_back.png",
+            "sha256": "6bb56179e00cd51a826a1929fc3de55ce03ef471d8b8ea11b4a56c12903ee355"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_tvunit_oyun_game/r3_shadow.png",
+            "sha256": "241b8ee1b7978e3b5a6c7be734d830a4d77ce9c6978a157689dd2cfe679b3924"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_pouf_oyun_bunnypink",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r0_back.png",
+            "sha256": "006e0e0bb7cc8b9debcd724537218100afcce33eabd66fb70a028ab24e14bff7"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r0_shadow.png",
+            "sha256": "c117ddf0dc2480891ac3487356b0870c4451355749bb1baeacfbebb88c6bb4f8"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r1_back.png",
+            "sha256": "1e35a8e9b0b9291ed44d53411b8b24de1252f952e8dc1e2f19efaf4e9272247f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r1_shadow.png",
+            "sha256": "c799beff0e954a29d4ea9602dc7c2f5bcb6ba8bc5f7afc7bf959960c6676ac7d"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r2_back.png",
+            "sha256": "d9927062bb18950af67ac09426cb1331402937a251603fc6a1e558bb2dd2af1d"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r2_shadow.png",
+            "sha256": "b6fe0d53d1c77193df4d56f8d19fdc29b45974eee4bfa19027c8963230368113"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r3_back.png",
+            "sha256": "fbc65cce9f27e2ccd4531f6b42cd8298815cfea802ec397b8bb253883d94a7a0"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r3_shadow.png",
+            "sha256": "c704c9e4f6532e72d2a630390429294e03f66f202be1cd1f7405a59548185515"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_pouf_oyun_bearpurple",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r0_back.png",
+            "sha256": "b43693f7fb721caa44ac229cc434b4f2ae15d14d69c5047d3c0a9a556f3731d4"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r0_shadow.png",
+            "sha256": "a8e6bd690cb79408d557cd71b03bdfa7db43f091345dbfb2abc75363de1bbee2"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r1_back.png",
+            "sha256": "8e7c1ceabee080e930cd64881221d24063a4379218e395cdf21503cf1c15e241"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r1_shadow.png",
+            "sha256": "4ea87023d3c91c349f6075942259d9754a20c3c03c74fb9274a45fe87500aacc"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r2_back.png",
+            "sha256": "750d46dc8c2d0b46efda8b95fd932b35f391092ab5d96af2698714e280255122"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r2_shadow.png",
+            "sha256": "e6982466fc1d878dca38fd7504f4bad14296e3fd566a979fd354b1a3b290aeac"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r3_back.png",
+            "sha256": "b16171df478bddc52a6b33352e31933d9d2cdf18258508d588479daf36e64b1d"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r3_shadow.png",
+            "sha256": "c3590b89066350d950062018e7cd4bf40aeab4d7528bb7146fc92a92193957e7"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_rug_oyun_checker",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_checker/r0_back.png",
+            "sha256": "a3fbf24a5c6f683f7cc980448abce4c1373aeba34cb18d509832001a6602ed07"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_checker/r1_back.png",
+            "sha256": "ba60644c29e116c710fbc7a40bf23d342aeb83b01ee740b6d90506c635d990e3"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_checker/r2_back.png",
+            "sha256": "23b5401b04b0b19b7275a24f64e5d0fd14d1e3b628a219ea2e36ec1d79f53807"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_checker/r3_back.png",
+            "sha256": "54b74ff0451b07e0c8eaacd0dbee2348975d0223a7070fcd745f8232ed72135a"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_rug_oyun_cloud",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_cloud/r0_back.png",
+            "sha256": "a374c73c39ebd74cc650b655f05978211e1e35a06dff01285e042516aae50c41"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_cloud/r1_back.png",
+            "sha256": "ce78c434ea5754dd83641bca1553827b04e626e50811f00fbf6a3f1590f4d642"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_cloud/r2_back.png",
+            "sha256": "1bf08ff028a7319c99fc85049d24f9486f8514c400e76ddeaf2d15198e60212f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_cloud/r3_back.png",
+            "sha256": "6b3d93aec1bd2e27d3cce4d7446d96ccbb45fee367262ede19e0470b03e80648"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_rug_oyun_tea",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_tea/r0_back.png",
+            "sha256": "862dfdcd804c961f453dce8b0b5943095efd3845db84086b25fa6a1018bdd4f7"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_tea/r1_back.png",
+            "sha256": "64fa5ca9dcb13fcc1d6dca0674927ee4237217f670892e6a50e982aad70bbe56"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_tea/r2_back.png",
+            "sha256": "15f452b1893ba074c92eda2193161c8deae57cd1dc9e475223053faf19bcd56f"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_rug_oyun_tea/r3_back.png",
+            "sha256": "e442a23928b1d46c750057572a070ec57491563fce982a9b5aefd3400d270f2e"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_poster_oyun_bunny",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_poster_oyun_bunny/left_back.png",
+            "sha256": "05c64a8f9d4efe0035edbfb64350d177e508d73c19695d556e88b2ee86476381"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_poster_oyun_bunny/left_shadow.png",
+            "sha256": "386f07350dda6cdbc7f2209fdcb90ead034bf3a137b6d2ddee72a77983e2f04b"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_poster_oyun_bunny/right_back.png",
+            "sha256": "0c7cfcd5e906895bfccb5114031f38d4451dbd23630a6b459e127d6047ad6b8b"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_poster_oyun_bunny/right_shadow.png",
+            "sha256": "ddca396bcf6e86982ebf2836db8cd32eb866bcef361885d9468d18596ebbed04"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_poster_oyun_controller",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17",
+        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
+          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_poster_oyun_controller/left_back.png",
+            "sha256": "dc0852eff15a1c742478daefb98c16f2f299d8d613f096a5921e57fd7212cae8"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_poster_oyun_controller/left_shadow.png",
+            "sha256": "808d2d4883f6c3f9da343a4109db3f2ac0a47735edddba0692d7bdb8d2637970"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_poster_oyun_controller/right_back.png",
+            "sha256": "8503dae85ef59ab9215cbfd215a67235f9a32b6a5ad6b7b7b6addcf0bb308c80"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_poster_oyun_controller/right_shadow.png",
+            "sha256": "0c837e357f6c9a5f54d7c1c3575f94f2fb4fd320b1be632ddc0e06ed735f83d0"
+          }
+        ]
+      }
     }
   ],
   "heldScopes": [
-    {
-      "scope": "pricing-pending",
-      "productionPublication": false,
-      "itemIdPatterns": [
-        "^room_v3_(?!bed_blumi_starter$)",
-        "^room_v2_chair_blush$"
-      ]
-    },
     {
       "scope": "female-wardrobe-promotion-hold",
       "productionPublication": false,
       "itemIdPatterns": [
         "^avatar_v2_top_cherry_heart_milkmaid_blouse$"
-      ]
-    },
-    {
-      "scope": "new-collection-art-pending",
-      "productionPublication": false,
-      "itemIdPatterns": [
-        "^dress_girl_butter_square_puff_mini$",
-        "^bottom_girl_wine_midi_skirt$",
-        "^bottom_girl_wide_jeans$",
-        "^bottom_girl_ecru_trousers$",
-        "^shoes_girl_camel_ankle_boots$",
-        "^top_girl_camel_vest_tee$",
-        "^top_girl_white_poplin_shirt$",
-        "^top_girl_rose_pearl_cardigan$",
-        "^top_girl_breton_stripe$",
-        "^top_girl_sage_knit_polo$",
-        "^dress_girl_denim_pinafore_mini$",
-        "^dress_girl_sage_shirred_tiered_mini$",
-        "^dress_girl_wine_gingham_tie$",
-        "^dress_girl_black_corset_flare_mini$",
-        "^dress_girl_cream_one_shoulder_mini$",
-        "^dress_girl_black_corset_slit_maxi$",
-        "^dress_girl_terracotta_patchwork_halter_bias_maxi$",
-        "^dress_girl_cream_one_shoulder_tie_midi$",
-        "^dress_girl_denim_milkmaid_button_midi$",
-        "^jacket_girl_black_crop_blazer$",
-        "^jacket_girl_light_denim_crop$",
-        "^glasses_girl_gold_round$",
-        "^glasses_girl_rose_soft_cateye$",
-        "^glasses_boy_black_soft_rect$",
-        "^glasses_boy_gunmetal_round$",
-        "^hair_girl_bun_wine_bow$",
-        "^hair_girl_caramel_braid_crown$",
-        "^hair_girl_ink_twin_braids$",
-        "^hair_girl_chestnut_butterfly$",
-        "^hair_girl_copper_soft_waves$",
-        "^hair_girl_ink_french_bob$",
-        "^necklace_girl_pearl_drop$",
-        "^bag_girl_camel_mini$",
-        "^clip_girl_pearl_bar_pair$"
       ]
     },
     {
