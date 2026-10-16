@@ -3,6 +3,7 @@
 // the body a front layer carries, never fabric inside the item's outline. A hand redraw (thumb-redraws/) wins over the
 // front cut; a seeded cleanup redraw (seed-clean-thumbs.mjs) is reproducible from its seeds and only removes pixels.
 import assert from "node:assert/strict"
+import { Buffer } from "node:buffer"
 import { createHash } from "node:crypto"
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
