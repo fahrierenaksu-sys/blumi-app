@@ -266,7 +266,20 @@ export const PUBLISHED_FRONT_THUMBS = new Set([
   "avatar_v2_shoes_male_green_skate_shoes", "avatar_v2_shoes_male_sand_desert_boots", "avatar_v2_shoes_male_tan_loafers",
   "avatar_v2_top_male_black_basic_tee", "avatar_v2_top_male_black_embroidered_sweatshirt",
   "avatar_v2_top_male_check_flannel_white_tee", "avatar_v2_top_male_forest_collar_sweater",
-  "avatar_v2_top_male_navy_knit_polo", "avatar_v2_top_male_olive_overshirt", "avatar_v2_top_male_taupe_waffle_blouson"
+  "avatar_v2_top_male_navy_knit_polo", "avatar_v2_top_male_olive_overshirt", "avatar_v2_top_male_taupe_waffle_blouson",
+  // 2026-10-17: the 31 new-collection items published by ab59344d; the owner approved their front-look cards
+  // (front-look sheet 2026-10-16 "güzel hepsi") and their publishing, and their receipts bind these front thumbs.
+  "bottom_girl_ecru_trousers", "bottom_girl_wide_jeans", "bottom_girl_wine_midi_skirt",
+  "dress_girl_black_corset_flare_mini", "dress_girl_black_corset_slit_maxi", "dress_girl_butter_square_puff_mini",
+  "dress_girl_cream_one_shoulder_mini", "dress_girl_cream_one_shoulder_tie_midi", "dress_girl_denim_milkmaid_button_midi",
+  "dress_girl_denim_pinafore_mini", "dress_girl_sage_shirred_tiered_mini", "dress_girl_terracotta_patchwork_halter_bias_maxi",
+  "dress_girl_wine_gingham_tie", "glasses_boy_black_soft_rect", "glasses_boy_gunmetal_round",
+  "glasses_girl_gold_round", "glasses_girl_rose_soft_cateye", "hair_girl_bun_wine_bow",
+  "hair_girl_caramel_braid_crown", "hair_girl_chestnut_butterfly", "hair_girl_copper_soft_waves",
+  "hair_girl_ink_french_bob", "hair_girl_ink_twin_braids", "jacket_girl_black_crop_blazer",
+  "jacket_girl_light_denim_crop", "shoes_girl_camel_ankle_boots", "top_girl_breton_stripe",
+  "top_girl_camel_vest_tee", "top_girl_rose_pearl_cardigan", "top_girl_sage_knit_polo",
+  "top_girl_white_poplin_shirt"
 ])
 
 export function readFrontThumbPins(path = FRONT_THUMBS_PINS) {
