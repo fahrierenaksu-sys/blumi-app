@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import test from "node:test"
-import { BOY_WARDROBE_PREVIEW_ALL_IDS, DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT } from "@blumi/domain"
+import { BOY_WARDROBE_PREVIEW_ALL_IDS, DEFAULT_FEMALE_AVATAR_LOADOUT, DEFAULT_MALE_AVATAR_LOADOUT, LANDED_NEW_COLLECTION_ITEMS } from "@blumi/domain"
 import type { Rig25 } from "../renderer/rigTypes"
 import { AVATAR_ITEM_ART, AVATAR_RIG_STARTER, listAvatarItemArt } from "./avatarItemArt"
 import { resolveAvatarDraw } from "./resolveAvatarDraw"
@@ -99,14 +99,18 @@ test("the boy wearing his wardrobe pieces is drawn in them, in both views and ev
 })
 
 test("every boy wardrobe ID maps to an item of his rig in both views, in its own slot", () => {
+  // the boy's art is his wardrobe IDs plus the landed new collection pieces declared for him, nothing else
+  const landed = new Map(LANDED_NEW_COLLECTION_ITEMS.filter((item) => item.bodyId === "avatar_v2_body_male_light").map((item) => [item.itemId, item.slot]))
   const ids = Object.entries(AVATAR_ITEM_ART.male)
-  assert.equal(ids.length, BOY_WARDROBE_PREVIEW_ALL_IDS.length)
+  assert.equal(ids.length, BOY_WARDROBE_PREVIEW_ALL_IDS.length + landed.size)
   for (const [canonical, rigItem] of ids) {
-    assert.ok(BOY_WARDROBE_PREVIEW_ALL_IDS.includes(canonical), canonical)
+    assert.ok(BOY_WARDROBE_PREVIEW_ALL_IDS.includes(canonical) || landed.has(canonical), canonical)
     for (const view of ["front", "back"] as const) {
       const art = boyRig.views[view].items[rigItem]
       assert.ok(art, `${rigItem} ${view}`)
-      assert.ok(canonical.startsWith(`avatar_v2_${art.slot}_male_`), `${canonical} is a ${art.slot}`)
+      const slot = landed.get(canonical)   // a declared accessory with group eyewear is the rig's glasses slot
+      if (slot) assert.ok([slot, "glasses"].includes(art.slot), `${canonical} is a ${slot}, drawn as ${art.slot}`)
+      else assert.ok(canonical.startsWith(`avatar_v2_${art.slot}_male_`), `${canonical} is a ${art.slot}`)
     }
   }
 })
