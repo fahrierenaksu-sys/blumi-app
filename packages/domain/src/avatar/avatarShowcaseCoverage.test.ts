@@ -37,9 +37,10 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * new collection: clip_girl_pearl_bar_pair landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  * new collection: hair_girl_bun_wine_bow landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  * new collection: hair_girl_chestnut_butterfly landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
+ * new collection: hair_girl_ink_french_bob landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: ["jacket_girl_light_denim_crop", "jacket_girl_black_crop_blazer", "clip_girl_pearl_bar_pair", "hair_girl_bun_wine_bow", "hair_girl_chestnut_butterfly"],
+  female: ["jacket_girl_light_denim_crop", "jacket_girl_black_crop_blazer", "clip_girl_pearl_bar_pair", "hair_girl_bun_wine_bow", "hair_girl_chestnut_butterfly", "hair_girl_ink_french_bob"],
   male: [],
 };
 

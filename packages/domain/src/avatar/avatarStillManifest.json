@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "36576563ad47619037fe7fa05295083733337ea54eee8b4a73699f183cc387ad",
+      "rigSha256": "b2fef6fa193190fd207fc8ba625d96df7313f7a50e8fd88c070c2f28b66fd7c1",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -514,6 +514,11 @@
           "rigItemId": "hair_girl_chestnut_butterfly",
           "thumb": "hair_girl_chestnut_butterfly"
         },
+        "hair_girl_ink_french_bob": {
+          "slot": "hair",
+          "rigItemId": "hair_girl_ink_french_bob",
+          "thumb": "hair_girl_ink_french_bob"
+        },
         "clip_girl_pearl_bar_pair": {
           "slot": "accessory",
           "rigItemId": "clip_girl_pearl_bar_pair",
@@ -691,6 +696,19 @@
               117,
               193,
               205
+            ]
+          },
+          {
+            "key": "hair_girl_ink_french_bob__o0p6",
+            "owner": "hair_girl_ink_french_bob",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              223,
+              104,
+              184,
+              168
             ]
           },
           {
@@ -1423,6 +1441,19 @@
             ]
           },
           {
+            "key": "hair_girl_ink_french_bob__o4p6",
+            "owner": "hair_girl_ink_french_bob",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              183,
+              34,
+              258,
+              223
+            ]
+          },
+          {
             "key": "clip_girl_pearl_bar_pair__o4p7",
             "owner": "clip_girl_pearl_bar_pair",
             "slot": "accessory",
@@ -1728,6 +1759,19 @@
             ]
           },
           {
+            "key": "hair_girl_ink_french_bob__o0p6",
+            "owner": "hair_girl_ink_french_bob",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              74,
+              52,
+              117,
+              108
+            ]
+          },
+          {
             "key": "body__o3",
             "owner": "body",
             "slot": "body",
@@ -2022,6 +2066,19 @@
               12,
               176,
               166
+            ]
+          },
+          {
+            "key": "hair_girl_ink_french_bob__o4p6",
+            "owner": "hair_girl_ink_french_bob",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              49,
+              10,
+              163,
+              141
             ]
           },
           {
