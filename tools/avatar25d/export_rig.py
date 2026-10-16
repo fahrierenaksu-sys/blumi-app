@@ -722,6 +722,26 @@ def _replacement_key(key, items, family):
     return parts[0], (parts[1] if len(parts) == 2 else None)
 
 
+def add_shared_drawings(atlas, drawings):
+    """Add an item's body drawings [(range name, png data uri)] to its atlas; drawings with the same pixels (one pair
+    drawing made for several partners) are packed once. -> {range name: the packed range name with its pixels}"""
+    first, same_as = {}, {}
+    for rname, png in drawings:
+        im = decode(png)
+        pixels = (im.size, im.tobytes())
+        if pixels in first:
+            same_as[rname] = first[pixels]
+            continue
+        first[pixels] = rname
+        atlas.add(rname, im)
+    return same_as
+
+
+def with_shared_rects(rects, same_as):
+    """The packed rects plus one entry per drawing packed once for several ranges (each takes its first range's rect)."""
+    return {**rects, **{rname: rects[packed] for rname, packed in same_as.items()}}
+
+
 def body_replacements(hy, items, body_sizes):
     """{owner item id: [(body range, png data uri, partner id or None), ...]} for the view's body variants.
 
@@ -914,17 +934,9 @@ def export_view(name, v, motion=None):
         for key, out_key in variant_owner.get(iid, []):
             for ln, png in sorted(leg_variants[key].items()):
                 ia.add(f'{ln}@{out_key}', decode(png))
-        # an item's identical body drawings (one pair drawing made for several partners) are packed once and share it
-        packed, same_as = {}, {}
-        for body, png, partner in replacements.get(iid, []):
-            rname = replacement_range(body, partner)
-            if png in packed:
-                same_as[rname] = packed[png]
-                continue
-            packed[png] = rname
-            ia.add(rname, decode(png))
+        same_as = add_shared_drawings(ia, [(replacement_range(body, partner), png) for body, png, partner in replacements.get(iid, [])])
         item_img, item_rects = ia.pack(PAGE_W // 2)
-        item_rects.update({rname: item_rects[first] for rname, first in same_as.items()})
+        item_rects = with_shared_rects(item_rects, same_as)
         item_atlases[iid] = (item_img, item_rects, walk_card is not None, cards)
     page_h = max([img.height] + [a[0].height for a in item_atlases.values()])
     page_h = (page_h + 15) // 16 * 16

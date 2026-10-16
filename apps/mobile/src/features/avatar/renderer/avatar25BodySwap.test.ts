@@ -5,23 +5,39 @@ import test from "node:test"
 import { avatar25PoseRanges, compileAvatar, VARIANT_SIT, type Avatar25PoseRange } from "./avatar25Pose"
 import type { Avatar25Pose, Avatar25ViewName, Rig25 } from "./rigTypes"
 
-const girl = JSON.parse(readFileSync(resolve(import.meta.dirname, "../rigs/girl/rig25.json"), "utf8")) as Rig25
+const shipped = JSON.parse(readFileSync(resolve(import.meta.dirname, "../rigs/girl/rig25.json"), "utf8")) as Rig25
 const VIEWS: Avatar25ViewName[] = ["front", "back"]
 const POSES: Avatar25Pose[] = ["stand", "walk", "sit", "wave"]
-/** The first item of a slot that draws no body range of its own (the girl's starter pieces: the fixtures below add them). */
+/** The first item of a slot that draws no front body range of its own (the girl's starter pieces: the fixtures below add them). */
 const itemOf = (rig: Rig25, slot: string) => Object.keys(rig.views.front.items).find((id) => {
   const item = rig.views.front.items[id]
   return item.slot === slot && item.torso === undefined && item.mesh.ranges.every((r) => r.bodyPart === undefined)
 })!
-const TOP = itemOf(girl, "top")
-const BOTTOM = itemOf(girl, "bottom")
-const SHOES = itemOf(girl, "shoes")
-const HAIR = itemOf(girl, "hair")
+const TOP = itemOf(shipped, "top")
+const BOTTOM = itemOf(shipped, "bottom")
+const SHOES = itemOf(shipped, "shoes")
+const HAIR = itemOf(shipped, "hair")
 const OUTFIT = [TOP, BOTTOM, SHOES, HAIR]
+/**
+ * The mechanism fixtures start from her starter outfit drawing no body range in any view, so each fixture adds exactly the
+ * drawings it names. (The shipped coral pants, BOTTOM, carry a back copy of the body's seated card with the grey shorts
+ * trimmed off its seat; the last test checks that copy on the shipped rig.)
+ */
+const girl = withoutBodyDrawings(shipped, OUTFIT)
 /** What the black trousers replace (the factory's torso, arm and seated-card variants). */
 const TROUSER_PARTS = ["torso", "torsoUpper", "torsoNoArms", "torsoSit", "torsoCardArms", "torsoWalk", "farArm", "nearArm", "sit"]
 /** What a crop top replaces (the shared bare-belly torso, `torso: "midriff"`). */
 const MIDRIFF_PARTS = ["torso", "torsoNoArms", "torsoCardArms", "torsoWalk"]
+
+/** The rig with these items' body drawings taken off (their ranges only; the vertices stay, unindexed). */
+function withoutBodyDrawings(src: Rig25, itemIds: string[]): Rig25 {
+  const rig = structuredClone(src)
+  for (const view of VIEWS) for (const id of itemIds) {
+    const item = rig.views[view].items[id]
+    if (item) item.mesh.ranges = item.mesh.ranges.filter((r) => r.bodyPart === undefined)
+  }
+  return rig
+}
 
 /**
  * The rig as export_rig.py writes it when `itemId` owns drawings of these body ranges: each a copy of the body
@@ -173,14 +189,14 @@ test("two worn items replacing the same body range resolve the same way whatever
 })
 
 test("the shipped girl's crop tops bare her waist and every bottom that brings its own body (her black trousers first) does so, in every pose and view", () => {
-  const items = girl.views.front.items
+  const items = shipped.views.front.items
   const crops = Object.keys(items).filter((id) => items[id].torso === "midriff")
   const trousers = Object.keys(items).filter((id) => items[id].slot === "bottom" && items[id].mesh.ranges.some((r) => r.bodyPart === "sit"))
   assert.equal(crops.length, 2)
   // every bottom with its own seated card brings its own body (the black trousers, and the sit-fitted skirts and trousers)
   assert.ok(trousers.includes("bottom_black_highwaist_straight"), "the black trousers bring their own body")
   for (const TROUSERS of trousers) {
-    const bodyDrawn = (worn: string[], view: Avatar25ViewName, pose: Avatar25Pose, part: string) => ownerOf(girl, view, worn, pose, part)
+    const bodyDrawn = (worn: string[], view: Avatar25ViewName, pose: Avatar25Pose, part: string) => ownerOf(shipped, view, worn, pose, part)
     for (const view of VIEWS) for (const pose of POSES) {
       // the parts the body draws in this pose, with nothing worn
       const torsoNow = TROUSER_PARTS.filter((p) => p.startsWith("torso") && bodyDrawn([], view, pose, p) === "body")
@@ -189,7 +205,7 @@ test("the shipped girl's crop tops bare her waist and every bottom that brings i
         const worn = [crop, ...(bottom ? [bottom] : []), SHOES, HAIR]
         // exactly one torso is drawn and it is the top's bare belly (with the trousers: their drawing of it, shorts trimmed);
         // the arms are the trousers' or the body's
-        const torso = avatar25PoseRanges(girl, view, worn, pose).filter((e) => e.name.startsWith("torso"))
+        const torso = avatar25PoseRanges(shipped, view, worn, pose).filter((e) => e.name.startsWith("torso"))
         assert.equal(torso.length, 1, `${view} ${pose} ${crop} ${bottom}`)
         assert.deepEqual([torso[0]!.owner, torso[0]!.name], bottom === TROUSERS ? [TROUSERS, `${torsoNow[0]}@with:${crop}`] : [crop, `${torsoNow[0]}@body`])
         for (const part of ["farArm", "nearArm"]) {
@@ -199,16 +215,22 @@ test("the shipped girl's crop tops bare her waist and every bottom that brings i
         // the body's own seated card shows the tank beside her arms, so under a crop it never draws: the crop's tank-free
         // copy of it does (with the trousers: the copy of their card, carried by the crop as its pair with them)
         const seatedNow = bodyDrawn([], view, pose, "sit")
-        const seated = avatar25PoseRanges(girl, view, worn, pose).find((e) => e.name === "sit" || e.name.startsWith("sit@body") || e.name.startsWith("sit@with:"))
+        const seated = avatar25PoseRanges(shipped, view, worn, pose).find((e) => e.name === "sit" || e.name.startsWith("sit@body") || e.name.startsWith("sit@with:"))
         assert.deepEqual(seated && seatedNow === "body" ? [seated.owner, seated.name] : seatedNow, seatedNow === "body" ? [crop, bottom === TROUSERS ? `sit@with:${TROUSERS}` : "sit@body"] : seatedNow, `${view} ${pose} sit`)
       }
       // the trousers with any other top draw the torso too; the starter outfit draws the body's own
       assert.equal(bodyDrawn([TOP, TROUSERS, SHOES, HAIR], view, pose, torsoNow[0]!), TROUSERS)
-      for (const part of [torsoNow[0]!, "farArm", "nearArm", "sit"]) assert.ok([null, "body"].includes(bodyDrawn(OUTFIT, view, pose, part)), `${view} ${pose} ${part}`)
+      for (const part of [torsoNow[0]!, "farArm", "nearArm"]) assert.ok([null, "body"].includes(bodyDrawn(OUTFIT, view, pose, part)), `${view} ${pose} ${part}`)
+      // seated, the starter outfit draws the body's own card or, in a view where her bottom carries a shorts-trimmed copy
+      // of it, that copy: exactly when and where the body's card would be drawn, and never without the bottom
+      const bottomCopy = shipped.views[view].items[BOTTOM]?.mesh.ranges.some((r) => r.bodyPart === "sit" && r.bodyWith === undefined) ?? false
+      const bodyCard = bodyDrawn([], view, pose, "sit")
+      assert.equal(bodyDrawn(OUTFIT, view, pose, "sit"), bodyCard === "body" && bottomCopy ? BOTTOM : bodyCard, `${view} ${pose} sit`)
+      assert.equal(bodyDrawn([TOP, SHOES, HAIR], view, pose, "sit"), bodyCard, `${view} ${pose} sit without the bottom`)
     }
     // seated under a crop top, the bottom's and shoes' cards are above the belly; with the starter top they keep their order
     for (const view of VIEWS) for (const crop of crops) for (const bottom of [BOTTOM, TROUSERS]) {
-      const sit = drawn(girl, view, [crop, bottom, SHOES, HAIR], "sit")
+      const sit = drawn(shipped, view, [crop, bottom, SHOES, HAIR], "sit")
       const belly = sit.findIndex((k) => k.includes(":torsoCardArms@"))
       assert.ok(belly >= 0, `${view} ${crop} ${bottom}`)
       // (the item's own seated card `<id>:sit@<order>`, not the trousers' replacement of the body's card, `sit@body` /

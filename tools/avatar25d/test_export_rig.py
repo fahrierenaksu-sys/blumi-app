@@ -373,12 +373,13 @@ class SharedBodyDrawingTest(unittest.TestCase):
 
     def test_identical_pair_drawings_of_one_item_share_their_page_rect(self):
         # pair drawings with the same pixels are packed once (one rect); a pair whose drawing really differs (the
-        # corset's arm band beside the trousers) keeps a rect of its own
+        # corset's arm band beside the trousers, or since the final base each crop top's own fitted belly) keeps a rect
+        # of its own
         import hashlib
         import numpy as np
         from PIL import Image
         rig = json.loads((APP_RIG / 'girl/rig25.json').read_text())
-        shared = 0
+        pairs = 0
         for view in rig['views'].values():
             for item in view['items'].values():
                 m = item['mesh']
@@ -389,6 +390,7 @@ class SharedBodyDrawingTest(unittest.TestCase):
                 for r in m['ranges']:
                     if 'bodyWith' not in r:
                         continue
+                    pairs += 1
                     verts = list(dict.fromkeys(m['index'][r['start']:r['start'] + r['count']]))
                     uv = tuple(m['uv'][i * 2 + k] for i in verts for k in (0, 1))
                     xs, ys = [u * W for u in uv[0::2]], [v * H for v in uv[1::2]]
@@ -398,9 +400,34 @@ class SharedBodyDrawingTest(unittest.TestCase):
                 for part, drawings in by_part.items():
                     for rects in drawings.values():
                         self.assertEqual(len(rects), 1, f'{part}: identical drawings packed twice')
-                    # more pair ranges than distinct drawings: two partners share one packed drawing
-                    shared += sum(1 for r in m['ranges'] if r.get('bodyPart') == part and 'bodyWith' in r) > len(drawings)
-        self.assertGreater(shared, 0, 'the girl rig has pair drawings shared by two partners')
+        self.assertGreater(pairs, 0, 'the girl rig has pair drawings')
+
+
+class SharedDrawingPackTest(unittest.TestCase):
+    """The exporter packs an item's body drawings with the same pixels once, whatever their PNG bytes."""
+
+    def test_same_pixels_share_one_rect_and_a_different_drawing_keeps_its_own(self):
+        from PIL import Image
+        ex = load_exporter()
+        belly = Image.new('RGBA', (12, 20), (240, 200, 180, 255))
+        other = belly.copy()
+        other.putpixel((3, 4), (20, 20, 20, 255))
+        # the same pixels written as a second, differently compressed PNG still count as the same drawing
+        import io, base64
+        buf = io.BytesIO()
+        belly.save(buf, 'PNG', compress_level=0)
+        recompressed = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+        self.assertNotEqual(recompressed, data_uri(belly))
+        atlas = ex.Atlas()
+        drawings = [('torso@with:a', data_uri(belly)), ('torso@with:b', recompressed), ('torso@with:c', data_uri(other))]
+        same_as = ex.add_shared_drawings(atlas, drawings)
+        self.assertEqual(same_as, {'torso@with:b': 'torso@with:a'})
+        self.assertEqual([key for key, _ in atlas.items], ['torso@with:a', 'torso@with:c'])
+        _, packed = atlas.pack(256)
+        rects = ex.with_shared_rects(packed, same_as)
+        self.assertEqual(rects['torso@with:b'], rects['torso@with:a'])
+        self.assertNotEqual(rects['torso@with:c'], rects['torso@with:a'])
+        self.assertNotIn('torso@with:b', packed)
 
 
 def data_uri(image):
