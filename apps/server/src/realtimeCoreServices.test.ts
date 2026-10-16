@@ -148,6 +148,50 @@ test("an accepted room pays nothing when only one participant entered it", async
   assert.equal((await services.economyService.getInventory("user_b")).coins, 1250)
 })
 
+test("a room with no remembered scene entries (a server restart) ends and pays nothing", async () => {
+  const services = createRealtimeCoreServices()
+  const now = new Date("2026-06-28T10:00:00.000Z")
+  const accepted = await openChatRoom(services, now)
+  assert.ok(accepted.miniRoom)
+
+  const ended = await services.miniRoomService.leaveMiniRoom(
+    accepted.miniRoom.miniRoomId,
+    "user_a",
+    new Date(now.getTime() + 60 * 60 * 1000)
+  )
+
+  assert.equal(ended?.endedByUserId, "user_a")
+  assert.equal(await services.miniRoomService.findActiveMiniRoomForUser("user_a"), null)
+  assert.equal((await services.economyService.getInventory("user_a")).coins, 1250)
+  assert.equal((await services.economyService.getInventory("user_b")).coins, 1250)
+})
+
+test("a failing reward-day anchor never makes leaving throw or keeps the room open", async () => {
+  const durableRepository = createInMemoryMiniRoomRepository()
+  const failingAnchorRepository: MiniRoomRepository = {
+    ...durableRepository,
+    async anchorMiniRoomCompletion() {
+      throw new Error("Room completion anchor is temporarily unavailable.")
+    }
+  }
+  const services = createRealtimeCoreServices(undefined, failingAnchorRepository)
+  const now = new Date("2026-06-28T10:00:00.000Z")
+  const accepted = await openChatRoom(services, now)
+  assert.ok(accepted.miniRoom)
+  enterBoth(services, accepted.miniRoom.miniRoomId, now)
+
+  const ended = await services.miniRoomService.leaveMiniRoom(
+    accepted.miniRoom.miniRoomId,
+    "user_b",
+    new Date(now.getTime() + 120_000)
+  )
+
+  assert.equal(ended?.endedByUserId, "user_b")
+  assert.equal(await services.miniRoomService.findActiveMiniRoomForUser("user_b"), null)
+  assert.equal((await services.economyService.getInventory("user_a")).coins, 1250)
+  assert.equal((await services.economyService.getInventory("user_b")).coins, 1250)
+})
+
 test("the shared stay is timed from the later participant's entry", async () => {
   const services = createRealtimeCoreServices()
   const now = new Date("2026-06-28T10:00:00.000Z")
