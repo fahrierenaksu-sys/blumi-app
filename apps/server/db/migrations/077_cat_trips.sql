@@ -64,4 +64,6 @@ CREATE INDEX IF NOT EXISTS blumi_cat_souvenirs_owner_idx ON blumi_cat_souvenirs 
 ALTER TABLE blumi_cat_trip_days ENABLE ROW LEVEL SECURITY;
 ALTER TABLE blumi_cat_trips ENABLE ROW LEVEL SECURITY;
 ALTER TABLE blumi_cat_souvenirs ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE blumi_cat_trip_days, blumi_cat_trips, blumi_cat_souvenirs FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE blumi_cat_trip_days FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE blumi_cat_trips FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE blumi_cat_souvenirs FROM PUBLIC, anon, authenticated;
