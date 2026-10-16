@@ -76,7 +76,8 @@ export interface EconomyRewardClaim {
   createdAt: string
   /**
    * Optional rolling cap: the claim is refused (claimed: false, no key used) when the user already has maxClaims
-   * rewards of this type created at or after `since`. Two claims racing at the cap may both pass, by one.
+   * rewards of this type created at or after `since`. Capped claims for one user and reward type are serialized, so
+   * parallel claims can never pass the cap.
    */
   windowCap?: { since: string; maxClaims: number }
 }

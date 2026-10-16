@@ -2,7 +2,8 @@ import type { QueryResultRow } from "pg"
 import type {
   EconomyCoinTransactionInput,
   EconomyInventoryRecord,
-  EconomyRepository
+  EconomyRepository,
+  EconomyRewardClaim
 } from "../economy/economyRepository"
 
 interface QueryExecutor {
@@ -13,7 +14,7 @@ interface QueryExecutor {
 }
 
 interface TransactionalQueryExecutor extends QueryExecutor {
-  connect?: () => Promise<QueryExecutor & { release(error?: Error | boolean): void }>
+  connect?: () => Promise<PooledClient>
 }
 
 export function createPostgresEconomyRepository(
@@ -137,57 +138,20 @@ export function createPostgresEconomyRepository(
     },
 
     async claimReward(input) {
-      const result = await pool.query(
-        `WITH inserted_reward AS (
-           INSERT INTO blumi_economy_reward_ledger (
-             user_id, reward_type, idempotency_key, coins, created_at
-           )
-           SELECT $1, $2, $3, $4::integer, $5::timestamptz
-            WHERE EXISTS (
-              SELECT 1 FROM blumi_economy_inventories WHERE user_id = $1
-            )
-              -- Optional rolling cap (economy v1 review): at most $7 rewards
-              -- of this type since $6. Uses the ledger primary key prefix.
-              AND ($6::timestamptz IS NULL OR (
-                SELECT count(*) FROM blumi_economy_reward_ledger
-                 WHERE user_id = $1 AND reward_type = $2 AND created_at >= $6::timestamptz
-              ) < $7::integer)
-           ON CONFLICT (user_id, reward_type, idempotency_key) DO NOTHING
-           RETURNING 1
-         ), updated_inventory AS (
-           -- One statement under the row lock: the reward repays refund debt
-           -- first and only the remainder becomes spendable coins.
-           UPDATE blumi_economy_inventories
-              SET coins = coins + GREATEST($4 - coin_debt, 0),
-                  coin_debt = GREATEST(coin_debt - $4, 0),
-                  updated_at = $5
-            WHERE user_id = $1 AND EXISTS (SELECT 1 FROM inserted_reward)
-           RETURNING user_id, coins, coin_debt, owned_avatar_item_ids,
-                     owned_room_item_ids, updated_at
-         )
-         SELECT TRUE AS claimed, * FROM updated_inventory
-         UNION ALL
-         SELECT FALSE AS claimed, user_id, coins, coin_debt, owned_avatar_item_ids,
-                owned_room_item_ids, updated_at
-           FROM blumi_economy_inventories
-          WHERE user_id = $1 AND NOT EXISTS (SELECT 1 FROM inserted_reward)
-         LIMIT 1`,
-        [
-          input.userId,
-          input.rewardType,
-          input.idempotencyKey,
-          input.coins,
-          new Date(input.createdAt),
-          input.windowCap ? new Date(input.windowCap.since) : null,
-          input.windowCap ? input.windowCap.maxClaims : null
-        ]
+      if (!input.windowCap) return claimReward(pool, input)
+      // A capped claim counts the user's ledger rows of this type and then
+      // inserts. One statement reads its snapshot when it starts, so parallel
+      // claims would each count below the cap and all insert. A per-user,
+      // per-type advisory lock taken in its own statement serializes them,
+      // and under READ COMMITTED the claim statement's snapshot is taken
+      // after the lock, so it counts every earlier committed claim.
+      const connect = pool.connect?.bind(pool)
+      if (!connect) throw new Error("A capped reward claim needs a transactional pool.")
+      return withAdvisoryXactLock(
+        connect,
+        `blumi:reward-cap:${input.userId}:${input.rewardType}`,
+        (client) => claimReward(client, input)
       )
-      const row = result.rows[0]
-      if (!row) throw new Error("Economy inventory is unavailable.")
-      return {
-        claimed: row.claimed === true,
-        inventory: mapInventory(row)
-      }
     },
 
     async applyCoinTransaction(input) {
@@ -198,30 +162,100 @@ export function createPostgresEconomyRepository(
       // transaction advisory lock taken in its own statement serializes them
       // and, under READ COMMITTED, the main statement's snapshot is taken
       // after the lock, so it sees the other side's committed rows.
-      const client = pool.connect ? await pool.connect() : null
-      if (!client) return applyCoinTransaction(pool, input)
-      // A connection whose ROLLBACK failed may still hold the transaction
-      // and its advisory lock: release(error) makes node-postgres destroy it
-      // instead of handing it to the next caller.
-      let broken: Error | undefined
-      try {
-        await client.query("BEGIN")
-        await client.query(
-          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-          [`blumi:store-transaction:${input.provider}:${input.transactionId}`]
-        )
-        const result = await applyCoinTransaction(client, input)
-        await client.query("COMMIT")
-        return result
-      } catch (error) {
-        await client.query("ROLLBACK").catch((rollbackError: unknown) => {
-          broken = rollbackError instanceof Error ? rollbackError : new Error("ROLLBACK failed.")
-        })
-        throw error
-      } finally {
-        client.release(broken)
-      }
+      const connect = pool.connect?.bind(pool)
+      if (!connect) return applyCoinTransaction(pool, input)
+      return withAdvisoryXactLock(
+        connect,
+        `blumi:store-transaction:${input.provider}:${input.transactionId}`,
+        (client) => applyCoinTransaction(client, input)
+      )
     }
+  }
+}
+
+type PooledClient = QueryExecutor & { release(error?: Error | boolean): void }
+
+/**
+ * Runs `work` in one transaction that first takes the advisory lock for
+ * `lockKey` in its own statement; the lock is released at COMMIT or ROLLBACK.
+ */
+async function withAdvisoryXactLock<T>(
+  connect: () => Promise<PooledClient>,
+  lockKey: string,
+  work: (client: QueryExecutor) => Promise<T>
+): Promise<T> {
+  const client = await connect()
+  // A connection whose ROLLBACK failed may still hold the transaction
+  // and its advisory lock: release(error) makes node-postgres destroy it
+  // instead of handing it to the next caller.
+  let broken: Error | undefined
+  try {
+    await client.query("BEGIN")
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [lockKey])
+    const result = await work(client)
+    await client.query("COMMIT")
+    return result
+  } catch (error) {
+    await client.query("ROLLBACK").catch((rollbackError: unknown) => {
+      broken = rollbackError instanceof Error ? rollbackError : new Error("ROLLBACK failed.")
+    })
+    throw error
+  } finally {
+    client.release(broken)
+  }
+}
+
+async function claimReward(pool: QueryExecutor, input: EconomyRewardClaim) {
+  const result = await pool.query(
+    `WITH inserted_reward AS (
+       INSERT INTO blumi_economy_reward_ledger (
+         user_id, reward_type, idempotency_key, coins, created_at
+       )
+       SELECT $1, $2, $3, $4::integer, $5::timestamptz
+        WHERE EXISTS (
+          SELECT 1 FROM blumi_economy_inventories WHERE user_id = $1
+        )
+          -- Optional rolling cap (economy v1 review): at most $7 rewards
+          -- of this type since $6. Uses the ledger primary key prefix.
+          AND ($6::timestamptz IS NULL OR (
+            SELECT count(*) FROM blumi_economy_reward_ledger
+             WHERE user_id = $1 AND reward_type = $2 AND created_at >= $6::timestamptz
+          ) < $7::integer)
+       ON CONFLICT (user_id, reward_type, idempotency_key) DO NOTHING
+       RETURNING 1
+     ), updated_inventory AS (
+       -- One statement under the row lock: the reward repays refund debt
+       -- first and only the remainder becomes spendable coins.
+       UPDATE blumi_economy_inventories
+          SET coins = coins + GREATEST($4 - coin_debt, 0),
+              coin_debt = GREATEST(coin_debt - $4, 0),
+              updated_at = $5
+        WHERE user_id = $1 AND EXISTS (SELECT 1 FROM inserted_reward)
+       RETURNING user_id, coins, coin_debt, owned_avatar_item_ids,
+                 owned_room_item_ids, updated_at
+     )
+     SELECT TRUE AS claimed, * FROM updated_inventory
+     UNION ALL
+     SELECT FALSE AS claimed, user_id, coins, coin_debt, owned_avatar_item_ids,
+            owned_room_item_ids, updated_at
+       FROM blumi_economy_inventories
+      WHERE user_id = $1 AND NOT EXISTS (SELECT 1 FROM inserted_reward)
+     LIMIT 1`,
+    [
+      input.userId,
+      input.rewardType,
+      input.idempotencyKey,
+      input.coins,
+      new Date(input.createdAt),
+      input.windowCap ? new Date(input.windowCap.since) : null,
+      input.windowCap ? input.windowCap.maxClaims : null
+    ]
+  )
+  const row = result.rows[0]
+  if (!row) throw new Error("Economy inventory is unavailable.")
+  return {
+    claimed: row.claimed === true,
+    inventory: mapInventory(row)
   }
 }
 
