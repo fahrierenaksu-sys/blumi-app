@@ -1,6 +1,6 @@
 /**
  * The new collection (2026-10-15, factory design collection_2140 + dresses v2): 10 girl dresses, 2 girl jackets,
- * 4 glasses (2 girl, 2 boy), 6 girl hairs and 3 girl accessories. Every ID is NEW (no old ID is renamed or reused).
+ * 4 glasses (2 girl, 2 boy), 6 girl hairs, 3 girl accessories, 3 girl bottoms and 1 pair of girl boots. Every ID is NEW (no old ID is renamed or reused).
  *
  * Each piece is declared once here. It joins the loadout, economy and mobile catalogs once its art has landed
  * (`NEW_COLLECTION_LANDED_ITEM_IDS`), and until its owner-approved receipt lands the release catalog's held scope
@@ -8,11 +8,12 @@
  * piece only when owned or sold, so a landed but held piece stays out of sight. `tools/avatar25d/import_collection_item.py`
  * lands one piece (graft, export, bake, map, mark landed, test); the lead lifts the hold together with the receipt.
  *
- * Prices: the dresses carry the owner-approved prices (OWNER_DECISIONS 2026-10-15 21:35, sheet_2110 ONAY.html). Every
+ * Prices: the dresses carry the owner-approved prices (OWNER_DECISIONS 2026-10-15 21:35, sheet_2110 ONAY.html); the
+ * bottoms and boots were approved on 2026-10-16 10:09 (OWNER_DECISIONS). Every
  * other price is a PROPOSAL by the PRICES_TR table (economy_0910) and needs the owner's yes before the hold is lifted.
  * `nameTr` fits the wardrobe card's two 13-character lines; `sheetNameTr` is the longer name shown on the owner sheet.
  */
-export type NewCollectionSlot = "hair" | "top" | "dress" | "accessory"
+export type NewCollectionSlot = "hair" | "top" | "bottom" | "shoes" | "dress" | "accessory"
 export type NewCollectionAccessoryGroup = "eyewear" | "neck" | "bag" | "hairClip"
 
 export interface NewCollectionItem {
@@ -48,6 +49,9 @@ const proposed = (
   isPriceOwnerApproved: false,
 })
 
+const approved = (itemId: string, slot: NewCollectionSlot, nameTr: string, priceCoins: number): NewCollectionItem =>
+  ({ ...proposed(itemId, slot, nameTr, priceCoins), isPriceOwnerApproved: true })
+
 export const NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze([
   dress("dress_girl_butter_square_puff_mini", "Sarı Balon Kol Elbise", "Sarı Kare Yakalı Balon Kol Mini Elbise", 220),
   dress("dress_girl_denim_pinafore_mini", "Kot Askılı Mini Elbise", "Kot Askılı Mini Elbise", 220),
@@ -74,6 +78,10 @@ export const NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze(
   proposed("necklace_girl_pearl_drop", "accessory", "İnci Damla Kolye", 150, { accessoryGroup: "neck" }),
   proposed("bag_girl_camel_mini", "accessory", "Deve Tüyü Omuz Çantası", 250, { accessoryGroup: "bag" }),
   proposed("clip_girl_pearl_bar_pair", "accessory", "İnci Toka İkilisi", 80, { accessoryGroup: "hairClip" }),
+  approved("bottom_girl_wine_midi_skirt", "bottom", "Bordo Midi Etek", 220),
+  approved("bottom_girl_wide_jeans", "bottom", "Bol Paça Kot", 220),
+  approved("bottom_girl_ecru_trousers", "bottom", "Ekru Pantolon", 220),
+  approved("shoes_girl_camel_ankle_boots", "shoes", "Deve Tüyü Bot", 180),
 ].map((item) => Object.freeze(item)))
 
 export const NEW_COLLECTION_ITEM_IDS: readonly string[] = Object.freeze(NEW_COLLECTION_ITEMS.map((item) => item.itemId))
