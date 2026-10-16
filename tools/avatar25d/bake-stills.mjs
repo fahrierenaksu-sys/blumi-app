@@ -14,11 +14,10 @@
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/full/<key>.webp   one layer per (owner, order[, leg variant])
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/bust/<key>.webp   the same layers in the 256 px bust window
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/thumb/<item>.webp the item alone, cropped, at most 256 px:
- *                                                                          an unpublished item with a front thumb pin
- *                                                                          (front-thumbs.mjs) takes that cut of its
- *                                                                          showcase front; otherwise baked from the rig,
- *                                                                          without the body art its pages carry (see
- *                                                                          withoutBodyArt: face, ears, neck, hands)
+ *                                                                          its front thumb pin (front-thumbs.mjs, the
+ *                                                                          cut of its showcase front) or a hand redraw;
+ *                                                                          the app bake fails for an item with neither
+ *                                                                          (an external rig export bakes from the rig)
  *   apps/mobile/src/features/avatar/stills/stillAssets.ts                 literal require table (Metro, asset scan)
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/showcase/<key>.webp front (showcase) layers, carried over from
  *                                                                          bake-showcase.mjs (verified by sha256)
@@ -39,7 +38,7 @@ import { fileURLToPath } from "node:url"
 import sharp from "sharp"
 import { tsImport } from "tsx/esm/api"
 import { cleanThumb } from "./thumb-clean.mjs"
-import { pinnedFrontThumb, readFrontThumbPins, thumbSource } from "./front-thumbs.mjs"
+import { PUBLISHED_FRONT_THUMBS, pinnedFrontThumb, readFrontThumbPins, thumbSource } from "./front-thumbs.mjs"
 
 export const BAKER_VERSION = 1
 const SS = 2
@@ -53,7 +52,7 @@ const STILLS = join(AVATAR, "stills")
 const MANIFEST = join(ROOT, "packages/domain/src/avatar/avatarStillManifest.json")
 const SHOWCASE_BAKED = join(ROOT, "tools/avatar25d/showcase-baked.json")
 const RELEASE_CATALOG = join(ROOT, "packages/domain/src/release/blumiR1ReleaseCatalog.json")
-/** Published (receipted) items: their thumb bytes are hash-locked, so thumbSource keeps them on the rig bake. */
+/** Published (receipted) items: their bytes are hash-locked, so a front thumb for one needs PUBLISHED_FRONT_THUMBS. */
 const PUBLISHED = new Set(JSON.parse(readFileSync(RELEASE_CATALOG, "utf8")).publishedItems.map((item) => item.itemId))
 const FRONT_PINS = readFrontThumbPins()
 const RIG_DIRS = { female: "girl", male: "boy" }
@@ -448,7 +447,8 @@ async function bakeBody(rigId, rigDir, files) {
     const canonical = canonicalOf[rigItemId]
     const own = rendered.filter((r) => r.layer.rigItemId === rigItemId && r.layer.legVariant === undefined && r.layer.bodyPart === undefined)
     const source = thumbSource({ itemId: canonical, isPublished: PUBLISHED.has(canonical) && !EXTERNAL,
-      hasRedraw: Boolean(THUMB_REDRAWS[rigId]?.[canonical]), hasFront: !EXTERNAL && Boolean(FRONT_PINS[rigId]?.[canonical]) })
+      hasRedraw: Boolean(THUMB_REDRAWS[rigId]?.[canonical]), hasFront: !EXTERNAL && Boolean(FRONT_PINS[rigId]?.[canonical]),
+      requireFront: !EXTERNAL })
     const thumb = source === "redraw" ? redrawnThumb(rigId, canonical)
       : source === "front" ? pinnedFrontThumb(FRONT_PINS, rigId, canonical)
       : await rigThumb(own, canvas, bodySkin, canonical, debugThumbs)
@@ -509,18 +509,17 @@ const THUMB_EDGE_CLEAN = {
 
 /** Card thumbs whose rig art lacks a part, redrawn by hand and pinned by sha256 in tools/avatar25d/thumb-redraws/<rig>/.
  *  The redraw replaces the baked thumb only while its bytes match the pin, so a changed file fails the bake loudly.
- *  white sneakers: the rig art has no closed heel, the redraw adds the heel counter and pink lining (gptfin_1615 t2 r1).
- *  male shoes: the baked heel collar reads open; the redraws close the collar and vamp top (tops_heels_2020 heel).
+ *  Cards show the item from the front (owner, 2026-10-16), so the room-view redraws (white sneakers, four male shoes,
+ *  two jackets) gave way to their front cuts. The cream one-shoulder mini keeps its room-view redraw: its front cut
+ *  holes the skirt (thumbs_1745), so it needs new front art before its card can show the front.
  *  pearl clip: the room art is 34x30 px, too small for a card; the thumb is cropped from its QA-passed showcase front
  *  (glassacc_2030 acc/sc_clip_layer.png, lossless, uncropped scale). Pearl necklace: same, the room chain is 1 px thin
  *  (acc/sc_neck_layer.png, cropped, at most 256 px). Camel mini bag: the room art bakes to a ragged 76x256 strap
  *  sliver; the thumb is the bag body cropped from its showcase front (strap ring down, at most 256 px).
- *  Two jackets: the room-rig thumb from 5f0ea360 (its front cut keeps wrist and collar skin; the room thumb was LOW only,
- *  frontqa_1730). Nine more: seed-clean-thumbs.mjs output, residue cleared by hand-placed seeds (<item>.seeds.json) from
+ *  Nine more: seed-clean-thumbs.mjs output, residue cleared by hand-placed seeds (<item>.seeds.json) from
  *  the front cut (the cream mini from its 5f0ea360 room thumb, whose front cut holes the skirt), thumbs_1745 round 5. */
 const THUMB_REDRAWS = {
   female: {
-    avatar_v2_shoes_white_clean_sneakers: "6b2e11f3e5bba4a1efc29e596877d3d938db4bf01a028307d11784b983064765",
     clip_girl_pearl_bar_pair: "71296b2fa7aae1b4370ce0333bb44e60cd3698198b9ab39758c09346935ac9bf",
     necklace_girl_pearl_drop: "9d351a3d9e2a470726989440298cad3ad2510ecc33c5b2f95c8e4c9b44814681",
     bag_girl_camel_mini: "dddd1910ec3b44a0aab35cfd013d56496cdb27b789ddd6dfc465a70472c91fc7",
@@ -530,18 +529,11 @@ const THUMB_REDRAWS = {
     dress_girl_sage_shirred_tiered_mini: "f11610a3b43b3cdb428e69e1144000448eb1074fe1697410736f3c64d4f1dec5",
     dress_girl_wine_gingham_tie: "5fa01b2cd56b133b128cb4692ce93a4848ac256ee5bc1165716af93f4cb8d4e7",
     hair_girl_ink_twin_braids: "47a69d11b3773cd217c4ce151f511dffd98cd719161cb1cfe23397da956aa797",
-    jacket_girl_black_crop_blazer: "44bbbe7a4f775d02dfd8df623eaa74e501e24b1619d30c944c33d5321f362ef3",
-    jacket_girl_light_denim_crop: "b8134c4186983c4bf1fc43a9227072857697413f4cd265a3c3ccb1e28731009f",
     top_girl_camel_vest_tee: "69ce986958f14f779b4867bef646cf6b7431acb5646ab66c2977688e47ed6bee",
     top_girl_sage_knit_polo: "b99bf278d90a9d2f7c269596847994516c936e91663f108dea21dbec788861ba",
     top_girl_white_poplin_shirt: "49f684d41aa39089ea2702dc8adf3349125416936cccfe4b3dd1144092393bb8"
   },
-  male: {
-    avatar_v2_shoes_male_brown_loafers: "2b5075873bbd3161a501d50e86cf058242c3d0d64243487c386b0d67a317f897",
-    avatar_v2_shoes_male_cream_chunky_sneakers: "64d71ae9a5184cf1f2d71ca8beb2751eeb385eca548519c29d1f0090364e6f15",
-    avatar_v2_shoes_male_dark_leather_sneakers: "6cb1cf1dd8dae4950c19934d5b7bae299f0b88f491d341f2870241d7b782abff",
-    avatar_v2_shoes_male_black_clean_sneakers: "bf9cff14d25f6315a5eab74ace87387616d91096e565f523d7ffa8ec1ed3bf9c"
-  }
+  male: {}
 }
 function redrawnThumb(rigId, canonical) {
   const pin = THUMB_REDRAWS[rigId]?.[canonical]
@@ -566,7 +558,9 @@ const RECEIPTED_ASSETS = new Map(JSON.parse(readFileSync(RELEASE_CATALOG, "utf8"
 async function applyPublishedStillPins(files) {
   for (const [rigId, itemIds] of Object.entries(PUBLISHED_STILL_PINS)) {
     for (const itemId of itemIds) {
-      const assets = (RECEIPTED_ASSETS.get(itemId) ?? []).filter((a) => /\/stills\/layers\/[^/]+\/(full|bust|thumb)\//.test(a.path))
+      // a published front thumb (PUBLISHED_FRONT_THUMBS) is the new front cut, not the pinned room thumb
+      const pinned = PUBLISHED_FRONT_THUMBS.has(itemId) ? /\/stills\/layers\/[^/]+\/(full|bust)\// : /\/stills\/layers\/[^/]+\/(full|bust|thumb)\//
+      const assets = (RECEIPTED_ASSETS.get(itemId) ?? []).filter((a) => pinned.test(a.path))
       if (assets.length === 0) throw new Error(`${rigId}/${itemId}: pinned stills need a published receipt with still assets`)
       for (const asset of assets) {
         const layerPath = asset.path.slice(asset.path.indexOf("/stills/") + "/stills/".length)
