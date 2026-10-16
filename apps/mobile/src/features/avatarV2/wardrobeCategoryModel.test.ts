@@ -18,6 +18,8 @@ const {
 } = require("./avatarV2Selectors") as typeof import("./avatarV2Selectors")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
 const { DEFAULT_AVATAR_ROOM_PROJECTION_MAP } = require("./room/avatarRoomProjection") as typeof import("./room/avatarRoomProjection")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+const { isAvatarV2ItemCompatibleWithBody } = require("./avatarBodyCompatibility") as typeof import("./avatarBodyCompatibility")
 const {
   getWardrobeCategoryItems,
   getAvatarStudioTabs,
@@ -152,7 +154,9 @@ const BAG = fixtureItem("fixture_mini_bag", "accessory", { accessoryGroup: "bag"
 test("Elbise, Gözlük and Aksesuar tabs show only when they have an item; glasses never sit under Aksesuar", () => {
   const live = getAvatarStudioTabs("closet", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2).map((tab) => tab.id)
   for (const id of ["dress", "glasses"] as const) {
-    assert.equal(live.includes(id), getWardrobeCategoryItems(AVATAR_V2_CATALOG, id).length > 0, `${id}: a tab exactly when it has an item`)
+    // a tab exactly when the category has an item this body can wear (the boy's glasses never open a tab for the girl)
+    const wearable = getWardrobeCategoryItems(AVATAR_V2_CATALOG, id).filter((item) => isAvatarV2ItemCompatibleWithBody(item, DEFAULT_AVATAR_V2.bodyId))
+    assert.equal(live.includes(id), wearable.length > 0, `${id}: a tab exactly when it has an item`)
   }
   const withNew = [...AVATAR_V2_CATALOG, ONE_PIECE, GLASSES, BAG]
   const tabs = getAvatarStudioTabs("closet", withNew, DEFAULT_AVATAR_V2).map((tab) => tab.id)
