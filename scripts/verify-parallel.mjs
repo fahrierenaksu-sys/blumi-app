@@ -210,7 +210,7 @@ async function execute(plan, jobs) {
     launch()
   })
 
-  writeFileSync(timingsFile, JSON.stringify(nextTimings, null, 1))
+  if (!process.argv.includes("--dry-run")) writeFileSync(timingsFile, JSON.stringify(nextTimings, null, 1))
   const wall = (Date.now() - wallStart) / 1000
   const cpu = finished.reduce((sum, result) => sum + result.seconds, 0)
   console.log(`\n${finished.length} leaves ${failed ? "run, at least one FAILED" : "passed"}; wall ${wall.toFixed(1)}s, summed ${cpu.toFixed(1)}s, jobs ${jobs}`)
