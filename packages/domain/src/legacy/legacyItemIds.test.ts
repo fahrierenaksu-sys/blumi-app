@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { ECONOMY_CATALOG } from "../economy/economyCatalog"
-import { RESERVED_ROOM_ITEM_IDS, ROOM_V3_FURNITURE } from "../economy/roomFurnitureIds"
+import { RESERVED_ROOM_ITEM_IDS, ROOM_V3_FURNITURE, STARTER_ROOM_BED_ID } from "../economy/roomFurnitureIds"
 import {
   BLUMI_R1_RELEASE_CATALOG,
   isReleaseCatalogItemHeld,
@@ -156,6 +156,21 @@ test("the 27 approved 2.5D pieces and the blush chair are held as pricing-pendin
     assert.equal(isReleaseCatalogItemHeld(id), false, `${id} must never be held`)
     assert.equal(ECONOMY_CATALOG.some((item) => item.itemId === id), false, `${id} has no art yet, so no entry`)
   }
+})
+
+test("every sellable room piece has a real price, so lifting its hold never sells it for free; the starter bed stays free", () => {
+  const sellableRoomIds = [...ROOM_V3_IDS, "room_v2_chair_blush"]
+  assert.ok(sellableRoomIds.length > 0, "the guard scanned the furniture")
+  for (const id of sellableRoomIds) {
+    const entry = ECONOMY_CATALOG.find((item) => item.itemId === id && item.type === "room")
+    assert.ok(entry, `${id} has no economy entry`)
+    assert.ok(Number.isInteger(entry.priceCoins) && entry.priceCoins > 0, `${id} is priced ${entry.priceCoins}`)
+    assert.notEqual(entry.ownedByDefault, true, `${id} must not be owned by default`)
+  }
+  const starterBed = ECONOMY_CATALOG.find((item) => item.itemId === STARTER_ROOM_BED_ID)
+  assert.ok(starterBed)
+  assert.equal(starterBed.priceCoins, 0)
+  assert.equal(starterBed.ownedByDefault, true)
 })
 
 test("held items are neither sold nor listed in production or development projections", () => {
