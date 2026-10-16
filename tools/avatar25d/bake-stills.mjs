@@ -497,12 +497,14 @@ const THUMB_EDGE_CLEAN = {
  *  male shoes: the baked heel collar reads open; the redraws close the collar and vamp top (tops_heels_2020 heel).
  *  pearl clip: the room art is 34x30 px, too small for a card; the thumb is cropped from its QA-passed showcase front
  *  (glassacc_2030 acc/sc_clip_layer.png, lossless, uncropped scale). Pearl necklace: same, the room chain is 1 px thin
- *  (acc/sc_neck_layer.png, cropped, at most 256 px). */
+ *  (acc/sc_neck_layer.png, cropped, at most 256 px). Camel mini bag: the room art bakes to a ragged 76x256 strap
+ *  sliver; the thumb is the bag body cropped from its showcase front (strap ring down, at most 256 px). */
 const THUMB_REDRAWS = {
   female: {
     avatar_v2_shoes_white_clean_sneakers: "6b2e11f3e5bba4a1efc29e596877d3d938db4bf01a028307d11784b983064765",
     clip_girl_pearl_bar_pair: "71296b2fa7aae1b4370ce0333bb44e60cd3698198b9ab39758c09346935ac9bf",
-    necklace_girl_pearl_drop: "9d351a3d9e2a470726989440298cad3ad2510ecc33c5b2f95c8e4c9b44814681"
+    necklace_girl_pearl_drop: "9d351a3d9e2a470726989440298cad3ad2510ecc33c5b2f95c8e4c9b44814681",
+    bag_girl_camel_mini: "dddd1910ec3b44a0aab35cfd013d56496cdb27b789ddd6dfc465a70472c91fc7"
   },
   male: {
     avatar_v2_shoes_male_brown_loafers: "2b5075873bbd3161a501d50e86cf058242c3d0d64243487c386b0d67a317f897",
