@@ -47,6 +47,7 @@ GENERATED_GLOBS = ["*_page*.png", "rig25.json", "rigAssets.ts", "astc/*.zip", "a
 VARIANT_FAMILIES = ("legVariants", "torsoVariants", "armVariants", "sitVariants")
 DEFAULT_FRONT_ORDER = {"shoes": 1, "bottom": 2, "top": 3, "hair": 4}
 ERASING_SLOTS = {"shoes", "bottom", "top", "dress"}
+HIDDEN_BACK_SLOTS = {"glasses", "accessory"}
 AFFECTED_TESTS = [
     ["npm", "run", "build", "-w", "@blumi/domain"],
     ["npm", "test", "-w", "@blumi/domain"],
@@ -91,6 +92,20 @@ def count_differing(a, b):
     return sum(1 for x, y in zip(a, b) if x != y) + abs(len(a) - len(b))
 
 
+def hidden_back_entry(src, view, item_id):
+    """The empty back entry of a head piece (glasses, accessory) the factory rig leaves out of the back view because
+    nothing of it shows from behind; the exporter needs the item in both views, with no parts allowed. None otherwise.
+    Pure."""
+    front = src["front"]["items"].get(item_id)
+    if view != "back" or front is None or front.get("slot") not in HIDDEN_BACK_SLOTS:
+        return None
+    entry = {"slot": front["slot"]}
+    if "group" in front:
+        entry["group"] = front["group"]
+    entry["parts"] = []
+    return entry
+
+
 def graft(base, src, item_id):
     """A copy of base with item_id (and its variant keys and card boxes) taken from src. Pure."""
     out = copy.deepcopy(base)
@@ -102,7 +117,13 @@ def graft(base, src, item_id):
                 fail(f"{view} {key} of the item rig differ from the base: not the same body")
         differing_layers += count_differing(v["layers"], s["layers"])
         if item_id not in s["items"]:
-            fail(f"the item rig has no {view} item {item_id} (art ID = rig ID = app ID)")
+            hidden = hidden_back_entry(src, view, item_id)
+            if hidden is None:
+                fail(f"the item rig has no {view} item {item_id} (art ID = rig ID = app ID)")
+            if item_id in v["items"]:
+                fail(f"the base rig already has {item_id}")
+            v["items"][item_id] = hidden
+            continue
         if item_id in v["items"]:
             fail(f"the base rig already has {item_id}")
         item = copy.deepcopy(s["items"][item_id])

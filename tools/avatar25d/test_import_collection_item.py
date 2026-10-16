@@ -39,6 +39,17 @@ class GraftTest(unittest.TestCase):
             imp.graft(base, rig({}), "jacket_x")
 
 
+    def test_a_head_piece_hidden_from_behind_gets_an_empty_back_entry_but_a_garment_does_not(self):
+        src = rig({})
+        src["front"]["items"]["clip_x"] = {"slot": "accessory", "group": "hairClip", "parts": [{"layer": "head"}]}
+        src["front"]["items"]["top_x"] = {"slot": "top", "parts": [{"layer": "torso"}]}
+        out, _ = imp.graft(rig({}), src, "clip_x")
+        self.assertEqual(out["back"]["items"]["clip_x"], {"slot": "accessory", "group": "hairClip", "parts": []})
+        self.assertEqual(out["front"]["items"]["clip_x"]["parts"], [{"layer": "head"}])
+        with self.assertRaises(SystemExit):
+            imp.graft(rig({}), src, "top_x")
+
+
 class SourceEditTest(unittest.TestCase):
     def test_item_art_entry_lands_in_its_own_rig_block_only(self):
         source = imp.ITEM_ART_TS.read_text()
