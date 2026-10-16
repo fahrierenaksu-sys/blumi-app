@@ -4,7 +4,8 @@ import {
   isAvatarLoadoutItemCompatibleWithBody,
   isLegacyItemId,
   isReleaseCatalogItemHeld,
-  type AvatarItemRules
+  type AvatarItemRules,
+  type ReleaseCatalog
 } from "@blumi/domain"
 import { isActiveRoomItemIdIn, projectInventoryRoomItems } from "../rooms/roomItemProjection"
 import {
@@ -108,6 +109,11 @@ export interface CreateEconomyServiceOptions {
   /** Avatar item facts (retired items, body fit). Defaults to the live catalog; tests pass the fixture rules. */
   avatarRules?: AvatarItemRules
   /**
+   * Which items are held (never sold). Defaults to the R1 release catalog; only tests pass another, to price-check
+   * items whose holds have not lifted yet.
+   */
+  releaseCatalog?: ReleaseCatalog
+  /**
    * When an account was created. With it, accounts created before the R1 price launch keep the pieces that used to be
    * free (`legacyFreeWardrobeGrant.ts`); without it nobody gets them free.
    */
@@ -172,7 +178,7 @@ export function createEconomyService(
         throw new PublicRequestError("That shop item is not available.")
       }
       // a held item (pricing pending, promotion hold, QA id) is never sold, in any environment
-      if (isReleaseCatalogItemHeld(itemId)) {
+      if (isReleaseCatalogItemHeld(itemId, options.releaseCatalog)) {
         throw new PublicRequestError("That shop item is not available.")
       }
       const item = findEconomyCatalogItem(itemId, input.type, catalog)
