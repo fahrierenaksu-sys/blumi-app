@@ -37,7 +37,8 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     jacket_girl_light_denim_crop: "jacket_girl_light_denim_crop",
     jacket_girl_black_crop_blazer: "jacket_girl_black_crop_blazer",
     clip_girl_pearl_bar_pair: "clip_girl_pearl_bar_pair",
-    hair_girl_bun_wine_bow: "hair_girl_bun_wine_bow"
+    hair_girl_bun_wine_bow: "hair_girl_bun_wine_bow",
+    hair_girl_chestnut_butterfly: "hair_girl_chestnut_butterfly"
   },
   // the boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts; QA unlock only, no receipts)
   male: {

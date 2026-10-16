@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "08739eaf1f4c59b75193ab31b75937deb6e44b552db8596cb4345412971f594e",
+      "rigSha256": "36576563ad47619037fe7fa05295083733337ea54eee8b4a73699f183cc387ad",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -509,6 +509,11 @@
           "rigItemId": "hair_girl_bun_wine_bow",
           "thumb": "hair_girl_bun_wine_bow"
         },
+        "hair_girl_chestnut_butterfly": {
+          "slot": "hair",
+          "rigItemId": "hair_girl_chestnut_butterfly",
+          "thumb": "hair_girl_chestnut_butterfly"
+        },
         "clip_girl_pearl_bar_pair": {
           "slot": "accessory",
           "rigItemId": "clip_girl_pearl_bar_pair",
@@ -673,6 +678,19 @@
               109,
               193,
               174
+            ]
+          },
+          {
+            "key": "hair_girl_chestnut_butterfly__o0p6",
+            "owner": "hair_girl_chestnut_butterfly",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              221,
+              117,
+              193,
+              205
             ]
           },
           {
@@ -1392,6 +1410,19 @@
             ]
           },
           {
+            "key": "hair_girl_chestnut_butterfly__o4p6",
+            "owner": "hair_girl_chestnut_butterfly",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              191,
+              38,
+              280,
+              264
+            ]
+          },
+          {
             "key": "clip_girl_pearl_bar_pair__o4p7",
             "owner": "clip_girl_pearl_bar_pair",
             "slot": "accessory",
@@ -1684,6 +1715,19 @@
             ]
           },
           {
+            "key": "hair_girl_chestnut_butterfly__o0p6",
+            "owner": "hair_girl_chestnut_butterfly",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              73,
+              61,
+              123,
+              130
+            ]
+          },
+          {
             "key": "body__o3",
             "owner": "body",
             "slot": "body",
@@ -1965,6 +2009,19 @@
               0,
               158,
               151
+            ]
+          },
+          {
+            "key": "hair_girl_chestnut_butterfly__o4p6",
+            "owner": "hair_girl_chestnut_butterfly",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              54,
+              12,
+              176,
+              166
             ]
           },
           {
