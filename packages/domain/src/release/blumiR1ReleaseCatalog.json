@@ -1130,30 +1130,30 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-16",
-        "sourceCommit": "5dd145fa75847aeff9692e641398778d46b9b0c6",
+        "receiptId": "owner-reissue-2026-10-16-2",
+        "sourceCommit": "fbaead367d0fe34c480b80e3b13cccf0991490a2",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-16",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-16.md",
-          "manifestSha256": "321524ab1bfd1bfcbc5f1255c30d8c6db638d1d55596bd2b92313557af6d876b"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-16-2.md",
+          "manifestSha256": "5e6393991da710230b58f2f22a4f7cc899346617ef153fffba91752667766a59"
         },
         "assets": [
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/avatar_v2_hair_mocha_ribbon_waves__o0p6.webp",
-            "sha256": "ccef0db26235ae24a6023ef2a9f23c9280eaf66671c706e3509763facd9a96ae"
+            "sha256": "9b6f7797499a8a9ad1418f609cb7ed37b72275bd0ecebdfbf8108412bd14496a"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/bust/avatar_v2_hair_mocha_ribbon_waves__o4p6.webp",
-            "sha256": "464effe5689e5e1c1f8011bfbb253b173af116bc480108fc8a8dc45e5c0f6340"
+            "sha256": "6a949a9a56443338fed0326af01239d4ee1b0b853508c3b87bbe956d3c43b1ec"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_hair_mocha_ribbon_waves__o0p6.webp",
-            "sha256": "e45128111be983d1255fd813b57b70b48e5fee882e4e39ecce5a0c05dca2b9fa"
+            "sha256": "74697bf64e0a7194dd4afc9abaa5a04bb4b95aabf113f9c45c1200f444d8116e"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/full/avatar_v2_hair_mocha_ribbon_waves__o4p6.webp",
-            "sha256": "603381fb9a568d1a29937f2203f2080bd15f38c1eb3909dbbfb7f89a509b5996"
+            "sha256": "1297ca202017c5b25f7419f33265d300ab87d8bdef380aeaa98828ac4ec15fea"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/avatar_v2_hair_mocha_ribbon_waves__back.webp",
@@ -1165,7 +1165,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/avatar_v2_hair_mocha_ribbon_waves.webp",
-            "sha256": "baf8b6ebb321b7c66dae5cd7fc279b0eca962fc40284727e0928e6474f452a9a"
+            "sha256": "b4040086daae099e637fb91e09dea1fc82f450ae6f04612d4afb07da9650bbb4"
           }
         ]
       }
