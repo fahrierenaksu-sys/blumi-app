@@ -76,8 +76,13 @@ const STUDIO_FIXTURE_CATALOG = [
 test("each worn kind with an item has its own Studio tab and hair lives only under My Character", () => {
   const closet = getAvatarStudioTabs("closet", STUDIO_FIXTURE_CATALOG, DEFAULT_AVATAR_V2)
   const appearance = getAvatarStudioTabs("appearance", STUDIO_FIXTURE_CATALOG, DEFAULT_AVATAR_V2)
-  // slots_2140: dresses have their own tab (Elbise), next to Tops; the fixture has no glasses, so no Gözlük tab
-  assert.deepEqual(closet.map((tab) => tab.id), ["top", "bottom", "dress", "shoes", "accessory"])
+  // slots_2140: dresses have their own tab (Elbise), next to Tops; the Gözlük tab follows the live catalog (a tab exactly when the girl can wear a pair)
+  const girlHasGlasses = getWardrobeCategoryItems(STUDIO_FIXTURE_CATALOG, "glasses")
+    .some((item) => isAvatarV2ItemCompatibleWithBody(item, DEFAULT_AVATAR_V2.bodyId))
+  assert.deepEqual(
+    closet.map((tab) => tab.id),
+    ["top", "bottom", "dress", "shoes", ...(girlHasGlasses ? ["glasses"] : []), "accessory"]
+  )
   assert.deepEqual(appearance.map((tab) => tab.id), ["hair", "face", "eyes", "nose"])
   assert.equal(closet.some((tab) => tab.categories.includes("hair")), false)
   assert.deepEqual(closet[0].categories, ["top"])
