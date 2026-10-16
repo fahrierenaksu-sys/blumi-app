@@ -77,7 +77,8 @@ export function createRealtimeRouter(
     // Local sockets only: no cross-instance publish (a NOTIFY query) per step.
     emit: (connectionIds, event) => {
       for (const connectionId of connectionIds) connectionManager.sendToConnection(connectionId, event)
-    }
+    },
+    onSceneEntered: (id, userId) => miniRoomService.recordSceneEntry?.(id, userId)
   })
   miniRoomService.onRoomInvalidated?.(id => motion.invalidate(id))
   // A step shed under backpressure is repaired by a delayed snapshot to that socket.

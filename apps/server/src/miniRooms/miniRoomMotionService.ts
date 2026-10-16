@@ -75,6 +75,8 @@ export function createMiniRoomMotionService(options: {
    * state: publishing it cross-instance would cost a database NOTIFY per step.
    */
   emit(connectionIds: string[], event: ServerEvent): void
+  /** A participant's socket entered the scene after its access check (the shared-room reward needs both). */
+  onSceneEntered?(miniRoomId: string, userId: string): void
   now?: () => number
 }) {
   const rooms = new Map<string, MotionRoom>()
@@ -287,6 +289,7 @@ export function createMiniRoomMotionService(options: {
       if (!avatar.present) room.avatars.set(userId, { ...avatar, present: true, revision: avatar.revision + 1 })
       if (superseded.length) options.emit(superseded, { type: "mini_room.scene_superseded", payload: { miniRoomId: id } })
       emitSnapshot(id, room)
+      try { options.onSceneEntered?.(id, userId) } catch { /* a reward note never fails a scene entry */ }
     },
     async move(connectionId: string, userId: string, input: MiniRoomMove) {
       const parsed = miniRoomMoveSchema.safeParse(input)

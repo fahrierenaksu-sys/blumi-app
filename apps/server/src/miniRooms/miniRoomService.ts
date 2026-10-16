@@ -13,6 +13,7 @@ import type { EconomyService } from "../economy/economyService"
 import type { ChatService } from "../chat/chatService"
 import type { PresenceService } from "../presence/presenceService"
 import type { SafetyService } from "../safety/safetyService"
+import { safeOperationalErrorKind } from "../operations/safeErrorLog"
 import { type LivekitTokenService } from "./livekitTokenService"
 import {
   createInMemoryMiniRoomRepository,
@@ -45,6 +46,11 @@ export interface MiniRoomService {
   onRoomInvalidated?(listener: (miniRoomId: string) => void): void
   /** A chat room was just verified active and unblocked by an accept or join. */
   onRoomReady?(listener: (miniRoom: MiniRoomRecord) => void): void
+  /**
+   * A participant's socket entered the room scene (motion service, after its access check). The shared-room reward
+   * pays only once both participants entered and stayed MINIMUM_REWARDED_ROOM_DURATION_MS from the later entry.
+   */
+  recordSceneEntry?(miniRoomId: string, userId: string, now?: Date): void
   repository: MiniRoomRepository
   createInvite(input: CreateInviteInput, now?: Date): Promise<MiniRoomInviteRecord>
   decideInvite(
@@ -162,6 +168,11 @@ export interface CreateMiniRoomServiceOptions {
 }
 
 const MINIMUM_REWARDED_ROOM_DURATION_MS = 120_000
+/**
+ * Rooms whose scene entries are remembered at once. Entries are process memory: a restart forgets them, so a room
+ * that spans a restart pays no reward (fails closed). The oldest room is forgotten first past this bound.
+ */
+const MAX_TRACKED_SCENE_ENTRY_ROOMS = 4_096
 
 export function createMiniRoomService(
   options: CreateMiniRoomServiceOptions
@@ -177,8 +188,11 @@ export function createMiniRoomService(
    * in flight skips its prefetch: the cost is one database read on first entry.
    */
   let invalidationEpoch = 0
+  /** First scene entry time (ms) per participant, per room. Each update stores a new inner map. */
+  const sceneEntries = new Map<string, ReadonlyMap<string, number>>()
   const notifyRoomInvalidated = (roomId: string): void => {
     invalidationEpoch += 1
+    sceneEntries.delete(roomId)
     for (const listener of roomInvalidationListeners) listener(roomId)
   }
   const announceReady = (room: MiniRoomRecord, epochAtStart: number): void => {
@@ -193,6 +207,17 @@ export function createMiniRoomService(
   return {
     onRoomInvalidated(listener) { roomInvalidationListeners.add(listener) },
     onRoomReady(listener) { roomReadyListeners.add(listener) },
+    recordSceneEntry(miniRoomId, userId, now = new Date()) {
+      const entries = sceneEntries.get(miniRoomId) ?? new Map<string, number>()
+      if (entries.has(userId)) return
+      sceneEntries.delete(miniRoomId)
+      sceneEntries.set(miniRoomId, new Map([...entries, [userId, now.getTime()]]))
+      while (sceneEntries.size > MAX_TRACKED_SCENE_ENTRY_ROOMS) {
+        const oldest = sceneEntries.keys().next().value
+        if (oldest === undefined) break
+        sceneEntries.delete(oldest)
+      }
+    },
     repository,
     async createChatInvite(input, now = new Date()) {
       assertDistinctChatProfiles(input.senderProfile, input.recipientProfile)
@@ -788,28 +813,9 @@ export function createMiniRoomService(
 
       const endedAt = now.toISOString()
       const economyService = options.economyService
-      if (
-        economyService &&
-        now.getTime() - new Date(miniRoom.startedAt).getTime() >=
-          MINIMUM_REWARDED_ROOM_DURATION_MS
-      ) {
-        const completionIntent = await repository.anchorMiniRoomCompletion({
-          miniRoomId,
-          requestedByUserId: endedByUserId,
-          requestedAt: endedAt,
-          rewardDate: endedAt.slice(0, 10)
-        })
-        if (!completionIntent) return null
-        await Promise.all(
-          miniRoom.participantUserIds.map((userId) =>
-            economyService.grantEventReward(
-              userId,
-              "room_complete",
-              completionIntent.rewardDate,
-              now
-            )
-          )
-        )
+      if (economyService && isSharedStayRewardable(miniRoom, sceneEntries.get(miniRoomId), now)) {
+        const rewardOutcome = await grantSharedRoomRewardSafely(repository, economyService, miniRoom, endedByUserId, now)
+        if (rewardOutcome === "room_closed") return null
       }
       const endedRoom = await repository.endMiniRoom(
         miniRoomId,
@@ -988,4 +994,63 @@ function inviteDenialMessage(reason: string | undefined): string {
   if (reason === "sender_busy") return "Leave your current room first."
   if (reason === "recipient_busy") return "That person is already in a room."
   return "Move closer before sending an invite."
+}
+
+/**
+ * The shared-room reward pays a real shared stay: both participants entered the scene, and the later of the two
+ * entries is at least MINIMUM_REWARDED_ROOM_DURATION_MS old. An accepted invite alone (one side never opened the
+ * room, or an offline sender put into a room) pays nothing.
+ */
+function isSharedStayRewardable(
+  miniRoom: MiniRoomRecord,
+  entries: ReadonlyMap<string, number> | undefined,
+  now: Date
+): boolean {
+  if (!entries) return false
+  const entryTimes = miniRoom.participantUserIds.map((userId) => entries.get(userId))
+  if (entryTimes.some((enteredAt) => enteredAt === undefined)) return false
+  const bothPresentSince = Math.max(...(entryTimes as number[]))
+  return now.getTime() - bothPresentSince >= MINIMUM_REWARDED_ROOM_DURATION_MS
+}
+
+/**
+ * Anchors the reward day and pays both participants, best effort: a reward failure is reported and never keeps a
+ * room open (2026-10-16 review: a throw here used to stop everyone leaving). Only "room_closed" (the room ended
+ * meanwhile or the caller is not in it) changes the leave.
+ */
+async function grantSharedRoomRewardSafely(
+  repository: MiniRoomRepository,
+  economyService: EconomyService,
+  miniRoom: MiniRoomRecord,
+  endedByUserId: string,
+  now: Date
+): Promise<"granted" | "room_closed" | "failed"> {
+  const endedAt = now.toISOString()
+  try {
+    const completionIntent = await repository.anchorMiniRoomCompletion({
+      miniRoomId: miniRoom.miniRoomId,
+      requestedByUserId: endedByUserId,
+      requestedAt: endedAt,
+      rewardDate: endedAt.slice(0, 10)
+    })
+    if (!completionIntent) return "room_closed"
+    const grants = await Promise.allSettled(
+      miniRoom.participantUserIds.map((userId) =>
+        economyService.grantEventReward(userId, "room_complete", completionIntent.rewardDate, now)
+      )
+    )
+    const failure = grants.find((grant) => grant.status === "rejected")
+    if (failure?.status === "rejected") {
+      reportRoomRewardFailure(failure.reason)
+      return "failed"
+    }
+    return "granted"
+  } catch (error) {
+    reportRoomRewardFailure(error)
+    return "failed"
+  }
+}
+
+function reportRoomRewardFailure(error: unknown): void {
+  console.error("Shared room reward failed", { errorKind: safeOperationalErrorKind(error) })
 }

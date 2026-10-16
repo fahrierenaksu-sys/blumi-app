@@ -355,3 +355,15 @@ test("a socket that missed a step is re-sent the current snapshot once, alone, a
   context.mock.timers.tick(MINI_ROOM_MOTION_RESYNC_DELAY_MS)
   assert.deepEqual(events, [])
 })
+
+test("a scene entry is reported only for a participant who passed the room's access check", async () => {
+  const room: any = { miniRoomId: "room", participantUserIds: ["a", "b"] }
+  const entered: string[] = []
+  const service = createMiniRoomMotionService({ findRoom: async () => room,
+    hasBlockBetween: async () => false, emit: () => undefined,
+    onSceneEntered: (miniRoomId, userId) => entered.push(`${miniRoomId}:${userId}`) })
+  await assert.rejects(service.enter("cx", "x", "room"))
+  await service.enter("ca", "a", "room")
+  await service.enter("cb", "b", "room")
+  assert.deepEqual(entered, ["room:a", "room:b"])
+})

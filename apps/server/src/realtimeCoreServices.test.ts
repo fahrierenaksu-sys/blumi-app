@@ -64,6 +64,7 @@ test("a room opened from a chat invite rewards a qualifying stay once and ends o
     /not available/i
   )
 
+  enterBoth(services, accepted.miniRoom.miniRoomId, now)
   const rewardEligibleEnd = new Date(now.getTime() + 120_000)
   const ended = await services.miniRoomService.leaveMiniRoom(
     accepted.miniRoom.miniRoomId,
@@ -90,6 +91,7 @@ test("mini rooms shorter than two minutes do not grant economy rewards", async (
   const now = new Date("2026-06-28T10:00:00.000Z")
   const accepted = await openChatRoom(services, now)
   assert.ok(accepted.miniRoom)
+  enterBoth(services, accepted.miniRoom.miniRoomId, now)
 
   await services.miniRoomService.leaveMiniRoom(
     accepted.miniRoom.miniRoomId,
@@ -101,48 +103,66 @@ test("mini rooms shorter than two minutes do not grant economy rewards", async (
   assert.equal((await services.economyService.getInventory("user_b")).coins, 1250)
 })
 
-test("a transient room reward failure leaves the room retryable without double credit", async () => {
+test("a room reward failure never keeps the room open and still credits the other participant", async () => {
   const economyService = createEconomyService()
-  let shouldFailReward = true
-  const retryableEconomyService: EconomyService = {
+  const failingEconomyService: EconomyService = {
     ...economyService,
-    async grantEventReward(...args) {
-      if (shouldFailReward) {
-        shouldFailReward = false
-        throw new Error("Reward ledger is temporarily unavailable.")
-      }
-      return economyService.grantEventReward(...args)
+    async grantEventReward(userId, ...rest) {
+      if (userId === "user_a") throw new Error("Reward ledger is temporarily unavailable.")
+      return economyService.grantEventReward(userId, ...rest)
     }
   }
-  const services = createRealtimeCoreServices(retryableEconomyService)
+  const services = createRealtimeCoreServices(failingEconomyService)
   const now = new Date("2026-06-28T10:00:00.000Z")
   const accepted = await openChatRoom(services, now)
   assert.ok(accepted.miniRoom)
-  const endedAt = new Date(now.getTime() + 120_000)
-
-  await assert.rejects(
-    services.miniRoomService.leaveMiniRoom(
-      accepted.miniRoom.miniRoomId,
-      "user_a",
-      endedAt
-    ),
-    /temporarily unavailable/i
-  )
-  assert.equal(
-    (await services.miniRoomService.findMiniRoom(accepted.miniRoom.miniRoomId))
-      ?.endedAt,
-    undefined
-  )
+  enterBoth(services, accepted.miniRoom.miniRoomId, now)
 
   const ended = await services.miniRoomService.leaveMiniRoom(
     accepted.miniRoom.miniRoomId,
     "user_a",
-    new Date(endedAt.getTime() + 1_000)
+    new Date(now.getTime() + 120_000)
   )
 
   assert.equal(ended?.endedByUserId, "user_a")
-  assert.equal((await economyService.getInventory("user_a")).coins, AFTER_ONE_ROOM_REWARD)
+  assert.equal(await services.miniRoomService.findActiveMiniRoomForUser("user_a"), null)
+  assert.equal((await economyService.getInventory("user_a")).coins, 1250)
   assert.equal((await economyService.getInventory("user_b")).coins, AFTER_ONE_ROOM_REWARD)
+})
+
+test("an accepted room pays nothing when only one participant entered it", async () => {
+  const services = createRealtimeCoreServices()
+  const now = new Date("2026-06-28T10:00:00.000Z")
+  const accepted = await openChatRoom(services, now)
+  assert.ok(accepted.miniRoom)
+  services.miniRoomService.recordSceneEntry?.(accepted.miniRoom.miniRoomId, "user_b", now)
+
+  const ended = await services.miniRoomService.leaveMiniRoom(
+    accepted.miniRoom.miniRoomId,
+    "user_b",
+    new Date(now.getTime() + 11 * 60 * 60 * 1000)
+  )
+
+  assert.equal(ended?.endedByUserId, "user_b")
+  assert.equal((await services.economyService.getInventory("user_a")).coins, 1250)
+  assert.equal((await services.economyService.getInventory("user_b")).coins, 1250)
+})
+
+test("the shared stay is timed from the later participant's entry", async () => {
+  const services = createRealtimeCoreServices()
+  const now = new Date("2026-06-28T10:00:00.000Z")
+  const accepted = await openChatRoom(services, now)
+  assert.ok(accepted.miniRoom)
+  const roomId = accepted.miniRoom.miniRoomId
+  services.miniRoomService.recordSceneEntry?.(roomId, "user_a", now)
+  const partnerEnteredAt = new Date(now.getTime() + 10 * 60 * 1000)
+  services.miniRoomService.recordSceneEntry?.(roomId, "user_b", partnerEnteredAt)
+
+  const tooEarly = await services.miniRoomService.leaveMiniRoom(roomId, "user_a", new Date(partnerEnteredAt.getTime() + 119_000))
+
+  assert.equal(tooEarly?.endedByUserId, "user_a")
+  assert.equal((await services.economyService.getInventory("user_a")).coins, 1250)
+  assert.equal((await services.economyService.getInventory("user_b")).coins, 1250)
 })
 
 test("an end write failure keeps the original reward day across a midnight retry", async () => {
@@ -162,6 +182,7 @@ test("an end write failure keeps the original reward day across a midnight retry
   const now = new Date("2026-07-14T23:57:59.000Z")
   const accepted = await openChatRoom(services, now)
   assert.ok(accepted.miniRoom)
+  enterBoth(services, accepted.miniRoom.miniRoomId, now)
 
   await assert.rejects(
     services.miniRoomService.leaveMiniRoom(
@@ -187,6 +208,7 @@ test("concurrent qualifying leaves credit each participant exactly once", async 
   const now = new Date("2026-07-14T10:00:00.000Z")
   const accepted = await openChatRoom(services, now)
   assert.ok(accepted.miniRoom)
+  enterBoth(services, accepted.miniRoom.miniRoomId, now)
   const endedAt = new Date(now.getTime() + 120_000)
 
   const leaveResults = await Promise.all([
@@ -289,6 +311,11 @@ function createRealtimeCoreServices(
     economyService,
     reactionService
   }
+}
+
+/** Both participants' sockets entered the room scene (what the motion service reports). */
+function enterBoth(services: ReturnType<typeof createRealtimeCoreServices>, miniRoomId: string, at: Date): void {
+  for (const userId of ["user_a", "user_b"]) services.miniRoomService.recordSceneEntry?.(miniRoomId, userId, at)
 }
 
 async function openChatRoom(
