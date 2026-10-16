@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "f568dc260d91dbea2507cf988b68bca24aa70ea25b6c46b6fb37186f8d80901f",
+      "rigSha256": "0827d7066a351194c27af36bbd8ff002f77a77ad2e343fea546287f6d521bba2",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -418,6 +418,11 @@
           "rigItemId": "top_girl_white_poplin_shirt",
           "thumb": "top_girl_white_poplin_shirt"
         },
+        "top_girl_rose_pearl_cardigan": {
+          "slot": "top",
+          "rigItemId": "top_girl_rose_pearl_cardigan",
+          "thumb": "top_girl_rose_pearl_cardigan"
+        },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
@@ -667,6 +672,19 @@
               314,
               61,
               106
+            ]
+          },
+          {
+            "key": "top_girl_rose_pearl_cardigan__o0p45",
+            "owner": "top_girl_rose_pearl_cardigan",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              209,
+              313,
+              44,
+              72
             ]
           },
           {
@@ -1412,6 +1430,19 @@
             ]
           },
           {
+            "key": "top_girl_rose_pearl_cardigan__o3p45",
+            "owner": "top_girl_rose_pearl_cardigan",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              219,
+              278,
+              165,
+              222
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1672,6 +1703,19 @@
               65,
               117
             ]
+          },
+          {
+            "key": "top_girl_rose_pearl_cardigan__o5p45",
+            "owner": "top_girl_rose_pearl_cardigan",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              364,
+              290,
+              56,
+              99
+            ]
           }
         ],
         "bust": [
@@ -1805,6 +1849,19 @@
               181,
               42,
               70
+            ]
+          },
+          {
+            "key": "top_girl_rose_pearl_cardigan__o0p45",
+            "owner": "top_girl_rose_pearl_cardigan",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              65,
+              180,
+              32,
+              49
             ]
           },
           {
@@ -2118,6 +2175,19 @@
             ]
           },
           {
+            "key": "top_girl_rose_pearl_cardigan__o3p45",
+            "owner": "top_girl_rose_pearl_cardigan",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              71,
+              159,
+              103,
+              97
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -2377,6 +2447,19 @@
               166,
               45,
               76
+            ]
+          },
+          {
+            "key": "top_girl_rose_pearl_cardigan__o5p45",
+            "owner": "top_girl_rose_pearl_cardigan",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              160,
+              166,
+              39,
+              65
             ]
           }
         ]
