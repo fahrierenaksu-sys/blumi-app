@@ -9,7 +9,7 @@
       "baseSha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0",
       "qaPass": "line_1900/REPORT.md (o_g1fix8 16:37 FINAL; G5 starter-shoes waiver = owner yes 2026-10-12 20:07)",
       "ownerApproved": true,
-      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-14 15:23 +0300: the owner approved ('evet') the front looks of hair_girl_bob and hair_girl_pigtails (factory girl_bob_2130 and girl_pigtails_2130 sc/final_r2, shown in girl_preview_1500/girl_wardrobe_now.png; OWNER_DECISIONS.md FRONT SHOWCASE line of 2026-10-14). Ribbon waves and white sneakers are still pending. 2026-10-15 10:38 +0300: the owner approved ('önden görünsün') the front looks of ribbon waves, white sneakers, crop white, crop black, black trousers, jacket and corset (OWNER_DECISIONS.md), conditional on the audit fixes (sneaker hem, trouser hips, waves flecks). Listed here: waves, white sneakers (hem moved to the trousers layer, factory girl_shoes5_1430 FIX r1 hem_move), both crops (factory girl_basics_sc_1640 o_basics_w10/k11), jacket and corset. The black trousers are NOT listed: the hip fix is still open (beta5_fix_1030/REPORT.md), so they keep the 3/4 fallback. 2026-10-15 (chat): the owner approved the starter polo front v6 ('Polo değişikliğini onaylıyorum') and allowed the corset and jacket pins to move to their hip-fix v6 files (front + erase, Workbench integration/card_design/showcase/f2_hem_1545, integration/front_fix_1545/REPORT.md). 2026-10-15 (hip fix, Workbench integration/gpt3_1745/REPORT.md): the black trousers are listed with their v2 front (skin at the hip flare where the base tank showed under both crops) and v2 erase (corset hip specks); this is the audit fix the 10:38 approval was conditional on. The changed look is on the sheet integration/gpt3_1745/t2/SHEET_black_trousers_phone_2x.png. 2026-10-15 19:37 +0300: the owner approved the starter polo front v7 ('Polo v7 değişikliğini onaylıyorum.', OWNER_DECISIONS.md): hem notch filled and stray pink specks removed, file gpt3_1745/top_polo_v7.png; the polo erase is unchanged.",
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-14 15:23 +0300: the owner approved ('evet') the front looks of hair_girl_bob and hair_girl_pigtails (factory girl_bob_2130 and girl_pigtails_2130 sc/final_r2, shown in girl_preview_1500/girl_wardrobe_now.png; OWNER_DECISIONS.md FRONT SHOWCASE line of 2026-10-14). Ribbon waves and white sneakers are still pending. 2026-10-15 10:38 +0300: the owner approved ('önden görünsün') the front looks of ribbon waves, white sneakers, crop white, crop black, black trousers, jacket and corset (OWNER_DECISIONS.md), conditional on the audit fixes (sneaker hem, trouser hips, waves flecks). Listed here: waves, white sneakers (hem moved to the trousers layer, factory girl_shoes5_1430 FIX r1 hem_move), both crops (factory girl_basics_sc_1640 o_basics_w10/k11), jacket and corset. The black trousers are NOT listed: the hip fix is still open (beta5_fix_1030/REPORT.md), so they keep the 3/4 fallback. 2026-10-15 (chat): the owner approved the starter polo front v6 ('Polo değişikliğini onaylıyorum') and allowed the corset and jacket pins to move to their hip-fix v6 files (front + erase, Workbench integration/card_design/showcase/f2_hem_1545, integration/front_fix_1545/REPORT.md). 2026-10-15 (hip fix, Workbench integration/gpt3_1745/REPORT.md): the black trousers are listed with their v2 front (skin at the hip flare where the base tank showed under both crops) and v2 erase (corset hip specks); this is the audit fix the 10:38 approval was conditional on. The changed look is on the sheet integration/gpt3_1745/t2/SHEET_black_trousers_phone_2x.png. 2026-10-15 19:37 +0300: the owner approved the starter polo front v7 ('Polo v7 değişikliğini onaylıyorum.', OWNER_DECISIONS.md): hem notch filled and stray pink specks removed, file gpt3_1745/top_polo_v7.png; the polo erase is unchanged. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv.",
       "crops": {
         "head": [
           876,
@@ -152,6 +152,240 @@
           "backFile": "surffix/hair_girl_ink_twin_braids/back.png",
           "sha256": "59ff757670339f15ab6f991af7dcb58194787422b0c3a7c934692b007e272c3b",
           "backSha256": "6e81c291475009087a28957f94e3441463b844d55413e35ff8b615fc8ee4199c"
+        },
+        "jacket_girl_black_crop_blazer": {
+          "slot": "top",
+          "order": 3,
+          "file": "release2_sc/jacket_girl_black_crop_blazer/front.png",
+          "sha256": "18133652aae3dba6ad48cfb1c8b2055cffd9509b4088f80f1e3c28422eba463b",
+          "eraseFile": "release2_sc/jacket_girl_black_crop_blazer/erase.png",
+          "eraseSha256": "e2478f395d43095a75de81f5379e1d3198e019e8b69b05119be4259964d15953",
+          "tucked": false
+        },
+        "clip_girl_pearl_bar_pair": {
+          "slot": "accessory",
+          "order": 6,
+          "file": "release2_sc/clip_girl_pearl_bar_pair/front.png",
+          "sha256": "10ddf1098efa78e9f079b831577157efa2ce41d0a5581bbac53d3498dcdaffbd"
+        },
+        "hair_girl_bun_wine_bow": {
+          "slot": "hair",
+          "order": 4,
+          "file": "release2_sc/hair_girl_bun_wine_bow/front.png",
+          "sha256": "011368770afc9217dfef0ccdb142dbc99e47a0d31b165baec873cb9d06feb211",
+          "backFile": "release2_sc/hair_girl_bun_wine_bow/back.png",
+          "backSha256": "e8ff6692530b3766e30e05cbf7a1275743aa3f9bc02b8eeba8e921bdc982a081"
+        },
+        "hair_girl_chestnut_butterfly": {
+          "slot": "hair",
+          "order": 4,
+          "file": "release2_sc/hair_girl_chestnut_butterfly/front.png",
+          "sha256": "c1ade688896215d09df36f5667c38a5c3c736c0a8aed3872bbce0e677ed82b4b",
+          "backFile": "release2_sc/hair_girl_chestnut_butterfly/back.png",
+          "backSha256": "c0f1a022a2efd607c8dadbc43b57f64220e02523f724ca4ca5ee8a99989f502f"
+        },
+        "hair_girl_ink_french_bob": {
+          "slot": "hair",
+          "order": 4,
+          "file": "release2_sc/hair_girl_ink_french_bob/front.png",
+          "sha256": "5e78bc39cb7eba098f87abf8e676f04fc5fa119cf4e3c882c948efb716ee069d",
+          "backFile": "release2_sc/hair_girl_ink_french_bob/back.png",
+          "backSha256": "3af16bf23867a8badc8149ee121ef712c0a410933cc1657dd7b22c43ba0f9ba0"
+        },
+        "top_girl_camel_vest_tee": {
+          "slot": "top",
+          "order": 3,
+          "file": "release2_sc/top_girl_camel_vest_tee/front.png",
+          "sha256": "0f60d4ce60126322fc2fd026a2d4b5ef3ea7ad4f3b82894cb57b90f6b97e9af0",
+          "eraseFile": "release2_sc/top_girl_camel_vest_tee/erase.png",
+          "eraseSha256": "b9963275d47b4280e771644c40dc62c505b93433c130926c58c037e5153fea2a",
+          "tucked": false
+        },
+        "top_girl_white_poplin_shirt": {
+          "slot": "top",
+          "order": 3,
+          "file": "release2_sc/top_girl_white_poplin_shirt/front.png",
+          "sha256": "cd5d045d97009bb861240c345cdf2e7ca8a2c2e73be416abf9b415154e74cc89",
+          "eraseFile": "release2_sc/top_girl_white_poplin_shirt/erase.png",
+          "eraseSha256": "28dbe4458534052233c324fb5b503a5fa7d2c8aa36a751dce26156896a7e8f57",
+          "tucked": false
+        },
+        "top_girl_rose_pearl_cardigan": {
+          "slot": "top",
+          "order": 3,
+          "file": "release2_sc/top_girl_rose_pearl_cardigan/front.png",
+          "sha256": "7124f993801d4d203d18f967c0a2bda7e8b45a169595e1dd02eef6536fe2db82",
+          "eraseFile": "release2_sc/top_girl_rose_pearl_cardigan/erase.png",
+          "eraseSha256": "69b3899837ed532715372b30abdb34e86bd282dc9a4e398011476a40f1adbf8e",
+          "tucked": false
+        },
+        "top_girl_breton_stripe": {
+          "slot": "top",
+          "order": 3,
+          "file": "release2_sc/top_girl_breton_stripe/front.png",
+          "sha256": "ff72aac6b20164f3076c853136ba42fc606028b2a3524854c147b07063a74d51",
+          "eraseFile": "release2_sc/top_girl_breton_stripe/erase.png",
+          "eraseSha256": "0b13994d1b3c1eb127ff1bb44d154eb1a9a181d8d70683239af26c53755d1ef2",
+          "tucked": false
+        },
+        "top_girl_sage_knit_polo": {
+          "slot": "top",
+          "order": 3,
+          "file": "release2_sc/top_girl_sage_knit_polo/front.png",
+          "sha256": "4b495c05c94b037dcca416b1f0f0a6af109feadb8e52810491b2118861e0b3d0",
+          "eraseFile": "release2_sc/top_girl_sage_knit_polo/erase.png",
+          "eraseSha256": "7179f4864179a64d9b3b0cff34a6c54f35901e3ed799461cd588f95facf39f64",
+          "tucked": false
+        },
+        "dress_girl_wine_gingham_tie": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_wine_gingham_tie/front.png",
+          "sha256": "6e54f9afbea45d7d3356fec6e0b8da7c36a7fa2b25e7d453be75f76998c9c064",
+          "eraseFile": "release2_sc/dress_girl_wine_gingham_tie/erase.png",
+          "eraseSha256": "a6ed6588f31dcbc8ffeebcddd8f28890ea5f55db7f4e00eb553e9c5564423702"
+        },
+        "necklace_girl_pearl_drop": {
+          "slot": "accessory",
+          "order": 6,
+          "file": "release2_sc/necklace_girl_pearl_drop/front.png",
+          "sha256": "f15f8add0ad2733d22e0575fcc77a7403ca853825044ac87eaf9745978d9a7a4"
+        },
+        "bag_girl_camel_mini": {
+          "slot": "accessory",
+          "order": 6,
+          "file": "release2_sc/bag_girl_camel_mini/front.png",
+          "sha256": "d6e996729a5c66a86481ee2eab63546d1922b5215864b4839d194b211ba3ff4c"
+        },
+        "bottom_girl_wine_midi_skirt": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "release2_sc/bottom_girl_wine_midi_skirt/front.png",
+          "sha256": "49e798d617349db04334e0719e86c0ec92245ed0a0cacf2abf524810347cc79d",
+          "eraseFile": "release2_sc/bottom_girl_wine_midi_skirt/erase.png",
+          "eraseSha256": "1a42aecda5e2f64e6bb45378b0ab84da0f10ad295eee9e09fbf655526ddb7b11"
+        },
+        "bottom_girl_wide_jeans": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "release2_sc/bottom_girl_wide_jeans/front.png",
+          "sha256": "2c6462daaa30a2bb69c550a3b55904218b1ed79d2ba073bc245a0472d73921a5",
+          "eraseFile": "release2_sc/bottom_girl_wide_jeans/erase.png",
+          "eraseSha256": "f81ae629d79d45bc0f9257451b3b223b0bbacc6fd3065f5c4e6bad084289a159"
+        },
+        "bottom_girl_ecru_trousers": {
+          "slot": "bottom",
+          "order": 2,
+          "file": "release2_sc/bottom_girl_ecru_trousers/front.png",
+          "sha256": "cf6306b7c4cf533d43ca61fdf253e1bef147231b819af02c92e87d8a70cad2b7",
+          "eraseFile": "release2_sc/bottom_girl_ecru_trousers/erase.png",
+          "eraseSha256": "b4f749712f960263566d6255dc17e72f6479ded056f1625b3556c4dcedcfce55"
+        },
+        "shoes_girl_camel_ankle_boots": {
+          "slot": "shoes",
+          "order": 1,
+          "file": "release2_sc/shoes_girl_camel_ankle_boots/front.png",
+          "sha256": "483ecb8d59e56b996fcb63f04680e2d8292856d04ad9ef4da05d08c3b399afe7",
+          "eraseFile": "release2_sc/shoes_girl_camel_ankle_boots/erase.png",
+          "eraseSha256": "c2f2137566d3ebec44420479f0509b3de08ee732f1454b9e2ee4745dc11a12d6"
+        },
+        "dress_girl_black_corset_slit_maxi": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_black_corset_slit_maxi/front.png",
+          "sha256": "8fc79a7eecc8d90d9d5f68f1db3d12144114be42123e1ef8a7e5e9375021112a",
+          "eraseFile": "release2_sc/dress_girl_black_corset_slit_maxi/erase.png",
+          "eraseSha256": "5316a9a884e0536f2051f6e5f500d7c6c3a522bf6e62c2a47d128326ea739a3d"
+        },
+        "dress_girl_terracotta_patchwork_halter_bias_maxi": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_terracotta_patchwork_halter_bias_maxi/front.png",
+          "sha256": "52b36ecaac56b49e9687c3d7ce35d0e510921cc6cffae8d6c721a8f20f15e0db",
+          "eraseFile": "release2_sc/dress_girl_terracotta_patchwork_halter_bias_maxi/erase.png",
+          "eraseSha256": "a0942962913e5006f65b9c5b2bd3ff74304516df92c2ec7f7fbf2a28df177cba"
+        },
+        "dress_girl_denim_milkmaid_button_midi": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_denim_milkmaid_button_midi/front.png",
+          "sha256": "c479c36d3a76078126bf451931cfdf9dbf34fb18e486a2c07dab381537d74c86",
+          "eraseFile": "release2_sc/dress_girl_denim_milkmaid_button_midi/erase.png",
+          "eraseSha256": "05a8b6cd73b6ebd1a5f25c9eac38c21610917a3d8f92c58c6a50854eb6babf19"
+        },
+        "dress_girl_cream_one_shoulder_tie_midi": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_cream_one_shoulder_tie_midi/front.png",
+          "sha256": "4450f41fca4b7b42cb5ca7d857e68df0798de69bbee930c536f9a27dd08fda01",
+          "eraseFile": "release2_sc/dress_girl_cream_one_shoulder_tie_midi/erase.png",
+          "eraseSha256": "d3d335e7e8e9f7075d63fc0e14d5b02d03b0d37814dd5a16e77d77459b82294e"
+        },
+        "dress_girl_denim_pinafore_mini": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_denim_pinafore_mini/front.png",
+          "sha256": "8e1a8372bfe807ed88c71389357108419e605878dde1748f57fe971e1476df74",
+          "eraseFile": "release2_sc/dress_girl_denim_pinafore_mini/erase.png",
+          "eraseSha256": "c99eedec217438f4259f2462646da2c2cc45652809d6778ae357c49eec81b9a2"
+        },
+        "dress_girl_sage_shirred_tiered_mini": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_sage_shirred_tiered_mini/front.png",
+          "sha256": "d1ab5f81569f6eb41c057add10f3076d2e2b3329a76ea4f0a758169075f119a5"
+        },
+        "dress_girl_black_corset_flare_mini": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_black_corset_flare_mini/front.png",
+          "sha256": "007e2b6baf2be631d7fd2c47e81c4a53b5db08b53bdb70e3f146fdd1ea4ef11a",
+          "eraseFile": "release2_sc/dress_girl_black_corset_flare_mini/erase.png",
+          "eraseSha256": "c8952878003adabd6d375be7d134fc348575fa7a4c827ba188a97f2917e4d453"
+        },
+        "dress_girl_butter_square_puff_mini": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_butter_square_puff_mini/front.png",
+          "sha256": "32a93a284d94075cb0b24a05b5d70b4c65325cc9d1482153d947332d1df35c48",
+          "eraseFile": "release2_sc/dress_girl_butter_square_puff_mini/erase.png",
+          "eraseSha256": "ec4e262d5ecb01aa059a7a396d5327692f4912285470149bc3498e7a3efa3113"
+        },
+        "dress_girl_cream_one_shoulder_mini": {
+          "slot": "dress",
+          "order": 3,
+          "file": "release2_sc/dress_girl_cream_one_shoulder_mini/front.png",
+          "sha256": "ca772fd16689c0ef02264949e6851d9d1977a1612edb678738ed53521fe1f7ad",
+          "eraseFile": "release2_sc/dress_girl_cream_one_shoulder_mini/erase.png",
+          "eraseSha256": "47c44fe67e6e21087d77b4d493d7fad75fcd3f64e42a0c6e51452c6eb33ad7eb"
+        },
+        "glasses_girl_gold_round": {
+          "slot": "glasses",
+          "order": 5,
+          "file": "release2_sc/glasses_girl_gold_round/front.png",
+          "sha256": "55c4acee1789f35ff94d504cd27b4f69916d54589f11165feeaad15dab2cbcbb"
+        },
+        "glasses_girl_rose_soft_cateye": {
+          "slot": "glasses",
+          "order": 5,
+          "file": "release2_sc/glasses_girl_rose_soft_cateye/front.png",
+          "sha256": "63235b04014f858da855d6d662970430c7b51d993118930ec8051d35e2f96a24"
+        },
+        "hair_girl_caramel_braid_crown": {
+          "slot": "hair",
+          "order": 4,
+          "file": "release2_sc/hair_girl_caramel_braid_crown/front.png",
+          "sha256": "3aaa203f51d854d52f70dd372ef4340c59ea87e58e3d37bc8a632345408c29e3",
+          "backFile": "release2_sc/hair_girl_caramel_braid_crown/back.png",
+          "backSha256": "a8160580a0009f14cb2cd767878db182dedcf5f8d0925b7c953b0f197566dbe9"
+        },
+        "hair_girl_copper_soft_waves": {
+          "slot": "hair",
+          "order": 4,
+          "file": "release2_sc/hair_girl_copper_soft_waves/front.png",
+          "sha256": "82685608601954bbb7902d0b4741a0ad20a42525f33bfb4b223b525ab327a7b6",
+          "backFile": "release2_sc/hair_girl_copper_soft_waves/back.png",
+          "backSha256": "df313be5b83d561d2e47376f165bc8eb2bd379f18cc4a6802d41d07f4874acc8"
         }
       }
     },
@@ -160,7 +394,7 @@
       "baseSha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648",
       "qaPass": "integration/RESUME_INTEGRATION.md STATE 2026-10-13 06:33 (boy SHOWCASE 26/26 full pass); prov_boy_2145/REPORT.md; curls_install_1030/REPORT.md",
       "ownerApproved": true,
-      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed.",
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv.",
       "crops": {
         "head": [
           870,
@@ -391,6 +625,18 @@
           "backFile": "boy_line_r3/o_twists/layers/boy_hair_back.png",
           "sha256": "87ab1bff2f0de3b8b4ff7681a12d4cc6a199b1c6a9915d867db4534a38096c08",
           "backSha256": "b622ce20c3a4dbe6f7416f562b29fd6f60a2afd08dc12b8fd98f435abf5efc02"
+        },
+        "glasses_boy_black_soft_rect": {
+          "slot": "glasses",
+          "order": 5,
+          "file": "release2_sc/glasses_boy_black_soft_rect/front.png",
+          "sha256": "7830092ee03c426afa8a72617c835eeb8f85078ceeba2bb8c135d8f716ff2008"
+        },
+        "glasses_boy_gunmetal_round": {
+          "slot": "glasses",
+          "order": 5,
+          "file": "release2_sc/glasses_boy_gunmetal_round/front.png",
+          "sha256": "0625cd31cb0b10f0b09e932ce32c609a10669ae5064934ef4e50d43a9aaeb1b7"
         }
       }
     }
