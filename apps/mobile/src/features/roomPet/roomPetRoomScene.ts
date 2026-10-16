@@ -87,7 +87,7 @@ export function resolveRoomPetDraw(input: {
   const isMoving = state.pose === "walk" || state.pose === "run"
   return {
     foot,
-    clip: getRoomPetClipForPose(state.pose),
+    clip: state.mode === "greet" && state.pose === "happy" ? "greet" : getRoomPetClipForPose(state.pose),
     heading: drawn.heading,
     mirrored: drawn.mirrored,
     emote: state.emote,

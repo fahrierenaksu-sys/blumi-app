@@ -9,13 +9,15 @@ import type { RoomPetPose } from "./roomPet.types"
  * The sheet draws only those two; 315 and 225 are the same frames mirrored,
  * so the art must be mirror-safe (no one-sided markings).
  */
-export type RoomPetClipName = "idle" | "walk" | "sit" | "sleep" | "happy"
+export type RoomPetClipName = "idle" | "walk" | "sit" | "sleep" | "happy" | "greet"
 export type RoomPetSpriteHeading = 45 | 135 | 225 | 315
 export type RoomPetDrawnHeading = 45 | 135
 
 export interface RoomPetSpriteClip {
   readonly fps: number
   readonly loop: boolean
+  /** A looping clip plays frames before this index once (sit down, curl up), then loops from it. */
+  readonly loopFrom: number
   readonly frames: Readonly<Record<RoomPetDrawnHeading, readonly number[]>>
 }
 
@@ -26,10 +28,12 @@ export interface RoomPetSpriteSheetLayout {
   readonly rows: number
   /** Where the feet touch the floor inside a cell, as a fraction of its height (from the top). */
   readonly footAnchorY: number
+  /** A cell's drawn height in room shell pixels, so the pet keeps the art's scale next to the avatars. */
+  readonly cellHeightShellPx: number
   readonly clips: Readonly<Record<RoomPetClipName, RoomPetSpriteClip>>
 }
 
-export const ROOM_PET_CLIP_NAMES: readonly RoomPetClipName[] = ["idle", "walk", "sit", "sleep", "happy"]
+export const ROOM_PET_CLIP_NAMES: readonly RoomPetClipName[] = ["idle", "walk", "sit", "sleep", "happy", "greet"]
 
 /** Every engine pose plays one clip; P2/P3 poses fall back to the nearest P1 clip until their art exists. */
 const CLIP_BY_POSE: Readonly<Record<RoomPetPose, RoomPetClipName>> = {
@@ -67,14 +71,23 @@ export function getRoomPetDrawnHeading(heading: RoomPetSpriteHeading): { heading
 }
 
 /**
- * The cell shown `elapsedMs` after a clip started. A loop wraps; a one-shot
- * clip holds its last frame. Runs on the UI thread.
+ * The cell shown `elapsedMs` after a clip started. A loop plays its lead-in
+ * (frames before `loopFrom`) once and then wraps; a one-shot clip holds its
+ * last frame. Runs on the UI thread.
  */
-export function getRoomPetSpriteCell(frames: readonly number[], fps: number, loop: boolean, elapsedMs: number): number {
+export function getRoomPetSpriteCell(
+  frames: readonly number[],
+  fps: number,
+  loop: boolean,
+  elapsedMs: number,
+  loopFrom = 0
+): number {
   "worklet"
   if (frames.length === 0) return 0
   const step = Math.max(0, Math.floor((Math.max(0, elapsedMs) * fps) / 1000))
-  const index = loop ? step % frames.length : Math.min(step, frames.length - 1)
+  if (!loop) return frames[Math.min(step, frames.length - 1)]!
+  const start = Math.min(Math.max(0, Math.floor(loopFrom)), frames.length - 1)
+  const index = step < frames.length ? step : start + ((step - start) % (frames.length - start))
   return frames[index]!
 }
 
@@ -84,6 +97,7 @@ export function getRoomPetSpriteSheetProblems(layout: RoomPetSpriteSheetLayout):
   const cellCount = layout.columns * layout.rows
   if (!(layout.cellWidth > 0 && layout.cellHeight > 0 && cellCount > 0)) problems.push("sheet has no cells")
   if (!(layout.footAnchorY > 0 && layout.footAnchorY <= 1)) problems.push("foot anchor must sit inside the cell")
+  if (!(layout.cellHeightShellPx > 0)) problems.push("cell needs a positive height in shell pixels")
   for (const name of ROOM_PET_CLIP_NAMES) {
     const clip = layout.clips[name]
     if (!clip) {
@@ -91,6 +105,10 @@ export function getRoomPetSpriteSheetProblems(layout: RoomPetSpriteSheetLayout):
       continue
     }
     if (!(clip.fps > 0)) problems.push(`clip ${name} needs a positive fps`)
+    const shortest = Math.min(clip.frames[45]?.length ?? 0, clip.frames[135]?.length ?? 0)
+    if (!(Number.isInteger(clip.loopFrom) && clip.loopFrom >= 0 && (clip.loopFrom === 0 || clip.loopFrom < shortest))) {
+      problems.push(`clip ${name} loops from outside its frames`)
+    }
     for (const heading of [45, 135] as const) {
       const frames = clip.frames[heading] ?? []
       if (frames.length === 0) problems.push(`clip ${name} has no frames for heading ${heading}`)

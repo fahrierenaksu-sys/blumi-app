@@ -4,7 +4,7 @@ import { useIsSurfaceFocused } from "../avatar/components/useIsSurfaceFocused"
 import type { RoomShell, RoomV2FurnitureRenderItem, RoomV2RenderItem } from "../roomV2/roomV2.types"
 import { getRoomV2FloorGridProjection } from "../roomV2/roomV2FloorGrid"
 import type { RoomRendererDepthSlot } from "../roomV2/components/roomRendererDepthSlot"
-import { ROOM_PET_PLACEHOLDER_SHEET } from "./placeholder/roomPetPlaceholderSheetSource"
+import { ROOM_PET_CAT_WHITE_SHEET } from "./sheet/roomPetCatWhiteSheetSource"
 import { IS_BLUMI_ROOM_PET_ENABLED } from "./roomPetFlag"
 import { ROOM_PET_RENDER_ID } from "./roomPetRoomScene"
 import { RoomPetFlipbook } from "./RoomPetFlipbook"
@@ -13,7 +13,7 @@ import { useRoomPet, type RoomPetOwnerSnapshot } from "./useRoomPet"
 /**
  * The room pet in My Room (P1: own room only), as one depth slot for the room
  * renderer. Undefined while EXPO_PUBLIC_BLUMI_ROOM_PET is off: no map, no
- * timers, nothing drawn. Draws the PLACEHOLDER sheet until the approved art lands.
+ * timers, nothing drawn. Draws the approved white cat sheet.
  */
 export function useMyRoomPetSlot(input: {
   readonly shell: RoomShell | null
@@ -47,7 +47,7 @@ export function useMyRoomPetSlot(input: {
       node: (
         <RoomPetFlipbook
           draw={draw}
-          sheet={ROOM_PET_PLACEHOLDER_SHEET}
+          sheet={ROOM_PET_CAT_WHITE_SHEET}
           canvasSize={canvasSize}
           onTap={handleTap}
           testID={testID ? `${testID}-${ROOM_PET_RENDER_ID}` : undefined}

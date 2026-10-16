@@ -1,4 +1,6 @@
 import assert from "node:assert/strict"
+import { existsSync, readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import test from "node:test"
 
 import type { RoomPoint2D, RoomV2FurnitureRenderItem, RoomV2RenderItem } from "../roomV2/roomV2.types"
@@ -9,7 +11,6 @@ import {
   ROOM_V2_BLUMI_WORLD_FLOOR_GRID
 } from "../roomV2/roomV2FloorGrid"
 import { createMyRoomAvatarDepthNeighbours, getMyRoomAvatarDepthIndex } from "../roomWorld/myRoomAvatarWalkModel"
-import { ROOM_PET_PLACEHOLDER_SHEET_LAYOUT } from "./placeholder/roomPetPlaceholderSheet"
 import type { RoomPetCell, RoomPetPose, RoomPetState } from "./roomPet.types"
 import { createRoomPetState, stepRoomPet } from "./roomPetEngine"
 import { isRoomPetCellWalkable, isSameRoomPetCell } from "./roomPetGrid"
@@ -22,6 +23,7 @@ import {
   getRoomPetSpriteHeading,
   getRoomPetSpriteSheetProblems
 } from "./roomPetSprite"
+import { ROOM_PET_CAT_WHITE_SHEET_LAYOUT } from "./sheet/roomPetCatWhiteSheet"
 
 const PROJECTION = createRoomV2FloorGridProjection(ROOM_V2_BLUMI_WORLD_FLOOR_GRID)
 const MIDDLE_COLUMN = Math.round((PROJECTION.minColumn + PROJECTION.maxColumn) / 2)
@@ -144,7 +146,15 @@ test("a tap on the pet plays the happy clip", () => {
   const state = stepRoomPet(petAt(walkableCellNear(0, 3)), MAP, { nowMs: 1_050, events: [{ type: "tap" }] })
   const draw = resolveRoomPetDraw({ isEnabled: true, projection: PROJECTION, map: MAP, state, renderItems: SCENE })
   assert.equal(draw?.clip, "happy")
-  assert.ok(ROOM_PET_PLACEHOLDER_SHEET_LAYOUT.clips.happy.frames[draw.heading].length > 0)
+  assert.ok(ROOM_PET_CAT_WHITE_SHEET_LAYOUT.clips.happy.frames[draw.heading].length > 0)
+})
+
+test("a greeting pet plays the greet clip, a plain happy pet the happy clip", () => {
+  const base = petAt(walkableCellNear(0, 3))
+  const greet = resolveRoomPetDraw({ isEnabled: true, projection: PROJECTION, map: MAP, state: { ...base, mode: "greet", pose: "happy" }, renderItems: SCENE })
+  const happy = resolveRoomPetDraw({ isEnabled: true, projection: PROJECTION, map: MAP, state: { ...base, mode: "react", pose: "happy" }, renderItems: SCENE })
+  assert.equal(greet?.clip, "greet")
+  assert.equal(happy?.clip, "happy")
 })
 
 test("a walking pet moves one engine step per drawing and wakes the clock for its next step", () => {
@@ -167,10 +177,29 @@ test("sprite contract: two drawn headings mirrored for the other two, loops wrap
   assert.equal(getRoomPetSpriteCell([4, 5, 6], 10, false, -50), 4)
 })
 
-test("the placeholder sheet is complete and every engine pose has a clip in it", () => {
-  assert.deepEqual(getRoomPetSpriteSheetProblems(ROOM_PET_PLACEHOLDER_SHEET_LAYOUT), [])
+test("sprite contract: a sit or curl lead-in plays once, then only the loop part repeats", () => {
+  const frames = [10, 11, 12, 13, 14, 15]
+  const at = (step: number) => getRoomPetSpriteCell(frames, 10, true, step * 100 + 1, 3)
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map(at), frames)
+  assert.deepEqual([6, 7, 8, 9, 10].map(at), [13, 14, 15, 13, 14])
+})
+
+test("the white cat sheet is complete and every engine pose has a clip in it", () => {
+  const sheet = ROOM_PET_CAT_WHITE_SHEET_LAYOUT
+  assert.deepEqual(getRoomPetSpriteSheetProblems(sheet), [])
   const poses: RoomPetPose[] = ["stand", "walk", "run", "sit", "curl", "sleep", "hop", "perch", "happy", "trickRoll", "trickHop", "trickWave"]
-  for (const pose of poses) assert.ok(ROOM_PET_PLACEHOLDER_SHEET_LAYOUT.clips[getRoomPetClipForPose(pose)])
-  const broken = { ...ROOM_PET_PLACEHOLDER_SHEET_LAYOUT, rows: 1 }
-  assert.ok(getRoomPetSpriteSheetProblems(broken).length > 0, "cells outside the sheet are refused")
+  for (const pose of poses) assert.ok(sheet.clips[getRoomPetClipForPose(pose)])
+  assert.ok(getRoomPetSpriteSheetProblems({ ...sheet, rows: 1 }).length > 0, "cells outside the sheet are refused")
+  const badLoop = { ...sheet, clips: { ...sheet.clips, sit: { ...sheet.clips.sit, loopFrom: 99 } } }
+  assert.ok(getRoomPetSpriteSheetProblems(badLoop).length > 0, "a loop start outside the frames is refused")
+})
+
+test("the white cat sheet image has exactly the cell grid its layout reads", () => {
+  const relative = "assets/roomPet/catWhite/room_pet_cat_white_sheet.png"
+  const path = [resolve(process.cwd(), relative), resolve(process.cwd(), "apps/mobile", relative)].find((candidate) => existsSync(candidate))
+  assert.ok(path, "the sheet image is bundled")
+  const png = readFileSync(path)
+  const sheet = ROOM_PET_CAT_WHITE_SHEET_LAYOUT
+  assert.equal(png.readUInt32BE(16), sheet.columns * sheet.cellWidth)
+  assert.equal(png.readUInt32BE(20), sheet.rows * sheet.cellHeight)
 })

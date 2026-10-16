@@ -7,8 +7,8 @@ import { useReducedMotion } from "../../ui/animations"
 import type { RoomPetDraw } from "./roomPetRoomScene"
 import { getRoomPetSpriteCell, type RoomPetSpriteSheetLayout } from "./roomPetSprite"
 
-/** The pet's drawn cell height in shell pixels (the pet itself fills about two thirds of it). */
-const ROOM_PET_CELL_SHELL_PX = 64
+/** A looping clip's frame clock runs this long before it restarts (the worklet wraps the frames itself). */
+const ROOM_PET_LOOP_CLOCK_MS = 60 * 60 * 1000
 const EMOTE_GLYPH: Readonly<Record<NonNullable<RoomPetDraw["emote"]>, string>> = {
   heart: "♥",
   zzz: "z",
@@ -32,8 +32,8 @@ export const RoomPetFlipbook = memo(function RoomPetFlipbook(props: RoomPetFlipb
   const { draw, sheet, canvasSize, onTap, testID } = props
   const { layout } = sheet
   const reduceMotion = useReducedMotion()
-  const widthFraction = (ROOM_PET_CELL_SHELL_PX * (layout.cellWidth / layout.cellHeight)) / canvasSize.width
-  const heightFraction = ROOM_PET_CELL_SHELL_PX / canvasSize.height
+  const widthFraction = (layout.cellHeightShellPx * (layout.cellWidth / layout.cellHeight)) / canvasSize.width
+  const heightFraction = layout.cellHeightShellPx / canvasSize.height
   const footX = useSharedValue(draw.foot.x)
   const footY = useSharedValue(draw.foot.y)
   const clipElapsedMs = useSharedValue(0)
@@ -50,7 +50,8 @@ export const RoomPetFlipbook = memo(function RoomPetFlipbook(props: RoomPetFlipb
   useEffect(() => {
     clipElapsedMs.value = 0
     if (reduceMotion) return
-    const run = withTiming(clipDurationMs, { duration: clipDurationMs, easing: Easing.linear })
+    const runMs = clip.loop ? ROOM_PET_LOOP_CLOCK_MS : clipDurationMs
+    const run = withTiming(runMs, { duration: runMs, easing: Easing.linear })
     clipElapsedMs.value = clip.loop ? withRepeat(run, -1, false) : run
   }, [clip.loop, clipDurationMs, clipElapsedMs, draw.clip, draw.heading, reduceMotion])
 
@@ -59,7 +60,7 @@ export const RoomPetFlipbook = memo(function RoomPetFlipbook(props: RoomPetFlipb
     top: `${(footY.value - heightFraction * layout.footAnchorY) * 100}%`
   }))
   const frameStyle = useAnimatedStyle(() => {
-    const cell = getRoomPetSpriteCell(frames, clip.fps, clip.loop, clipElapsedMs.value)
+    const cell = getRoomPetSpriteCell(frames, clip.fps, clip.loop, clipElapsedMs.value, clip.loopFrom)
     return {
       left: `${-(cell % layout.columns) * 100}%`,
       top: `${-Math.floor(cell / layout.columns) * 100}%`
