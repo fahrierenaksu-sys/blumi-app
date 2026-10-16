@@ -110,6 +110,7 @@ import {
 } from "./notifications/notificationPortraitService"
 import { createReactionService, type ReactionService } from "./reactions/reactionService"
 import { createRoomService, type RoomService } from "./rooms/roomService"
+import { resolveQaClothingGrant } from "./economy/qaClothingGrant"
 import { resolveQaRoomGrantCatalog } from "./economy/qaRoomGrant"
 import {
   createPersonalRoomDecorService,
@@ -804,8 +805,19 @@ export function createConfiguredServerServices(
   if (qaRoomGrantCatalog) {
     console.warn("QA room grant is ON: held furniture is owned by every account on this memory server.")
   }
+  // local QA auth only (development, loopback, memory: resolveServerConfig): the listed QA accounts own held clothing
+  const qaClothingGrant = resolveQaClothingGrant({
+    qaAuth: config.qaAuth,
+    nodeEnv: config.nodeEnv,
+    authRepositoryMode: config.authRepositoryMode,
+    authRepository: authService.repository
+  })
+  if (qaClothingGrant) {
+    console.warn("QA clothing grant is ON: the local QA accounts own held clothing on this memory server.")
+  }
   const economyService = createEconomyService({
     catalog: qaRoomGrantCatalog,
+    qaOwnedAvatarItemIdsFor: qaClothingGrant,
     getAccountCreatedAt: async (userId) => (await authService.repository.findAccountByUserId(userId))?.createdAt ?? null
   })
   const commerceService = createCommerceService({ economyService })

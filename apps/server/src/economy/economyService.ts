@@ -93,6 +93,11 @@ export interface CreateEconomyServiceOptions {
    * free (`legacyFreeWardrobeGrant.ts`); without it nobody gets them free.
    */
   getAccountCreatedAt?: AccountCreatedAtLookup
+  /**
+   * Local Simulator QA only (`qaClothingGrant.ts`, wired by config.ts when local QA auth is on): extra avatar pieces a
+   * user owns by default. Never set on a deployed or database server.
+   */
+  qaOwnedAvatarItemIdsFor?: (userId: string) => Promise<readonly string[]>
 }
 
 export function createEconomyService(
@@ -118,7 +123,8 @@ export function createEconomyService(
       const requiredAvatarItemIds = [
         ...getDefaultOwnedItemIds("avatar", catalog),
         ...getLegacyAvatarReplacementIds(ownedAvatarItemIds),
-        ...(await legacyFreeWardrobeFor(userId, ownedAvatarItemIds))
+        ...(await legacyFreeWardrobeFor(userId, ownedAvatarItemIds)),
+        ...(options.qaOwnedAvatarItemIdsFor ? await options.qaOwnedAvatarItemIdsFor(userId) : [])
       ]
       // a retired default (the old free bed) is no longer granted; rows that hold it are read past
       const requiredRoomItemIds = getDefaultOwnedItemIds("room", catalog).filter(isActiveRoomItemId)
