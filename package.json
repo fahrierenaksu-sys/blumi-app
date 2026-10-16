@@ -32,6 +32,7 @@
     "doctor": "expo-doctor apps/mobile",
     "test": "npm run build:packages && npm --workspaces --if-present run test",
     "audit:release": "node scripts/security/run-audit.mjs",
+    "verify:fast": "node scripts/verify-parallel.mjs",
     "verify": "npm run verify:source-hygiene && npm run verify:operations-center && npm run verify:workbench-tools && npm run build:packages && npm run verify:avatar-rigs && node --test scripts/security/audit-policy.test.mjs scripts/automation/local-backup.test.mjs scripts/automation/ci-db-backup.test.mjs && npm run verify:release-infra && npm run typecheck && npm run lint && npm run test && npm run verify:postgres && npm run audit:release && npm run doctor",
     "clean-clone:verify": "npm ci && npm run verify"
   },
