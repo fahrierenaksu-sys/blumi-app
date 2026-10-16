@@ -18,8 +18,10 @@ import { createPresenceService } from "./presence/presenceService"
 import { createReactionService } from "./reactions/reactionService"
 import { createRoomService } from "./rooms/roomService"
 import { createSafetyService } from "./safety/safetyService"
-import { createEconomyService } from "./economy/economyService"
+import { ECONOMY_REWARD_COINS, createEconomyService } from "./economy/economyService"
 import type { EconomyService } from "./economy/economyService"
+
+const AFTER_ONE_ROOM_REWARD = 1250 + ECONOMY_REWARD_COINS.room_complete
 
 test("a room opened from a chat invite rewards a qualifying stay once and ends once", async () => {
   const services = createRealtimeCoreServices()
@@ -69,8 +71,8 @@ test("a room opened from a chat invite rewards a qualifying stay once and ends o
     rewardEligibleEnd
   )
   assert.equal(ended?.endedByUserId, "user_a")
-  assert.equal((await services.economyService.getInventory("user_a")).coins, 1275)
-  assert.equal((await services.economyService.getInventory("user_b")).coins, 1275)
+  assert.equal((await services.economyService.getInventory("user_a")).coins, AFTER_ONE_ROOM_REWARD)
+  assert.equal((await services.economyService.getInventory("user_b")).coins, AFTER_ONE_ROOM_REWARD)
 
   const duplicateEnd = await services.miniRoomService.leaveMiniRoom(
     accepted.miniRoom.miniRoomId,
@@ -78,8 +80,8 @@ test("a room opened from a chat invite rewards a qualifying stay once and ends o
     new Date(rewardEligibleEnd.getTime() + 1_000)
   )
   assert.equal(duplicateEnd, null)
-  assert.equal((await services.economyService.getInventory("user_a")).coins, 1275)
-  assert.equal((await services.economyService.getInventory("user_b")).coins, 1275)
+  assert.equal((await services.economyService.getInventory("user_a")).coins, AFTER_ONE_ROOM_REWARD)
+  assert.equal((await services.economyService.getInventory("user_b")).coins, AFTER_ONE_ROOM_REWARD)
   assert.equal(await services.miniRoomService.findActiveMiniRoomForUser("user_a"), null)
 })
 
@@ -139,8 +141,8 @@ test("a transient room reward failure leaves the room retryable without double c
   )
 
   assert.equal(ended?.endedByUserId, "user_a")
-  assert.equal((await economyService.getInventory("user_a")).coins, 1275)
-  assert.equal((await economyService.getInventory("user_b")).coins, 1275)
+  assert.equal((await economyService.getInventory("user_a")).coins, AFTER_ONE_ROOM_REWARD)
+  assert.equal((await economyService.getInventory("user_b")).coins, AFTER_ONE_ROOM_REWARD)
 })
 
 test("an end write failure keeps the original reward day across a midnight retry", async () => {
@@ -176,8 +178,8 @@ test("an end write failure keeps the original reward day across a midnight retry
   )
 
   assert.equal(ended?.endedAt, "2026-07-15T00:00:01.000Z")
-  assert.equal((await services.economyService.getInventory("user_a")).coins, 1275)
-  assert.equal((await services.economyService.getInventory("user_b")).coins, 1275)
+  assert.equal((await services.economyService.getInventory("user_a")).coins, AFTER_ONE_ROOM_REWARD)
+  assert.equal((await services.economyService.getInventory("user_b")).coins, AFTER_ONE_ROOM_REWARD)
 })
 
 test("concurrent qualifying leaves credit each participant exactly once", async () => {
@@ -205,8 +207,8 @@ test("concurrent qualifying leaves credit each participant exactly once", async 
 
   assert.equal(terminalPayloads.length, 1)
   assert.equal(leaveResults.filter((result) => result === null).length, 1)
-  assert.equal((await services.economyService.getInventory("user_a")).coins, 1275)
-  assert.equal((await services.economyService.getInventory("user_b")).coins, 1275)
+  assert.equal((await services.economyService.getInventory("user_a")).coins, AFTER_ONE_ROOM_REWARD)
+  assert.equal((await services.economyService.getInventory("user_b")).coins, AFTER_ONE_ROOM_REWARD)
 })
 
 test("connection and reaction services validate decisions and reactions", async () => {

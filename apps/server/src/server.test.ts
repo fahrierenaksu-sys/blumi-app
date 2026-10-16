@@ -12,7 +12,7 @@ import { createChatService } from "./chat/chatService"
 import { createInMemoryConnectionRepository } from "./connections/connectionRepository"
 import type { ConnectionService } from "./connections/connectionService"
 import { TEST_AVATAR_ITEM_RULES } from "@blumi/domain"
-import { createEconomyService } from "./economy/economyService"
+import { ECONOMY_REWARD_COINS, createEconomyService } from "./economy/economyService"
 import { TEST_AVATAR_GIRL_BODY_ID, TEST_AVATAR_PAID_ITEM_ID, TEST_ECONOMY_CATALOG } from "./economy/testRoomCatalog"
 import { createNotificationService } from "./notifications/notificationService"
 import {
@@ -2013,10 +2013,10 @@ test("economy endpoints require sessions and complete server-priced purchases", 
   })
   assert.equal(dailyReward.statusCode, 200)
   assert.equal(dailyReward.json().claimed, true)
-  assert.equal(dailyReward.json().rewardCoins, 25)
-  assert.equal(dailyReward.json().inventory.coins, 1275)
+  assert.equal(dailyReward.json().rewardCoins, ECONOMY_REWARD_COINS.daily_login)
+  assert.equal(dailyReward.json().inventory.coins, 1250 + ECONOMY_REWARD_COINS.daily_login)
   assert.equal(repeatedDailyReward.json().claimed, false)
-  assert.equal(repeatedDailyReward.json().inventory.coins, 1275)
+  assert.equal(repeatedDailyReward.json().inventory.coins, 1250 + ECONOMY_REWARD_COINS.daily_login)
 
   const purchase = await app.inject({
     method: "POST",
@@ -2032,7 +2032,7 @@ test("economy endpoints require sessions and complete server-priced purchases", 
   })
   assert.equal(purchase.statusCode, 201)
   assert.equal(purchase.json().priceCoins, 410)
-  assert.equal(purchase.json().inventory.coins, 865)
+  assert.equal(purchase.json().inventory.coins, 1250 + ECONOMY_REWARD_COINS.daily_login - 410)
 
   const repeat = await app.inject({
     method: "POST",

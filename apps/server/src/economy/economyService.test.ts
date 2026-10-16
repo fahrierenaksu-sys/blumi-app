@@ -10,7 +10,7 @@ import {
   TEST_AVATAR_ITEM_RULES as avatarRules,
   isRetiredAvatarItemId
 } from "@blumi/domain"
-import { createEconomyService } from "./economyService"
+import { ECONOMY_REWARD_COINS, createEconomyService } from "./economyService"
 import {
   TEST_AVATAR_BOY_BODY_ID,
   TEST_AVATAR_DRESS_BOTTOM_ID,
@@ -25,6 +25,17 @@ import {
   TEST_ROOM_STARTER_ITEM_ID,
   TEST_ROOM_DEFAULT_OWNED_IDS
 } from "./testRoomCatalog"
+
+const DAILY = ECONOMY_REWARD_COINS.daily_login
+const ROOM = ECONOMY_REWARD_COINS.room_complete
+const MATCH = ECONOMY_REWARD_COINS.mutual_match
+
+test("reward amounts are positive whole coins and the shared room pays at least the daily reward", () => {
+  for (const [rewardType, coins] of Object.entries(ECONOMY_REWARD_COINS)) {
+    assert.ok(Number.isInteger(coins) && coins > 0, `${rewardType} pays ${coins}`)
+  }
+  assert.ok(ROOM >= DAILY, "the north-star action (time together in a room) never pays less than opening the app")
+})
 
 test("complete inventory reads stay authoritative without reconciliation writes", async () => {
   const backing = createInMemoryEconomyRepository()
@@ -260,7 +271,7 @@ test("starter reconciliation preserves a concurrent reward", async () => {
   ])
   const inventory = await firstService.getInventory("reward_user")
 
-  assert.equal(inventory.coins, 1275)
+  assert.equal(inventory.coins, 1250 + DAILY)
   assert.ok(inventory.ownedAvatarItemIds.includes("avatar_v2_body_default"))
   assert.ok(inventory.ownedRoomItemIds.includes(TEST_ROOM_STARTER_ITEM_ID))
 })
@@ -351,12 +362,12 @@ test("daily rewards are server-priced and idempotent per UTC day", async () => {
   )
 
   assert.equal(first.claimed, true)
-  assert.equal(first.rewardCoins, 25)
-  assert.equal(first.inventory.coins, 1275)
+  assert.equal(first.rewardCoins, DAILY)
+  assert.equal(first.inventory.coins, 1250 + DAILY)
   assert.equal(duplicate.claimed, false)
-  assert.equal(duplicate.inventory.coins, 1275)
+  assert.equal(duplicate.inventory.coins, 1250 + DAILY)
   assert.equal(nextDay.claimed, true)
-  assert.equal(nextDay.inventory.coins, 1300)
+  assert.equal(nextDay.inventory.coins, 1250 + 2 * DAILY)
 })
 
 test("event rewards use fixed server amounts and stable idempotency keys", async () => {
@@ -380,10 +391,10 @@ test("event rewards use fixed server amounts and stable idempotency keys", async
     new Date("2026-07-12T09:02:00.000Z")
   )
 
-  assert.equal(match.rewardCoins, 50)
+  assert.equal(match.rewardCoins, MATCH)
   assert.equal(duplicate.rewardCoins, 0)
-  assert.equal(room.rewardCoins, 25)
-  assert.equal(room.inventory.coins, 1325)
+  assert.equal(room.rewardCoins, ROOM)
+  assert.equal(room.inventory.coins, 1250 + MATCH + ROOM)
 })
 
 test("room rewards are capped once per user per UTC day", async () => {
@@ -413,11 +424,11 @@ test("room rewards are capped once per user per UTC day", async () => {
     new Date("2026-07-12T12:00:00.000Z")
   )
 
-  assert.equal(firstRoom.rewardCoins, 25)
+  assert.equal(firstRoom.rewardCoins, ROOM)
   assert.equal(secondRoomSameDay.rewardCoins, 0)
-  assert.equal(firstRoomNextDay.rewardCoins, 25)
-  assert.equal(firstRoomNextDay.inventory.coins, 1300)
-  assert.equal(otherUserSameDay.rewardCoins, 25)
+  assert.equal(firstRoomNextDay.rewardCoins, ROOM)
+  assert.equal(firstRoomNextDay.inventory.coins, 1250 + 2 * ROOM)
+  assert.equal(otherUserSameDay.rewardCoins, ROOM)
 })
 
 test("mutual match rewards remain idempotent per unique pair across UTC days", async () => {
@@ -435,7 +446,7 @@ test("mutual match rewards remain idempotent per unique pair across UTC days", a
     new Date("2026-07-13T09:00:00.000Z")
   )
 
-  assert.equal(first.rewardCoins, 50)
+  assert.equal(first.rewardCoins, MATCH)
   assert.equal(nextDayDuplicate.rewardCoins, 0)
 })
 

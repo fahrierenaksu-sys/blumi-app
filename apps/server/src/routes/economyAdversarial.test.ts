@@ -7,7 +7,7 @@ import {
 } from "@blumi/domain"
 import { createAuthService, type AuthService } from "../auth/authService"
 import { createAvatarService } from "../avatar/avatarService"
-import { createEconomyService } from "../economy/economyService"
+import { ECONOMY_REWARD_COINS, createEconomyService } from "../economy/economyService"
 import {
   TEST_ECONOMY_CATALOG,
   TEST_ROOM_PAID_ITEM_ID,
@@ -254,7 +254,7 @@ test("A8 the daily reward is granted once per UTC day under twenty concurrent cl
     app.inject({ method: "POST", url: "/v1/economy/rewards/daily", headers: user.headers })
   ))
   assert.equal(responses.filter((response) => response.json().claimed === true).length, 1)
-  assert.equal((await balance(app, user.headers)).coins, STARTER_COINS + 25)
+  assert.equal((await balance(app, user.headers)).coins, STARTER_COINS + ECONOMY_REWARD_COINS.daily_login)
   await app.close()
 })
 
@@ -456,13 +456,15 @@ test("A17 earned reward coins settle a refund debt first so purchases become pos
     ...purchase1500, eventId: "evt_refund", kind: "reversal", payloadHash: "b".repeat(64)
   })
   assert.equal(refund.inventory.coinDebt, 250)
-  for (let day = 1; day <= 20; day += 1) {
+  const rewardDays = 20
+  assert.ok(rewardDays * ECONOMY_REWARD_COINS.daily_login > refund.inventory.coinDebt, "the rewards outgrow the debt")
+  for (let day = 1; day <= rewardDays; day += 1) {
     await economyService.claimDailyReward(user.userId, new Date(Date.UTC(2026, 9, day, 12)))
   }
-  // 20 daily rewards (500 coins) first repay the 250-coin debt; the rest is spendable.
+  // The daily rewards first repay the 250-coin debt; only the rest is spendable.
   const inventory = await balance(app, user.headers)
   assert.equal(inventory.coinDebt, 0)
-  assert.equal(inventory.coins, 250)
+  assert.equal(inventory.coins, rewardDays * ECONOMY_REWARD_COINS.daily_login - 250)
   const purchase = await app.inject({ method: "POST", url: "/v1/economy/purchase", headers: user.headers, payload: { itemId: CHEAP_TOP, type: "avatar" } })
   assert.equal(purchase.statusCode, 201, purchase.body)
   await app.close()

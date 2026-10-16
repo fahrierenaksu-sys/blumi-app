@@ -76,10 +76,20 @@ export interface RewardGrantResult {
   rewardCoins: number
 }
 
-const DAILY_REWARD_COINS = 25
-const EVENT_REWARD_COINS = {
-  room_complete: 25,
+/**
+ * Server-decided reward amounts (economy v1, Workbench economy_2025/LEAD/ECONOMY_PLAN.md). The shared room is the
+ * north-star action, so it pays at least as much as opening the app; a match pays once per pair ever.
+ */
+export const ECONOMY_REWARD_COINS = Object.freeze({
+  daily_login: 40,
+  room_complete: 40,
   mutual_match: 50
+} as const)
+
+const DAILY_REWARD_COINS = ECONOMY_REWARD_COINS.daily_login
+const EVENT_REWARD_COINS = {
+  room_complete: ECONOMY_REWARD_COINS.room_complete,
+  mutual_match: ECONOMY_REWARD_COINS.mutual_match
 } as const
 
 export interface CreateEconomyServiceOptions {

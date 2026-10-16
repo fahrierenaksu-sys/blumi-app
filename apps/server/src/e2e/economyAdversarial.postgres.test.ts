@@ -11,7 +11,7 @@ import { createPostgresAuthRepository } from "../db/postgresAuthRepository"
 import { createPostgresEconomyRepository } from "../db/postgresEconomyRepository"
 import { createPostgresPersonalRoomDecorRepository } from "../db/postgresPersonalRoomDecorRepository"
 import { createPostgresReferralRepository } from "../db/postgresReferralRepository"
-import { createEconomyService } from "../economy/economyService"
+import { ECONOMY_REWARD_COINS, createEconomyService } from "../economy/economyService"
 import { TEST_ECONOMY_CATALOG, TEST_ROOM_STARTER_ITEM_ID } from "../economy/testRoomCatalog"
 import { createReferralService } from "../referrals/referralService"
 import { createPersonalRoomDecorService } from "../rooms/personalRoomDecorService"
@@ -148,7 +148,7 @@ test("PG-A8 the daily reward is granted once under twenty concurrent claims", re
   ))
   assert.equal(responses.filter((response) => response.statusCode !== 200).length, 0)
   assert.equal(responses.filter((response) => response.json().claimed === true).length, 1)
-  assert.equal((await coins(user.userId)).coins, STARTER_COINS + 25)
+  assert.equal((await coins(user.userId)).coins, STARTER_COINS + ECONOMY_REWARD_COINS.daily_login)
   const ledger = await pool.query("SELECT count(*)::int AS entries FROM blumi_economy_reward_ledger WHERE user_id = $1", [user.userId])
   assert.equal(ledger.rows[0].entries, 1)
   await app.close()
