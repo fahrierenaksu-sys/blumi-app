@@ -551,6 +551,39 @@ function redrawnThumb(rigId, canonical) {
   return bytes
 }
 
+/** Published items whose receipted stills are kept byte for byte when a rig export only moves their alpha rims (the
+ *  atlas grew). Each still path of the item's receipt is served from tools/avatar25d/still-pins/<path under layers>,
+ *  pinned by the receipt's own sha256, and must keep the baked size, so the manifest rects stay true. A reissued
+ *  receipt with new bytes needs its entry removed here (or the pin copy replaced) in the same commit.
+ *  2026-10-16 final girl base (integration/OWNER_DECISIONS.md): bob, pigtails, white sneakers changed on rims only. */
+const PUBLISHED_STILL_PINS = {
+  female: ["hair_girl_bob", "hair_girl_pigtails", "avatar_v2_shoes_white_clean_sneakers"]
+}
+const STILL_PIN_DIR = join(ROOT, "tools/avatar25d/still-pins")
+const RECEIPTED_ASSETS = new Map(JSON.parse(readFileSync(RELEASE_CATALOG, "utf8")).publishedItems
+  .map((item) => [item.itemId, item.receipt?.assets ?? []]))
+
+async function applyPublishedStillPins(files) {
+  for (const [rigId, itemIds] of Object.entries(PUBLISHED_STILL_PINS)) {
+    for (const itemId of itemIds) {
+      const assets = (RECEIPTED_ASSETS.get(itemId) ?? []).filter((a) => /\/stills\/layers\/[^/]+\/(full|bust|thumb)\//.test(a.path))
+      if (assets.length === 0) throw new Error(`${rigId}/${itemId}: pinned stills need a published receipt with still assets`)
+      for (const asset of assets) {
+        const layerPath = asset.path.slice(asset.path.indexOf("/stills/") + "/stills/".length)
+        const baked = files.get(layerPath)
+        if (!baked) throw new Error(`${layerPath}: a pinned still is no longer baked`)
+        const bytes = readFileSync(join(STILL_PIN_DIR, layerPath.replace(/^layers\//, "")))
+        if (sha256(bytes) !== asset.sha256) throw new Error(`${layerPath}: the pinned still differs from its receipt`)
+        const [was, now] = await Promise.all([sharp(bytes).metadata(), sharp(baked).metadata()])
+        if (was.width !== now.width || was.height !== now.height) {
+          throw new Error(`${layerPath}: the bake changed the size of a pinned still (${was.width}x${was.height} -> ${now.width}x${now.height})`)
+        }
+        files.set(layerPath, bytes)
+      }
+    }
+  }
+}
+
 /** Items whose thumb is not cleaned: their own colour lies inside the body's skin model, so withoutBodyArt cuts holes
  *  into the item itself (honey pigtails lose crown and tail strands). Their art carries no eye, ear or hand fragments
  *  (checked 2026-10-14, rc_beta4_1530). Remove an entry once the cleaner can tell such an item from skin. */
@@ -858,6 +891,7 @@ for (const [rigId, rigDir] of rigSources) {
   manifest.bodies[rigId] = EXTERNAL ? baked.manifest : mergeShowcase(rigId, baked.manifest, files)
   evidence.push(baked.evidence)
 }
+if (!EXTERNAL) await applyPublishedStillPins(files)
 if (EXTERNAL) {
   for (const [path, bytes] of files) {
     mkdirSync(dirname(join(OUT_DIR, path)), { recursive: true })
