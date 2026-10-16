@@ -7,6 +7,7 @@ import type { RootStackParamList } from "../../../navigation/RootNavigator"
 import { avatarToShopCombinationDraft } from "../shopAvatarDraft"
 import {
   createShopCombinationState,
+  isEquippedSyncPending,
   reduceShopCombination,
   type ShopAvatarRevision,
   type ShopCombinationAction,
@@ -49,16 +50,18 @@ export function useShopCombinationSession(input: {
   // The wardrobe (or another surface) can save a new look while the Shop stays
   // mounted; without this the Shop keeps drawing the look it mounted with.
   const equippedKey = JSON.stringify(avatarToShopCombinationDraft(input.avatar))
+  const { phase } = combinationState
   useEffect(() => {
-    const current = combinationStateRef.current
-    if (JSON.stringify(current.equipped) === equippedKey) return
+    const equipped = avatarToShopCombinationDraft(input.avatar)
+    if (!isEquippedSyncPending(combinationStateRef.current, equipped)) return
     dispatchCombination({
       type: "equipped_changed_elsewhere",
-      equipped: avatarToShopCombinationDraft(input.avatar),
+      equipped,
       avatarRevision: input.avatarRevision
     })
+  // Re-checked when the phase returns to "editing", so a save that landed mid-apply is not lost.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the serialized look
-  }, [equippedKey, input.avatarRevision])
+  }, [equippedKey, input.avatarRevision, phase])
 
   const discardShopPreview = useCallback((): void => {
     dispatchCombination({ type: "discard_draft" })

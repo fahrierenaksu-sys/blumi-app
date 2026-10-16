@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   createShopCombinationState,
+  isEquippedSyncPending,
   reduceShopCombination,
   type ShopCombinationDraft,
   type ShopCombinationState,
@@ -532,4 +533,34 @@ test("an outside save never rewrites the draft while a purchase or save is runni
     avatarRevision: "revision-2"
   }).state
   assert.deepEqual(result, saving)
+})
+
+test("a look saved elsewhere during a running apply stays pending and is applied once editing resumes", () => {
+  const mounted = createShopCombinationState({
+    equipped,
+    ownedProductIds: ["top-current"],
+    avatarRevision: "revision-1"
+  })
+  const savedElsewhere: ShopCombinationDraft = { ...equipped, top: "top-from-wardrobe" }
+  const confirming: ShopCombinationState = { ...mounted, phase: "confirming" }
+
+  // The reducer drops the sync while confirming, so the caller must keep asking.
+  assert.equal(isEquippedSyncPending(confirming, savedElsewhere), false)
+  const dropped = reduceShopCombination(confirming, {
+    type: "equipped_changed_elsewhere",
+    equipped: savedElsewhere,
+    avatarRevision: "revision-2"
+  }).state
+  assert.deepEqual(dropped.equipped, equipped)
+
+  const resumed = reduceShopCombination(confirming, { type: "cancel_apply" }).state
+  assert.equal(resumed.phase, "editing")
+  assert.equal(isEquippedSyncPending(resumed, savedElsewhere), true)
+  const applied = reduceShopCombination(resumed, {
+    type: "equipped_changed_elsewhere",
+    equipped: savedElsewhere,
+    avatarRevision: "revision-2"
+  }).state
+  assert.equal(applied.draft.top, "top-from-wardrobe")
+  assert.equal(isEquippedSyncPending(applied, savedElsewhere), false)
 })

@@ -395,6 +395,19 @@ function stopApply(
   })
 }
 
+/**
+ * True when a look saved elsewhere still has to reach the Shop draft. The
+ * reducer ignores the sync outside "editing", so callers ask again whenever
+ * the phase changes instead of dropping the save for good.
+ */
+export function isEquippedSyncPending(
+  state: ShopCombinationState,
+  equipped: ShopCombinationDraft
+): boolean {
+  return state.phase === "editing" &&
+    JSON.stringify(state.equipped) !== JSON.stringify(equipped)
+}
+
 /** Slots the user did not try on follow the new saved look; tried-on slots stay. */
 function rebaseDraftOntoEquipped(
   draft: ShopCombinationDraft,
