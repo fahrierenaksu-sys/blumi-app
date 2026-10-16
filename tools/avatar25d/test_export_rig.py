@@ -633,6 +633,18 @@ class RigAssetModulesTest(unittest.TestCase):
         self.assertEqual(sorted(ex.rig_asset_modules(pngs, False)), ['rigAssets.ts'])
 
 
+class BlinkFrameInHeadTest(unittest.TestCase):
+    def test_a_blink_frame_never_draws_where_the_open_head_is_transparent(self):
+        import numpy as np
+        from PIL import Image
+        ex = load_exporter()
+        head = np.zeros((4, 6, 4), np.uint8); head[:, :4] = (250, 210, 185, 255)     # columns 4-5: no head (a hair shows there)
+        frame = np.zeros((4, 6, 4), np.uint8); frame[:] = (240, 200, 175, 255)       # the frame paints skin everywhere
+        out = np.asarray(ex.blink_frame_in_head(Image.fromarray(frame, 'RGBA'), Image.fromarray(head, 'RGBA')))
+        self.assertTrue((out[:, 4:, 3] == 0).all())
+        self.assertTrue((out[:, :4] == frame[:, :4]).all())
+
+
 class BlinkGateGlassesTest(unittest.TestCase):
     """A tiny rig: a 32 px head whose eye closes (page 0: open head left, closed frame right) and one item on page 1."""
     SKIN, EYE, RIM = (254, 215, 188, 255), (60, 40, 30, 255), (200, 160, 40, 255)

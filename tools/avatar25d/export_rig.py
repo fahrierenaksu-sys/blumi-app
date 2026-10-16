@@ -272,6 +272,16 @@ def free_spot(size, taken, page_size, phase, align):
     return None
 
 
+def blink_frame_in_head(frame, head_open):
+    """A blink frame drawn only where the open head draws (alpha = min(frame, open)): a frame that carries skin where
+    the open head is transparent would hide a hair part under the head there for the length of the blink
+    (hairfix_0945 SWAP #7: girl front, a skin column beside the eye)."""
+    import numpy as np   # local, like the other numpy helpers here (the exporter imports it lazily)
+    f = np.asarray(frame.convert('RGBA')).copy()
+    f[..., 3] = np.minimum(f[..., 3], np.asarray(head_open.convert('RGBA'))[..., 3])
+    return Image.fromarray(f, 'RGBA')
+
+
 def pack_blink(blink, layers, rects, page):
     """Paste the blink frames into free space of `page` (page 0) and return the runtime's `blink` entry."""
     layer = blink.get('layer')
@@ -296,7 +306,7 @@ def pack_blink(blink, layers, rects, page):
             raise SystemExit(f'blink: frame {name} is {frame.size}, the rect is {(rw, rh)}')
         # the head around the rect (transparent outside the layer), then the frame REPLACES the rect, alpha included
         tile = src.crop((rx - M, ry - M, rx + rw + M, ry + rh + M))
-        tile.paste(frame, (M, M))
+        tile.paste(blink_frame_in_head(frame, src.crop((rx, ry, rx + rw, ry + rh))), (M, M))
         spot = free_spot(tile.size, taken, page.size, ((hx + rx - M) % BLINK_ALIGN, (hy + ry - M) % BLINK_ALIGN), BLINK_ALIGN)
         if spot is None:
             raise SystemExit(f'blink: no free room in page 0 for frame {name} {tile.size}')
