@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "bb2737eda628c110225f871e8b0b576898406cf590f4c42462ee19af686fb9b8",
+      "rigSha256": "d03815e70f3b256af3dd5e95bb1c8e85035e7b92f2ce65d03a095aef4f589a1e",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -503,6 +503,11 @@
               ]
             }
           }
+        },
+        "clip_girl_pearl_bar_pair": {
+          "slot": "accessory",
+          "rigItemId": "clip_girl_pearl_bar_pair",
+          "thumb": "clip_girl_pearl_bar_pair"
         }
       },
       "layers": {
@@ -1356,6 +1361,19 @@
             ]
           },
           {
+            "key": "clip_girl_pearl_bar_pair__o4p7",
+            "owner": "clip_girl_pearl_bar_pair",
+            "slot": "accessory",
+            "order": 4.7,
+            "seq": 7000,
+            "rect": [
+              346,
+              88,
+              36,
+              32
+            ]
+          },
+          {
             "key": "body__o5",
             "owner": "body",
             "slot": "body",
@@ -1890,6 +1908,19 @@
               13,
               155,
               207
+            ]
+          },
+          {
+            "key": "clip_girl_pearl_bar_pair__o4p7",
+            "owner": "clip_girl_pearl_bar_pair",
+            "slot": "accessory",
+            "order": 4.7,
+            "seq": 7000,
+            "rect": [
+              149,
+              46,
+              27,
+              24
             ]
           },
           {

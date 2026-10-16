@@ -494,9 +494,14 @@ const THUMB_EDGE_CLEAN = {
 /** Card thumbs whose rig art lacks a part, redrawn by hand and pinned by sha256 in tools/avatar25d/thumb-redraws/<rig>/.
  *  The redraw replaces the baked thumb only while its bytes match the pin, so a changed file fails the bake loudly.
  *  white sneakers: the rig art has no closed heel, the redraw adds the heel counter and pink lining (gptfin_1615 t2 r1).
- *  male shoes: the baked heel collar reads open; the redraws close the collar and vamp top (tops_heels_2020 heel). */
+ *  male shoes: the baked heel collar reads open; the redraws close the collar and vamp top (tops_heels_2020 heel).
+ *  pearl clip: the room art is 34x30 px, too small for a card; the thumb is cropped from its QA-passed showcase front
+ *  (glassacc_2030 acc/sc_clip_layer.png, lossless, uncropped scale). */
 const THUMB_REDRAWS = {
-  female: { avatar_v2_shoes_white_clean_sneakers: "6b2e11f3e5bba4a1efc29e596877d3d938db4bf01a028307d11784b983064765" },
+  female: {
+    avatar_v2_shoes_white_clean_sneakers: "6b2e11f3e5bba4a1efc29e596877d3d938db4bf01a028307d11784b983064765",
+    clip_girl_pearl_bar_pair: "71296b2fa7aae1b4370ce0333bb44e60cd3698198b9ab39758c09346935ac9bf"
+  },
   male: {
     avatar_v2_shoes_male_brown_loafers: "2b5075873bbd3161a501d50e86cf058242c3d0d64243487c386b0d67a317f897",
     avatar_v2_shoes_male_cream_chunky_sneakers: "64d71ae9a5184cf1f2d71ca8beb2751eeb385eca548519c29d1f0090364e6f15",

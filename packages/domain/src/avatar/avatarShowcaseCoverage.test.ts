@@ -34,9 +34,10 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * and the owner approved polo front v7, so the black trousers are allowlisted and baked and their entry is gone.
  * new collection: jacket_girl_light_denim_crop landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  * new collection: jacket_girl_black_crop_blazer landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
+ * new collection: clip_girl_pearl_bar_pair landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: ["jacket_girl_light_denim_crop", "jacket_girl_black_crop_blazer"],
+  female: ["jacket_girl_light_denim_crop", "jacket_girl_black_crop_blazer", "clip_girl_pearl_bar_pair"],
   male: [],
 };
 
