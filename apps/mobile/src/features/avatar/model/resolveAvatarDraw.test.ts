@@ -160,7 +160,8 @@ test("every rig item's slot agrees with its catalog item: glasses are eyewear, a
       ...girl[view], items: { ...girl[view].items, ...Object.fromEntries(Object.entries(items).map(([id, it]) => [id, { ...girl[view].items.hair_ink_pageboy_star!, ...it }])) }
     }])) as Rig25["views"] }
   })
-  const art = (entries: Record<string, string>) => ({ ...AVATAR_ITEM_ART, female: { ...AVATAR_ITEM_ART.female, ...entries } })
+  // fixture art only: the live map is checked against the live catalog above, and the fixture rules do not know live accessories
+  const art = (entries: Record<string, string>) => ({ female: entries, male: {} })
   const good = withItems({ rig_glasses: { slot: "glasses" }, rig_dress: { slot: "dress" } })
   assert.deepEqual(avatarItemArtSlotProblems(art({ [FX.paidEyewear]: "rig_glasses", [FX.onePieceDress]: "rig_dress" }), good, FX_RULES), [])
   const swapped = withItems({ rig_glasses: { slot: "accessory" }, rig_dress: { slot: "top" } })
