@@ -157,6 +157,7 @@ const app = createServer({
   safetyService: services.safetyService,
   accountRecoveryService: services.accountRecoveryService,
   personalRoomDecorService: services.personalRoomDecorService,
+  roomPetService: services.roomPetService,
   roomSnapshotService: services.roomSnapshotService,
   logger: config.nodeEnv !== "test",
   nodeEnv: config.nodeEnv,

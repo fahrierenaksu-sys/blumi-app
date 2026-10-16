@@ -72,6 +72,8 @@ import { createAccountRecoveryService, type AccountRecoveryService } from "./acc
 import { createReferralService, type ReferralService } from "./referrals/referralService"
 import { registerReferralRoutes } from "./routes/referralRoutes"
 import { registerPersonalRoomDecorRoutes } from "./routes/personalRoomDecorRoutes"
+import { registerRoomPetRoutes } from "./routes/roomPetRoutes"
+import type { RoomPetService } from "./roomPets/roomPetService"
 import {
   createCapabilityService,
   isCapabilityRolledOut,
@@ -156,6 +158,8 @@ interface CreateServerOptions {
   accountRecoveryService?: AccountRecoveryService
   referralService?: ReferralService
   personalRoomDecorService?: PersonalRoomDecorService
+  /** The room pet, only when BLUMI_ROOM_PET_ENABLED=1; absent means its routes do not exist. */
+  roomPetService?: RoomPetService
   roomSnapshotService?: RoomSnapshotService
   /** Push sender pictures; must be the instance the notification service links to. */
   notificationPortraits?: NotificationPortraitService
@@ -410,6 +414,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     await registerChatPreferencesRoutes(instance, routeServices)
     await registerReferralRoutes(instance, routeServices)
     await registerPersonalRoomDecorRoutes(instance, routeServices)
+    if (options.roomPetService) {
+      await registerRoomPetRoutes(instance, { authService, roomPetService: options.roomPetService })
+    }
     await registerRoomSnapshotRoutes(instance, routeServices)
     await registerNotificationPortraitRoutes(instance, {
       notificationPortraits: options.notificationPortraits ?? createNotificationPortraitService({})
