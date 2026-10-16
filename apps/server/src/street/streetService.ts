@@ -39,6 +39,13 @@ export interface StreetServiceDependencies {
   /** Deleted, banned or suspended accounts read as false. */
   isUserAllowed(userId: string, now: Date): Promise<boolean>
   getRoom(userId: string): Promise<StreetRoomSource | null>
+  /**
+   * A room privacy rule that keeps a partner's room from matches. Every window
+   * stays closed for that partner. Defaults to open: no such setting exists
+   * today (the Discovery showcase switch covers strangers only), and the owner
+   * decided on 2026-10-17 that a home is visible to matches by default.
+   */
+  isRoomVisibleToMatches?(userId: string): Promise<boolean>
   guests?: StreetGuestProvider
   log?: { warn(entry: Record<string, unknown>, message: string): void }
 }
@@ -136,7 +143,8 @@ export function createStreetService(deps: StreetServiceDependencies): StreetServ
       displayName: participant?.displayName?.slice(0, 80) ?? null,
       unread: thread.unreadCount ?? 0
     }
-    if (digest?.windowClosed) {
+    const roomVisible = await (deps.isRoomVisibleToMatches?.(partnerId) ?? Promise.resolve(true))
+    if (digest?.windowClosed || !roomVisible) {
       return { ...base, closed: true, avatar: null, room: null, change: null }
     }
     const room = await deps.getRoom(partnerId)
@@ -185,7 +193,6 @@ function uniqueByPartner(threads: readonly ChatThread[], viewerUserId: string) {
 
 function toStreetRoom(source: StreetRoomSource): StreetRoom {
   return {
-    revision: source.revision,
     roomShellId: source.decor.roomShellId,
     placedItems: source.decor.placedItems.map((item) => ({
       itemId: item.itemId,

@@ -39,8 +39,8 @@ export const streetRoomPlacementSchema = z.object({
   rotation: z.enum(["front", "back", "left", "right"])
 }).strict()
 
+/** Only what the renderer draws: no revision, instance id or other internal version. */
 export const streetRoomSchema = z.object({
-  revision: z.number().int().nonnegative(),
   roomShellId: z.string().min(1).max(160),
   placedItems: z.array(streetRoomPlacementSchema).max(80)
 }).strict()

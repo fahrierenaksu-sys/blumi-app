@@ -98,7 +98,33 @@ test("a hidden user is a closed window; everyone else is visible by default", as
   assert.deepEqual({ closed: ece?.closed, room: ece?.room, avatar: ece?.avatar, change: ece?.change },
     { closed: true, room: null, avatar: null, change: null })
   assert.equal(can?.closed, false)
-  assert.equal(can?.room?.revision, 3)
+  assert.equal(can?.room?.roomShellId, "shell")
+  assert.equal(can?.room && "revision" in can.room, false)
+})
+
+test("a partner whose room privacy keeps matches out is a closed window with no room or look", async () => {
+  // Arrange: ece's room privacy refuses matches; can keeps the default
+  const { street } = service({
+    threads: [thread("ece"), thread("can")],
+    mutual: ["ece", "can"],
+    isRoomVisibleToMatches: async (userId) => userId !== "ece"
+  })
+  await street.recordLookSave("ece", LOOK, { ...LOOK, hairId: "h2" }, new Date("2026-10-16T12:00:00.000Z"))
+  // Act
+  const result = await street.read(VIEWER, new Date("2026-10-17T08:00:00.000Z"))
+  // Assert
+  const ece = result.windows.find((window) => window.threadId === "thread_ece")
+  assert.deepEqual({ closed: ece?.closed, room: ece?.room, avatar: ece?.avatar, change: ece?.change },
+    { closed: true, room: null, avatar: null, change: null })
+  assert.equal(result.windows.find((window) => window.threadId === "thread_can")?.closed, false)
+})
+
+test("a street-off partner is closed and a non-match is absent", async () => {
+  const { street } = service({ threads: [thread("ece"), thread("stranger")], mutual: ["ece"] })
+  await street.setWindowClosed("ece", true)
+  const result = await street.read(VIEWER, new Date("2026-10-17T08:00:00.000Z"))
+  assert.deepEqual(result.windows.map((window) => [window.threadId, window.closed]), [["thread_ece", true]])
+  assert.equal(result.windows[0]?.room, null)
 })
 
 test("the street refuses to read before migration 079 and a save never fails because of it", async () => {
