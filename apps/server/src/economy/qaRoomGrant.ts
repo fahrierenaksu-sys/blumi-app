@@ -3,7 +3,8 @@ import {
   isLegacyItemId,
   isReleaseCatalogItemHeld,
   resolveUnheldEconomyCatalog,
-  type EconomyCatalogItem
+  type EconomyCatalogItem,
+  type ReleaseCatalog
 } from "@blumi/domain"
 
 /** Room ids that are reserved without art: never granted, even to QA (none since the starter bed got its art, F9). */
@@ -20,6 +21,8 @@ const QA_ROOM_GRANT_EXCLUDED_IDS = new Set<string>()
 export function resolveQaRoomGrantCatalog(input: {
   env: Readonly<Record<string, string | undefined>>
   authRepositoryMode: string
+  /** Which items are held. Defaults to the R1 release catalog; only tests pass another, to hold fixture pieces. */
+  releaseCatalog?: ReleaseCatalog
 }): readonly EconomyCatalogItem[] | undefined {
   const flag = input.env.BLUMI_QA_ROOM_GRANT?.trim()
   if (!flag || flag === "0") return undefined
@@ -34,10 +37,10 @@ export function resolveQaRoomGrantCatalog(input: {
   const granted = DOMAIN_ECONOMY_CATALOG
     .filter((item) =>
       item.type === "room" &&
-      isReleaseCatalogItemHeld(item.itemId) &&
+      isReleaseCatalogItemHeld(item.itemId, input.releaseCatalog) &&
       !isLegacyItemId(item.itemId) &&
       !QA_ROOM_GRANT_EXCLUDED_IDS.has(item.itemId)
     )
     .map((item) => ({ ...item, ownedByDefault: true }))
-  return Object.freeze([...resolveUnheldEconomyCatalog(DOMAIN_ECONOMY_CATALOG), ...granted])
+  return Object.freeze([...resolveUnheldEconomyCatalog(DOMAIN_ECONOMY_CATALOG, input.releaseCatalog), ...granted])
 }

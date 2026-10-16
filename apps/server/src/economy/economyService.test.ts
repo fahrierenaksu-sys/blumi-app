@@ -478,20 +478,25 @@ test("room reward keys accept only anchored, non-future UTC dates", async () => 
   )
 })
 
-test("held pricing-pending furniture, the free starter bed and legacy ids cannot be bought", async () => {
+test("receipted home pieces sell at their price; the free starter bed and legacy ids cannot be bought", async () => {
   const service = createEconomyService()
-  for (const itemId of [
-    "room_v3_sofa_japon_cream",
-    "room_v3_armchair_japon_cream",
-    "room_v2_chair_blush",
-    "universal_bench_a"
-  ]) {
-    await assert.rejects(
-      () => service.purchaseItem("held_user", { type: "room", itemId }),
-      /not available/i,
-      itemId
-    )
+  // receipted (owner-approved) pieces are bought like any other item, one fresh account each
+  for (const [itemId, priceCoins] of [
+    ["room_v3_sofa_japon_cream", 480],
+    ["room_v3_armchair_japon_cream", 300],
+    ["room_v2_chair_blush", 250]
+  ] as const) {
+    const buyer = `buyer_${itemId}`
+    await service.purchaseItem(buyer, { type: "room", itemId })
+    const bought = await service.getInventory(buyer)
+    assert.equal(bought.coins, 1250 - priceCoins, itemId)
+    assert.ok(bought.ownedRoomItemIds.includes(itemId), itemId)
   }
+  await assert.rejects(
+    () => service.purchaseItem("held_user", { type: "room", itemId: "universal_bench_a" }),
+    /not available/i,
+    "universal_bench_a"
+  )
   // the starter bed is every account's own already (F9): there is nothing to buy
   await assert.rejects(() => service.purchaseItem("held_user", { type: "room", itemId: "room_v3_bed_blumi_starter" }))
   const inventory = await service.getInventory("held_user")

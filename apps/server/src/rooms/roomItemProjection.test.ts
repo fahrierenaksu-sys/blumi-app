@@ -9,8 +9,12 @@ test("no retired, held or unknown room id is active, whatever catalog the server
   for (const itemId of LEGACY_ROOM_ITEM_IDS) {
     assert.equal(isActiveWithEveryDomainItem(itemId), false, itemId)
   }
-  for (const itemId of ["room_v3_sofa_japon_cream", "room_v2_chair_blush", "room_v9_unknown"]) {
+  for (const itemId of ["room_v2_candidate_stand_in", "room_v9_unknown"]) {
     assert.equal(isActiveRoomItemId(itemId), false, itemId)
+  }
+  // receipted (owner-approved) home pieces are active
+  for (const itemId of ["room_v3_sofa_japon_cream", "room_v2_chair_blush"]) {
+    assert.equal(isActiveRoomItemId(itemId), true, itemId)
   }
   // the free starter bed is active and owned by everyone (F9)
   assert.equal(isActiveRoomItemId("room_v3_bed_blumi_starter"), true)
