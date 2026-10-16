@@ -633,6 +633,46 @@ class RigAssetModulesTest(unittest.TestCase):
         self.assertEqual(sorted(ex.rig_asset_modules(pngs, False)), ['rigAssets.ts'])
 
 
+class BlinkGateGlassesTest(unittest.TestCase):
+    """A tiny rig: a 32 px head whose eye closes (page 0: open head left, closed frame right) and one item on page 1."""
+    SKIN, EYE, RIM = (254, 215, 188, 255), (60, 40, 30, 255), (200, 160, 40, 255)
+
+    def rig(self, out, slot, redirect_item=False):
+        import numpy as np
+        from PIL import Image
+        p0 = np.zeros((32, 64, 4), np.uint8); p0[:, :] = self.SKIN; p0[12:20, 12:20] = self.EYE   # open head ...
+        p0[12:20, 44:52] = self.SKIN                                                               # ... closed frame
+        p1 = np.zeros((32, 64, 4), np.uint8); p1[11, 14:17] = self.RIM      # a thin rim bit over the eye, joined to nothing
+        Image.fromarray(p0, 'RGBA').save(out / 'front_page0.png'); Image.fromarray(p1, 'RGBA').save(out / 'front_page1.png')
+        quad = lambda page: {'pos': [0, 0, 32, 0, 32, 32, 0, 32], 'uv': [0, 0, .5, 0, .5, 1, 0, 1], 'page': [page] * 4,
+                             'index': [0, 1, 2, 0, 2, 3]}
+        blink = {'page': 0, 'rect': [10, 10, 12, 12], 'pad': 0, 'frames': {'half': [32, 0], 'closed': [32, 0]}, 'items': []}
+        if redirect_item:     # an eye patch for the item that points at empty page space: its rim would vanish
+            blink['items'] = [{'item': 'it', 'page': 1, 'rect': [10, 10, 12, 12], 'pad': 0, 'offset': [32, 0]}]
+        front = {'pageSize': [64, 32], 'pages': ['front_page0.png', 'front_page1.png'], 'blink': blink,
+                 'mesh': {**quad(0), 'ranges': [{'name': 'head', 'start': 0, 'count': 6, 'order': 4}]},
+                 'items': {'it': {'slot': slot, 'mesh': {**quad(1), 'ranges': [
+                     {'name': 'part0', 'layer': 'head', 'start': 0, 'count': 6, 'order': 4.5}]}}}}
+        (out / 'rig25.json').write_text(json.dumps({'views': {'front': front}}))
+        return out
+
+    def check(self, slot, redirect_item=False):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('blink_gate', HERE / 'blink_gate.py')
+        gate = importlib.util.module_from_spec(spec); spec.loader.exec_module(gate)
+        with tempfile.TemporaryDirectory() as d:
+            return [c for c in gate.check(self.rig(pathlib.Path(d), slot, redirect_item), scales=(1.0,)) if c['outfit'] != 'bare']
+
+    def test_a_glasses_rim_floating_over_the_eye_passes_and_the_same_bit_of_hair_is_a_speck(self):
+        glasses, hair = self.check('glasses'), self.check('hair')
+        self.assertTrue(glasses and all(c['ok'] and c['specks'] == 0 for c in glasses), glasses)
+        self.assertTrue(hair and all(not c['ok'] and c['specks'] > 0 for c in hair), hair)
+
+    def test_a_glasses_rim_that_changes_during_the_blink_fails(self):
+        cases = self.check('glasses', redirect_item=True)
+        self.assertTrue(cases and all(not c['ok'] and c['rimChanged'] > 0 for c in cases), cases)
+
+
 class PartOrderTest(unittest.TestCase):
     def test_order_layer_sets_the_draw_order_only_and_a_part_without_it_keeps_its_layer_order(self):
         ex = load_exporter()

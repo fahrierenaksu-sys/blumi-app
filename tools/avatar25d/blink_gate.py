@@ -8,6 +8,9 @@ frame, bare and with every item worn, at scale 1 and 2, unmirrored and mirrored.
     EYE_GROW stored texels (a half-size page's bilinear filter reaches 1 texel past a cleared texel);
   - FAIL on a hole: a pixel drawn in open that shows the background in the frame;
   - FAIL on a speck: item pixels left floating over the eye in a frame (not joined to the item outside the eye).
+    Glasses are not checked for specks: they are their own layer drawn over the eyes and never get an eye patch
+    (export_rig.pack_blink_items skips the slot), so a thin rim over the eye is meant to float there. Instead:
+  - FAIL when a glasses pixel changes in a frame (a rim that vanishes or flickers while the eye blinks).
 Mirroring is a vertex flip (uv unchanged), so it is checked by flipping the render; seated/walking move the rigid head
 only (same texels, other placement), so the rest pose covers them for this texel rule.
 Usage: python3 blink_gate.py <rigdir> [--report out.json]   (exit 1 on failure)"""
@@ -24,6 +27,7 @@ SKIN_DIST = 60 / 255      # a head pixel this far from the face's skin is the ey
 HAIR_MISMATCH = 90 / 255  # an item pixel this far from the head's own eye pixel is hair, not a painted eye copy
 LASH_SAT = 0.65           # an eye copy's lash line: HSV saturation above this (hair brown ~0.45-0.5) ...
 LASH_VALUE = 90 / 255     # ... and darker than this (as the exporter)
+GLASSES = 'glasses'       # the eyewear slot (export_rig.py NEW_KIND_SLOTS)
 COPY_REACH = 4            # px around the head's eye drawing that may hold an item's eye copy (rim, lash dots)
 
 
@@ -208,22 +212,30 @@ def check(rigdir, scales=(1.0, 2.0)):
         for outfit, items in outfits.items():
             r = bare if not items else {fr: render(v, pages, items, fr, scale) for fr in ('open',) + FRAMES}
             eye, zone, item_eye = eye_masks(bare['open'], [bare[fr] for fr in FRAMES], r['open'], scale)
+            glasses = tuple(i for i in items if v['items'][i]['slot'] == GLASSES)
+            ref, rim_px = bare, np.zeros(zone.shape, bool)       # specks: item pixels against bare (+ the glasses)
+            if glasses:
+                ref = {fr: render(v, pages, glasses, fr, scale) for fr in FRAMES}
+                rest = tuple(i for i in items if i not in glasses)
+                rim_px = changed(r['open'], render(v, pages, rest, 'open', scale))   # where the glasses show
             near = _grow(eye, int(round(EYE_GROW * scale)))                      # px: nothing visible changes outside
             texel = _grow(eye, int(round(EYE_GROW * scale / texel_scale)))      # texels: nothing changes at all
             for frame in FRAMES:
                 for mirror in (False, True):
                     flip = (lambda a: a[:, ::-1]) if mirror else (lambda a: a)
                     o, f, ok_px, ok_near = flip(r['open']), flip(r[frame]), flip(texel), flip(near)
-                    loose = specks(flip(bare[frame]), f, flip(zone))
+                    loose = specks(flip(ref[frame]), f, flip(zone))
                     diff = changed(o, f)
+                    rim = diff & flip(rim_px)
                     outside = (diff & ~ok_px) | (diff & ~ok_near & (np.abs(o - f).max(-1) >= VISIBLE))
                     hole = _holes(o, f, ok_px)
                     ys, xs = np.nonzero(outside)
                     cases.append({'outfit': outfit, 'frame': frame, 'scale': scale, 'mirror': mirror,
                                   'changed': int(diff.sum()), 'itemEye': int(item_eye.sum()),
                                   'outsideEye': int(outside.sum()), 'holes': int(hole.sum()), 'specks': int(loose.sum()),
+                                  'rimChanged': int(rim.sum()),
                                   'outsideBox': [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())] if len(xs) else None,
-                                  'ok': not outside.any() and not hole.any() and not loose.any()})
+                                  'ok': not outside.any() and not hole.any() and not loose.any() and not rim.any()})
     return cases
 
 
