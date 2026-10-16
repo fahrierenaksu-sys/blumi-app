@@ -52,7 +52,7 @@ import base64, io, json, math, pathlib, sys
 from PIL import Image
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))   # page_store.py beside this file, however it is loaded
-from page_store import published_rig_items, store_page
+from page_store import page_scope, published_rig_items, store_page
 
 ROOT_DIR = pathlib.Path(__file__).resolve().parents[2]
 ARGS = sys.argv[1:]
@@ -1045,12 +1045,11 @@ def export_view(name, v, motion=None):
     published = published_rig_items()
     for k, pg in enumerate(pages):
         page_names.append(f'{name}_page{k}.png')
-        # UVs are normalised, so only the stored resolution changes. The body and published items keep Pillow's
-        # resize byte for byte; unpublished items take the ring-safe one (page_store.py, the strap-ghost fix).
+        # UVs are normalised, so only the stored resolution changes. Published items keep Pillow's resize byte for
+        # byte; the body and unpublished items take the ring-safe one (page_store.py, the strap-ghost fix).
         on_page = [iid for iid in sorted(items) if items[iid]['page'] == k]
-        rects = lambda ids: [r for iid in ids for r in item_rects[iid].values()]
-        stored = store_page(pg, PAGE_STORE_SCALE, rects(i for i in on_page if i not in published),
-                            rects(i for i in on_page if i in published), math.ceil(PAD * PAGE_STORE_SCALE))
+        ring_safe, keep = page_scope(k, pg.size, on_page, item_rects, published)
+        stored = store_page(pg, PAGE_STORE_SCALE, ring_safe, keep, math.ceil(PAD * PAGE_STORE_SCALE))
         if k in blink_keeps:
             stored = restore_blink_item_hair(stored, PAGE_STORE_SCALE, blink_keeps[k])
         stored.save(OUT / page_names[-1], optimize=True)

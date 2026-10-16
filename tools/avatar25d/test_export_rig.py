@@ -1011,8 +1011,8 @@ def hard_edged_square(page, box, colour):
 
 
 class StorePageScopeTest(unittest.TestCase):
-    """The strap-ghost fix (WB strapghost_1710) runs only for unpublished items; the body and published items keep
-    Pillow's resize byte for byte, so receipted looks never change."""
+    """The strap-ghost fix (WB strapghost_1710) runs for the body and unpublished items; published items keep Pillow's
+    resize byte for byte, so receipted looks never change."""
     COLOUR = (200, 170, 150)
     PUBLISHED, UNPUBLISHED = (8, 8, 60, 60), (108, 8, 60, 60)
 
@@ -1048,6 +1048,22 @@ class StorePageScopeTest(unittest.TestCase):
         stored = self.ps.store_page(self.page, 0.5, [], [self.PUBLISHED, self.UNPUBLISHED])
         self.assertEqual(stored.tobytes(), self.old.tobytes())
         self.assertIs(self.ps.store_page(self.page, 1), self.page)
+
+    def stored_page(self, k, on_page, published):
+        rects = {'pub': {'part0': self.PUBLISHED}, 'new': {'part0': self.UNPUBLISHED}}
+        ring_safe, keep = self.ps.page_scope(k, self.page.size, on_page, rects, published)
+        return self.ps.store_page(self.page, 0.5, ring_safe, keep)
+
+    def test_body_page_hard_edges_keep_their_colour(self):
+        stored = self.stored_page(self.ps.BODY_PAGE, [], frozenset())
+        for box in (self.PUBLISHED, self.UNPUBLISHED):
+            self.assertLessEqual(self.worst_colour_shift(stored, box), 2)
+
+    def test_item_page_scope_fixes_unpublished_and_keeps_published_bytes(self):
+        import numpy as np
+        stored = self.stored_page(1, ['new', 'pub'], frozenset({'pub'}))
+        self.assertLessEqual(self.worst_colour_shift(stored, self.UNPUBLISHED), 2)
+        self.assertTrue((np.asarray(stored)[:, :50] == np.asarray(self.old)[:, :50]).all(), 'published item changed')
 
     def test_published_rig_items_follow_receipts_through_the_item_art_map(self):
         with tempfile.TemporaryDirectory() as d:

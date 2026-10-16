@@ -6,9 +6,10 @@ piece + its upper piece over the shoulder skin) the upper piece's edge shows as 
 (WB integration/strapghost_1710). `resize_rgba_lanczos` is the same LANCZOS on float premultiplied bands, divided by
 the unclipped alpha, then clipped: same size, sharpness and UVs, no light rim.
 
-Single decision point (`store_page`): texels of items that draw a published (receipted) shop item, and pages without
-items (the body), keep Pillow's resize byte for byte; only unpublished items' texels take the ring-safe resize. An item
-becomes published only through owner receipts, and its look must not change under them.
+Single decision point (`page_scope`): the body page and unpublished items' texels take the ring-safe resize; texels of
+items that draw a published (receipted) shop item keep Pillow's resize byte for byte, because an item becomes published
+only through owner receipts and its look must not change under them. The body page carries no receipt (lead decision
+2026-10-16, WB integration/OWNER_DECISIONS.md): its own hard layer edges showed the same light dashes on the shoulder.
 """
 import json, math, pathlib, re
 from PIL import Image
@@ -27,6 +28,18 @@ def published_rig_items(catalog=RELEASE_CATALOG, item_art=ITEM_ART):
         raise SystemExit(f'page store: read {len(published)} published items and {len(art)} item-art entries; '
                          'refusing to guess which items keep the old resize')
     return frozenset(published | {rig for item, rig in art if item in published})
+
+
+BODY_PAGE = 0   # export_rig packs the body (layers, variants, blink frames) on page 0 and items from page 1
+
+
+def page_scope(k, page_size, on_page, item_rects, published):
+    """(ring_safe_rects, keep_rects) in source px for stored page `k`: the whole body page, else the unpublished items'
+    packed parts, minus the published items' parts."""
+    if k == BODY_PAGE:
+        return [(0, 0, *page_size)], []
+    rects = lambda keep: [r for iid in on_page if (iid in published) == keep for r in item_rects[iid].values()]
+    return rects(False), rects(True)
 
 
 def resize_rgba_lanczos(im, size):
