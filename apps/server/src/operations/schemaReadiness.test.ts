@@ -44,7 +44,9 @@ test("only independently guarded additive features are optional for readiness", 
     // The chat repository's own ledger probe keeps 071's time-only hide rule until it is applied.
     "075_chat_hide_point_message.sql",
     // Only the beta reset script uses it, and that script refuses to apply without it.
-    "076_beta_reset_runs.sql"
+    "076_beta_reset_runs.sql",
+    // The room pet service probes this ledger row; its routes answer 409 until it is applied.
+    "078_room_pets.sql"
   ])
 })
 
