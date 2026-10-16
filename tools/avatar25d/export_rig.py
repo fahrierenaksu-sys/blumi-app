@@ -48,8 +48,11 @@ Full resolution (owner decision 2026-10-08: quality first). Vertices are in shee
 Palette slots: 0..B-1 = bones (rig order); B = ROOT (identity, cards placed in sheet px); B+1 = WAVE (whole-arm card
 about the shoulder pivot).
 """
-import base64, io, json, pathlib, sys
+import base64, io, json, math, pathlib, sys
 from PIL import Image
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))   # page_store.py beside this file, however it is loaded
+from page_store import published_rig_items, store_page
 
 ROOT_DIR = pathlib.Path(__file__).resolve().parents[2]
 ARGS = sys.argv[1:]
@@ -1039,11 +1042,15 @@ def export_view(name, v, motion=None):
             items[iid].update(mirror)
 
     page_names = []
+    published = published_rig_items()
     for k, pg in enumerate(pages):
         page_names.append(f'{name}_page{k}.png')
-        # UVs are normalised, so only the stored resolution changes. Pillow resizes RGBA premultiplied.
-        stored = pg if PAGE_STORE_SCALE == 1 else pg.resize(
-            (round(pg.width * PAGE_STORE_SCALE), round(pg.height * PAGE_STORE_SCALE)), Image.LANCZOS)
+        # UVs are normalised, so only the stored resolution changes. The body and published items keep Pillow's
+        # resize byte for byte; unpublished items take the ring-safe one (page_store.py, the strap-ghost fix).
+        on_page = [iid for iid in sorted(items) if items[iid]['page'] == k]
+        rects = lambda ids: [r for iid in ids for r in item_rects[iid].values()]
+        stored = store_page(pg, PAGE_STORE_SCALE, rects(i for i in on_page if i not in published),
+                            rects(i for i in on_page if i in published), math.ceil(PAD * PAGE_STORE_SCALE))
         if k in blink_keeps:
             stored = restore_blink_item_hair(stored, PAGE_STORE_SCALE, blink_keeps[k])
         stored.save(OUT / page_names[-1], optimize=True)

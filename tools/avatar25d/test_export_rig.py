@@ -997,5 +997,73 @@ class ExportBodyReplacementTest(unittest.TestCase):
                     tx, ty = min(int(round(px - u * mid.width)) + sx, W - 1), min(int(round(py - (1 - w) * mid.height)) + sy, H - 1)
                     self.assertEqual(page[ty, tx].tolist(), art[sy, sx].tolist() if art[sy, sx, 3] else page[ty, tx].tolist(), (view, k))
 
+
+def load_page_store():
+    sys.path.insert(0, str(HERE))
+    import page_store
+    return page_store
+
+
+def hard_edged_square(page, box, colour):
+    """A flat, opaque square with a binary alpha edge (a dress piece's cut edge) pasted onto `page`."""
+    from PIL import Image
+    page.paste(Image.new('RGBA', (box[2], box[3]), (*colour, 255)), box[:2])
+
+
+class StorePageScopeTest(unittest.TestCase):
+    """The strap-ghost fix (WB strapghost_1710) runs only for unpublished items; the body and published items keep
+    Pillow's resize byte for byte, so receipted looks never change."""
+    COLOUR = (200, 170, 150)
+    PUBLISHED, UNPUBLISHED = (8, 8, 60, 60), (108, 8, 60, 60)
+
+    def setUp(self):
+        from PIL import Image
+        self.ps = load_page_store()
+        self.page = Image.new('RGBA', (200, 80), (0, 0, 0, 0))
+        hard_edged_square(self.page, self.PUBLISHED, self.COLOUR)
+        hard_edged_square(self.page, self.UNPUBLISHED, self.COLOUR)
+        self.old = self.page.resize((100, 40), Image.LANCZOS)
+
+    def worst_colour_shift(self, stored, box):
+        """Largest colour change from the drawn colour over the (nearly) opaque texels of `box` (stored px)."""
+        import numpy as np
+        x, y, w, h = (v // 2 for v in box)
+        a = np.asarray(stored).astype(int)[y:y + h, x:x + w]
+        solid = a[..., 3] >= 250
+        return int(np.abs(a[..., :3][solid] - np.array(self.COLOUR)).max())
+
+    def test_unpublished_hard_edge_keeps_its_colour(self):
+        stored = self.ps.store_page(self.page, 0.5, [self.UNPUBLISHED], [self.PUBLISHED])
+        self.assertGreater(self.worst_colour_shift(self.old, self.UNPUBLISHED), 4, 'the old resize shows the light rim')
+        self.assertLessEqual(self.worst_colour_shift(stored, self.UNPUBLISHED), 2)
+
+    def test_published_item_texels_are_byte_identical_to_the_old_resize(self):
+        import numpy as np
+        stored = np.asarray(self.ps.store_page(self.page, 0.5, [self.UNPUBLISHED], [self.PUBLISHED]))
+        old = np.asarray(self.old)
+        self.assertTrue((stored[:, :50] == old[:, :50]).all(), 'published half changed')
+        self.assertFalse((stored[:, 50:] == old[:, 50:]).all(), 'unpublished half did not take the fix')
+
+    def test_a_page_without_unpublished_items_is_byte_identical(self):
+        stored = self.ps.store_page(self.page, 0.5, [], [self.PUBLISHED, self.UNPUBLISHED])
+        self.assertEqual(stored.tobytes(), self.old.tobytes())
+        self.assertIs(self.ps.store_page(self.page, 1), self.page)
+
+    def test_published_rig_items_follow_receipts_through_the_item_art_map(self):
+        with tempfile.TemporaryDirectory() as d:
+            catalog, art = pathlib.Path(d) / 'catalog.json', pathlib.Path(d) / 'art.ts'
+            catalog.write_text(json.dumps({'publishedItems': [{'itemId': 'avatar_v2_hair_x'}, {'itemId': 'hair_y'}]}))
+            art.write_text('export const A = {\n  female: {\n    avatar_v2_hair_x: "hair_girl_x",\n'
+                           '    dress_girl_new: "dress_girl_new",\n  },\n}\n')
+            self.assertEqual(self.ps.published_rig_items(catalog, art), {'avatar_v2_hair_x', 'hair_girl_x', 'hair_y'})
+            art.write_text('export const A = {}\n')
+            with self.assertRaises(SystemExit):
+                self.ps.published_rig_items(catalog, art)
+
+    def test_the_repo_catalog_marks_a_published_girl_item(self):
+        published = self.ps.published_rig_items()
+        self.assertIn('hair_girl_waves', published)   # avatar_v2_hair_mocha_ribbon_waves, receipted 2026-10-15
+
+
 if __name__ == '__main__':
     unittest.main()
