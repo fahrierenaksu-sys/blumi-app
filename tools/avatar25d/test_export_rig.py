@@ -620,6 +620,19 @@ class PoseOnlyTest(unittest.TestCase):
                 ex.pose_only('top_a', 1, {'poseOnly': bad})
 
 
+class RigAssetModulesTest(unittest.TestCase):
+    def test_with_astc_packs_ios_requires_no_png_page_and_the_default_module_requires_every_page(self):
+        ex = load_exporter()
+        pngs = ['back_page0.png', 'front_page0.png']
+        with_astc = ex.rig_asset_modules(pngs, True)
+        self.assertEqual(sorted(with_astc), ['rigAssets.ios.ts', 'rigAssets.ts'])
+        self.assertNotIn('require(', with_astc['rigAssets.ios.ts'])
+        for page in pngs:
+            self.assertIn(f'require("./{page}")', with_astc['rigAssets.ts'])
+        # without the packs iOS has nothing else to draw from, so it keeps the PNG module
+        self.assertEqual(sorted(ex.rig_asset_modules(pngs, False)), ['rigAssets.ts'])
+
+
 class PartOrderTest(unittest.TestCase):
     def test_order_layer_sets_the_draw_order_only_and_a_part_without_it_keeps_its_layer_order(self):
         ex = load_exporter()

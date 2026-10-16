@@ -43,7 +43,7 @@ EXPORT_ARGS = {
     "female": ["--motion", "lab40/motion_A4.json", "--motion-config", "life/avatar_motion_girl_app.json"],
     "male": ["--motion-config", "life/avatar_motion_male_app.json"],
 }
-GENERATED_GLOBS = ["*_page*.png", "rig25.json", "rigAssets.ts", "astc/*.zip", "astc/manifest.json", "astc/astcAssets.ts"]
+GENERATED_GLOBS = ["*_page*.png", "rig25.json", "rigAssets.ts", "rigAssets.ios.ts", "astc/*.zip", "astc/manifest.json", "astc/astcAssets.ts"]
 VARIANT_FAMILIES = ("legVariants", "torsoVariants", "armVariants", "sitVariants")
 DEFAULT_FRONT_ORDER = {"shoes": 1, "bottom": 2, "top": 3, "hair": 4}
 ERASING_SLOTS = {"shoes", "bottom", "top", "dress"}

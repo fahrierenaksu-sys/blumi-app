@@ -18,8 +18,14 @@ export const AVATAR_GIRL_RIG = require("../rigs/girl/rig25.json") as Rig25
 /** The boy's exported rig (export_rig.py --out …/rigs/boy; Workbench avatar25-v2/male/rig/rig_M3a_walk.json). */
 export const AVATAR_BOY_RIG = require("../rigs/boy/rig25.json") as Rig25
 
+/**
+ * Reads one PNG page. On iOS the map is empty (rigs/<rig>/rigAssets.ios.ts): every iOS GPU draws the ASTC packs, so
+ * the PNG pages are not bundled there and reaching this reader means the ASTC path was skipped or failed.
+ */
 function textureReader(textures: Record<string, number>) {
+  const hasPngPages = Object.keys(textures).length > 0
   return async (name: string): Promise<ArrayBuffer> => {
+    if (!hasPngPages) throw new Error("2.5D avatar PNG pages are not bundled on this platform; it draws the ASTC pages")
     const moduleId = textures[name]
     if (moduleId === undefined) throw new Error(`Unknown 2.5D avatar texture: ${name}`)
     const asset = Asset.fromModule(moduleId)
