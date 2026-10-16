@@ -5,6 +5,7 @@ import { CHAT_HIDE_MIGRATION_ID, CHAT_HIDE_POINT_MIGRATION_ID } from "../chat/ch
 import { CHAT_RECEIPTS_MIGRATION_ID } from "../chat/chatReceiptSchema"
 import { SMS_ADMISSION_MIGRATION_ID } from "../auth/firebaseSmsAdmission"
 import { BETA_RESET_RUNS_MIGRATION_ID } from "./betaResetRuns"
+import { CAT_TRIPS_MIGRATION_ID } from "../catTrips/catTripSchema"
 
 interface MigrationIdentity { id: string; checksum: string }
 interface SchemaQueryExecutor {
@@ -28,7 +29,9 @@ export const OPTIONAL_READINESS_MIGRATIONS: readonly string[] = Object.freeze([
   // The chat repository probes its own ledger row and keeps 071's time rule until then.
   CHAT_HIDE_POINT_MIGRATION_ID,
   // The app never touches it; the beta reset script checks for it and refuses to apply without it.
-  BETA_RESET_RUNS_MIGRATION_ID
+  BETA_RESET_RUNS_MIGRATION_ID,
+  // The cat trip service probes the ledger and answers enabled:false until it is applied.
+  CAT_TRIPS_MIGRATION_ID
 ])
 
 /** Read the packaged schema manifest once at service construction, not on each probe. */
