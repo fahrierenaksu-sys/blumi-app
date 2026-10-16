@@ -316,7 +316,8 @@ export function resolveServerConfig(
   if (paymentsFlag !== undefined && paymentsFlag !== "0" && paymentsFlag !== "1") {
     throw new Error("BLUMI_PAYMENTS_ENABLED must be 0 or 1.")
   }
-  const paymentsEnabled = paymentsFlag !== "0"
+  // Fail-safe: real-money payments run only when explicitly enabled with "1"; unset means off.
+  const paymentsEnabled = paymentsFlag === "1"
   // Disable both verification and webhook authentication; never grant unverified purchases.
   const revenueCatApiKey = paymentsEnabled ? env.REVENUECAT_SECRET_API_KEY?.trim() : undefined
   const revenueCatProjectId = paymentsEnabled ? env.REVENUECAT_PROJECT_ID?.trim() : undefined

@@ -157,17 +157,39 @@ test("staging can omit unverified app-link identities without weakening producti
   }), /BLUMI_APPLE_APP_ID/)
 })
 
+test("an unset BLUMI_PAYMENTS_ENABLED means payments are off: credentials are dropped and none are required", async () => {
+  const unset = { ...VALID_PRODUCTION_ENV }
+  delete (unset as Record<string, string | undefined>).BLUMI_PAYMENTS_ENABLED
+  const config = resolveServerConfig(unset)
+  assert.equal(config.revenueCatApiKey, undefined)
+  assert.equal(config.revenueCatProjectId, undefined)
+  assert.equal(config.revenueCatWebhookSigningSecret, undefined)
+  assert.deepEqual(config.revenueCatCoinProductIdMap, {})
+  for (const key of Object.keys(REVENUECAT_ENV)) {
+    assert.doesNotThrow(() => resolveServerConfig({ ...unset, [key]: undefined }), key)
+  }
+  const services = createConfiguredServerServices(config)
+  try {
+    await assert.rejects(services.revenueCatPurchaseVerifier.verifyTransactions({
+      userId: "user_a", transactionIds: ["transaction_1"]
+    }), CommerceProviderUnavailableError)
+  } finally {
+    await services.close()
+  }
+})
+
 test("production-mode purchases require the complete server-only RevenueCat configuration", () => {
+  const paymentsOn = { ...VALID_PRODUCTION_ENV, BLUMI_PAYMENTS_ENABLED: "1" }
   for (const key of Object.keys(REVENUECAT_ENV) as (keyof typeof REVENUECAT_ENV)[]) {
-    const incomplete = { ...VALID_PRODUCTION_ENV }
+    const incomplete: Record<string, string | undefined> = { ...paymentsOn }
     delete incomplete[key]
     assert.throws(() => resolveServerConfig(incomplete), new RegExp(key))
   }
   assert.throws(
-    () => resolveServerConfig({ ...VALID_PRODUCTION_ENV, REVENUECAT_COIN_PRODUCT_ID_MAP: "{}" }),
+    () => resolveServerConfig({ ...paymentsOn, REVENUECAT_COIN_PRODUCT_ID_MAP: "{}" }),
     /REVENUECAT_COIN_PRODUCT_ID_MAP/
   )
-  assert.equal(resolveServerConfig(VALID_PRODUCTION_ENV).revenueCatProjectId, "project_1")
+  assert.equal(resolveServerConfig(paymentsOn).revenueCatProjectId, "project_1")
 })
 
 test("server uses in-memory auth repository outside production by default", () => {
@@ -197,6 +219,7 @@ test("RevenueCat reconciliation fails closed until the server-only provider conf
   const configuredServices = createConfiguredServerServices(
     resolveServerConfig({
       NODE_ENV: "development",
+      BLUMI_PAYMENTS_ENABLED: "1",
       REVENUECAT_SECRET_API_KEY: "server_secret",
       REVENUECAT_PROJECT_ID: "project_1",
       REVENUECAT_COIN_PRODUCT_ID_MAP: JSON.stringify({
