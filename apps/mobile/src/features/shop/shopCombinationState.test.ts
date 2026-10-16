@@ -484,3 +484,52 @@ function completePurchase(
     productId
   })
 }
+
+test("a saved look changed elsewhere moves the untouched Shop draft slots and keeps the tried-on ones", () => {
+  const mounted = createShopCombinationState({
+    equipped,
+    ownedProductIds: ["hair-current", "top-current", "bottom-current", "shoes-current"],
+    avatarRevision: "revision-1"
+  })
+  const triedShoes = reduceShopCombination(mounted, {
+    type: "preview_product",
+    slot: "shoes",
+    productId: "shoes-preview",
+    compatible: true
+  }).state
+
+  // The wardrobe saved a new top while the Shop stayed mounted.
+  const savedElsewhere: ShopCombinationDraft = { ...equipped, top: "top-from-wardrobe" }
+  const synced = reduceShopCombination(triedShoes, {
+    type: "equipped_changed_elsewhere",
+    equipped: savedElsewhere,
+    avatarRevision: "revision-2"
+  }).state
+
+  assert.deepEqual(synced.equipped, savedElsewhere)
+  assert.equal(synced.draft.top, "top-from-wardrobe")
+  assert.equal(synced.draft.shoes, "shoes-preview")
+  assert.equal(synced.avatarRevision, "revision-2")
+
+  const untouched = reduceShopCombination(mounted, {
+    type: "equipped_changed_elsewhere",
+    equipped: savedElsewhere,
+    avatarRevision: "revision-2"
+  }).state
+  assert.deepEqual(untouched.draft, savedElsewhere)
+})
+
+test("an outside save never rewrites the draft while a purchase or save is running", () => {
+  const mounted = createShopCombinationState({
+    equipped,
+    ownedProductIds: [],
+    avatarRevision: "revision-1"
+  })
+  const saving: ShopCombinationState = { ...mounted, phase: "saving" }
+  const result = reduceShopCombination(saving, {
+    type: "equipped_changed_elsewhere",
+    equipped: { ...equipped, top: "top-from-wardrobe" },
+    avatarRevision: "revision-2"
+  }).state
+  assert.deepEqual(result, saving)
+})

@@ -46,6 +46,20 @@ export function useShopCombinationSession(input: {
     return transition.commands
   }, [])
 
+  // The wardrobe (or another surface) can save a new look while the Shop stays
+  // mounted; without this the Shop keeps drawing the look it mounted with.
+  const equippedKey = JSON.stringify(avatarToShopCombinationDraft(input.avatar))
+  useEffect(() => {
+    const current = combinationStateRef.current
+    if (JSON.stringify(current.equipped) === equippedKey) return
+    dispatchCombination({
+      type: "equipped_changed_elsewhere",
+      equipped: avatarToShopCombinationDraft(input.avatar),
+      avatarRevision: input.avatarRevision
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the serialized look
+  }, [equippedKey, input.avatarRevision])
+
   const discardShopPreview = useCallback((): void => {
     dispatchCombination({ type: "discard_draft" })
   }, [dispatchCombination])

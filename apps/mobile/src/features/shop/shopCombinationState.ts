@@ -99,6 +99,12 @@ export type ShopCombinationAction =
   | { type: "purchase_failed"; productId: string; reason: string }
   | { type: "cancel_apply" }
   | { type: "avatar_save_confirmed"; avatarRevision: ShopAvatarRevision }
+  /** The saved look changed outside the Shop (the wardrobe) while the Shop stayed mounted. */
+  | {
+    type: "equipped_changed_elsewhere"
+    equipped: ShopCombinationDraft
+    avatarRevision: ShopAvatarRevision
+  }
   | { type: "avatar_save_failed"; reason: string }
   | { type: "avatar_save_revision_conflict" }
   | {
@@ -292,6 +298,16 @@ export function reduceShopCombination(
     })
   }
 
+  if (action.type === "equipped_changed_elsewhere") {
+    if (state.phase !== "editing") return unchanged(state)
+    return transition({
+      ...state,
+      equipped: { ...action.equipped },
+      draft: rebaseDraftOntoEquipped(state.draft, state.equipped, action.equipped),
+      avatarRevision: action.avatarRevision
+    })
+  }
+
   if (action.type === "refresh_after_conflict") {
     if (state.phase !== "review_required") return unchanged(state)
     return transition({
@@ -377,6 +393,23 @@ function stopApply(
     requiresRefresh: false,
     issue
   })
+}
+
+/** Slots the user did not try on follow the new saved look; tried-on slots stay. */
+function rebaseDraftOntoEquipped(
+  draft: ShopCombinationDraft,
+  previousEquipped: ShopCombinationDraft,
+  nextEquipped: ShopCombinationDraft
+): ShopCombinationDraft {
+  const rebased: Record<string, string | readonly string[] | null | undefined> = { ...draft }
+  for (const key of new Set([...Object.keys(draft), ...Object.keys(nextEquipped)])) {
+    const isTriedOn = JSON.stringify(draft[key as keyof ShopCombinationDraft] ?? null) !==
+      JSON.stringify(previousEquipped[key as keyof ShopCombinationDraft] ?? null)
+    if (isTriedOn) continue
+    rebased[key] = nextEquipped[key as keyof ShopCombinationDraft]
+  }
+  const accessoryIds = rebased.accessoryIds as readonly string[] | undefined
+  return accessoryIds ? { ...rebased, accessoryIds: [...accessoryIds] } : rebased
 }
 
 function transition(
