@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "8e06e2dc19853aef8accd79cea3660ae6e028854c44cc9129bc92df71b82c8b3",
+      "rigSha256": "26df024f8b9e5704286d1ade7c17caa8fba7dddb1b442c4b8121d0221c7c49f9",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -771,6 +771,11 @@
           "rigItemId": "hair_girl_ink_french_bob",
           "thumb": "hair_girl_ink_french_bob"
         },
+        "hair_girl_caramel_braid_crown": {
+          "slot": "hair",
+          "rigItemId": "hair_girl_caramel_braid_crown",
+          "thumb": "hair_girl_caramel_braid_crown"
+        },
         "dress_girl_wine_gingham_tie": {
           "slot": "dress",
           "rigItemId": "dress_girl_wine_gingham_tie",
@@ -1308,6 +1313,19 @@
               104,
               184,
               168
+            ]
+          },
+          {
+            "key": "hair_girl_caramel_braid_crown__o0p6",
+            "owner": "hair_girl_caramel_braid_crown",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              216,
+              46,
+              213,
+              353
             ]
           },
           {
@@ -3311,6 +3329,19 @@
             ]
           },
           {
+            "key": "hair_girl_caramel_braid_crown__o4p6",
+            "owner": "hair_girl_caramel_braid_crown",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              213,
+              47,
+              262,
+              342
+            ]
+          },
+          {
             "key": "clip_girl_pearl_bar_pair__o4p7",
             "owner": "clip_girl_pearl_bar_pair",
             "slot": "accessory",
@@ -3996,6 +4027,19 @@
               52,
               117,
               108
+            ]
+          },
+          {
+            "key": "hair_girl_caramel_braid_crown__o0p6",
+            "owner": "hair_girl_caramel_braid_crown",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              70,
+              17,
+              134,
+              221
             ]
           },
           {
@@ -4780,6 +4824,19 @@
               10,
               163,
               141
+            ]
+          },
+          {
+            "key": "hair_girl_caramel_braid_crown__o4p6",
+            "owner": "hair_girl_caramel_braid_crown",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              68,
+              18,
+              165,
+              213
             ]
           },
           {
