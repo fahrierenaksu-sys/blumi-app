@@ -146,6 +146,12 @@ export function createPostgresEconomyRepository(
             WHERE EXISTS (
               SELECT 1 FROM blumi_economy_inventories WHERE user_id = $1
             )
+              -- Optional rolling cap (economy v1 review): at most $7 rewards
+              -- of this type since $6. Uses the ledger primary key prefix.
+              AND ($6::timestamptz IS NULL OR (
+                SELECT count(*) FROM blumi_economy_reward_ledger
+                 WHERE user_id = $1 AND reward_type = $2 AND created_at >= $6::timestamptz
+              ) < $7::integer)
            ON CONFLICT (user_id, reward_type, idempotency_key) DO NOTHING
            RETURNING 1
          ), updated_inventory AS (
@@ -171,7 +177,9 @@ export function createPostgresEconomyRepository(
           input.rewardType,
           input.idempotencyKey,
           input.coins,
-          new Date(input.createdAt)
+          new Date(input.createdAt),
+          input.windowCap ? new Date(input.windowCap.since) : null,
+          input.windowCap ? input.windowCap.maxClaims : null
         ]
       )
       const row = result.rows[0]

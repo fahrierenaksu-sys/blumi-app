@@ -74,6 +74,11 @@ export interface EconomyRewardClaim {
   idempotencyKey: string
   coins: number
   createdAt: string
+  /**
+   * Optional rolling cap: the claim is refused (claimed: false, no key used) when the user already has maxClaims
+   * rewards of this type created at or after `since`. Two claims racing at the cap may both pass, by one.
+   */
+  windowCap?: { since: string; maxClaims: number }
 }
 
 export interface EconomyRewardClaimResult {
@@ -84,6 +89,8 @@ export interface EconomyRewardClaimResult {
 export interface InMemoryEconomyStore {
   inventoriesByUserId: Map<string, EconomyInventoryRecord>
   rewardKeys: Set<string>
+  /** Claim times per `${userId}:${rewardType}`, for rolling caps. */
+  rewardClaimTimes: Map<string, readonly string[]>
   commerceEventPayloadHashes: Map<string, string>
   commerceLedgerKeys: Set<string>
   commerceTransactions: Map<string, {
@@ -97,6 +104,7 @@ export function createInMemoryEconomyStore(): InMemoryEconomyStore {
   return {
     inventoriesByUserId: new Map(),
     rewardKeys: new Set(),
+    rewardClaimTimes: new Map(),
     commerceEventPayloadHashes: new Map(),
     commerceLedgerKeys: new Set(),
     commerceTransactions: new Map()
@@ -243,7 +251,16 @@ export function createInMemoryEconomyRepository(
       if (store.rewardKeys.has(ledgerKey)) {
         return { claimed: false, inventory: cloneInventory(inventory) }
       }
+      const typeKey = `${input.userId}:${input.rewardType}`
+      const claimTimes = store.rewardClaimTimes.get(typeKey) ?? []
+      const windowCap = input.windowCap
+      if (windowCap) {
+        const since = new Date(windowCap.since).getTime()
+        const recent = claimTimes.filter((createdAt) => new Date(createdAt).getTime() >= since).length
+        if (recent >= windowCap.maxClaims) return { claimed: false, inventory: cloneInventory(inventory) }
+      }
       store.rewardKeys.add(ledgerKey)
+      store.rewardClaimTimes.set(typeKey, [...claimTimes, input.createdAt])
       // Like a purchased credit, an earned reward repays refund debt first.
       const nextInventory = applyCoinCredit(inventory, input.coins, input.createdAt)
       store.inventoriesByUserId.set(input.userId, cloneInventory(nextInventory))

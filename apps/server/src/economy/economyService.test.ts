@@ -10,7 +10,7 @@ import {
   TEST_AVATAR_ITEM_RULES as avatarRules,
   isRetiredAvatarItemId
 } from "@blumi/domain"
-import { ECONOMY_REWARD_COINS, createEconomyService } from "./economyService"
+import { ECONOMY_REWARD_COINS, MUTUAL_MATCH_REWARDS_PER_WEEK, createEconomyService } from "./economyService"
 import {
   TEST_AVATAR_BOY_BODY_ID,
   TEST_AVATAR_DRESS_BOTTOM_ID,
@@ -368,6 +368,20 @@ test("daily rewards are server-priced and idempotent per UTC day", async () => {
   assert.equal(duplicate.inventory.coins, 1250 + DAILY)
   assert.equal(nextDay.claimed, true)
   assert.equal(nextDay.inventory.coins, 1250 + 2 * DAILY)
+})
+
+test("an account collects at most MUTUAL_MATCH_REWARDS_PER_WEEK new-pair match rewards in a rolling week", async () => {
+  const service = createEconomyService()
+  const start = new Date("2026-07-12T09:00:00.000Z")
+  const grantAt = (pair: number, at: Date) => service.grantEventReward("user_main", "mutual_match", `pair:user_main:helper_${pair}`, at)
+  for (let pair = 0; pair < MUTUAL_MATCH_REWARDS_PER_WEEK; pair += 1) {
+    assert.equal((await grantAt(pair, new Date(start.getTime() + pair * 60_000))).rewardCoins, MATCH)
+  }
+  const overCap = await grantAt(MUTUAL_MATCH_REWARDS_PER_WEEK, new Date(start.getTime() + 60 * 60_000))
+  assert.equal(overCap.rewardCoins, 0, "a new user ID from a re-created helper account cannot keep paying")
+  const nextWeek = await grantAt(MUTUAL_MATCH_REWARDS_PER_WEEK + 1, new Date(start.getTime() + 8 * 24 * 60 * 60_000))
+  assert.equal(nextWeek.rewardCoins, MATCH)
+  assert.equal((await service.getInventory("user_main")).coins, 1250 + (MUTUAL_MATCH_REWARDS_PER_WEEK + 1) * MATCH)
 })
 
 test("event rewards use fixed server amounts and stable idempotency keys", async () => {

@@ -87,6 +87,14 @@ export const ECONOMY_REWARD_COINS = Object.freeze({
   mutual_match: 50
 } as const)
 
+/**
+ * New-pair match rewards one account can collect in a rolling week. Deleting an account and signing up again with
+ * the same phone gives a new user ID and so a new pair key (2026-10-16 exploit review H1); this cap bounds what one
+ * helper phone can pay a main account until a phone-hash tombstone exists. A real player matches about once a week.
+ */
+export const MUTUAL_MATCH_REWARDS_PER_WEEK = 3
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+
 const DAILY_REWARD_COINS = ECONOMY_REWARD_COINS.daily_login
 const EVENT_REWARD_COINS = {
   room_complete: ECONOMY_REWARD_COINS.room_complete,
@@ -238,7 +246,10 @@ export function createEconomyService(
         rewardType,
         idempotencyKey: normalizedKey,
         coins,
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
+        ...(rewardType === "mutual_match"
+          ? { windowCap: { since: new Date(now.getTime() - WEEK_MS).toISOString(), maxClaims: MUTUAL_MATCH_REWARDS_PER_WEEK } }
+          : {})
       })
       return {
         inventory: project(cloneInventory(result.inventory)),

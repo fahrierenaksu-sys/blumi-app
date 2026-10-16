@@ -9,6 +9,7 @@ import { runRepositoryContract, type RepositoryContractBackend } from "./reposit
 
 const AT = "2026-09-30T10:00:00.000Z"
 const LATER = "2026-09-30T11:00:00.000Z"
+const LATER_STILL = "2026-09-30T12:00:00.000Z"
 
 type Backend = RepositoryContractBackend<EconomyRepository>
 
@@ -156,6 +157,19 @@ runRepositoryContract<EconomyRepository>({
       const late = await backend.repository.claimReward(orphanClaim)
       assert.equal(late.claimed, true, "a failed claim must not have consumed its key")
       assert.equal(late.inventory.coins, 25)
+    },
+
+    "claimReward with a rolling cap refuses past the cap without using the key, and counts only that reward type": async (backend) => {
+      const { userId } = await seedInventory(backend, 0)
+      const windowCap = { since: AT, maxClaims: 2 }
+      const claim = { userId, rewardType: "mutual_match" as const, coins: 50, createdAt: LATER, windowCap }
+      await backend.repository.claimReward({ ...claim, rewardType: "daily_login", idempotencyKey: "2026-09-30" })
+      assert.equal((await backend.repository.claimReward({ ...claim, idempotencyKey: "pair:1" })).claimed, true)
+      assert.equal((await backend.repository.claimReward({ ...claim, idempotencyKey: "pair:2" })).claimed, true)
+      const capped = await backend.repository.claimReward({ ...claim, idempotencyKey: "pair:3" })
+      assert.deepEqual([capped.claimed, capped.inventory.coins], [false, 150])
+      const nextWindow = await backend.repository.claimReward({ ...claim, idempotencyKey: "pair:3", windowCap: { since: LATER_STILL, maxClaims: 2 } })
+      assert.equal(nextWindow.claimed, true, "a capped claim must not have consumed its key")
     },
 
     "claimReward repays a refund debt first and adds only the remainder to coins": async (backend) => {
