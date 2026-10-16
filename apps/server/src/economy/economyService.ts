@@ -78,10 +78,11 @@ export interface RewardGrantResult {
 
 /**
  * Server-decided reward amounts (economy v1, Workbench economy_2025/LEAD/ECONOMY_PLAN.md). The shared room is the
- * north-star action, so it pays at least as much as opening the app; a match pays once per pair ever.
+ * north-star action, so it pays more than opening the app. The daily login stays 25: it is auto-claimed solo
+ * activity, and raising it would only grow balances faster than new pieces ship. A match pays once per pair ever.
  */
 export const ECONOMY_REWARD_COINS = Object.freeze({
-  daily_login: 40,
+  daily_login: 25,
   room_complete: 40,
   mutual_match: 50
 } as const)
