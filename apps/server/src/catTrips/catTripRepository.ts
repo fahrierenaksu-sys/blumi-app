@@ -58,10 +58,16 @@ export interface CatTripRepository {
     cap: number
   }): Promise<boolean>
   /** One souvenir per trip: a repeat returns the stored one. */
-  grantSouvenir(souvenir: CatSouvenirRecord): Promise<CatSouvenirRecord>
+  grantSouvenir(souvenir: CatSouvenirRecord & { tripId: string }): Promise<CatSouvenirRecord>
   listSouvenirs(ownerUserId: string, limit: number): Promise<CatSouvenirRecord[]>
-  /** Deletes trips created before `cutoff` (their souvenirs follow); returns the trip count. */
+  /** Deletes trips created before `cutoff`; their souvenirs stay (detached from the trip). Returns the trip count. */
   purgeCreatedBefore(cutoff: string): Promise<number>
+  /**
+   * Removes everything the user owns or hosts: day plans, trips on either side
+   * and their souvenirs. Returns the trip count. (PostgreSQL also cascades from
+   * the account row; this is for in-memory storage and explicit erasure.)
+   */
+  deleteUserData(userId: string): Promise<number>
 }
 
 export function cloneTrip(trip: CatTripRecord): CatTripRecord {
@@ -165,9 +171,21 @@ export function createInMemoryCatTripRepository(): CatTripRepository {
       for (const trip of [...trips.values()]) {
         if (Date.parse(trip.createdAt) >= Date.parse(cutoff)) continue
         trips.delete(trip.tripId)
-        for (const [id, souvenir] of souvenirs) if (souvenir.tripId === trip.tripId) souvenirs.delete(id)
+        for (const [id, souvenir] of souvenirs) if (souvenir.tripId === trip.tripId) souvenirs.set(id, { ...souvenir, tripId: null })
         count += 1
       }
+      return count
+    },
+    async deleteUserData(userId) {
+      let count = 0
+      for (const trip of [...trips.values()]) {
+        if (trip.ownerUserId !== userId && trip.hostUserId !== userId) continue
+        trips.delete(trip.tripId)
+        for (const [id, souvenir] of souvenirs) if (souvenir.tripId === trip.tripId) souvenirs.set(id, { ...souvenir, tripId: null })
+        count += 1
+      }
+      for (const [id, souvenir] of souvenirs) if (souvenir.ownerUserId === userId) souvenirs.delete(id)
+      for (const key of [...days]) if (key.startsWith(`${userId}|`)) days.delete(key)
       return count
     }
   }

@@ -61,7 +61,8 @@ export interface CatTripRecord {
 export interface CatSouvenirRecord {
   souvenirId: string
   ownerUserId: string
-  tripId: string
+  /** Null once the trip was deleted by retention; the keepsake stays on the shelf. */
+  tripId: string | null
   key: string
   rarity: CatSouvenirRarity
   acquiredAt: string

@@ -104,7 +104,7 @@ export type CatStateResult =
       catPhase: "home" | "away"
       currentTrip: CatOwnerTripView | null
       pendingReveals: CatOwnerTripView[]
-      souvenirs: Array<CatSouvenirView & { souvenirId: string; tripId: string; acquiredAt: string }>
+      souvenirs: Array<CatSouvenirView & { souvenirId: string; tripId: string | null; acquiredAt: string }>
     }
 
 export type CatRevealResult =
@@ -123,7 +123,10 @@ export interface CatTripService {
   isTeaserCurrent(userId: string, tripId: string, role: CatTripRole): Promise<boolean>
   /** Block, unmatch or removal: the cat comes home at once. Safe to call when the feature is off. */
   endTripsBetween(userAId: string, userBId: string, reason: CatTripEndReason): Promise<number>
+  /** Deletes trips older than the retention window (90 days). Runs whenever the tables exist, even with the flag off. */
   purgeExpired(): Promise<number>
+  /** Erases everything a user owns or hosts (account deletion). Runs whenever the tables exist, even with the flag off. */
+  deleteUserData(userId: string): Promise<number>
 }
 
 export function createCatTripService(options: CatTripServiceOptions): CatTripService {
@@ -136,6 +139,11 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
 
   async function isReady(): Promise<boolean> {
     if (!options.enabled) return false
+    return options.schema ? options.schema.isReady() : true
+  }
+
+  /** The tables exist (migration 077 applied), whatever the feature flag says: data is erased either way. */
+  async function tablesExist(): Promise<boolean> {
     return options.schema ? options.schema.isReady() : true
   }
 
@@ -405,8 +413,13 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
     },
 
     async purgeExpired() {
-      if (!(await isReady())) return 0
+      if (!(await tablesExist())) return 0
       return repository.purgeCreatedBefore(new Date(now().getTime() - CAT_TRIP_RETENTION_MS).toISOString())
+    },
+
+    async deleteUserData(userId) {
+      if (!(await tablesExist())) return 0
+      return repository.deleteUserData(userId)
     }
   }
 }

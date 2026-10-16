@@ -164,6 +164,16 @@ export function createPostgresCatTripRepository(pool: TransactionalQueryExecutor
       )
       return result.rows.map(mapSouvenir)
     },
+    async deleteUserData(userId) {
+      return inTransaction(async (executor) => {
+        await executor.query("DELETE FROM blumi_cat_souvenirs WHERE owner_user_id = $1", [userId])
+        const trips = await executor.query(
+          "DELETE FROM blumi_cat_trips WHERE owner_user_id = $1 OR host_user_id = $1 RETURNING trip_id", [userId]
+        )
+        await executor.query("DELETE FROM blumi_cat_trip_days WHERE owner_user_id = $1", [userId])
+        return trips.rows.length
+      })
+    },
     async purgeCreatedBefore(cutoff) {
       const result = await pool.query(
         "DELETE FROM blumi_cat_trips WHERE created_at < $1 RETURNING trip_id",
@@ -212,7 +222,7 @@ function mapSouvenir(row: QueryResultRow): CatSouvenirRecord {
   return {
     souvenirId: String(row.souvenir_id),
     ownerUserId: String(row.owner_user_id),
-    tripId: String(row.trip_id),
+    tripId: row.trip_id === null ? null : String(row.trip_id),
     key: String(row.souvenir_key),
     rarity: String(row.rarity) as CatSouvenirRarity,
     acquiredAt: iso(row.acquired_at)

@@ -41,7 +41,8 @@ export function createDisabledCatTripService(): CatTripService {
     async acknowledgeReveal() { return { outcome: "disabled" } },
     async isTeaserCurrent() { return false },
     async endTripsBetween() { return 0 },
-    async purgeExpired() { return 0 }
+    async purgeExpired() { return 0 },
+    async deleteUserData() { return 0 }
   }
 }
 

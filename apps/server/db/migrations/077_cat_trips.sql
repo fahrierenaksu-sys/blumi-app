@@ -5,7 +5,7 @@
 -- two trips for it (blumi_cat_trips) and one souvenir per finished trip
 -- (blumi_cat_souvenirs). Destinations, times and souvenirs are decided here,
 -- never by the client. No message text, name or phone number is stored: only
--- user ids (all cascade with the account), times, a keyed seed digest and counts.
+-- user ids (all cascade with the account; trips are deleted after 90 days, souvenirs stay on the shelf), times, a keyed seed digest and counts.
 --
 -- /ready treats this file as optional: the server probes the ledger and keeps
 -- the whole feature off (routes answer enabled:false) until this row exists
@@ -52,7 +52,8 @@ CREATE INDEX IF NOT EXISTS blumi_cat_trips_created_idx ON blumi_cat_trips (creat
 CREATE TABLE IF NOT EXISTS blumi_cat_souvenirs (
   souvenir_id TEXT PRIMARY KEY,
   owner_user_id TEXT NOT NULL REFERENCES blumi_accounts (user_id) ON DELETE CASCADE,
-  trip_id TEXT NOT NULL REFERENCES blumi_cat_trips (trip_id) ON DELETE CASCADE,
+  -- The keepsake outlives its trip (trips are deleted after 90 days); it goes with the account.
+  trip_id TEXT REFERENCES blumi_cat_trips (trip_id) ON DELETE SET NULL,
   souvenir_key TEXT NOT NULL CHECK (char_length(souvenir_key) BETWEEN 1 AND 40),
   rarity TEXT NOT NULL CHECK (rarity IN ('common', 'uncommon', 'rare')),
   acquired_at TIMESTAMPTZ NOT NULL,

@@ -801,6 +801,8 @@ export function createConfiguredServerServices(
     otpHmacSecret: config.otpHmacSecret,
     sessionCacheTtlMs: config.sessionCacheTtlMs,
     accountDeletionHandlers: [
+      // In-memory storage has no foreign keys: erase the account's cat trips and souvenirs explicitly.
+      (account) => catTripService.deleteUserData(account.userId).then(() => undefined),
       (account) => notificationService.repository.removeAllDevices(account.userId)
     ]
   })

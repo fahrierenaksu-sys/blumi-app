@@ -249,3 +249,22 @@ test("purgeExpired deletes trips older than the retention window", async () => {
   h.setNow(START + 91 * 24 * 60 * 60_000)
   assert.equal(await h.service.purgeExpired(), CAT_TRIPS_PER_DAY)
 })
+
+test("retention and account erasure run with the flag off, and stop without the tables", async () => {
+  const enabled = harness()
+  await enabled.service.getState(OWNER)
+  const off = createCatTripService({
+    repository: enabled.repository, world: enabled.world, enabled: false, seedSecret: "x",
+    now: () => new Date(START + 91 * 24 * 60 * 60_000)
+  })
+  assert.equal(await off.purgeExpired(), CAT_TRIPS_PER_DAY)
+  assert.equal(await off.deleteUserData(OWNER), 0)
+
+  const withTrips = harness()
+  await withTrips.service.getState(OWNER)
+  assert.equal(await withTrips.service.deleteUserData(OWNER), CAT_TRIPS_PER_DAY)
+  assert.deepEqual(await withTrips.trips(), [])
+  const missingTables = harness({ schema: { isReady: async () => false } })
+  assert.equal(await missingTables.service.deleteUserData(OWNER), 0)
+  assert.equal(await missingTables.service.purgeExpired(), 0)
+})

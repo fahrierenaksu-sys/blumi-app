@@ -109,6 +109,10 @@ const retentionWorker = startPeriodicWorker({
   run: () => services.retentionService.purgeExpired(), intervalMs: 600_000, firstRunDelayMs: startupJitterMs(600_000),
   reportError: (error) => console.error("Retention cleanup failed", safeOperationalErrorKind(error))
 })
+const catTripRetentionWorker = startPeriodicWorker({
+  run: () => services.catTripService.purgeExpired().then(() => undefined), intervalMs: 600_000, firstRunDelayMs: startupJitterMs(600_000),
+  reportError: (error) => console.error("Cat trip retention failed", safeOperationalErrorKind(error))
+})
 const discoveryWatchWorker = startDiscoveryWatchWorker({
   matchService: services.matchService,
   safetyService: services.safetyService,
@@ -226,7 +230,8 @@ const shutdown = createGracefulShutdown({
     () => ticketCleanupWorker.stop(),
     () => rateBudgetCleanupWorker.stop(),
     () => discoverySnapshotCleanupWorker.stop(),
-    () => retentionWorker.stop()
+    () => retentionWorker.stop(),
+    () => catTripRetentionWorker.stop()
   ],
   drainOutgoing: () => connectionManager.closeFanout(),
   closeData: () => services.close()

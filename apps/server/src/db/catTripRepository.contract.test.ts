@@ -163,7 +163,7 @@ runRepositoryContract<CatTripRepository>({
       assert.deepEqual(await backend.repository.listSouvenirs(host, 10), [])
     },
 
-    "purgeCreatedBefore removes old trips and their souvenirs": async (backend) => {
+    "purgeCreatedBefore removes old trips and keeps their souvenirs on the shelf": async (backend) => {
       const [owner, host] = [backend.id("owner"), backend.id("host")]
       await backend.ensureUsers(owner, host)
       const old = trip(backend, owner, host, 0, { createdAt: at(1) })
@@ -176,7 +176,31 @@ runRepositoryContract<CatTripRepository>({
       assert.ok(purged >= 1)
       assert.equal(await backend.repository.findTrip(old.tripId), null)
       assert.ok(await backend.repository.findTrip(fresh.tripId))
-      assert.deepEqual(await backend.repository.listSouvenirs(owner, 10), [])
+      const shelf = await backend.repository.listSouvenirs(owner, 10)
+      assert.deepEqual(shelf.map((entry) => [entry.key, entry.tripId]), [["ribbon", null]])
+    },
+
+    "deleteUserData erases a user's plans, trips on both sides and souvenirs, and leaves others": async (backend) => {
+      const [leaver, friend, bystander] = [backend.id("leaver"), backend.id("friend"), backend.id("bystander")]
+      await backend.ensureUsers(leaver, friend, bystander)
+      const own = trip(backend, leaver, friend, 0)
+      const hosted = trip(backend, friend, leaver, 1)
+      const unrelated = trip(backend, friend, bystander, 0)
+      await plan(backend, leaver, [own])
+      await plan(backend, friend, [hosted, unrelated])
+      for (const [owner, planned, key] of [[leaver, own, "ribbon"], [friend, hosted, "leaf"]] as const) {
+        await backend.repository.grantSouvenir({
+          souvenirId: backend.id(`sv_${key}`), ownerUserId: owner, tripId: planned.tripId, key, rarity: "common", acquiredAt: at(12)
+        })
+      }
+      assert.equal(await backend.repository.deleteUserData(leaver), 2)
+      assert.equal(await backend.repository.findTrip(own.tripId), null)
+      assert.equal(await backend.repository.findTrip(hosted.tripId), null)
+      assert.ok(await backend.repository.findTrip(unrelated.tripId))
+      assert.deepEqual(await backend.repository.listSouvenirs(leaver, 10), [])
+      assert.equal(await backend.repository.isDayPlanned(leaver, DAY), false)
+      assert.equal((await backend.repository.listSouvenirs(friend, 10)).length, 1, "the friend's own souvenir stays")
+      assert.equal(await backend.repository.deleteUserData(leaver), 0)
     }
   }
 })
