@@ -83,6 +83,7 @@ import {
   getMyRoomAvatarDepthIndex
 } from "../features/roomWorld/myRoomAvatarWalkModel"
 import { useMyRoomAvatarWalk } from "../features/roomWorld/useMyRoomAvatarWalk"
+import { useMyRoomPetSlot } from "../features/roomPet/useMyRoomPetSlot"
 import {
   INITIAL_ROOM_TAP_MARKER_STATE,
   reduceRoomTapMarker
@@ -371,6 +372,22 @@ export function MyRoomScreen({
   const readAvatarPose = useCallback((): MyRoomAvatarPose => liveWalkRef.current === null
     ? avatarPoseRef.current
     : { ...avatarPoseRef.current, x: avatarWalk.x.value, y: avatarWalk.y.value }, [avatarWalk])
+
+  // Room pet (flag EXPO_PUBLIC_BLUMI_ROOM_PET, off by default): one depth slot in the room's draw order.
+  const seatedFurnitureRenderIdRef = useRef(seatedFurnitureRenderId)
+  seatedFurnitureRenderIdRef.current = seatedFurnitureRenderId
+  const readPetOwner = useCallback(() => {
+    const pose = readAvatarPose()
+    return { point: { x: pose.x, y: pose.y }, seatFurnitureId: seatedFurnitureRenderIdRef.current ?? null }
+  }, [readAvatarPose])
+  const petDepthSlot = useMyRoomPetSlot({
+    shell: baseRoomScene.shell,
+    sceneItems: baseRoomScene.renderItems,
+    renderItems,
+    isReady: persistenceState !== "loading",
+    readOwner: readPetOwner,
+    testID: "my-room-production-stage"
+  })
 
   const cancelPendingMotionWork = useCallback((): void => {
     motionLifecycle.blur()
@@ -924,6 +941,7 @@ export function MyRoomScreen({
               onItemTap={handleRoomItemTap}
               style={[styles.stageRenderer, { width: stageRendererWidth }]}
               onSceneReady={handleShellDisplay}
+              depthSlot={petDepthSlot}
             /></Animated.View>}
             <MyRoomStageVeil covered={stageCovered} />
             {roomOwnerLabel ? (

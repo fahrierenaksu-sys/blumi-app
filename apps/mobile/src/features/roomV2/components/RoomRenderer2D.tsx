@@ -21,6 +21,11 @@ import {
   useRoomSceneReadiness
 } from "./roomSceneReadiness"
 import { RoomFloorTapLayer } from "./RoomFloorTapLayer"
+import {
+  placeRoomRendererDepthSlot,
+  ROOM_RENDERER_DEPTH_SLOT_KEY,
+  type RoomRendererDepthSlot
+} from "./roomRendererDepthSlot"
 import { getRoomAvatarTapTarget } from "./roomAvatarTapTargetModel"
 import { getRoomFurnitureTapTarget, isRoomFurnitureTapOnSeat } from "./roomFurnitureTapTargetModel"
 import { useReducedMotion } from "../../../ui/animations"
@@ -130,6 +135,11 @@ interface RoomRenderer2DProps {
    * Their contact shadows stay here, on the floor under everything.
    */
   hiddenItemRenderIds?: ReadonlySet<string>
+  /**
+   * One extra drawing (the room pet) placed in the upright items' draw order, just before
+   * `beforeRenderId` (null: after every item). Layered floor pieces always stay behind it.
+   */
+  depthSlot?: RoomRendererDepthSlot
 }
 
 export function RoomRenderer2D(props: RoomRenderer2DProps) {
@@ -159,7 +169,8 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     floorUnderlay,
     onSceneReady,
     onItemDrawn,
-    hiddenItemRenderIds
+    hiddenItemRenderIds,
+    depthSlot
   } = props
   const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 })
   const reduceMotion = useReducedMotion()
@@ -314,7 +325,10 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
           <RoomRendererLayeredFurnitureShadow key={`${item.renderId}-layered-shadow`} item={item} />
         ) : null
       )}
-      {renderItems.filter((item) => !isRoomV2LayeredFloorPiece(item)).map(renderMainItem)}
+      {placeRoomRendererDepthSlot(
+        renderItems.filter((item) => !isRoomV2LayeredFloorPiece(item)).map((item): { renderId: string; node: ReactNode } => ({ renderId: item.renderId, node: renderMainItem(item) })),
+        depthSlot ? { renderId: ROOM_RENDERER_DEPTH_SLOT_KEY, beforeRenderId: depthSlot.beforeRenderId, node: depthSlot.node } : null
+      ).map((entry) => <Fragment key={entry.renderId}>{entry.node}</Fragment>)}
     </Root>
   )
 }
