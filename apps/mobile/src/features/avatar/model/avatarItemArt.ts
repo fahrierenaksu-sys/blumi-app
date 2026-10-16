@@ -59,7 +59,8 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     dress_girl_denim_pinafore_mini: "dress_girl_denim_pinafore_mini",
     dress_girl_sage_shirred_tiered_mini: "dress_girl_sage_shirred_tiered_mini",
     dress_girl_black_corset_flare_mini: "dress_girl_black_corset_flare_mini",
-    dress_girl_butter_square_puff_mini: "dress_girl_butter_square_puff_mini"
+    dress_girl_butter_square_puff_mini: "dress_girl_butter_square_puff_mini",
+    dress_girl_cream_one_shoulder_mini: "dress_girl_cream_one_shoulder_mini"
   },
   // the boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts; QA unlock only, no receipts)
   male: {

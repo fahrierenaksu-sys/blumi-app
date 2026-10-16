@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "81ae83b05bdeb078ff7d7f85a4a50a27209f0fbf58b8b47f0449ae1b214aa15e",
+      "rigSha256": "81fccc705e6d8eb7112f195e2b43d5f51f03a1aa75eee7350fc998c30bebf425",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -907,6 +907,11 @@
           "slot": "dress",
           "rigItemId": "dress_girl_butter_square_puff_mini",
           "thumb": "dress_girl_butter_square_puff_mini"
+        },
+        "dress_girl_cream_one_shoulder_mini": {
+          "slot": "dress",
+          "rigItemId": "dress_girl_cream_one_shoulder_mini",
+          "thumb": "dress_girl_cream_one_shoulder_mini"
         },
         "clip_girl_pearl_bar_pair": {
           "slot": "accessory",
@@ -3101,6 +3106,19 @@
             ]
           },
           {
+            "key": "dress_girl_cream_one_shoulder_mini__o3p45",
+            "owner": "dress_girl_cream_one_shoulder_mini",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              171,
+              277,
+              260,
+              339
+            ]
+          },
+          {
             "key": "dress_girl_denim_milkmaid_button_midi__o3p45",
             "owner": "dress_girl_denim_milkmaid_button_midi",
             "slot": "dress",
@@ -3584,6 +3602,19 @@
               285,
               69,
               208
+            ]
+          },
+          {
+            "key": "dress_girl_cream_one_shoulder_mini__o5p45",
+            "owner": "dress_girl_cream_one_shoulder_mini",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5006,
+            "rect": [
+              364,
+              281,
+              32,
+              76
             ]
           }
         ],
@@ -4521,6 +4552,19 @@
             ]
           },
           {
+            "key": "dress_girl_cream_one_shoulder_mini__o3p45",
+            "owner": "dress_girl_cream_one_shoulder_mini",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              75,
+              158,
+              110,
+              98
+            ]
+          },
+          {
             "key": "dress_girl_denim_milkmaid_button_midi__o3p45",
             "owner": "dress_girl_denim_milkmaid_button_midi",
             "slot": "dress",
@@ -4978,6 +5022,19 @@
               163,
               47,
               75
+            ]
+          },
+          {
+            "key": "dress_girl_cream_one_shoulder_mini__o5p45",
+            "owner": "dress_girl_cream_one_shoulder_mini",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5006,
+            "rect": [
+              160,
+              161,
+              25,
+              51
             ]
           }
         ]
