@@ -55,6 +55,9 @@ import {
   createStaticChatReceiptSchema,
   type ChatReceiptSchemaProbe
 } from "./chat/chatReceiptSchema"
+import { createPostgresStreetRepository } from "./db/postgresStreetRepository"
+import { createInMemoryStreetRepository, type StreetRepository } from "./street/streetRepository"
+import { createStaticStreetSchema, createStreetSchemaProbe, type StreetSchemaProbe } from "./street/streetSchema"
 import { createChatHidePointSchemaProbe, createChatHideSchemaProbe } from "./chat/chatHideSchema"
 import {
   DEFAULT_CAPABILITY_ROLLOUTS,
@@ -203,6 +206,9 @@ export interface ConfiguredServerServices {
   capabilityService: CapabilityService
   /** Whether migration 070 is applied; warmed at startup. */
   chatReceiptSchema: ChatReceiptSchemaProbe
+  /** Sokağım storage and whether migration 079 is applied (the `chat_street` runtime gate). */
+  streetRepository: StreetRepository
+  streetSchema: StreetSchemaProbe
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
   authRateLimiter?: SharedRateBudget
@@ -619,7 +625,9 @@ export function createConfiguredServerServices(
     }) : undefined
     const checkSchemaReadiness = createSchemaReadinessCheck(pool)
     const chatReceiptSchema = createChatReceiptSchemaProbe(pool)
-    const capabilityService = createConfiguredCapabilityService(chatReceiptSchema)
+    const streetSchema = createStreetSchemaProbe(pool)
+    const streetRepository = createPostgresStreetRepository(pool)
+    const capabilityService = createConfiguredCapabilityService(chatReceiptSchema, streetSchema)
     const notificationService = createNotificationService({
       repository: createPostgresNotificationRepository(pool),
       pushProvider,
@@ -714,6 +722,8 @@ export function createConfiguredServerServices(
       onVerifiedPhone,
       capabilityService,
       chatReceiptSchema,
+      streetSchema,
+      streetRepository,
       authService,
       chatService,
       economyService,
@@ -887,10 +897,13 @@ export function createConfiguredServerServices(
 
   // In-memory storage has no migrations: receipts depend on the manifest only.
   const chatReceiptSchema = createStaticChatReceiptSchema(true)
+  const streetSchema = createStaticStreetSchema(true)
   return {
     afterResponseTasks,
-    capabilityService: createConfiguredCapabilityService(chatReceiptSchema),
+    capabilityService: createConfiguredCapabilityService(chatReceiptSchema, streetSchema),
     chatReceiptSchema,
+    streetSchema,
+    streetRepository: createInMemoryStreetRepository(),
     authService,
     chatService,
     economyService,
@@ -923,7 +936,10 @@ export function createConfiguredServerServices(
   }
 }
 
-function createConfiguredCapabilityService(chatReceiptSchema: ChatReceiptSchemaProbe): CapabilityService {
+function createConfiguredCapabilityService(
+  chatReceiptSchema: ChatReceiptSchemaProbe,
+  streetSchema: StreetSchemaProbe
+): CapabilityService {
   // Typing stores nothing, so it is on unless the manifest stages it or the
   // BLUMI_CHAT_TYPING_ENABLED kill switch turns it off for everyone.
   const chatTypingOn = isChatTypingSwitchedOn(process.env.BLUMI_CHAT_TYPING_ENABLED)
@@ -932,6 +948,8 @@ function createConfiguredCapabilityService(chatReceiptSchema: ChatReceiptSchemaP
     defaultRollouts: DEFAULT_CAPABILITY_ROLLOUTS,
     runtimeGates: {
       chat_read_receipts: () => chatReceiptSchema.peek(),
+      // Off unless the manifest stages it; never before migration 079.
+      chat_street: () => streetSchema.peek(),
       chat_typing: () => chatTypingOn
     }
   })

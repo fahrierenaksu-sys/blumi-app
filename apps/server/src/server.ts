@@ -81,6 +81,11 @@ import {
 import { registerCapabilityRoutes } from "./routes/capabilityRoutes"
 import { createChatReceiptService } from "./chat/chatReceiptService"
 import { registerChatPreferencesRoutes } from "./routes/chatPreferencesRoutes"
+import { registerStreetRoutes } from "./routes/streetRoutes"
+import { createInMemoryStreetRepository, type StreetRepository } from "./street/streetRepository"
+import { createStaticStreetSchema, type StreetSchemaProbe } from "./street/streetSchema"
+import { createStreetService } from "./street/streetService"
+import { withStreetDigests } from "./street/streetDigestHooks"
 import { getRoomSnapshotSelfCheckState } from "./rooms/roomSnapshotRenderer"
 import { computeAvatarArtPackHash, getAvatarPortraitSelfCheckState } from "./avatar/avatarPortrait"
 import {
@@ -160,6 +165,10 @@ interface CreateServerOptions {
   /** Push sender pictures; must be the instance the notification service links to. */
   notificationPortraits?: NotificationPortraitService
   capabilityService?: CapabilityService
+  /** Sokağım storage (migration 079); in-memory by default. */
+  streetRepository?: StreetRepository
+  /** Whether migration 079 is applied; in-memory storage is always ready. */
+  streetSchema?: StreetSchemaProbe
   /** Side effects that responses do not wait for; drained when the app closes. */
   afterResponseTasks?: AfterResponseTasks
 }
@@ -190,7 +199,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   const revenueCatPurchaseVerifier =
     options.revenueCatPurchaseVerifier ??
     createUnavailableRevenueCatPurchaseVerifier()
-  const avatarService = options.avatarService ?? createAvatarService({
+  const baseAvatarService = options.avatarService ?? createAvatarService({
     authService,
     economyService
   })
@@ -212,7 +221,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       })
     }
   })
-  const personalRoomDecorService =
+  const basePersonalRoomDecorService =
     options.personalRoomDecorService ??
     createPersonalRoomDecorService({
       getOwnedRoomItemIds: async (userId) =>
@@ -223,6 +232,35 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       isActiveRoomItemId: economyService.isActiveRoomItemId,
       roomSnapshotService
     })
+  const streetSchema = options.streetSchema ?? createStaticStreetSchema(true)
+  const streetService = createStreetService({
+    repository: options.streetRepository ?? createInMemoryStreetRepository(),
+    isSchemaReady: () => streetSchema.isReady(),
+    listThreads: async (viewerUserId, limit) => (await chatService.listThreadsPage(viewerUserId, { limit })).threads,
+    listMutualPartnerIds: async (viewerUserId) => {
+      const [matches, connections] = await Promise.all([
+        matchService.repository.listMatchesForUser(viewerUserId),
+        options.connectionService?.repository.listMatchesForUser(viewerUserId) ?? Promise.resolve([])
+      ])
+      return new Set([...matches, ...connections].flatMap((match) => match.participantUserIds)
+        .filter((userId) => userId !== viewerUserId))
+    },
+    listBlockedPartnerIds: (viewerUserId, partnerIds) => partnerIds.length === 0
+      ? Promise.resolve([])
+      : safetyService.listBlockedUserIdsBetween(viewerUserId, [...partnerIds]),
+    isUserAllowed: (userId, now) => authService.isRealtimeUserAllowed(userId, now),
+    getRoom: (userId) => basePersonalRoomDecorService.get(userId),
+    log: { warn: (entry, message) => console.warn(message, entry) }
+  })
+  const { avatarService, personalRoomDecorService } = withStreetDigests({
+    avatarService: baseAvatarService,
+    personalRoomDecorService: basePersonalRoomDecorService,
+    getSessionLoadout: async (sessionToken, now) => {
+      const session = await authService.getSession(sessionToken, now)
+      return session ? { userId: session.account.userId, loadout: session.account.profile.avatar.loadout ?? null } : null
+    },
+    streetService
+  })
   const capabilityService = options.capabilityService ?? createCapabilityService({
     manifest: parseCapabilityManifest(process.env.BLUMI_CAPABILITY_MANIFEST).manifest
   })
@@ -361,6 +399,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     roomSnapshotService,
     capabilityService,
     chatReceiptService,
+    streetService,
     accountRecoveryService,
     connectionManager,
     connectionService: options.connectionService,
@@ -408,6 +447,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     await registerCommerceRoutes(instance, routeServices)
     await registerNotificationRoutes(instance, routeServices)
     await registerChatPreferencesRoutes(instance, routeServices)
+    await registerStreetRoutes(instance, routeServices)
     await registerReferralRoutes(instance, routeServices)
     await registerPersonalRoomDecorRoutes(instance, routeServices)
     await registerRoomSnapshotRoutes(instance, routeServices)

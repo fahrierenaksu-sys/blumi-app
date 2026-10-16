@@ -117,6 +117,8 @@ const ROUTE_MATRIX: Record<string, RouteEntry> = {
   "PUT /v1/notification-preferences": { auth: "bearer", ids: "-", crossAccount: "caller only" },
   "GET /v1/chat-preferences": { auth: "bearer", ids: "-", crossAccount: "caller only" },
   "PUT /v1/chat-preferences": { auth: "bearer", ids: "-", crossAccount: "caller only" },
+  "GET /v1/street": { auth: "bearer", ids: "-", crossAccount: "caller's own active mutual matches only; 404 while chat_street is off" },
+  "PUT /v1/street/visibility": { auth: "bearer", ids: "-", crossAccount: "caller only; 404 while chat_street is off" },
   "POST /v1/devices": { auth: "bearer", ids: "body pushToken", crossAccount: "a known foreign token is re-bound to the caller (device hand-over design; token is a device secret)" },
   "DELETE /v1/devices": { auth: "bearer", ids: "body pushToken", crossAccount: "removes caller's registration only; victim's kept (asserted)" },
   "POST /v1/referrals/invite": { auth: "bearer", ids: "-", crossAccount: "caller only" },
