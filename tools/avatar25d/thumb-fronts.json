@@ -256,19 +256,15 @@
       ]
     },
     "dress_girl_cream_one_shoulder_mini": {
-      "sha256": "52520a7261ded1f0c68c8a711079d4464deed23da4de8174ea5919c5d125be6a",
+      "sha256": "797ad0884f5fa3ef2e8fc6bbf577f52cf32c14233c70d5d4f53f289e88655ce2",
       "size": [
-        200,
+        208,
         256
       ],
       "sources": [
         {
-          "file": "girl_dress.png",
-          "sha256": "15c68cada018a8131d63c1c54caf9007c42d4ee5a0fc7ac3e3b61a4b25fec1db"
-        },
-        {
-          "file": "girl_a.png",
-          "sha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0"
+          "file": "front_clean_full.png",
+          "sha256": "1da8f44e4f1dae530bfb05b27a829e4672eaeb97bdcdc73f344be432d5d420f6"
         }
       ]
     },

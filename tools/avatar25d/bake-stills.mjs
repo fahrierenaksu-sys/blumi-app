@@ -510,14 +510,14 @@ const THUMB_EDGE_CLEAN = {
 /** Card thumbs whose rig art lacks a part, redrawn by hand and pinned by sha256 in tools/avatar25d/thumb-redraws/<rig>/.
  *  The redraw replaces the baked thumb only while its bytes match the pin, so a changed file fails the bake loudly.
  *  Cards show the item from the front (owner, 2026-10-16), so the room-view redraws (white sneakers, four male shoes,
- *  two jackets) gave way to their front cuts. The cream one-shoulder mini keeps its room-view redraw: its front cut
- *  holes the skirt (thumbs_1745), so it needs new front art before its card can show the front.
+ *  two jackets) gave way to their front cuts. The cream one-shoulder mini's front cut was holed, so it is a ChatGPT
+ *  masked redraw of its front art (cream_mini/, 2026-10-16), cut as a front thumb like the rest.
  *  pearl clip: the room art is 34x30 px, too small for a card; the thumb is cropped from its QA-passed showcase front
  *  (glassacc_2030 acc/sc_clip_layer.png, lossless, uncropped scale). Pearl necklace: same, the room chain is 1 px thin
  *  (acc/sc_neck_layer.png, cropped, at most 256 px). Camel mini bag: the room art bakes to a ragged 76x256 strap
  *  sliver; the thumb is the bag body cropped from its showcase front (strap ring down, at most 256 px).
- *  Nine more: seed-clean-thumbs.mjs output, residue cleared by hand-placed seeds (<item>.seeds.json) from
- *  the front cut (the cream mini from its 5f0ea360 room thumb, whose front cut holes the skirt), thumbs_1745 round 5. */
+ *  Eight more: seed-clean-thumbs.mjs output, residue cleared by hand-placed seeds (<item>.seeds.json) from
+ *  the front cut, thumbs_1745 round 5. */
 const THUMB_REDRAWS = {
   female: {
     clip_girl_pearl_bar_pair: "71296b2fa7aae1b4370ce0333bb44e60cd3698198b9ab39758c09346935ac9bf",
@@ -525,7 +525,6 @@ const THUMB_REDRAWS = {
     bag_girl_camel_mini: "dddd1910ec3b44a0aab35cfd013d56496cdb27b789ddd6dfc465a70472c91fc7",
     dress_girl_black_corset_flare_mini: "b997417e270a3053a5386eb39e1f3af30515fefe3cfaeac7023aaacaea522d4b",
     dress_girl_butter_square_puff_mini: "d4726aadf3e2e0d82bd8315d8d98d72aa3eed412af4ab670428a17f1e0ef54ee",
-    dress_girl_cream_one_shoulder_mini: "69544e567363415d649450d9d6a2022389fa60a5056b8ce592c55ab58259f751",
     dress_girl_sage_shirred_tiered_mini: "f11610a3b43b3cdb428e69e1144000448eb1074fe1697410736f3c64d4f1dec5",
     dress_girl_wine_gingham_tie: "5fa01b2cd56b133b128cb4692ce93a4848ac256ee5bc1165716af93f4cb8d4e7",
     hair_girl_ink_twin_braids: "47a69d11b3773cd217c4ce151f511dffd98cd719161cb1cfe23397da956aa797",
