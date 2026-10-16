@@ -3,6 +3,7 @@ import type { ChatService } from "../chat/chatService"
 import type { MatchService } from "../matches/matchService"
 import type { NotificationService } from "../notifications/notificationService"
 import type { SafetyService } from "../safety/safetyService"
+import type { RoomCatOwnership } from "../roomPets/roomPetService"
 import type { CatTripRepository } from "./catTripRepository"
 import type { CatTripSchemaProbe } from "./catTripSchema"
 import { createCatTripService, type CatTripService, type CatTripWorld } from "./catTripService"
@@ -46,6 +47,15 @@ export function createDisabledCatTripService(): CatTripService {
   }
 }
 
+/**
+ * Whether a member has a cat that can travel or receive a guest. Only the
+ * room pet record answers yes: while the pet flag is off or migration 078 is
+ * not applied, nobody has a cat, so no trip is planned (fail closed).
+ */
+export function createCatTripCatCheck(ownership: RoomCatOwnership): (userId: string) => Promise<boolean> {
+  return async (userId) => (await ownership.isAuthoritative()) && ownership.hasCat(userId)
+}
+
 const TEASER_TYPE: Record<CatTripRole, "cat.trip_owner" | "cat.trip_host"> = {
   owner: "cat.trip_owner",
   host: "cat.trip_host"
@@ -60,6 +70,8 @@ export function createConfiguredCatTripService(input: {
   matchService: MatchService
   safetyService: SafetyService
   notificationService: NotificationService
+  /** The room pet record; see createCatTripCatCheck. */
+  catOwnership: RoomCatOwnership
   report?: (event: string, fields?: Record<string, number | string>) => void
 }): CatTripService {
   const { authService, chatService, matchService, safetyService, notificationService } = input
@@ -71,8 +83,7 @@ export function createConfiguredCatTripService(input: {
     },
     hasBlockBetween: (userAId, userBId) => safetyService.hasBlockBetween(userAId, userBId),
     isUserActive: (userId, now) => authService.isRealtimeUserAllowed(userId, now),
-    // The room cat has no server record yet (pet P1): every active account counts as having one.
-    async hasCat() { return true },
+    hasCat: createCatTripCatCheck(input.catOwnership),
     async getTimeSettings(userId) {
       const preferences = await notificationService.getPreferences(userId)
       return {

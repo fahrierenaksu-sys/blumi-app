@@ -140,8 +140,7 @@ function toView(pet: RoomPetRecord): RoomPetView {
 /**
  * What other server features (the traveling cat's `hasCat`) may ask about a
  * member's pet. `isAuthoritative` is false while the pet flag is off or 078
- * is not applied; a caller then keeps its own fallback instead of reading
- * "no cat" for everyone.
+ * is not applied. The traveling cat treats that as "no cat" (fail closed).
  */
 export interface RoomCatOwnership {
   isAuthoritative(): Promise<boolean>

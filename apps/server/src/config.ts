@@ -76,7 +76,7 @@ import { createPostgresPersonalRoomDecorRepository } from "./db/postgresPersonal
 import { createPostgresRoomPetRepository } from "./db/postgresRoomPetRepository"
 import { createInMemoryRoomPetRepository } from "./roomPets/roomPetRepository"
 import { createRoomPetSchemaProbe } from "./roomPets/roomPetSchema"
-import { createRoomPetService, isRoomPetEnabled, type RoomPetService } from "./roomPets/roomPetService"
+import { createRoomCatOwnership, createRoomPetService, isRoomPetEnabled, type RoomPetService } from "./roomPets/roomPetService"
 import { createPostgresRoomSnapshotRepository } from "./db/postgresRoomSnapshotRepository"
 import { createPostgresSafetyRepository } from "./db/postgresSafetyRepository"
 import {
@@ -721,13 +721,6 @@ export function createConfiguredServerServices(
       livekitTokenService,
       economyService
     })
-    const catTripService = createConfiguredCatTripService({
-      config: resolveCatTripsConfig(process.env, config.nodeEnv),
-      repository: createPostgresCatTripRepository(pool),
-      schema: createCatTripSchemaProbe(pool),
-      authService, chatService, matchService, safetyService, notificationService,
-      report: reportCatTripEvent
-    })
     // The pet row goes with the account through its foreign key (078).
     const roomPetService = isRoomPetEnabled(process.env)
       ? createRoomPetService({
@@ -736,6 +729,14 @@ export function createConfiguredServerServices(
         report: reportRoomPetEvent
       })
       : undefined
+    const catTripService = createConfiguredCatTripService({
+      config: resolveCatTripsConfig(process.env, config.nodeEnv),
+      repository: createPostgresCatTripRepository(pool),
+      schema: createCatTripSchemaProbe(pool),
+      authService, chatService, matchService, safetyService, notificationService,
+      catOwnership: createRoomCatOwnership(roomPetService),
+      report: reportCatTripEvent
+    })
     return {
       afterResponseTasks,
       onVerifiedPhone,
@@ -927,6 +928,7 @@ export function createConfiguredServerServices(
     config: resolveCatTripsConfig(process.env, config.nodeEnv),
     repository: createInMemoryCatTripRepository(),
     authService, chatService, matchService, safetyService, notificationService,
+    catOwnership: createRoomCatOwnership(roomPetService),
     report: reportCatTripEvent
   })
   return {
