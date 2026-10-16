@@ -47,9 +47,12 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * new collection: necklace_girl_pearl_drop landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  * new collection: bag_girl_camel_mini landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  * new collection: bottom_girl_wine_midi_skirt landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
+ * new collection: bottom_girl_wide_jeans landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
+ * new collection: bottom_girl_ecru_trousers landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
+ * new collection: shoes_girl_camel_ankle_boots landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
-  female: ["jacket_girl_light_denim_crop", "jacket_girl_black_crop_blazer", "clip_girl_pearl_bar_pair", "hair_girl_bun_wine_bow", "hair_girl_chestnut_butterfly", "hair_girl_ink_french_bob", "top_girl_camel_vest_tee", "top_girl_white_poplin_shirt", "top_girl_rose_pearl_cardigan", "top_girl_breton_stripe", "top_girl_sage_knit_polo", "dress_girl_wine_gingham_tie", "necklace_girl_pearl_drop", "bag_girl_camel_mini", "bottom_girl_wine_midi_skirt"],
+  female: ["jacket_girl_light_denim_crop", "jacket_girl_black_crop_blazer", "clip_girl_pearl_bar_pair", "hair_girl_bun_wine_bow", "hair_girl_chestnut_butterfly", "hair_girl_ink_french_bob", "top_girl_camel_vest_tee", "top_girl_white_poplin_shirt", "top_girl_rose_pearl_cardigan", "top_girl_breton_stripe", "top_girl_sage_knit_polo", "dress_girl_wine_gingham_tie", "necklace_girl_pearl_drop", "bag_girl_camel_mini", "bottom_girl_wine_midi_skirt", "bottom_girl_wide_jeans", "bottom_girl_ecru_trousers", "shoes_girl_camel_ankle_boots"],
   male: [],
 };
 

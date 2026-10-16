@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "e217e5f65f0e23c33f6ff8e351b1266ccae380fe8867dcedb3b9c9e5e3950004",
+      "rigSha256": "8de698c84266781c52a532e496e9fcb10b42f776a3f6c16606cdc7000cacadf6",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -88,6 +88,11 @@
               ]
             }
           }
+        },
+        "shoes_girl_camel_ankle_boots": {
+          "slot": "shoes",
+          "rigItemId": "shoes_girl_camel_ankle_boots",
+          "thumb": "shoes_girl_camel_ankle_boots"
         },
         "avatar_v2_bottom_coral_wave_pants": {
           "slot": "bottom",
@@ -282,6 +287,138 @@
             }
           ]
         },
+        "bottom_girl_wide_jeans": {
+          "slot": "bottom",
+          "rigItemId": "bottom_girl_wide_jeans",
+          "thumb": "bottom_girl_wide_jeans",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoSit"
+            },
+            {
+              "part": "torsoUpper"
+            },
+            {
+              "part": "torsoWalk"
+            },
+            {
+              "part": "torsoCardArms",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torso",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torsoNoArms",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torsoWalk",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torsoCardArms",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "torso",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "torsoNoArms",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "torsoWalk",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "farArm"
+            },
+            {
+              "part": "nearArm"
+            },
+            {
+              "part": "sit"
+            }
+          ]
+        },
+        "bottom_girl_ecru_trousers": {
+          "slot": "bottom",
+          "rigItemId": "bottom_girl_ecru_trousers",
+          "thumb": "bottom_girl_ecru_trousers",
+          "replaces": [
+            {
+              "part": "torsoCardArms"
+            },
+            {
+              "part": "torso"
+            },
+            {
+              "part": "torsoNoArms"
+            },
+            {
+              "part": "torsoSit"
+            },
+            {
+              "part": "torsoUpper"
+            },
+            {
+              "part": "torsoWalk"
+            },
+            {
+              "part": "torsoCardArms",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torso",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torsoNoArms",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torsoWalk",
+              "with": "avatar_v2_top_black_cute_crop_top"
+            },
+            {
+              "part": "torsoCardArms",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "torso",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "torsoNoArms",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "torsoWalk",
+              "with": "avatar_v2_top_white_cute_crop_top"
+            },
+            {
+              "part": "farArm"
+            },
+            {
+              "part": "nearArm"
+            },
+            {
+              "part": "sit"
+            }
+          ]
+        },
         "avatar_v2_top_coral_wave_polo": {
           "slot": "top",
           "rigItemId": "top_coral_wave_polo",
@@ -332,6 +469,14 @@
             },
             {
               "part": "sit",
+              "with": "bottom_girl_ecru_trousers"
+            },
+            {
+              "part": "sit",
+              "with": "bottom_girl_wide_jeans"
+            },
+            {
+              "part": "sit",
               "with": "bottom_girl_wine_midi_skirt"
             }
           ],
@@ -378,6 +523,14 @@
             {
               "part": "sit",
               "with": "avatar_v2_bottom_black_highwaist_trousers"
+            },
+            {
+              "part": "sit",
+              "with": "bottom_girl_ecru_trousers"
+            },
+            {
+              "part": "sit",
+              "with": "bottom_girl_wide_jeans"
             },
             {
               "part": "sit",
@@ -661,6 +814,34 @@
             "slot": "bottom",
             "order": 0,
             "seq": 2017,
+            "rect": [
+              126,
+              286,
+              156,
+              340
+            ],
+            "bodyPart": "farArm"
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o0__body-farArm",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 0,
+            "seq": 2019,
+            "rect": [
+              126,
+              286,
+              156,
+              340
+            ],
+            "bodyPart": "farArm"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o0__body-farArm",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 0,
+            "seq": 2019,
             "rect": [
               126,
               286,
@@ -962,6 +1143,21 @@
             "legVariant": "shoes"
           },
           {
+            "key": "shoes_girl_camel_ankle_boots__o1__shoes",
+            "owner": "shoes_girl_camel_ankle_boots",
+            "slot": "shoes",
+            "order": 1,
+            "seq": 1002,
+            "rect": [
+              210,
+              532,
+              100,
+              384
+            ],
+            "leg": "farLeg",
+            "legVariant": "shoes"
+          },
+          {
             "key": "bottom_girl_wine_midi_skirt__o1__bottom",
             "owner": "bottom_girl_wine_midi_skirt",
             "slot": "bottom",
@@ -1001,7 +1197,7 @@
               ],
               "sheet": [
                 121,
-                866
+                1252
               ]
             }
           },
@@ -1030,7 +1226,36 @@
               ],
               "sheet": [
                 121,
-                866
+                1252
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_wine_midi_skirt__o1__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "bottom_girl_wine_midi_skirt",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2001,
+            "rect": [
+              211,
+              532,
+              99,
+              384
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "bottom_girl_wine_midi_skirt__o1__bottom-cut",
+              "rect": [
+                0,
+                868,
+                99,
+                384
+              ],
+              "sheet": [
+                121,
+                1252
               ]
             }
           },
@@ -1065,6 +1290,36 @@
             "legVariant": "bottom"
           },
           {
+            "key": "bottom_girl_wide_jeans__o1__bottom",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              189,
+              854,
+              112,
+              144
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o1__bottom",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              189,
+              903,
+              112,
+              95
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom"
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o1__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -1089,7 +1344,7 @@
               ],
               "sheet": [
                 112,
-                240
+                313
               ]
             }
           },
@@ -1118,7 +1373,210 @@
               ],
               "sheet": [
                 112,
-                240
+                313
+              ]
+            }
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o1__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              243,
+              845,
+              52,
+              71
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "avatar_v2_bottom_black_highwaist_trousers__o1__bottom-cut",
+              "rect": [
+                0,
+                242,
+                52,
+                71
+              ],
+              "sheet": [
+                112,
+                313
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o1__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              189,
+              854,
+              112,
+              133
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "source": {
+              "key": "bottom_girl_wide_jeans__o1__bottom-cut",
+              "rect": [
+                0,
+                0,
+                112,
+                133
+              ],
+              "sheet": [
+                112,
+                286
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o1__bottom__cut-by__avatar_v2_shoes_white_clean_sneakers",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              237,
+              854,
+              62,
+              87
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_white_clean_sneakers",
+            "source": {
+              "key": "bottom_girl_wide_jeans__o1__bottom-cut",
+              "rect": [
+                0,
+                135,
+                62,
+                87
+              ],
+              "sheet": [
+                112,
+                286
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o1__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              243,
+              854,
+              51,
+              62
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "bottom_girl_wide_jeans__o1__bottom-cut",
+              "rect": [
+                0,
+                224,
+                51,
+                62
+              ],
+              "sheet": [
+                112,
+                286
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o1__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              189,
+              903,
+              112,
+              84
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "source": {
+              "key": "bottom_girl_ecru_trousers__o1__bottom-cut",
+              "rect": [
+                0,
+                0,
+                112,
+                84
+              ],
+              "sheet": [
+                112,
+                139
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o1__bottom__cut-by__avatar_v2_shoes_white_clean_sneakers",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              237,
+              903,
+              62,
+              38
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_white_clean_sneakers",
+            "source": {
+              "key": "bottom_girl_ecru_trousers__o1__bottom-cut",
+              "rect": [
+                0,
+                86,
+                62,
+                38
+              ],
+              "sheet": [
+                112,
+                139
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o1__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              243,
+              903,
+              50,
+              13
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "bottom_girl_ecru_trousers__o1__bottom-cut",
+              "rect": [
+                0,
+                126,
+                50,
+                13
+              ],
+              "sheet": [
+                112,
+                139
               ]
             }
           },
@@ -1166,6 +1624,20 @@
             "leg": "farLeg"
           },
           {
+            "key": "shoes_girl_camel_ankle_boots__o1p15",
+            "owner": "shoes_girl_camel_ankle_boots",
+            "slot": "shoes",
+            "order": 1.15,
+            "seq": 1001,
+            "rect": [
+              187,
+              871,
+              119,
+              123
+            ],
+            "leg": "farLeg"
+          },
+          {
             "key": "avatar_v2_bottom_coral_wave_pants__o1p3",
             "owner": "avatar_v2_bottom_coral_wave_pants",
             "slot": "bottom",
@@ -1190,6 +1662,34 @@
               531,
               95,
               397
+            ],
+            "leg": "farLeg"
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o1p3",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 1.3,
+            "seq": 2002,
+            "rect": [
+              211,
+              531,
+              109,
+              366
+            ],
+            "leg": "farLeg"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o1p3",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 1.3,
+            "seq": 2002,
+            "rect": [
+              215,
+              531,
+              105,
+              381
             ],
             "leg": "farLeg"
           },
@@ -1238,6 +1738,21 @@
             "legVariant": "shoes"
           },
           {
+            "key": "shoes_girl_camel_ankle_boots__o2__shoes",
+            "owner": "shoes_girl_camel_ankle_boots",
+            "slot": "shoes",
+            "order": 2,
+            "seq": 1003,
+            "rect": [
+              301,
+              532,
+              111,
+              399
+            ],
+            "leg": "nearLeg",
+            "legVariant": "shoes"
+          },
+          {
             "key": "bottom_girl_wine_midi_skirt__o2__bottom",
             "owner": "bottom_girl_wine_midi_skirt",
             "slot": "bottom",
@@ -1277,7 +1792,7 @@
               ],
               "sheet": [
                 124,
-                933
+                1334
               ]
             }
           },
@@ -1306,7 +1821,36 @@
               ],
               "sheet": [
                 124,
-                933
+                1334
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_wine_midi_skirt__o2__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "bottom_girl_wine_midi_skirt",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2002,
+            "rect": [
+              301,
+              532,
+              111,
+              399
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "bottom_girl_wine_midi_skirt__o2__bottom-cut",
+              "rect": [
+                0,
+                935,
+                111,
+                399
+              ],
+              "sheet": [
+                124,
+                1334
               ]
             }
           },
@@ -1341,6 +1885,36 @@
             "legVariant": "bottom"
           },
           {
+            "key": "bottom_girl_wide_jeans__o2__bottom",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              288,
+              872,
+              120,
+              155
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o2__bottom",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              288,
+              928,
+              120,
+              99
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom"
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o2__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -1365,7 +1939,7 @@
               ],
               "sheet": [
                 120,
-                277
+                350
               ]
             }
           },
@@ -1394,7 +1968,210 @@
               ],
               "sheet": [
                 120,
-                277
+                350
+              ]
+            }
+          },
+          {
+            "key": "avatar_v2_bottom_black_highwaist_trousers__o2__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "avatar_v2_bottom_black_highwaist_trousers",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              349,
+              860,
+              53,
+              71
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "avatar_v2_bottom_black_highwaist_trousers__o2__bottom-cut",
+              "rect": [
+                0,
+                279,
+                53,
+                71
+              ],
+              "sheet": [
+                120,
+                350
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o2__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              288,
+              872,
+              120,
+              152
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "source": {
+              "key": "bottom_girl_wide_jeans__o2__bottom-cut",
+              "rect": [
+                0,
+                0,
+                120,
+                152
+              ],
+              "sheet": [
+                120,
+                314
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o2__bottom__cut-by__avatar_v2_shoes_white_clean_sneakers",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              344,
+              872,
+              62,
+              99
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_white_clean_sneakers",
+            "source": {
+              "key": "bottom_girl_wide_jeans__o2__bottom-cut",
+              "rect": [
+                0,
+                154,
+                62,
+                99
+              ],
+              "sheet": [
+                120,
+                314
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o2__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              349,
+              872,
+              51,
+              59
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "bottom_girl_wide_jeans__o2__bottom-cut",
+              "rect": [
+                0,
+                255,
+                51,
+                59
+              ],
+              "sheet": [
+                120,
+                314
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o2__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              288,
+              928,
+              120,
+              96
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_mint_ribbon_court_sneakers",
+            "source": {
+              "key": "bottom_girl_ecru_trousers__o2__bottom-cut",
+              "rect": [
+                0,
+                0,
+                120,
+                96
+              ],
+              "sheet": [
+                120,
+                146
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o2__bottom__cut-by__avatar_v2_shoes_white_clean_sneakers",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              344,
+              928,
+              62,
+              43
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "avatar_v2_shoes_white_clean_sneakers",
+            "source": {
+              "key": "bottom_girl_ecru_trousers__o2__bottom-cut",
+              "rect": [
+                0,
+                98,
+                62,
+                43
+              ],
+              "sheet": [
+                120,
+                146
+              ]
+            }
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o2__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              349,
+              928,
+              50,
+              3
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "bottom_girl_ecru_trousers__o2__bottom-cut",
+              "rect": [
+                0,
+                143,
+                50,
+                3
+              ],
+              "sheet": [
+                120,
+                146
               ]
             }
           },
@@ -1442,6 +2219,20 @@
             "leg": "nearLeg"
           },
           {
+            "key": "shoes_girl_camel_ankle_boots__o2p15",
+            "owner": "shoes_girl_camel_ankle_boots",
+            "slot": "shoes",
+            "order": 2.15,
+            "seq": 1000,
+            "rect": [
+              289,
+              871,
+              125,
+              154
+            ],
+            "leg": "nearLeg"
+          },
+          {
             "key": "avatar_v2_bottom_coral_wave_pants__o2p3",
             "owner": "avatar_v2_bottom_coral_wave_pants",
             "slot": "bottom",
@@ -1466,6 +2257,34 @@
               532,
               130,
               426
+            ],
+            "leg": "nearLeg"
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o2p3",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 2.3,
+            "seq": 2001,
+            "rect": [
+              291,
+              531,
+              149,
+              385
+            ],
+            "leg": "nearLeg"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o2p3",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 2.3,
+            "seq": 2001,
+            "rect": [
+              291,
+              531,
+              125,
+              409
             ],
             "leg": "nearLeg"
           },
@@ -1512,6 +2331,34 @@
             "bodyPart": "torso"
           },
           {
+            "key": "bottom_girl_wide_jeans__o3__body-torso",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2006,
+            "rect": [
+              211,
+              262,
+              198,
+              344
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o3__body-torso",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2006,
+            "rect": [
+              215,
+              262,
+              194,
+              344
+            ],
+            "bodyPart": "torso"
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -1542,6 +2389,36 @@
             "bodyWith": "avatar_v2_top_black_cute_crop_top"
           },
           {
+            "key": "bottom_girl_wide_jeans__o3__body-torso-with-avatar_v2_top_black_cute_crop_top",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2012,
+            "rect": [
+              210,
+              262,
+              198,
+              344
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_black_cute_crop_top"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2012,
+            "rect": [
+              213,
+              262,
+              195,
+              344
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_black_cute_crop_top"
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -1566,6 +2443,36 @@
               209,
               262,
               199,
+              344
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_white_cute_crop_top"
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o3__body-torso-with-avatar_v2_top_white_cute_crop_top",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2016,
+            "rect": [
+              210,
+              262,
+              198,
+              344
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_white_cute_crop_top"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2016,
+            "rect": [
+              213,
+              262,
+              195,
               344
             ],
             "bodyPart": "torso",
@@ -1665,6 +2572,32 @@
               427,
               334,
               343
+            ]
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o3p3",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 3.3,
+            "seq": 2000,
+            "rect": [
+              212,
+              429,
+              191,
+              178
+            ]
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o3p3",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 3.3,
+            "seq": 2000,
+            "rect": [
+              215,
+              425,
+              189,
+              182
             ]
           },
           {
@@ -2008,6 +2941,34 @@
             "bodyPart": "nearArm"
           },
           {
+            "key": "bottom_girl_wide_jeans__o5__body-nearArm",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 5,
+            "seq": 2020,
+            "rect": [
+              365,
+              289,
+              114,
+              369
+            ],
+            "bodyPart": "nearArm"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o5__body-nearArm",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 5,
+            "seq": 2020,
+            "rect": [
+              365,
+              289,
+              114,
+              369
+            ],
+            "bodyPart": "nearArm"
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o5__body-nearArm",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -2044,7 +3005,7 @@
               364,
               286,
               61,
-              87
+              86
             ]
           },
           {
@@ -2221,6 +3182,34 @@
             "bodyPart": "farArm"
           },
           {
+            "key": "bottom_girl_wide_jeans__o0__body-farArm",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 0,
+            "seq": 2019,
+            "rect": [
+              49,
+              164,
+              66,
+              92
+            ],
+            "bodyPart": "farArm"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o0__body-farArm",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 0,
+            "seq": 2019,
+            "rect": [
+              49,
+              164,
+              66,
+              92
+            ],
+            "bodyPart": "farArm"
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o0__body-farArm",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -2269,7 +3258,7 @@
             "rect": [
               62,
               154,
-              38,
+              37,
               64
             ]
           },
@@ -2498,6 +3487,34 @@
             "bodyPart": "torso"
           },
           {
+            "key": "bottom_girl_wide_jeans__o3__body-torso",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2006,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o3__body-torso",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2006,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso"
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -2528,6 +3545,36 @@
             "bodyWith": "avatar_v2_top_black_cute_crop_top"
           },
           {
+            "key": "bottom_girl_wide_jeans__o3__body-torso-with-avatar_v2_top_black_cute_crop_top",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2012,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_black_cute_crop_top"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o3__body-torso-with-avatar_v2_top_black_cute_crop_top",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2012,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_black_cute_crop_top"
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -2548,6 +3595,36 @@
             "slot": "bottom",
             "order": 3,
             "seq": 2014,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_white_cute_crop_top"
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o3__body-torso-with-avatar_v2_top_white_cute_crop_top",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2016,
+            "rect": [
+              72,
+              149,
+              112,
+              107
+            ],
+            "bodyPart": "torso",
+            "bodyWith": "avatar_v2_top_white_cute_crop_top"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o3__body-torso-with-avatar_v2_top_white_cute_crop_top",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 3,
+            "seq": 2016,
             "rect": [
               72,
               149,
@@ -2625,6 +3702,32 @@
               250,
               77,
               6
+            ]
+          },
+          {
+            "key": "bottom_girl_wide_jeans__o3p3",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 3.3,
+            "seq": 2000,
+            "rect": [
+              153,
+              251,
+              10,
+              5
+            ]
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o3p3",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 3.3,
+            "seq": 2000,
+            "rect": [
+              85,
+              249,
+              79,
+              7
             ]
           },
           {
@@ -2968,6 +4071,34 @@
             "bodyPart": "nearArm"
           },
           {
+            "key": "bottom_girl_wide_jeans__o5__body-nearArm",
+            "owner": "bottom_girl_wide_jeans",
+            "slot": "bottom",
+            "order": 5,
+            "seq": 2020,
+            "rect": [
+              161,
+              166,
+              46,
+              90
+            ],
+            "bodyPart": "nearArm"
+          },
+          {
+            "key": "bottom_girl_ecru_trousers__o5__body-nearArm",
+            "owner": "bottom_girl_ecru_trousers",
+            "slot": "bottom",
+            "order": 5,
+            "seq": 2020,
+            "rect": [
+              161,
+              166,
+              46,
+              90
+            ],
+            "bodyPart": "nearArm"
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o5__body-nearArm",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -3004,7 +4135,7 @@
               160,
               164,
               42,
-              58
+              57
             ]
           },
           {
