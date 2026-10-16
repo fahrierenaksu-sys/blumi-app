@@ -151,7 +151,9 @@ const BAG = fixtureItem("fixture_mini_bag", "accessory", { accessoryGroup: "bag"
 
 test("Elbise, Gözlük and Aksesuar tabs show only when they have an item; glasses never sit under Aksesuar", () => {
   const live = getAvatarStudioTabs("closet", AVATAR_V2_CATALOG, DEFAULT_AVATAR_V2).map((tab) => tab.id)
-  assert.ok(!live.includes("dress") && !live.includes("glasses"), "no tab without an item")
+  for (const id of ["dress", "glasses"] as const) {
+    assert.equal(live.includes(id), getWardrobeCategoryItems(AVATAR_V2_CATALOG, id).length > 0, `${id}: a tab exactly when it has an item`)
+  }
   const withNew = [...AVATAR_V2_CATALOG, ONE_PIECE, GLASSES, BAG]
   const tabs = getAvatarStudioTabs("closet", withNew, DEFAULT_AVATAR_V2).map((tab) => tab.id)
   assert.ok((["dress", "glasses", "accessory"] as const).every((id) => tabs.includes(id)), tabs.join())
