@@ -75,7 +75,20 @@ export function getRoomPetClipForHop(pose: RoomPetPose, hopPhase: "approach" | "
   return pose === "hop" && hopPhase === "down" ? "hopDown" : getRoomPetClipForPose(pose)
 }
 
-/** The feet of a hopping pet on frame `frameIndex`, in shell-canvas units (`shellPxToStage` converts the arc). */
+/** How long a clip plays once, from its frame count and fps (a one-shot holds its last frame after this). */
+export function getRoomPetClipDurationMs(clip: RoomPetSpriteClip): number {
+  const frameCount = Math.max(clip.frames[45]?.length ?? 0, clip.frames[135]?.length ?? 0)
+  return clip.fps > 0 ? (frameCount * 1000) / clip.fps : 0
+}
+
+/** The frame a one-shot clip shows `elapsedMs` after it started (holds the last frame). Runs on the UI thread. */
+export function getRoomPetClipFrameIndex(frameCount: number, fps: number, elapsedMs: number): number {
+  "worklet"
+  if (frameCount <= 0) return 0
+  return Math.min(Math.max(0, Math.floor((Math.max(0, elapsedMs) * fps) / 1000)), frameCount - 1)
+}
+
+/** The feet of a hopping pet on frame `frameIndex`, in shell-canvas units (`shellPxToStage` converts the arc). Runs on the UI thread. */
 export function getRoomPetRootMotionFoot(
   from: RoomPoint2D,
   to: RoomPoint2D,
@@ -83,6 +96,7 @@ export function getRoomPetRootMotionFoot(
   frameIndex: number,
   shellPxToStage: number
 ): RoomPoint2D {
+  "worklet"
   const last = motion.travel.length - 1
   if (last < 0) return from
   const index = Math.min(Math.max(0, Math.floor(frameIndex)), last)

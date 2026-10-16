@@ -13,10 +13,12 @@ import {
 import { createMyRoomAvatarDepthNeighbours, getMyRoomAvatarDepthIndex } from "../roomWorld/myRoomAvatarWalkModel"
 import type { RoomPetCell, RoomPetPose, RoomPetState } from "./roomPet.types"
 import { createRoomPetState, stepRoomPet } from "./roomPetEngine"
+import { advanceRoomPetHop, arriveRoomPetHop, startRoomPetHop } from "./roomPetBehaviour"
 import { isRoomPetCellWalkable, isSameRoomPetCell } from "./roomPetGrid"
 import { createRoomPetMapFromRoom } from "./roomPetRoomAdapter"
 import { getRoomPetBeforeRenderId, getRoomPetNextWakeMs, getRoomPetOwnerEvents, resolveRoomPetDraw } from "./roomPetRoomScene"
 import {
+  getRoomPetClipDurationMs,
   getRoomPetClipForPose,
   getRoomPetDrawnHeading,
   getRoomPetRootMotionFoot,
@@ -234,4 +236,69 @@ test("hop root motion: the feet start on the floor point, land on the seat point
   assert.ok(play && play.travel.every((travel) => travel === 0) && Math.max(...play.arcShellPx) > 0, "the play hop jumps in place")
   const broken = { ...sheet, clips: { ...sheet.clips, hopUp: { ...sheet.clips.hopUp, rootMotion: { travel: [0, 1], arcShellPx: [0, 0] } } } }
   assert.ok(getRoomPetSpriteSheetProblems(broken).length > 0, "root motion with the wrong frame count is refused")
+})
+
+/** The test sofa with a seat point, so the pet can perch on it. */
+function seatScene(): { map: ReturnType<typeof createRoomPetMapFromRoom>; scene: RoomV2RenderItem[] } {
+  const approach = cellPoint(walkableCellNear(0, 2))
+  const sofa: RoomV2FurnitureRenderItem = {
+    ...SOFA,
+    interactionType: "seat",
+    seatWorldPoints: [{ id: "left", facing: "front", seatHeight: 0, seat: { x: SOFA_CENTER.x, y: SOFA_CENTER.y - 0.02 }, approach, exit: approach }]
+  }
+  return { map: createRoomPetMapFromRoom({ projection: PROJECTION, furniture: [sofa] }), scene: [sofa] }
+}
+
+test("a hop lasts exactly its clip: the pet lands on the seat on hopUp's last frame and back on the floor on hopDown's", () => {
+  const sheet = ROOM_PET_CAT_WHITE_SHEET_LAYOUT
+  const { map: SEAT_MAP } = seatScene()
+  const upMs = (sheet.clips.hopUp.frames[45].length * 1000) / sheet.clips.hopUp.fps
+  const downMs = (sheet.clips.hopDown.frames[45].length * 1000) / sheet.clips.hopDown.fps
+  assert.equal(getRoomPetClipDurationMs(sheet.clips.hopUp), upMs)
+  const started = startRoomPetHop(petAt(walkableCellNear(0, 2)), SEAT_MAP, 1_000)
+  assert.ok(started, "the sofa is reachable")
+  const goingUp = arriveRoomPetHop(started, 5_000)
+  assert.equal(goingUp.pose, "hop")
+  assert.equal(goingUp.modeEndsAtMs, 5_000 + upMs)
+  const perched = advanceRoomPetHop(goingUp, SEAT_MAP, goingUp.modeEndsAtMs!)
+  assert.equal(perched.pose, "perch")
+  const goingDown = advanceRoomPetHop(perched, SEAT_MAP, 20_000)
+  assert.equal(goingDown.pose, "hop")
+  assert.equal(goingDown.modeEndsAtMs, 20_000 + downMs)
+})
+
+test("hop drawing: the feet follow root motion floor -> seat -> floor, end where the next pose stands, and the pet draws over the seat", () => {
+  const sheet = ROOM_PET_CAT_WHITE_SHEET_LAYOUT
+  const { map: SEAT_MAP, scene: SEAT_SCENE } = seatScene()
+  const spot = SEAT_MAP.spots.find((candidate) => candidate.id === "sofa_1")
+  assert.ok(spot?.perchAnchor, "the sofa has a seat point")
+  const pet = petAt(spot.cell)
+  const draw = (state: RoomPetState) => resolveRoomPetDraw({ isEnabled: true, projection: PROJECTION, map: SEAT_MAP, state, renderItems: SEAT_SCENE })
+  const floor = cellPoint(spot.cell)
+  const up = draw({ ...pet, pose: "hop", perchSpotId: "sofa_1", goal: { kind: "hop", spotId: "sofa_1", phase: "up" } })
+  const perch = draw({ ...pet, pose: "perch", perchSpotId: "sofa_1", goal: { kind: "hop", spotId: "sofa_1", phase: "perch" } })
+  const down = draw({ ...pet, pose: "hop", perchSpotId: null, goal: { kind: "hop", spotId: "sofa_1", phase: "down" } })
+  const stand = draw({ ...pet, pose: "stand", perchSpotId: null, goal: null })
+  assert.ok(up?.hop && down?.hop && perch && stand)
+  assert.deepEqual(up.hop, { from: floor, to: spot.perchAnchor })
+  assert.deepEqual(down.hop, { from: spot.perchAnchor, to: floor })
+  const upMotion = sheet.clips.hopUp.rootMotion!
+  const downMotion = sheet.clips.hopDown.rootMotion!
+  const upEnd = getRoomPetRootMotionFoot(up.hop.from, up.hop.to, upMotion, upMotion.travel.length - 1, 0.001)
+  const downEnd = getRoomPetRootMotionFoot(down.hop.from, down.hop.to, downMotion, downMotion.travel.length - 1, 0.001)
+  assert.deepEqual(upEnd, perch.foot, "hopUp ends perched at the seat height")
+  assert.deepEqual(downEnd, stand.foot, "hopDown ends on the floor where the pet then stands")
+  assert.deepEqual(getRoomPetRootMotionFoot(up.hop.from, up.hop.to, upMotion, 0, 0.001), stand.foot, "hopUp starts from the floor, not the seat")
+  const perchedOrder = getRoomPetBeforeRenderId(SEAT_SCENE, perch.foot, "sofa_1")
+  assert.equal(up.beforeRenderId, perchedOrder, "the jumping pet draws over the seat it lands on")
+  assert.equal(down.beforeRenderId, perchedOrder, "and over it while jumping off")
+  assert.equal(stand.hop, null)
+  assert.equal(perch.hop, null)
+})
+
+test("the play hop trick jumps in place: its path starts and ends where the pet stands", () => {
+  const pet = petAt(walkableCellNear(0, 2))
+  const play = resolveRoomPetDraw({ isEnabled: true, projection: PROJECTION, map: MAP, state: { ...pet, pose: "trickHop" }, renderItems: SCENE })
+  assert.equal(play?.clip, "hopPlay")
+  assert.deepEqual(play?.hop, { from: play?.foot, to: play?.foot })
 })

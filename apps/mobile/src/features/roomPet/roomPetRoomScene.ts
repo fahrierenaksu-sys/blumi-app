@@ -37,6 +37,16 @@ export interface RoomPetDraw {
   readonly beforeRenderId: string | null
   /** How long the move to `foot` takes (one engine step), 0 when it stands. */
   readonly moveMs: number
+  /**
+   * A hop clip's path: the feet follow the clip's root motion from `from` to
+   * `to` frame by frame (`foot` is `to`, where the clip ends). Null for every other clip.
+   */
+  readonly hop: RoomPetHopPath | null
+}
+
+export interface RoomPetHopPath {
+  readonly from: RoomPoint2D
+  readonly to: RoomPoint2D
 }
 
 function getCellPoint(projection: RoomV2FloorGridProjection, cell: RoomPetCell): RoomPoint2D {
@@ -81,19 +91,34 @@ export function resolveRoomPetDraw(input: {
   const { isEnabled, projection, map, state } = input
   if (!isEnabled || !projection || !map || !state) return null
   const perchSpot = state.perchSpotId ? map.spots.find((spot) => spot.id === state.perchSpotId) : undefined
-  const foot = perchSpot?.perchAnchor ?? getCellPoint(projection, state.cell)
+  const floorFoot = getCellPoint(projection, state.cell)
+  const foot = perchSpot?.perchAnchor ?? floorFoot
   const direction = getScreenDirection(projection, state.cell, state.facing)
   const drawn = getRoomPetDrawnHeading(getRoomPetSpriteHeading(direction.x, direction.y))
   const isMoving = state.pose === "walk" || state.pose === "run"
+  const hopGoal = state.goal?.kind === "hop" ? state.goal : null
+  const clip = state.mode === "greet" && state.pose === "happy" ? "greet" : getRoomPetClipForHop(state.pose, hopGoal ? hopGoal.phase : null)
+  const hopSpot = state.pose === "hop" && hopGoal ? map.spots.find((spot) => spot.id === hopGoal.spotId) : undefined
+  const hop = getHopPath(clip, foot, floorFoot, hopSpot?.perchAnchor ?? null)
+  const depthSpotId = perchSpot?.id ?? (hop && hopSpot ? hopSpot.id : null)
   return {
     foot,
-    clip: state.mode === "greet" && state.pose === "happy" ? "greet" : getRoomPetClipForHop(state.pose, state.goal?.kind === "hop" ? state.goal.phase : null),
+    clip,
     heading: drawn.heading,
     mirrored: drawn.mirrored,
     emote: state.emote,
-    beforeRenderId: getRoomPetBeforeRenderId(input.renderItems, foot, perchSpot ? perchSpot.id : null),
-    moveMs: isMoving ? state.stepMs : 0
+    beforeRenderId: getRoomPetBeforeRenderId(input.renderItems, foot, depthSpotId),
+    moveMs: isMoving ? state.stepMs : 0,
+    hop
   }
+}
+
+/** hopUp runs floor -> seat, hopDown seat -> floor, hopPlay jumps in place; a hop without a seat point plays in place. */
+function getHopPath(clip: RoomPetClipName, foot: RoomPoint2D, floorFoot: RoomPoint2D, seat: RoomPoint2D | null): RoomPetHopPath | null {
+  if (clip === "hopPlay" || ((clip === "hopUp" || clip === "hopDown") && !seat)) return { from: foot, to: foot }
+  if (clip === "hopUp" && seat) return { from: floorFoot, to: seat }
+  if (clip === "hopDown" && seat) return { from: seat, to: floorFoot }
+  return null
 }
 
 /** The engine events for an owner change between two room snapshots (null: not in the room). */

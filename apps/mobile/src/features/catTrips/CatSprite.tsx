@@ -16,6 +16,8 @@ const CANVAS = Object.freeze({
  * The approved white cat from the room pet sheet, standing in a box of its
  * own (postcard, collar tag). Same atlas and flipbook as in the room.
  */
+const BOX_FOOT = { x: 0.5, y: 0.92 }
+
 export const CatSprite = memo(function CatSprite(props: {
   clip: RoomPetClipName
   size: number
@@ -24,13 +26,15 @@ export const CatSprite = memo(function CatSprite(props: {
 }) {
   const { clip, size, onTap, testID } = props
   const draw: RoomPetDraw = useMemo(() => ({
-    foot: { x: 0.5, y: 0.92 },
+    foot: BOX_FOOT,
     clip,
     heading: 135,
     mirrored: false,
     emote: clip === "sleep" ? "zzz" : clip === "greet" || clip === "happy" ? "heart" : null,
     beforeRenderId: null,
-    moveMs: 0
+    moveMs: 0,
+    /** A hop clip jumps in place inside the box. */
+    hop: clip === "hopUp" || clip === "hopDown" || clip === "hopPlay" ? { from: BOX_FOOT, to: BOX_FOOT } : null
   }), [clip])
   return (
     <View style={[styles.box, { width: size, height: size }]}>

@@ -1,4 +1,6 @@
 import type { RoomPetTrick } from "./roomPet.types"
+import { getRoomPetClipDurationMs } from "./roomPetSprite"
+import { ROOM_PET_CAT_WHITE_SHEET_LAYOUT } from "./sheet/roomPetCatWhiteSheet"
 
 /** Behaviour timing. Lively but calm: no autonomous decision is closer than IDLE_MIN_MS to the last one. */
 export const ROOM_PET_TUNING = {
@@ -22,7 +24,9 @@ export const ROOM_PET_TUNING = {
   chatHeartCooldownMs: 4000,
   hopChance: 0.25,
   hopCooldownMs: 45000,
-  hopPhaseMs: 450,
+  /** A hop up or down lasts exactly its clip, so the pet lands on the seat (or floor) on the clip's last frame. */
+  hopUpMs: getRoomPetClipDurationMs(ROOM_PET_CAT_WHITE_SHEET_LAYOUT.clips.hopUp),
+  hopDownMs: getRoomPetClipDurationMs(ROOM_PET_CAT_WHITE_SHEET_LAYOUT.clips.hopDown),
   perchMinMs: 4000,
   perchMaxMs: 9000,
   emoteMs: 1600,

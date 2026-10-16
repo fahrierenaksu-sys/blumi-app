@@ -195,7 +195,7 @@ export function arriveRoomPetHop(state: RoomPetState, atMs: number): RoomPetStat
     pose: "hop",
     perchSpotId: state.goal.spotId,
     goal: { ...state.goal, phase: "up" },
-    modeEndsAtMs: atMs + T.hopPhaseMs
+    modeEndsAtMs: atMs + T.hopUpMs
   }
 }
 
@@ -213,7 +213,7 @@ export function advanceRoomPetHop(state: RoomPetState, map: RoomPetMap, atMs: nu
     }
   }
   if (state.goal.phase === "perch") {
-    return { ...state, pose: "hop", perchSpotId: null, goal: { ...state.goal, phase: "down" }, modeEndsAtMs: atMs + T.hopPhaseMs }
+    return { ...state, pose: "hop", perchSpotId: null, goal: { ...state.goal, phase: "down" }, modeEndsAtMs: atMs + T.hopDownMs }
   }
   return enterRoomPetDefault({ ...state, perchSpotId: null }, map, atMs)
 }
