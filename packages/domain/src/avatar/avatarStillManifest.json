@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "0827d7066a351194c27af36bbd8ff002f77a77ad2e343fea546287f6d521bba2",
+      "rigSha256": "b4ca18df78b87f894228659da2f481a8a05b289e971702080c3dcd0e2fdda154",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -423,6 +423,11 @@
           "rigItemId": "top_girl_rose_pearl_cardigan",
           "thumb": "top_girl_rose_pearl_cardigan"
         },
+        "top_girl_breton_stripe": {
+          "slot": "top",
+          "rigItemId": "top_girl_breton_stripe",
+          "thumb": "top_girl_breton_stripe"
+        },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
           "rigItemId": "hair_ink_pageboy_star",
@@ -685,6 +690,19 @@
               313,
               44,
               72
+            ]
+          },
+          {
+            "key": "top_girl_breton_stripe__o0p45",
+            "owner": "top_girl_breton_stripe",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              191,
+              315,
+              65,
+              107
             ]
           },
           {
@@ -1443,6 +1461,19 @@
             ]
           },
           {
+            "key": "top_girl_breton_stripe__o3p45",
+            "owner": "top_girl_breton_stripe",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              219,
+              281,
+              160,
+              217
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1716,6 +1747,19 @@
               56,
               99
             ]
+          },
+          {
+            "key": "top_girl_breton_stripe__o5p45",
+            "owner": "top_girl_breton_stripe",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              364,
+              290,
+              69,
+              129
+            ]
           }
         ],
         "bust": [
@@ -1862,6 +1906,19 @@
               180,
               32,
               49
+            ]
+          },
+          {
+            "key": "top_girl_breton_stripe__o0p45",
+            "owner": "top_girl_breton_stripe",
+            "slot": "top",
+            "order": 0.45,
+            "seq": 3002,
+            "rect": [
+              55,
+              181,
+              44,
+              71
             ]
           },
           {
@@ -2188,6 +2245,19 @@
             ]
           },
           {
+            "key": "top_girl_breton_stripe__o3p45",
+            "owner": "top_girl_breton_stripe",
+            "slot": "top",
+            "order": 3.45,
+            "seq": 3001,
+            "rect": [
+              71,
+              161,
+              103,
+              95
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -2460,6 +2530,19 @@
               166,
               39,
               65
+            ]
+          },
+          {
+            "key": "top_girl_breton_stripe__o5p45",
+            "owner": "top_girl_breton_stripe",
+            "slot": "top",
+            "order": 5.45,
+            "seq": 3000,
+            "rect": [
+              160,
+              166,
+              47,
+              84
             ]
           }
         ]
