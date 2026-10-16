@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "ef49e719526953f892f81a0b48fddbfd4c07bb420df66e0881198e2ab6c3f9df",
+      "rigSha256": "de5d2e7e757a00f2a3f85dd92f394cd6091023e532a8be27c14b272a049d04b7",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -781,6 +781,11 @@
           "rigItemId": "hair_girl_copper_soft_waves",
           "thumb": "hair_girl_copper_soft_waves"
         },
+        "hair_girl_ink_twin_braids": {
+          "slot": "hair",
+          "rigItemId": "hair_girl_ink_twin_braids",
+          "thumb": "hair_girl_ink_twin_braids"
+        },
         "dress_girl_wine_gingham_tie": {
           "slot": "dress",
           "rigItemId": "dress_girl_wine_gingham_tie",
@@ -1344,6 +1349,19 @@
               46,
               226,
               349
+            ]
+          },
+          {
+            "key": "hair_girl_ink_twin_braids__o0p6",
+            "owner": "hair_girl_ink_twin_braids",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              208,
+              40,
+              217,
+              351
             ]
           },
           {
@@ -3373,6 +3391,19 @@
             ]
           },
           {
+            "key": "hair_girl_ink_twin_braids__o4p6",
+            "owner": "hair_girl_ink_twin_braids",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              204,
+              43,
+              217,
+              336
+            ]
+          },
+          {
             "key": "clip_girl_pearl_bar_pair__o4p7",
             "owner": "clip_girl_pearl_bar_pair",
             "slot": "accessory",
@@ -4084,6 +4115,19 @@
               17,
               143,
               218
+            ]
+          },
+          {
+            "key": "hair_girl_ink_twin_braids__o0p6",
+            "owner": "hair_girl_ink_twin_braids",
+            "slot": "hair",
+            "order": 0.6,
+            "seq": 4001,
+            "rect": [
+              65,
+              13,
+              137,
+              220
             ]
           },
           {
@@ -4894,6 +4938,19 @@
               18,
               179,
               210
+            ]
+          },
+          {
+            "key": "hair_girl_ink_twin_braids__o4p6",
+            "owner": "hair_girl_ink_twin_braids",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              62,
+              15,
+              138,
+              211
             ]
           },
           {

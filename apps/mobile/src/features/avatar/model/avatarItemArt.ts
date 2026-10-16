@@ -64,7 +64,8 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     glasses_girl_gold_round: "glasses_girl_gold_round",
     glasses_girl_rose_soft_cateye: "glasses_girl_rose_soft_cateye",
     hair_girl_caramel_braid_crown: "hair_girl_caramel_braid_crown",
-    hair_girl_copper_soft_waves: "hair_girl_copper_soft_waves"
+    hair_girl_copper_soft_waves: "hair_girl_copper_soft_waves",
+    hair_girl_ink_twin_braids: "hair_girl_ink_twin_braids"
   },
   // the boy's 2.5D wardrobe PREVIEW (domain boyWardrobePreview.ts; QA unlock only, no receipts)
   male: {
