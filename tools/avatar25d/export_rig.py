@@ -362,14 +362,17 @@ def _flood(seed, through):
         out = grown
 
 
-def blink_item_cut(head_open, frames, item, light_edge=False):
+def blink_item_cut(head_open, frames, item, light_edge=False, tied=None):
     """Item pixels (same size crops of the eye rect, RGBA uint8) that copy the open eye: True = cleared in the patch.
     Only the eye copy goes: item pixels at the head's eye drawing (iris, sclera, lashes, its rim and loose dots) that
     are not hair. Hair keeps every pixel: strands that enter the rect from its sides or top (runs from the edge) and
     item pixels joined by a thick path to the item outside the eye (bang tips, side locks hanging into it).
     `light_edge` (a part's `blinkLightEdge`, set by the factory for a LIGHT side lock lying over an eye corner, whose
     soft inner edge matches the lid colour): the one-pixel rim of the cut next to kept hair that differs from the head
-    is kept too, unless it is the copy's vivid dark lash line."""
+    is kept too, unless it is the copy's vivid dark lash line.
+    `tied` (crop-size bool mask, optional): item pixels on the crop's border that continue in the part OUTSIDE the
+    rect. They are the item outside the eye even inside the eye zone: a side lock that only clips the rect's corner
+    over the face contour (which the blink frames repaint, so it reads as eye drawing) is hair, not a loose copy."""
     import numpy as np
     O = head_open.astype(float); P = item.astype(float); F = [f.astype(float) for f in frames]
     h, w = O.shape[:2]
@@ -414,7 +417,10 @@ def blink_item_cut(head_open, frames, item, light_edge=False):
     path = drawn & (~eye | mismatch | above)
     thick = path & _dilate(~_dilate(~path, 1), 1)
     border = np.zeros((h, w), bool); border[0] = border[-1] = border[:, 0] = border[:, -1] = True
-    outside = _flood(border & drawn & ~zone, drawn & ~zone)
+    seeds = border & drawn & ~zone
+    if tied is not None:
+        seeds |= tied & drawn & border
+    outside = _flood(seeds, drawn & ~zone)
     hair = _flood(outside, thick & zone)
     hair |= path & zone & _dilate(hair, 1) | protect    # the strand's own edge px (the thickness test rounds them off)
     cut = zone & drawn & opaque & ~hair
@@ -448,6 +454,20 @@ def blink_patches_one_outfit(patches, items_src):
     return sum(per_slot.values())
 
 
+def blink_crop_ties(img, ox, oy, rw, rh):
+    """Pixels on the border of the eye-rect crop (ox, oy, rw, rh) of a part image that the part continues from outside
+    the crop (a drawn 4-neighbour just past that border): the strand is tied to the item outside the rect."""
+    import numpy as np
+    a = np.asarray(img.convert('RGBA'))[..., 3] >= 128
+    big = np.zeros((rh + 2, rw + 2), bool)                        # the crop plus a one-pixel ring, False off the part
+    x0, y0 = max(ox - 1, 0), max(oy - 1, 0); x1, y1 = min(ox + rw + 1, img.width), min(oy + rh + 1, img.height)
+    if x1 > x0 and y1 > y0:
+        big[y0 - (oy - 1):y1 - (oy - 1), x0 - (ox - 1):x1 - (ox - 1)] = a[y0:y1, x0:x1]
+    ties = np.zeros((rh, rw), bool)
+    ties[0] |= big[0, 1:-1]; ties[-1] |= big[-1, 1:-1]; ties[:, 0] |= big[1:-1, 0]; ties[:, -1] |= big[1:-1, -1]
+    return ties
+
+
 def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pages, page_taken, meshes=None):
     """The item patches (see above) for the view's `blink.items`; pastes each into free space of its item's page.
     `meshes` ({item id: mesh}) clips each redirect rect to the drawn area of its part: a hair that ends above the
@@ -471,7 +491,7 @@ def pack_blink_items(src_blink, head_layer, head_box, items_src, item_rects, pag
             if ox + rw <= 0 or oy + rh <= 0 or ox >= img.width or oy >= img.height:
                 continue
             crop = np.asarray(img.crop((ox, oy, ox + rw, oy + rh)))   # transparent where the part is not
-            cut = blink_item_cut(head_open, frames, crop, bool(part.get('blinkLightEdge')))
+            cut = blink_item_cut(head_open, frames, crop, bool(part.get('blinkLightEdge')), blink_crop_ties(img, ox, oy, rw, rh))
             if not cut.any():
                 continue
             worn_most = blink_patches_one_outfit([*out, {'item': iid}], items_src)

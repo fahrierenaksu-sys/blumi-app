@@ -645,6 +645,40 @@ class BlinkFrameInHeadTest(unittest.TestCase):
         self.assertTrue((out[:, :4] == frame[:, :4]).all())
 
 
+class BlinkCropTiesTest(unittest.TestCase):
+    SKIN, EYE, LOCK = (254, 215, 188, 255), (60, 40, 30, 255), (140, 68, 35, 255)
+
+    def eye_case(self):
+        import numpy as np
+        head = np.zeros((16, 16, 4), np.uint8); head[:] = self.SKIN; head[:10, :10] = self.EYE   # the eye at the rect's corner
+        closed = np.zeros_like(head); closed[:] = self.SKIN                                        # the frame closes it
+        item = np.zeros_like(head)
+        item[:3, :2] = self.LOCK          # a side lock clipping the rect's corner (it goes on outside the rect)
+        item[5:9, 5:9] = self.EYE         # a painted copy of the eye inside the rect
+        return head, [closed, closed], item
+
+    def test_a_lock_that_goes_on_outside_the_rect_is_hair_and_the_eye_copy_still_goes(self):
+        import numpy as np
+        ex = load_exporter()
+        head, frames, item = self.eye_case()
+        ties = np.zeros((16, 16), bool); ties[0, :2] = True; ties[:3, 0] = True
+        untied = ex.blink_item_cut(head, frames, item)
+        tied = ex.blink_item_cut(head, frames, item, tied=ties)
+        self.assertTrue(untied[:3, :2].any())            # without the tie the lock reads as a loose bit and blinks away
+        self.assertFalse(tied[:3, :2].any())              # tied to the item outside the rect: kept
+        self.assertTrue(tied[5:9, 5:9].all())             # the eye copy is still cleared
+
+    def test_ties_are_the_crop_border_pixels_the_part_continues_from_outside(self):
+        from PIL import Image
+        import numpy as np
+        ex = load_exporter()
+        a = np.zeros((20, 20, 4), np.uint8)
+        a[2:9, 4:6] = self.LOCK      # a lock from above the crop into it
+        a[9:11, 7:9] = self.LOCK    # a blob inside the crop only
+        ties = ex.blink_crop_ties(Image.fromarray(a, 'RGBA'), 3, 5, 10, 10)   # crop x3..12, y5..14
+        self.assertEqual(sorted(zip(*np.nonzero(ties))), [(0, 1), (0, 2)])    # the lock's two columns on the top row
+
+
 class BlinkGateGlassesTest(unittest.TestCase):
     """A tiny rig: a 32 px head whose eye closes (page 0: open head left, closed frame right) and one item on page 1."""
     SKIN, EYE, RIM = (254, 215, 188, 255), (60, 40, 30, 255), (200, 160, 40, 255)
