@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "07e9212beea00f74d6270d2ca38cda69b13be5ee8c9782dc14f10b8f0b56e5b2",
+      "rigSha256": "5dbd003d63a06584547ef3412771d8eb281db26f0a46573a343bd8827d0d8345",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -544,6 +544,11 @@
           "rigItemId": "hair_girl_ink_french_bob",
           "thumb": "hair_girl_ink_french_bob"
         },
+        "dress_girl_wine_gingham_tie": {
+          "slot": "dress",
+          "rigItemId": "dress_girl_wine_gingham_tie",
+          "thumb": "dress_girl_wine_gingham_tie"
+        },
         "clip_girl_pearl_bar_pair": {
           "slot": "accessory",
           "rigItemId": "clip_girl_pearl_bar_pair",
@@ -721,6 +726,19 @@
               313,
               48,
               72
+            ]
+          },
+          {
+            "key": "dress_girl_wine_gingham_tie__o0p45",
+            "owner": "dress_girl_wine_gingham_tie",
+            "slot": "dress",
+            "order": 0.45,
+            "seq": 5007,
+            "rect": [
+              204,
+              461,
+              31,
+              32
             ]
           },
           {
@@ -1505,6 +1523,19 @@
             ]
           },
           {
+            "key": "dress_girl_wine_gingham_tie__o3p45",
+            "owner": "dress_girl_wine_gingham_tie",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              165,
+              263,
+              270,
+              377
+            ]
+          },
+          {
             "key": "body__o4",
             "owner": "body",
             "slot": "body",
@@ -1803,6 +1834,19 @@
               290,
               59,
               100
+            ]
+          },
+          {
+            "key": "dress_girl_wine_gingham_tie__o5p45",
+            "owner": "dress_girl_wine_gingham_tie",
+            "slot": "dress",
+            "order": 5.45,
+            "seq": 5003,
+            "rect": [
+              383,
+              450,
+              21,
+              43
             ]
           }
         ],
@@ -2325,6 +2369,19 @@
               147,
               103,
               109
+            ]
+          },
+          {
+            "key": "dress_girl_wine_gingham_tie__o3p45",
+            "owner": "dress_girl_wine_gingham_tie",
+            "slot": "dress",
+            "order": 3.45,
+            "seq": 5000,
+            "rect": [
+              76,
+              150,
+              102,
+              106
             ]
           },
           {

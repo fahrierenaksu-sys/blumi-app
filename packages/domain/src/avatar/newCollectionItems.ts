@@ -96,6 +96,7 @@ export const NEW_COLLECTION_ITEM_IDS: readonly string[] = Object.freeze(NEW_COLL
  */
 export const NEW_COLLECTION_LANDED_ITEM_IDS: ReadonlySet<string> = new Set<string>([
   "clip_girl_pearl_bar_pair",
+  "dress_girl_wine_gingham_tie",
   "hair_girl_bun_wine_bow",
   "hair_girl_chestnut_butterfly",
   "hair_girl_ink_french_bob",
