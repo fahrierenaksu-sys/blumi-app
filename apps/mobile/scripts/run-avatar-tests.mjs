@@ -154,6 +154,8 @@ try {
       resolve(workspaceRoot, "src/features/avatar/stills/avatarStills.test.ts"),
       // front (showcase) bake: only allowlisted, hash-approved stills are baked
       resolve(workspaceRoot, "src/features/avatar/stills/showcaseBake.test.ts"),
+      // card thumbs cut from the showcase front for unpublished items; published thumbs stay receipt-locked
+      resolve(workspaceRoot, "src/features/avatar/stills/frontThumbs.test.mjs"),
       // still layout and the live-canvas budget (plan 2.2)
       resolve(workspaceRoot, "src/features/avatar/model/avatarStillLayout.test.ts"),
       // the front (showcase) stack outside the room: whole-figure 3/4 fallback, missing assets, plan cache (Phase 3 D1)

@@ -13,7 +13,10 @@
  * Output
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/full/<key>.webp   one layer per (owner, order[, leg variant])
  *   apps/mobile/src/features/avatar/stills/layers/<rig>/bust/<key>.webp   the same layers in the 256 px bust window
- *   apps/mobile/src/features/avatar/stills/layers/<rig>/thumb/<item>.webp the item alone, cropped, at most 256 px,
+ *   apps/mobile/src/features/avatar/stills/layers/<rig>/thumb/<item>.webp the item alone, cropped, at most 256 px:
+ *                                                                          an unpublished item with a front thumb pin
+ *                                                                          (front-thumbs.mjs) takes that cut of its
+ *                                                                          showcase front; otherwise baked from the rig,
  *                                                                          without the body art its pages carry (see
  *                                                                          withoutBodyArt: face, ears, neck, hands)
  *   apps/mobile/src/features/avatar/stills/stillAssets.ts                 literal require table (Metro, asset scan)
@@ -36,6 +39,7 @@ import { fileURLToPath } from "node:url"
 import sharp from "sharp"
 import { tsImport } from "tsx/esm/api"
 import { cleanThumb } from "./thumb-clean.mjs"
+import { pinnedFrontThumb, readFrontThumbPins, thumbSource } from "./front-thumbs.mjs"
 
 export const BAKER_VERSION = 1
 const SS = 2
@@ -48,6 +52,10 @@ const AVATAR = join(ROOT, "apps/mobile/src/features/avatar")
 const STILLS = join(AVATAR, "stills")
 const MANIFEST = join(ROOT, "packages/domain/src/avatar/avatarStillManifest.json")
 const SHOWCASE_BAKED = join(ROOT, "tools/avatar25d/showcase-baked.json")
+const RELEASE_CATALOG = join(ROOT, "packages/domain/src/release/blumiR1ReleaseCatalog.json")
+/** Published (receipted) items: their thumb bytes are hash-locked, so thumbSource keeps them on the rig bake. */
+const PUBLISHED = new Set(JSON.parse(readFileSync(RELEASE_CATALOG, "utf8")).publishedItems.map((item) => item.itemId))
+const FRONT_PINS = readFrontThumbPins()
 const RIG_DIRS = { female: "girl", male: "boy" }
 // worn order of the live renderer (resolveAvatarDraw): the four slots, then a dress, glasses, accessories (appended, so
 // the seq of every existing layer is unchanged)
@@ -439,20 +447,11 @@ async function bakeBody(rigId, rigDir, files) {
   for (const rigItemId of rigItemIds) {
     const canonical = canonicalOf[rigItemId]
     const own = rendered.filter((r) => r.layer.rigItemId === rigItemId && r.layer.legVariant === undefined && r.layer.bodyPart === undefined)
-    const withBody = composite(own, canvas)
-    const { rgba: alone, removed } = THUMB_KEEPS_BODY_ART.has(canonical)
-      ? { rgba: withBody, removed: new Uint8Array(canvas.width * canvas.height) }
-      : withoutBodyArt(withBody, bodySkin, canvas)
-    if (debugThumbs) debugThumbs.push({ canonical, withBody, alone, removed })
-    const rect = alphaRect(alone, canvas.width, canvas.height)
-    const scale = Math.min(1, THUMB_MAX_PX / Math.max(rect[2], rect[3]))
-    const thumbW = Math.max(1, Math.round(rect[2] * scale)), thumbH = Math.max(1, Math.round(rect[3] * scale))
-    const resized = await sharp(crop(alone, canvas, rect), { raw: { width: rect[2], height: rect[3], channels: 4 } })
-      .resize(thumbW, thumbH, { kernel: "lanczos3" }).raw().toBuffer()
-    const edgeClean = THUMB_EDGE_CLEAN[canonical]
-    const finished = edgeClean ? cleanThumb(resized, thumbW, thumbH, edgeClean).rgba : resized
-    const baked = await sharp(finished, { raw: { width: thumbW, height: thumbH, channels: 4 } }).webp({ lossless: true, effort: 6 }).toBuffer()
-    const thumb = redrawnThumb(rigId, canonical) ?? baked
+    const source = thumbSource({ itemId: canonical, isPublished: PUBLISHED.has(canonical) && !EXTERNAL,
+      hasRedraw: Boolean(THUMB_REDRAWS[rigId]?.[canonical]), hasFront: !EXTERNAL && Boolean(FRONT_PINS[rigId]?.[canonical]) })
+    const thumb = source === "redraw" ? redrawnThumb(rigId, canonical)
+      : source === "front" ? pinnedFrontThumb(FRONT_PINS, rigId, canonical)
+      : await rigThumb(own, canvas, bodySkin, canonical, debugThumbs)
     files.set(`layers/${rigId}/thumb/${canonical}.webp`, thumb)
     // every body range it draws instead of the body's, in any pose: the resolver picks winners from these, as live
     const claims = [...new Map(bodyClaims(view, rigItemId)
@@ -476,6 +475,23 @@ async function bakeBody(rigId, rigDir, files) {
     },
     evidence
   }
+}
+
+/** A card thumb baked from the item's room rig parts, its carried body art removed (withoutBodyArt), at most 256 px. */
+async function rigThumb(own, canvas, bodySkin, canonical, debugThumbs) {
+  const withBody = composite(own, canvas)
+  const { rgba: alone, removed } = THUMB_KEEPS_BODY_ART.has(canonical)
+    ? { rgba: withBody, removed: new Uint8Array(canvas.width * canvas.height) }
+    : withoutBodyArt(withBody, bodySkin, canvas)
+  if (debugThumbs) debugThumbs.push({ canonical, withBody, alone, removed })
+  const rect = alphaRect(alone, canvas.width, canvas.height)
+  const scale = Math.min(1, THUMB_MAX_PX / Math.max(rect[2], rect[3]))
+  const thumbW = Math.max(1, Math.round(rect[2] * scale)), thumbH = Math.max(1, Math.round(rect[3] * scale))
+  const resized = await sharp(crop(alone, canvas, rect), { raw: { width: rect[2], height: rect[3], channels: 4 } })
+    .resize(thumbW, thumbH, { kernel: "lanczos3" }).raw().toBuffer()
+  const edgeClean = THUMB_EDGE_CLEAN[canonical]
+  const finished = edgeClean ? cleanThumb(resized, thumbW, thumbH, edgeClean).rgba : resized
+  return sharp(finished, { raw: { width: thumbW, height: thumbH, channels: 4 } }).webp({ lossless: true, effort: 6 }).toBuffer()
 }
 
 /** Card thumbs that get the edge cleaner (thumb-clean.mjs: part seams, skin flecks on the outline, opt-in heel-collar
