@@ -77,15 +77,15 @@
       ]
     },
     "avatar_v2_shoes_mint_ribbon_court_sneakers": {
-      "sha256": "fd0359e3b40bcfc3e64c45bdab8a30343acf8ff580da5f506b3af06d4b164fae",
+      "sha256": "15684aee166f67399d65a5311bc193e4f67d79e91a598deee7d9bacf12067827",
       "size": [
         256,
-        142
+        141
       ],
       "sources": [
         {
-          "file": "girl_shoes.png",
-          "sha256": "9c295ba9658a02b407c463cc342d30d53e39426156bbe412355185c7eb977028"
+          "file": "mint_ribbon_court_sneakers.png",
+          "sha256": "c9e3495aa3bd9f0aef24c76997d002254eb4a41ea9a94813fb7ff087a1fa1d1d"
         }
       ]
     },
@@ -907,28 +907,28 @@
       ]
     },
     "avatar_v2_shoes_male_black_clean_sneakers": {
-      "sha256": "55a643f16d77e6f6056b74fd96fdc57b420ac270d2a50332d055dcd71553bb3b",
+      "sha256": "d601c101c63757a1849dcfe9ce43eac280cb57bb13e268a5a82f111fcec99556",
       "size": [
         256,
-        100
+        169
       ],
       "sources": [
         {
-          "file": "boy_shoes.png",
-          "sha256": "79320675c82e62caca16d85378825355e0e0c9a33e4c615f68db4eedb5210ba3"
+          "file": "black_clean_sneakers.png",
+          "sha256": "d05e9a99030f8d068fb4c352bb4b00b6b7a122cf8394dbc96a91d225658776a9"
         }
       ]
     },
     "avatar_v2_shoes_male_black_everyday_sneakers": {
-      "sha256": "66fcd8cabf465ce96a21eab5f0c847fcec9cc06ce2f095943f24046de9aac517",
+      "sha256": "a993450ed9afdcd6763b0593135ed23d35d27f654bed860defd8ab090f6fbb4c",
       "size": [
         256,
-        98
+        153
       ],
       "sources": [
         {
-          "file": "boy_shoes.png",
-          "sha256": "fa3225588e527979232bdf5e100eb322f4bb6fa133edf50ca8d1bb853a962b31"
+          "file": "black_everyday_sneakers.png",
+          "sha256": "4d21944ffe10147f614996dacf2f209ced1ffb7e3a6054a5d9f80f8901a58575"
         }
       ]
     },
@@ -950,15 +950,15 @@
       ]
     },
     "avatar_v2_shoes_male_cream_chunky_sneakers": {
-      "sha256": "36b8502ba9f019fe931eb10f174dba89fb3d3bbce7cdb746263afd0bf80afa80",
+      "sha256": "0dc0c5a8b523a12383af7f4a91eb61d185dd4b308eed020ac7a3bde300fd8c3a",
       "size": [
         256,
-        111
+        162
       ],
       "sources": [
         {
-          "file": "boy_shoes.png",
-          "sha256": "e9492b8035029d04d77400a7205919ea1d6d313b5b4ba0a59fc2fe4af5fd8f1f"
+          "file": "cream_chunky_sneakers.png",
+          "sha256": "30c92b92562f6e8382364f7b0f6f91392622bf125b29f81f85004f71e2d4644f"
         }
       ]
     },
@@ -989,19 +989,15 @@
       ]
     },
     "avatar_v2_shoes_male_sand_desert_boots": {
-      "sha256": "6cf53e96d6e7d5115b67f297ff333726134e6fd8ad4694a72520d82f8a3f6d1a",
+      "sha256": "088a32aedb8ec9dee0105c20737b33e3bf4e1247a0f533a39cbe9946def7ff81",
       "size": [
         256,
-        94
+        170
       ],
       "sources": [
         {
-          "file": "boy_shoes.png",
-          "sha256": "3b6ee49cdf96e2eb177c17fe32ed80d9f5209b034d2e462281e87c4e74020cf5"
-        },
-        {
-          "file": "boy_a.png",
-          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+          "file": "sand_desert_boots.png",
+          "sha256": "ebc0a1b8d5baebcdabe9b8b874da1be84e6d239cd179ad5cb9200a58e7b46e8f"
         }
       ]
     },
