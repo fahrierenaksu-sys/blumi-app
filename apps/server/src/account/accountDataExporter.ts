@@ -14,6 +14,12 @@ export interface AccountDataExportSections {
   reactions: readonly Record<string, unknown>[]
   blocks: readonly Record<string, unknown>[]
   messages: readonly Record<string, unknown>[]
+  roomPet: Record<string, unknown> | null
+  catTripPrefs: Record<string, unknown> | null
+  streetWindow: Record<string, unknown> | null
+  catTripDays: readonly Record<string, unknown>[]
+  catTrips: readonly Record<string, unknown>[]
+  catSouvenirs: readonly Record<string, unknown>[]
 }
 
 export interface AccountDataExporter {
@@ -60,6 +66,12 @@ function emptySections(): AccountDataExportSections {
     connectionMatches: [],
     reactions: [],
     blocks: [],
-    messages: []
+    messages: [],
+    roomPet: null,
+    catTripPrefs: null,
+    streetWindow: null,
+    catTripDays: [],
+    catTrips: [],
+    catSouvenirs: []
   }
 }

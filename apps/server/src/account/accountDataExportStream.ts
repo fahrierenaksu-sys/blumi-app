@@ -27,6 +27,22 @@ const sections = [
   ["messages", "SELECT message_id, thread_id, body, sent_at FROM blumi_chat_messages WHERE sender_user_id = $1 ORDER BY sent_at ASC, message_id ASC", false],
 ] as const
 
+/**
+ * Release 3 tables (migrations 077-080) are optional: a database without one exports an empty section.
+ * A hosted trip names its owner only after the host opened the reveal, as in the app.
+ */
+const optionalSections = [
+  ["roomPet", "blumi_room_pets", "SELECT pet_id, species_item_id, name, name_status, room_state, revision, created_at, updated_at FROM blumi_room_pets WHERE user_id = $1", true],
+  ["catTripPrefs", "blumi_cat_trip_prefs", "SELECT travel_enabled, host_enabled, push_enabled, updated_at FROM blumi_cat_trip_prefs WHERE user_id = $1", true],
+  ["streetWindow", "blumi_street_digests", "SELECT window_closed, look_kind, look_changed_at, room_kind, room_changed_at, updated_at FROM blumi_street_digests WHERE user_id = $1", true],
+  ["catTripDays", "blumi_cat_trip_days", "SELECT day_key, planned_at FROM blumi_cat_trip_days WHERE owner_user_id = $1 ORDER BY day_key ASC", false],
+  ["catTrips", "blumi_cat_trips", `SELECT trip_id, CASE WHEN owner_user_id = $1 THEN 'owner' ELSE 'host' END AS role,
+      CASE WHEN owner_user_id = $1 OR host_revealed_at IS NOT NULL THEN owner_user_id END AS owner_user_id,
+      host_user_id, day_key, starts_at, ends_at, kind, status, ended_at, end_reason, owner_revealed_at, host_revealed_at, created_at
+    FROM blumi_cat_trips WHERE owner_user_id = $1 OR host_user_id = $1 ORDER BY starts_at ASC, trip_id ASC`, false],
+  ["catSouvenirs", "blumi_cat_souvenirs", "SELECT souvenir_id, trip_id, souvenir_key, rarity, acquired_at FROM blumi_cat_souvenirs WHERE owner_user_id = $1 ORDER BY acquired_at ASC, souvenir_id ASC", false],
+] as const
+
 export async function* streamPostgresAccountExport(
   client: ExportConnection, authorizedAccount: AccountRecord, metadata: AccountExportMetadata
 ): AsyncGenerator<string> {
@@ -38,10 +54,25 @@ export async function* streamPostgresAccountExport(
     const account = await readPostgresAccountExportSnapshot(client, authorizedAccount.accountId)
     if (!account || account.userId !== authorizedAccount.userId) throw new Error("Account export is no longer available.")
     yield JSON.stringify({ ...metadata, account: exportAccountFields(account) }).slice(0, -1) + ',"data":{'
+    const present = await client.query(
+      "SELECT name FROM unnest($1::text[]) AS name WHERE to_regclass('public.' || name) IS NOT NULL",
+      [optionalSections.map(([, table]) => table)]
+    )
+    const presentTables = new Set(present.rows.map((row) => String(row.name)))
+    const allSections = [
+      ...sections,
+      ...optionalSections.map(([name, table, query, singleton]) => presentTables.has(table)
+        ? [name, query, singleton] as const
+        : [name, null, singleton] as const)
+    ]
     let firstSection = true
-    for (const [name, query, singleton] of sections) {
+    for (const [name, query, singleton] of allSections) {
       yield (firstSection ? "" : ",") + JSON.stringify(name) + ":"
       firstSection = false
+      if (query === null) {
+        yield singleton ? "null" : "[]"
+        continue
+      }
       if (singleton) {
         const result = await client.query(query, [account.userId])
         yield JSON.stringify(result.rows[0] ?? null)
