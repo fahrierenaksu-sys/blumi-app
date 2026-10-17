@@ -197,8 +197,6 @@ export const shopPreviewStyles = StyleSheet.create({
   },
   roomHeroTopOverlay: {
     position: "absolute",
-    left: 10,
-    right: 10,
     top: 8,
     zIndex: 5,
     flexDirection: "row",
