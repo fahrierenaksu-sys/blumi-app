@@ -6,11 +6,14 @@ const workspaceRoot = resolve(new URL("..", import.meta.url).pathname)
 const repositoryRoot = resolve(workspaceRoot, "../..")
 const distDirectory = join(workspaceRoot, "dist")
 
-for (const workspace of ["@blumi/contracts", "@blumi/domain"]) {
-  execFileSync("npm", ["run", "build", "-w", workspace], {
-    cwd: repositoryRoot,
-    stdio: "inherit"
-  })
+// verify:fast builds the packages once before any leaf starts; a rebuild here would race the other leaves reading dist.
+if (process.env.BLUMI_PACKAGES_PREBUILT !== "1") {
+  for (const workspace of ["@blumi/contracts", "@blumi/domain"]) {
+    execFileSync("npm", ["run", "build", "-w", workspace], {
+      cwd: repositoryRoot,
+      stdio: "inherit"
+    })
+  }
 }
 
 // Compiled tests of deleted sources must not survive in dist and keep running.

@@ -123,10 +123,13 @@ const sourceFiles = [
 ]
 
 try {
-  execFileSync("npm", ["run", "build"], {
-    cwd: resolve(repositoryRoot, "packages/domain"),
-    stdio: "inherit"
-  })
+  // verify:fast builds the packages once before any leaf starts; a rebuild here would race the other leaves reading dist.
+  if (process.env.BLUMI_PACKAGES_PREBUILT !== "1") {
+    execFileSync("npm", ["run", "build"], {
+      cwd: resolve(repositoryRoot, "packages/domain"),
+      stdio: "inherit"
+    })
+  }
 
   execFileSync(
     process.execPath,
