@@ -229,7 +229,7 @@ One row per item. Phase: P1 foundation, P2 room, P3 surfaces, P4 items and catal
 | S17 | Chat empty state | `ChatThreadEmptyState.tsx:102` | `AvatarPortrait` medium | P3 | Open |
 | S18 | Room invite card, sender | `S/features/chat/ChatRoomInviteScene.tsx:28` (`RoomInviteAvatar`) | `AvatarPortrait` small | P3 | Open |
 | S19 | Room invite card, recipient | same `:29` | `AvatarPortrait` small | P3 | Open |
-| S20 | Chat → room door zoom | `S/features/chat/roomDoorFlight.tsx` | kept; re-verified with the new portraits and room | P3 | Open |
+| S20 | Chat → room door zoom | `S/features/chat/roomDoorFlight.tsx` | removed 2026-10-17: the zoom covered the opening room with a blank sheet; the room now fades in whole with its avatars | P3 | Implemented |
 | S21 | Notification permission card | `S/features/notifications/ChatNotificationPermissionCard.tsx:32` (requires `session/assets/register-world-hero-v1-runtime` PNG) | scene rebuilt from the world texture + baked stills | P6 (F15) | Open |
 | S22 | Incoming invite callout (initials) | `S/components/IncomingInviteCallout.tsx:27` | kept (no old art); verified | P3 | Open |
 | S23 | Blocked users row (initials) | `S/features/settings/BlockedUserRow.tsx` | kept (no old art); verified | P3 | Open |
