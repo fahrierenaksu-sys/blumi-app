@@ -20,9 +20,22 @@ import type { AuthEntryCopy } from "../authEntryCopy"
 import {
   resolveOtpCells,
   resolveResendControl,
-  type RegisterCodeRequestStatus
+  resolveSmsNoticeCard,
+  type RegisterCodeRequestStatus,
+  type SmsNoticeTone
 } from "./registerScreenModel"
 import { registerStyles as styles } from "./registerStyles"
+
+const SMS_NOTICE_STYLES: Record<SmsNoticeTone, {
+  card: StyleProp<ViewStyle>
+  icon: "checkmark" | "ellipsis-horizontal" | "alert-circle-outline"
+  ink: string
+}> = {
+  success: { card: styles.sentCardSuccess, icon: "checkmark", ink: uiTheme.colors.successInk },
+  pending: { card: styles.sentCardPending, icon: "ellipsis-horizontal", ink: uiTheme.colors.textSecondary },
+  warning: { card: styles.sentCardWarning, icon: "alert-circle-outline", ink: uiTheme.colors.warningInk },
+  error: { card: styles.sentCardError, icon: "alert-circle-outline", ink: uiTheme.colors.dangerInk }
+}
 
 /**
  * Sent-code status, the six-cell one-time-code field, and resend with its
@@ -36,6 +49,7 @@ export function RegisterOtpEntry({
   containerStyle,
   codeRequestStatus,
   smsNotice,
+  smsNoticeTone = null,
   maskedPhoneNumber,
   verificationCode,
   otpFocused,
@@ -57,6 +71,8 @@ export function RegisterOtpEntry({
   containerStyle: StyleProp<ViewStyle>
   codeRequestStatus: RegisterCodeRequestStatus
   smsNotice: string | null
+  /** Set by the last code request; null lets the request status decide. */
+  smsNoticeTone?: SmsNoticeTone | null
   maskedPhoneNumber: string
   verificationCode: string
   otpFocused: boolean
@@ -73,6 +89,13 @@ export function RegisterOtpEntry({
   rejectedCodeCount?: number
 }) {
   const resend = resolveResendControl(resendCooldownSeconds, busy, authCopy)
+  const notice = resolveSmsNoticeCard({
+    codeRequestStatus,
+    smsNotice,
+    requestTone: smsNoticeTone,
+    authCopy
+  })
+  const noticeStyle = SMS_NOTICE_STYLES[notice.tone]
   const reduceMotion = useReducedMotion()
   const shakeX = useSharedValue(0)
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }))
@@ -88,20 +111,24 @@ export function RegisterOtpEntry({
   }, [reduceMotion, rejectedCodeCount, shakeX])
   return (
     <View testID="register-code-step" style={containerStyle}>
-      <View style={styles.sentCard}>
+      <View style={[styles.sentCard, noticeStyle.card]}>
         <View style={styles.sentIcon}>
           <Ionicons
             accessible={false}
-            name={codeRequestStatus === "sent" ? "checkmark" : "ellipsis-horizontal"}
+            name={noticeStyle.icon}
             size={15}
-            color={uiTheme.colors.successInk}
+            color={noticeStyle.ink}
           />
         </View>
         <View style={styles.sentCopy}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.sentTitle}>
-            {smsNotice ?? authCopy.codeSent}
+          <Text
+            accessibilityRole={notice.tone === "error" ? "alert" : undefined}
+            maxFontSizeMultiplier={1.5}
+            style={[styles.sentTitle, { color: noticeStyle.ink }]}
+          >
+            {notice.text}
           </Text>
-          <Text maxFontSizeMultiplier={1.5} style={styles.sentNumber}>
+          <Text maxFontSizeMultiplier={1.5} style={[styles.sentNumber, { color: noticeStyle.ink }]}>
             {maskedPhoneNumber}
           </Text>
         </View>
@@ -117,7 +144,7 @@ export function RegisterOtpEntry({
             pressed ? styles.controlPressed : null
           ]}
         >
-          <Text style={styles.changeButtonText}>{authCopy.edit}</Text>
+          <Text style={[styles.changeButtonText, { color: noticeStyle.ink }]}>{authCopy.edit}</Text>
         </Pressable>
       </View>
 

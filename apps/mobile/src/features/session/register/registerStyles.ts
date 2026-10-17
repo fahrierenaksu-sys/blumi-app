@@ -364,9 +364,23 @@ export const registerStyles = StyleSheet.create({
     gap: uiTheme.spacing.sm,
     padding: uiTheme.spacing.sm,
     borderRadius: uiTheme.radius.md,
+    borderWidth: 1
+  },
+  sentCardSuccess: {
     backgroundColor: uiTheme.colors.successSoft,
-    borderWidth: 1,
     borderColor: "rgba(58,192,138,0.22)"
+  },
+  sentCardPending: {
+    backgroundColor: uiTheme.colors.surfaceMuted,
+    borderColor: uiTheme.colors.border
+  },
+  sentCardWarning: {
+    backgroundColor: uiTheme.colors.warningSoft,
+    borderColor: "rgba(138,91,11,0.22)"
+  },
+  sentCardError: {
+    backgroundColor: uiTheme.colors.dangerSoft,
+    borderColor: "rgba(187,51,71,0.22)"
   },
   sentIcon: {
     width: 30,

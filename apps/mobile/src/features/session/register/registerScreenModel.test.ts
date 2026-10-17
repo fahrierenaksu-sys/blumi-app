@@ -7,6 +7,7 @@ import {
   canSubmitRegisterVerification,
   resolveCodeRequestFailure,
   resolveCodeRequestSuccess,
+  resolveSmsNoticeCard,
   resolveCreatePrimaryActionLabel,
   resolveFallbackHeadingCopy,
   resolveLegalRequirementsMet,
@@ -261,20 +262,55 @@ test("verification always submits a complete code only after a code was sent", (
 test("code request outcomes keep a previously sent code usable after a failed resend", () => {
   assert.deepEqual(resolveCodeRequestSuccess(false, en), {
     codeRequestStatus: "sent",
-    smsNotice: en.codeExpiresSoon
+    smsNotice: en.codeExpiresSoon,
+    smsNoticeTone: "success"
   })
   assert.deepEqual(resolveCodeRequestSuccess(true, en), {
     codeRequestStatus: "sent",
-    smsNotice: en.freshCodeSent
+    smsNotice: en.freshCodeSent,
+    smsNoticeTone: "success"
   })
   assert.deepEqual(resolveCodeRequestFailure(true, en), {
     codeRequestStatus: "sent",
-    smsNotice: en.resendFailed
+    smsNotice: en.resendFailed,
+    smsNoticeTone: "warning"
   })
   assert.deepEqual(resolveCodeRequestFailure(false, tr), {
     codeRequestStatus: "failed",
-    smsNotice: tr.codeNotSent
+    smsNotice: tr.codeNotSent,
+    smsNoticeTone: "error"
   })
+})
+
+test("a code that could not be sent is never drawn as a success", () => {
+  const failed = resolveCodeRequestFailure(false, tr)
+  assert.deepEqual(resolveSmsNoticeCard({
+    codeRequestStatus: failed.codeRequestStatus,
+    smsNotice: failed.smsNotice,
+    requestTone: failed.smsNoticeTone,
+    authCopy: tr
+  }), { text: tr.codeNotSent, tone: "error" })
+  // Even with the notice cleared or a stale tone, a failed send stays an error.
+  assert.deepEqual(resolveSmsNoticeCard({
+    codeRequestStatus: "failed", smsNotice: null, requestTone: "success", authCopy: en
+  }), { text: en.codeNotSent, tone: "error" })
+  const resendFailed = resolveCodeRequestFailure(true, en)
+  assert.equal(resolveSmsNoticeCard({
+    codeRequestStatus: resendFailed.codeRequestStatus,
+    smsNotice: resendFailed.smsNotice,
+    requestTone: resendFailed.smsNoticeTone,
+    authCopy: en
+  }).tone, "warning")
+  assert.equal(resolveSmsNoticeCard({
+    codeRequestStatus: "sending", smsNotice: en.sendingCode, requestTone: "pending", authCopy: en
+  }).tone, "pending")
+  const sent = resolveCodeRequestSuccess(true, en)
+  assert.deepEqual(resolveSmsNoticeCard({
+    codeRequestStatus: sent.codeRequestStatus,
+    smsNotice: sent.smsNotice,
+    requestTone: sent.smsNoticeTone,
+    authCopy: en
+  }), { text: en.freshCodeSent, tone: "success" })
 })
 
 test("the resend control announces and shows the remaining cooldown", () => {

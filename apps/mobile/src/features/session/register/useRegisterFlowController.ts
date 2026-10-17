@@ -34,7 +34,8 @@ import {
   shouldRunResendCooldown,
   tickResendCooldown,
   type RegisterAuthIntent,
-  type RegisterCodeRequestStatus
+  type RegisterCodeRequestStatus,
+  type SmsNoticeTone
 } from "./registerScreenModel"
 
 export interface RegisterFlowControllerInput {
@@ -74,7 +75,14 @@ export function useRegisterFlowController({
   const [flow, setFlow] = useState(createInitialRegisterFlow)
   const [attemptedPrimaryAction, setAttemptedPrimaryAction] = useState(false)
   const [localBusy, setLocalBusy] = useState(false)
-  const [smsNotice, setSmsNotice] = useState<string | null>(null)
+  const [smsNoticeState, setSmsNoticeState] = useState<{ text: string | null; tone: SmsNoticeTone | null }>(
+    { text: null, tone: null }
+  )
+  const smsNotice = smsNoticeState.text
+  // Text and tone change together, so a failure is never drawn as a success.
+  const setSmsNotice = (text: string | null, tone: SmsNoticeTone | null = null): void => {
+    setSmsNoticeState({ text, tone })
+  }
   const [codeRequestStatus, setCodeRequestStatus] =
     useState<RegisterCodeRequestStatus>("idle")
   const [otpFocused, setOtpFocused] = useState(false)
@@ -218,7 +226,7 @@ export function useRegisterFlowController({
     setLocalBusy(true)
     onClearError()
     setCodeRequestStatus("sending")
-    setSmsNotice(authCopy.sendingCode)
+    setSmsNotice(authCopy.sendingCode, "pending")
     try {
       if (!isCodeStep) {
         setFlow((current) =>
@@ -239,12 +247,12 @@ export function useRegisterFlowController({
       setAttemptedPrimaryAction(false)
       setOtpTouched(false)
       setResendCooldownSeconds(RESEND_COOLDOWN_SECONDS)
-      setSmsNotice(success.smsNotice)
+      setSmsNotice(success.smsNotice, success.smsNoticeTone)
     } catch {
       // Session state owns the user-facing provider error.
       const failure = resolveCodeRequestFailure(previousCodeAvailable, authCopy)
       setCodeRequestStatus(failure.codeRequestStatus)
-      setSmsNotice(failure.smsNotice)
+      setSmsNotice(failure.smsNotice, failure.smsNoticeTone)
     } finally {
       actionInFlightRef.current = false
       setLocalBusy(false)
@@ -360,6 +368,7 @@ export function useRegisterFlowController({
     attemptedPrimaryAction,
     codeRequestStatus,
     smsNotice,
+    smsNoticeTone: smsNoticeState.tone,
     otpFocused,
     otpEditable,
     termsAccepted,

@@ -173,25 +173,54 @@ type CodeRequestNoticeCopy = Pick<
   "freshCodeSent" | "codeExpiresSoon" | "resendFailed" | "codeNotSent"
 >
 
+/**
+ * How the code-status card above the code cells is drawn. Only a code that is
+ * actually on its way is a success; a failed send is an error, and a failed
+ * resend while the previous code may still work is a warning.
+ */
+export type SmsNoticeTone = "pending" | "success" | "warning" | "error"
+
 export function resolveCodeRequestSuccess(
   isCodeStep: boolean,
   authCopy: CodeRequestNoticeCopy
-): { codeRequestStatus: "sent"; smsNotice: string } {
+): { codeRequestStatus: "sent"; smsNotice: string; smsNoticeTone: SmsNoticeTone } {
   return {
     codeRequestStatus: "sent",
     smsNotice: isCodeStep
       ? authCopy.freshCodeSent
-      : authCopy.codeExpiresSoon
+      : authCopy.codeExpiresSoon,
+    smsNoticeTone: "success"
   }
 }
 
 export function resolveCodeRequestFailure(
   previousCodeAvailable: boolean,
   authCopy: CodeRequestNoticeCopy
-): { codeRequestStatus: "sent" | "failed"; smsNotice: string } {
+): { codeRequestStatus: "sent" | "failed"; smsNotice: string; smsNoticeTone: SmsNoticeTone } {
   return {
     codeRequestStatus: previousCodeAvailable ? "sent" : "failed",
-    smsNotice: previousCodeAvailable ? authCopy.resendFailed : authCopy.codeNotSent
+    smsNotice: previousCodeAvailable ? authCopy.resendFailed : authCopy.codeNotSent,
+    smsNoticeTone: previousCodeAvailable ? "warning" : "error"
+  }
+}
+
+/** Text and tone of the code-status card; a failed send never reads as sent. */
+export function resolveSmsNoticeCard(input: {
+  codeRequestStatus: RegisterCodeRequestStatus
+  smsNotice: string | null
+  requestTone: SmsNoticeTone | null
+  authCopy: Pick<AuthEntryCopy, "codeSent" | "codeNotSent">
+}): { text: string; tone: SmsNoticeTone } {
+  const { codeRequestStatus, smsNotice, requestTone, authCopy } = input
+  if (codeRequestStatus === "failed") {
+    return { text: smsNotice ?? authCopy.codeNotSent, tone: "error" }
+  }
+  if (codeRequestStatus === "sending") {
+    return { text: smsNotice ?? authCopy.codeSent, tone: "pending" }
+  }
+  return {
+    text: smsNotice ?? authCopy.codeSent,
+    tone: smsNotice === null ? (codeRequestStatus === "sent" ? "success" : "pending") : requestTone ?? "success"
   }
 }
 

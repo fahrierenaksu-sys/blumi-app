@@ -117,6 +117,7 @@ export function RegisterCreateView({
               ]}
               codeRequestStatus={register.codeRequestStatus}
               smsNotice={register.smsNotice}
+              smsNoticeTone={register.smsNoticeTone}
               maskedPhoneNumber={register.maskedPhoneNumber}
               verificationCode={flow.verificationCode}
               editable={register.otpEditable}
