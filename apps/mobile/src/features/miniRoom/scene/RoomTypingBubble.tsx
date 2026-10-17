@@ -12,7 +12,7 @@ const EXITING = FadeOut.duration(120).reduceMotion(ReduceMotion.Never)
  * the avatar art and its transforms are untouched. Decorative: the screen
  * announces "… yazıyor" once (usePartnerTyping).
  */
-export function RoomTypingBubble() {
+export function RoomTypingBubble(props: { bottomPx: number }) {
   const reduceMotion = useReducedMotion()
   return (
     <Animated.View
@@ -21,7 +21,7 @@ export function RoomTypingBubble() {
       importantForAccessibility="no-hide-descendants"
       entering={reduceMotion ? undefined : ENTERING}
       exiting={reduceMotion ? undefined : EXITING}
-      style={styles.anchor}
+      style={[styles.anchor, { bottom: props.bottomPx }]}
     >
       <TypingDots size={6} color="#D06A9A" />
       <View style={styles.tail} />
@@ -34,7 +34,6 @@ const styles = StyleSheet.create({
   anchor: {
     position: "absolute",
     left: "50%",
-    bottom: 132,
     width: 48,
     height: 26,
     marginLeft: -24,

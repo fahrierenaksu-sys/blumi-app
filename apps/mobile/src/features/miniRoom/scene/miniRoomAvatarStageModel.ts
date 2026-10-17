@@ -40,3 +40,29 @@ export function resolveMiniRoomCameraTransform(
     scale: target.width / rest.width
   }
 }
+
+/** The speech stack's resting height above the anchor box's bottom, sized for the old avatarV2 box. */
+export const MINI_ROOM_SPEECH_BOTTOM_PX = 130
+/** A stack lifted over the partner's when the two chibis stand close sits this much higher. */
+export const MINI_ROOM_SPEECH_RAISE_PX = 38
+/** Clear air between the top of the drawn head (hair included) and the bubble's tail. */
+const MINI_ROOM_SPEECH_HEAD_GAP_PX = 8
+
+/**
+ * Where a speech bubble (or the typing dots) sits, up from the anchor box's bottom. A calibrated 2.5D figure is
+ * shorter than the old fixed box, so the line sits just above her head instead of floating far over it; without
+ * a measured figure the old height stays. Never higher than the old height.
+ */
+export function resolveMiniRoomSpeechBottomPx(input: {
+  /** Room point (her soles), up from the anchor box's bottom. */
+  footFromBottomPx: number
+  /** The calibrated 2.5D figure's standing height on this stage; absent = not measured. */
+  figureHeightPx?: number
+  raised: boolean
+}): number {
+  const { footFromBottomPx, figureHeightPx, raised } = input
+  const resting = figureHeightPx !== undefined && figureHeightPx > 0
+    ? Math.min(MINI_ROOM_SPEECH_BOTTOM_PX, Math.round(footFromBottomPx + figureHeightPx + MINI_ROOM_SPEECH_HEAD_GAP_PX))
+    : MINI_ROOM_SPEECH_BOTTOM_PX
+  return raised ? resting + MINI_ROOM_SPEECH_RAISE_PX : resting
+}

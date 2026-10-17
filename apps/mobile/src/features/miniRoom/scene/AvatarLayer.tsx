@@ -21,7 +21,7 @@ import {
   resolveMiniRoomFigureZIndices,
   type MiniRoomLayeredSeat
 } from "./miniRoomLayeredSeats"
-import { resolveMiniRoomAvatarAnchorOffset } from "./miniRoomAvatarStageModel"
+import { resolveMiniRoomAvatarAnchorOffset, resolveMiniRoomSpeechBottomPx } from "./miniRoomAvatarStageModel"
 import {
   EMPTY_MINI_ROOM_DEPTH_SCENE,
   resolveMiniRoomAvatarSortDepth,
@@ -141,6 +141,11 @@ export const AvatarLayer = memo(function AvatarLayer(props: AvatarLayerProps) {
         } else if (bubblesAreClose) {
           bubblePlacement = avatar.userId === leftBubbleUserId ? "left" : "right"
         }
+        const speechBottomPx = resolveMiniRoomSpeechBottomPx({
+          footFromBottomPx: MINI_ROOM_ANCHOR_POINT_FROM_BOTTOM,
+          figureHeightPx: resolveMiniRoomFigureHeightPx(avatar, stagePx.height),
+          raised: bubblesAreClose && avatar.userId !== leftBubbleUserId
+        })
         return (
           <AvatarOverlay
             key={`${avatar.userId}:overlay`}
@@ -150,7 +155,7 @@ export const AvatarLayer = memo(function AvatarLayer(props: AvatarLayerProps) {
             stageHeight={stageHeight}
             bubbles={avatarBubbles}
             bubblePlacement={bubblePlacement}
-            bubbleRaised={bubblesAreClose && avatar.userId !== leftBubbleUserId}
+            speechBottomPx={speechBottomPx}
             onDismissBubble={onDismissBubble}
             dismissBubbleLabel={dismissBubbleLabel}
             isLocal={isLocal}
@@ -350,6 +355,13 @@ const roomCalibration = roomAvatar25d.roomCalibration
 /** Where the anchor's room point is, measured up from the anchor box's bottom (its height less marginTop). */
 const MINI_ROOM_ANCHOR_POINT_FROM_BOTTOM = 142 - 130
 
+/** A calibrated 2.5D figure's standing height on this stage (the same one AvatarFigure draws); else undefined. */
+function resolveMiniRoomFigureHeightPx(avatar: AvatarState, stageHeightPx: number): number | undefined {
+  if (!roomCalibration || stageHeightPx <= 0) return undefined
+  const spec = getMiniRoomAvatar25dSpec({ appearance: avatar.appearance, motion: avatar.motion, facing: avatar.facing })
+  return spec ? roomCalibration.avatarFigureHeightPx(stageHeightPx, spec.rig) : undefined
+}
+
 const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
   const {
     avatar,
@@ -462,7 +474,8 @@ interface AvatarOverlayProps {
   /** This avatar's lines, oldest first. */
   bubbles: readonly SpeechBubble[]
   bubblePlacement: BubblePlacement
-  bubbleRaised: boolean
+  /** Speech and typing dots, up from the anchor box's bottom (resolveMiniRoomSpeechBottomPx). */
+  speechBottomPx: number
   onDismissBubble: (bubbleId: string) => void
   dismissBubbleLabel: string
   isLocal: boolean
@@ -480,7 +493,7 @@ const AvatarOverlay = memo(function AvatarOverlay(props: AvatarOverlayProps) {
     stageHeight,
     bubbles,
     bubblePlacement,
-    bubbleRaised,
+    speechBottomPx,
     onDismissBubble,
     dismissBubbleLabel,
     isLocal,
@@ -494,13 +507,13 @@ const AvatarOverlay = memo(function AvatarOverlay(props: AvatarOverlayProps) {
       <RoomSpeechBubbleStack
         bubbles={bubbles}
         placement={bubblePlacement}
-        raised={bubbleRaised}
+        bottomPx={speechBottomPx}
         animate={motionPolicy.animateBubble}
         onDismissBubble={onDismissBubble}
         dismissBubbleLabel={dismissBubbleLabel}
       />
       {/* A spoken line wins over the dots; the art and its transforms are untouched. */}
-      {typing && bubbles.length === 0 ? <RoomTypingBubble /> : null}
+      {typing && bubbles.length === 0 ? <RoomTypingBubble bottomPx={speechBottomPx} /> : null}
       <View pointerEvents="none" style={[styles.namePlate, isLocal ? styles.namePlateLocal : null]}>
         <Text style={styles.nameText} numberOfLines={1}>
           {isLocal ? localUserLabel : avatar.displayName}

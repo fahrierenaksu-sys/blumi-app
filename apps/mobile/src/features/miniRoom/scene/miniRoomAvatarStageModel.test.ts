@@ -2,7 +2,10 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   resolveMiniRoomAvatarAnchorOffset,
-  resolveMiniRoomCameraTransform
+  resolveMiniRoomCameraTransform,
+  MINI_ROOM_SPEECH_BOTTOM_PX,
+  MINI_ROOM_SPEECH_RAISE_PX,
+  resolveMiniRoomSpeechBottomPx
 } from "./miniRoomAvatarStageModel"
 import { resolveMiniRoomLayout } from "./miniRoomLayout"
 
@@ -31,4 +34,22 @@ test("the keyboard frames the room by transform: the typing camera is the restin
   assert.ok(Math.abs(centreX - (typing.left + typing.width / 2)) < 1e-9)
   assert.ok(Math.abs(centreY - (typing.top + typing.height / 2)) < 1e-9)
   assert.deepEqual(resolveMiniRoomCameraTransform(rest, rest), { translateX: 0, translateY: 0, scale: 1 })
+})
+
+test("a 2.5D figure's speech sits just above her head, not at the old box height", () => {
+  const bottom = resolveMiniRoomSpeechBottomPx({ footFromBottomPx: 12, figureHeightPx: 72, raised: false })
+  assert.ok(bottom > 12 + 72, "the bubble clears her head")
+  assert.ok(bottom <= 12 + 72 + 12, "the bubble stays close to her head")
+  assert.ok(bottom < MINI_ROOM_SPEECH_BOTTOM_PX)
+})
+
+test("speech keeps the old height without a measured figure and never rises above it", () => {
+  assert.equal(resolveMiniRoomSpeechBottomPx({ footFromBottomPx: 12, raised: false }), MINI_ROOM_SPEECH_BOTTOM_PX)
+  assert.equal(resolveMiniRoomSpeechBottomPx({ footFromBottomPx: 12, figureHeightPx: 400, raised: false }), MINI_ROOM_SPEECH_BOTTOM_PX)
+})
+
+test("a raised stack sits one step above the plain one", () => {
+  const plain = resolveMiniRoomSpeechBottomPx({ footFromBottomPx: 12, figureHeightPx: 72, raised: false })
+  const raised = resolveMiniRoomSpeechBottomPx({ footFromBottomPx: 12, figureHeightPx: 72, raised: true })
+  assert.equal(raised - plain, MINI_ROOM_SPEECH_RAISE_PX)
 })
