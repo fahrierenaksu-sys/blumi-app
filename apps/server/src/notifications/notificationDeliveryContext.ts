@@ -190,7 +190,8 @@ export function createNotificationRelevanceCheck(
         return notBlockedWith(userId, data.profileId)
       case "cat.trip_owner":
       case "cat.trip_host":
-        if (!data.tripId || !dependencies.isCatTripTeaserCurrent) return Boolean(data.tripId)
+        // Fail closed: without the trip check a teaser is never sent.
+        if (!data.tripId || !dependencies.isCatTripTeaserCurrent) return false
         return dependencies.isCatTripTeaserCurrent(userId, data.tripId, data.type === "cat.trip_owner" ? "owner" : "host")
       default:
         return true

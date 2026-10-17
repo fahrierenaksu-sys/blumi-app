@@ -67,3 +67,13 @@ test("a teaser is dropped once its trip is no longer current", async () => {
   current.clear()
   assert.equal(await check(delivery("cat.trip_owner"), NOW), false)
 })
+
+test("without the trip check wired a cat teaser is never sent (fail closed)", async () => {
+  const check = createNotificationRelevanceCheck({
+    isUserAllowed: async () => true,
+    hasBlockBetween: async () => false,
+    findThread: async () => null,
+    findRoomInvite: async () => null
+  })
+  assert.equal(await check({ userId: "owner", notification: teaser("cat.trip_owner") }, NOW), false)
+})

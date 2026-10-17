@@ -28,7 +28,10 @@ export function resolveCatTripsConfig(env: NodeJS.ProcessEnv, nodeEnv: string): 
   const secret = env.BLUMI_CAT_TRIPS_SEED_SECRET?.trim() ?? ""
   const requested = env.BLUMI_CAT_TRIPS_ENABLED === "1"
   if (nodeEnv === "production") {
-    return { enabled: requested && secret.length >= 16, seedSecret: secret }
+    const enabled = requested && secret.length >= 16
+    // One line, never the value: the owner can see why turning the flag on changed nothing.
+    if (requested && !enabled) console.warn("Cat trips requested but BLUMI_CAT_TRIPS_SEED_SECRET is missing or too short; cat trips stay off.")
+    return { enabled, seedSecret: secret }
   }
   return { enabled: requested, seedSecret: secret || DEV_SEED_SECRET }
 }
