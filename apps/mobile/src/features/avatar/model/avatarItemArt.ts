@@ -96,7 +96,13 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     avatar_v2_bottom_male_black_pocket_trousers: "bottom_male_basic_b",
     avatar_v2_shoes_male_black_everyday_sneakers: "shoes_male_basic_b",
     glasses_boy_black_soft_rect: "glasses_boy_black_soft_rect",
-    glasses_boy_gunmetal_round: "glasses_boy_gunmetal_round"
+    glasses_boy_gunmetal_round: "glasses_boy_gunmetal_round",
+    hair_male_blond_fade: "hair_male_blond_fade",
+    hair_male_soft_crop: "hair_male_soft_crop",
+    hair_male_black_side_part: "hair_male_black_side_part",
+    hair_male_chestnut_waves: "hair_male_chestnut_waves",
+    hair_male_cocoa_quiff: "hair_male_cocoa_quiff",
+    hair_male_wavy_quiff: "hair_male_wavy_quiff"
   }
 }
 

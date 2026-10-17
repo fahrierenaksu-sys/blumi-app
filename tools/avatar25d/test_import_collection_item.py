@@ -29,6 +29,20 @@ class GraftTest(unittest.TestCase):
         self.assertEqual(differing, 2)
         self.assertNotIn("jacket_x", base["front"]["items"], "the base input is not changed")
 
+    def test_replace_takes_the_old_entry_and_its_variant_keys_out_before_the_new_graft(self):
+        hybrid = {"sit": {"box": [0, 0, 9, 9]}, "wave": {"box": [2, 2, 8, 8]},
+                  "torsoVariants": {"jacket_x": {"p": "old"}, "jacket_x+bottom_b": {"p": "old"}, "top_a": {"p": 3}}}
+        landed = rig({"top_a": {"slot": "top"}, "jacket_x": {"slot": "top", "art": "old"}}, hybrid=hybrid)
+        fixed = rig({"jacket_x": {"slot": "top", "art": "new"}},
+                    hybrid={**hybrid, "torsoVariants": {"jacket_x": {"p": "new"}}})
+        out, _ = imp.graft(imp.ungraft(landed, "jacket_x"), fixed, "jacket_x")
+        self.assertEqual(out["front"]["items"]["jacket_x"]["art"], "new")
+        self.assertEqual(out["back"]["hybrid"]["torsoVariants"], {"top_a": {"p": 3}, "jacket_x": {"p": "new"}})
+        self.assertEqual(out["front"]["items"]["top_a"], {"slot": "top"}, "the other items stay")
+        self.assertEqual(landed["front"]["items"]["jacket_x"]["art"], "old", "the base input is not changed")
+        with self.assertRaises(SystemExit):
+            imp.ungraft(landed, "not_landed")
+
     def test_refuses_another_body_or_a_missing_item(self):
         base = rig({})
         other = rig({"jacket_x": {"slot": "top"}})

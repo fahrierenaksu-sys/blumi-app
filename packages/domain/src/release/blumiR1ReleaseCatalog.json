@@ -4294,6 +4294,180 @@
           }
         ]
       }
+    },
+    {
+      "itemId": "hair_male_blond_fade",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17-boy-hairs",
+        "sourceCommit": "db9004476c13eef527e2087f8551fc4017c97e79",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "7b828e45d78707d5e05f5bbd431bc8397e39153871e6fc2e4b2647bfbebe09e6"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_blond_fade__o4p6.webp",
+            "sha256": "afd9de7140ab854379aae43b838d86e373cf2ffa5eb27b46a50904f2f6778097"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_blond_fade__o4p6.webp",
+            "sha256": "8c866e1a25085d807760f5fd97825d8a965773cb2cdd47ce19613426d05f1fb2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_blond_fade.webp",
+            "sha256": "aa4c3c5985a5d179ce63e8e803cb0d33f950600a03e3d7619e5a7b1314eda494"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_soft_crop",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17-boy-hairs",
+        "sourceCommit": "db9004476c13eef527e2087f8551fc4017c97e79",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "7b828e45d78707d5e05f5bbd431bc8397e39153871e6fc2e4b2647bfbebe09e6"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_soft_crop__o4p6.webp",
+            "sha256": "05cd7913d248b0e3fbd140ca93eec02106640172d690d293c02d6fc8ab909cb7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_soft_crop__o4p6.webp",
+            "sha256": "e8b47243f38c83643c4f6cd5e3fc02e76ff5bb9b69f2a1704cd6b9b3518b59aa"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_soft_crop.webp",
+            "sha256": "0b84f317670f9f52938de5cb23571b59b60b64fcd5a1478b77ddb8415e96b43d"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_black_side_part",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17-boy-hairs",
+        "sourceCommit": "db9004476c13eef527e2087f8551fc4017c97e79",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "7b828e45d78707d5e05f5bbd431bc8397e39153871e6fc2e4b2647bfbebe09e6"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_black_side_part__o4p6.webp",
+            "sha256": "977117213e7469e32df369065121965b72c4e15c8d1a3831bd3f8133eeb34542"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_black_side_part__o4p6.webp",
+            "sha256": "5dfc5083d150e375d9090500b728d99bdeed108539539916d88e323b0ce782d7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_black_side_part.webp",
+            "sha256": "491f4b1b68527d7e8b2f2864cd3a7dfd61a0d988a0d81cc26ddafaae53b7fc86"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_wavy_quiff",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17-boy-hairs",
+        "sourceCommit": "db9004476c13eef527e2087f8551fc4017c97e79",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "7b828e45d78707d5e05f5bbd431bc8397e39153871e6fc2e4b2647bfbebe09e6"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_wavy_quiff__o4p6.webp",
+            "sha256": "38a9a5951ba87e646ce1c7e97f6c41306890eab03aa0a3f862d3c59f1c9cf1a4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_wavy_quiff__o4p6.webp",
+            "sha256": "9516c715e78c4d46cd3bdee42ec4d61e30fe06c74255f4e4b96f5e8d2c9665ce"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_wavy_quiff.webp",
+            "sha256": "79c808f328763a4ff246769c35f63edc4d60d53d3268fa7c040d97824148a1d4"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_cocoa_quiff",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17-boy-hairs",
+        "sourceCommit": "db9004476c13eef527e2087f8551fc4017c97e79",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "7b828e45d78707d5e05f5bbd431bc8397e39153871e6fc2e4b2647bfbebe09e6"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_cocoa_quiff__o4p6.webp",
+            "sha256": "0186b3ac1021e46c35c74308a4c55f398e54c838168fd7b14848880f449fa9b6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_cocoa_quiff__o4p6.webp",
+            "sha256": "d4c4bd4a6d41985727b91c503d55924caf41862f9bb7183cf7b6969d06ec7dfe"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_cocoa_quiff.webp",
+            "sha256": "167993ba3d563500501c67d0ee82c68e4549c2e9555b80985cadbe39bf928bb0"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_chestnut_waves",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17-boy-hairs",
+        "sourceCommit": "db9004476c13eef527e2087f8551fc4017c97e79",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "7b828e45d78707d5e05f5bbd431bc8397e39153871e6fc2e4b2647bfbebe09e6"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_chestnut_waves__o4p6.webp",
+            "sha256": "175d3decd59635c449230dd2e0811a4eee00ac7f17f2ad83531b3102636179bc"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_chestnut_waves__o4p6.webp",
+            "sha256": "f6f04cb38fbb256066fe2b648b571d9c5c1b3e5c931a44ac64991db4e4f89719"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_chestnut_waves.webp",
+            "sha256": "dd19af01718bca6bbd7fa9c57734587f49dbf4406a4bb609bbc99607dc7f71d3"
+          }
+        ]
+      }
     }
   ],
   "heldScopes": [

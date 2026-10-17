@@ -279,7 +279,10 @@ export const PUBLISHED_FRONT_THUMBS = new Set([
   "hair_girl_ink_french_bob", "hair_girl_ink_twin_braids", "jacket_girl_black_crop_blazer",
   "jacket_girl_light_denim_crop", "shoes_girl_camel_ankle_boots", "top_girl_breton_stripe",
   "top_girl_camel_vest_tee", "top_girl_rose_pearl_cardigan", "top_girl_sage_knit_polo",
-  "top_girl_white_poplin_shirt"
+  "top_girl_white_poplin_shirt",
+  // 2026-10-17: the boy's six hairs, published with the owner's receipt approval in chat; their receipts bind these front thumbs.
+  "hair_male_black_side_part", "hair_male_blond_fade", "hair_male_chestnut_waves", "hair_male_cocoa_quiff",
+  "hair_male_soft_crop", "hair_male_wavy_quiff"
 ])
 
 export function readFrontThumbPins(path = FRONT_THUMBS_PINS) {

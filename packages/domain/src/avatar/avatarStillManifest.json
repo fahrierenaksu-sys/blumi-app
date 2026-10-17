@@ -5931,7 +5931,7 @@
       }
     },
     "male": {
-      "rigSha256": "6450139e53483b57478e394c06715aebfe8a2617d60d0f8441a6adb7528a72db",
+      "rigSha256": "875c9099bd6773df477b4576637a710c97048aa362a73ccd07954c2fa8955950",
       "sheetHeight": 982,
       "canvas": {
         "width": 649,
@@ -6592,6 +6592,36 @@
               ]
             }
           }
+        },
+        "hair_male_blond_fade": {
+          "slot": "hair",
+          "rigItemId": "hair_male_blond_fade",
+          "thumb": "hair_male_blond_fade"
+        },
+        "hair_male_soft_crop": {
+          "slot": "hair",
+          "rigItemId": "hair_male_soft_crop",
+          "thumb": "hair_male_soft_crop"
+        },
+        "hair_male_black_side_part": {
+          "slot": "hair",
+          "rigItemId": "hair_male_black_side_part",
+          "thumb": "hair_male_black_side_part"
+        },
+        "hair_male_chestnut_waves": {
+          "slot": "hair",
+          "rigItemId": "hair_male_chestnut_waves",
+          "thumb": "hair_male_chestnut_waves"
+        },
+        "hair_male_cocoa_quiff": {
+          "slot": "hair",
+          "rigItemId": "hair_male_cocoa_quiff",
+          "thumb": "hair_male_cocoa_quiff"
+        },
+        "hair_male_wavy_quiff": {
+          "slot": "hair",
+          "rigItemId": "hair_male_wavy_quiff",
+          "thumb": "hair_male_wavy_quiff"
         },
         "glasses_boy_black_soft_rect": {
           "slot": "glasses",
@@ -11698,6 +11728,84 @@
             ]
           },
           {
+            "key": "hair_male_blond_fade__o4p6",
+            "owner": "hair_male_blond_fade",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              195,
+              35,
+              236,
+              178
+            ]
+          },
+          {
+            "key": "hair_male_soft_crop__o4p6",
+            "owner": "hair_male_soft_crop",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              187,
+              30,
+              244,
+              183
+            ]
+          },
+          {
+            "key": "hair_male_black_side_part__o4p6",
+            "owner": "hair_male_black_side_part",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              187,
+              25,
+              257,
+              210
+            ]
+          },
+          {
+            "key": "hair_male_chestnut_waves__o4p6",
+            "owner": "hair_male_chestnut_waves",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              187,
+              29,
+              248,
+              167
+            ]
+          },
+          {
+            "key": "hair_male_cocoa_quiff__o4p6",
+            "owner": "hair_male_cocoa_quiff",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              185,
+              19,
+              261,
+              183
+            ]
+          },
+          {
+            "key": "hair_male_wavy_quiff__o4p6",
+            "owner": "hair_male_wavy_quiff",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              178,
+              19,
+              257,
+              179
+            ]
+          },
+          {
             "key": "body__o5",
             "owner": "body",
             "slot": "body",
@@ -12113,6 +12221,84 @@
               16,
               146,
               115
+            ]
+          },
+          {
+            "key": "hair_male_blond_fade__o4p6",
+            "owner": "hair_male_blond_fade",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              60,
+              17,
+              147,
+              113
+            ]
+          },
+          {
+            "key": "hair_male_soft_crop__o4p6",
+            "owner": "hair_male_soft_crop",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              55,
+              14,
+              152,
+              115
+            ]
+          },
+          {
+            "key": "hair_male_black_side_part__o4p6",
+            "owner": "hair_male_black_side_part",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              55,
+              11,
+              160,
+              132
+            ]
+          },
+          {
+            "key": "hair_male_chestnut_waves__o4p6",
+            "owner": "hair_male_chestnut_waves",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              55,
+              14,
+              155,
+              105
+            ]
+          },
+          {
+            "key": "hair_male_cocoa_quiff__o4p6",
+            "owner": "hair_male_cocoa_quiff",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              54,
+              8,
+              162,
+              115
+            ]
+          },
+          {
+            "key": "hair_male_wavy_quiff__o4p6",
+            "owner": "hair_male_wavy_quiff",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              50,
+              8,
+              160,
+              113
             ]
           },
           {

@@ -8,7 +8,7 @@ Run from anywhere on the Mac that has the art Workbench; the repository is this 
         --item-rig  <QA-passed room rig that holds ITEM_ID (Workbench)> \
         --out-rig   <where to write the new assembled source rig (Workbench; the next import's --base-rig)> \
         [--front FRONT.png [--front-erase ERASE.png] [--front-back BACK.png] [--front-order N]] \
-        [--owner-look-approved "<date, owner words, OWNER_DECISIONS line>"] [--plan] [--skip-tests]
+        [--owner-look-approved "<date, owner words, OWNER_DECISIONS line>"] [--replace] [--plan] [--skip-tests]
 
 Steps (each stops the run on failure; nothing is committed, the end prints the files to stage):
   1. ITEM_ID is declared in newCollectionItems.ts and not landed yet; its body picks the rig (girl or boy).
@@ -23,6 +23,11 @@ Steps (each stops the run on failure; nothing is committed, the end prints the f
      --owner-look-approved the allowlist entry is added and bake-showcase runs; without it the piece is listed in the
      showcase-pending test list (3/4 fallback) and the pending allowlist entry is printed for the owner sheet.
   6. bake-stills, the blink gate, then typecheck and the affected tests (domain, avatar, wardrobe, shop preview).
+With --front, the Shop and Wardrobe card thumb is cut from the front layer (front-thumbs.mjs) before bake-stills.
+--replace re-imports an already landed piece after an art fix (QA swap): the old entry (and its variant keys) is taken
+out of --base-rig (the last import's --out-rig), the new one grafted, exported and baked again; the domain and app
+sources are left as they are (step 4 and the pending list are skipped). An owner-approved front keeps its allowlist
+entry: re-approve and rerun bake-showcase when its front layer changed.
 --plan validates the inputs and prints the steps without writing anything.
 """
 import argparse, copy, hashlib, json, os, re, shutil, subprocess, sys, tempfile
@@ -138,6 +143,29 @@ def graft(base, src, item_id):
     return out, differing_layers
 
 
+def ungraft(base, item_id):
+    """A copy of base without item_id: its item entry in both views and the hybrid variant keys that name it. Pure."""
+    out = copy.deepcopy(base)
+    for view in ("front", "back"):
+        v = out[view]
+        if item_id not in v["items"]:
+            fail(f"the base rig has no {view} item {item_id} to replace")
+        del v["items"][item_id]
+        for family in VARIANT_FAMILIES:
+            keys = [key for key in (v["hybrid"].get(family) or {}) if item_id in key.split("+")]
+            for key in keys:
+                del v["hybrid"][family][key]
+    return out
+
+
+def cut_front_thumb(args, rig, item_id):
+    """The card thumb from the front layer (front-thumbs.mjs), so bake-stills takes the front, never the 3/4 view."""
+    with tempfile.TemporaryDirectory(prefix="blumi-thumb-") as scratch:
+        sources = Path(scratch) / "sources.tsv"
+        sources.write_text("item_id\trig\tfront\tback\n" + f"{item_id}\t{rig}\t{args.front}\t{args.front_back or ''}\n")
+        run(["node", "tools/avatar25d/front-thumbs.mjs", "--sources", sources])
+
+
 def insert_item_art(source, rig, item_id):
     """avatarItemArt.ts source with `item_id: "item_id"` appended to the rig's AVATAR_ITEM_ART block. Pure."""
     start = source.index("export const AVATAR_ITEM_ART")
@@ -225,6 +253,7 @@ def parse_args():
     p.add_argument("--front-back", type=Path)
     p.add_argument("--front-order", type=int)
     p.add_argument("--owner-look-approved", metavar="NOTE")
+    p.add_argument("--replace", action="store_true")
     p.add_argument("--plan", action="store_true")
     p.add_argument("--skip-tests", action="store_true")
     args = p.parse_args()
@@ -242,28 +271,45 @@ def main():
     args = parse_args()
     item_id = args.item_id
     rig, is_landed = declared_item(item_id)
-    if is_landed:
-        fail(f"{item_id} has already landed")
-    print(f"1. {item_id}: rig {rig}")
+    if is_landed and not args.replace:
+        fail(f"{item_id} has already landed (pass --replace to re-import its art)")
+    if args.replace and not is_landed:
+        fail(f"{item_id} has not landed yet: import it without --replace")
+    print(f"1. {item_id}: rig {rig}" + (" (replace)" if args.replace else ""))
     base, src = json.loads(args.base_rig.read_text()), json.loads(args.item_rig.read_text())
+    if args.replace:
+        base = ungraft(base, item_id)
     merged, differing_layers = graft(base, src, item_id)
     slot = src["front"]["items"][item_id]["slot"]
     print(f"2. graft ok (slot {slot}); body layers differing between base and item rig: {differing_layers} (base kept)")
     approved = bool(args.owner_look_approved)
     entry = front_entry(args, slot, item_id) if args.front else None
     if args.plan:
-        print("--plan: inputs valid; would export, map, mark landed, "
-              + ("allowlist + bake front" if approved else "list front as pending") + ", bake stills, gate, test")
+        steps = "replace the rig item, export" if args.replace else "export, map, mark landed, " + (
+            "allowlist + bake front" if approved else "list front as pending")
+        print(f"--plan: inputs valid; would {steps}, cut the card thumb, bake stills, gate, test")
         if entry:
             print("front entry:", json.dumps({item_id: entry}))
         return
     args.out_rig.write_text(json.dumps(merged))
     out_dir = export_rig(rig, args.out_rig.resolve())
     print(f"3. exported {args.out_rig} -> {out_dir.relative_to(ROOT)}")
+    if args.replace:
+        if entry:
+            copy_front(args, item_id)
+        print("4-5. replace: sources unchanged" + (", front layers copied" if entry else ""))
+    else:
+        land_sources(args, rig, item_id, entry, approved)
+    if args.front:
+        cut_front_thumb(args, rig, item_id)
+    finish(out_dir, args)
+
+
+def land_sources(args, rig, item_id, entry, approved):
+    """Steps 4 and 5 of a first import: map, mark landed, and allowlist or list the front as pending."""
     ITEM_ART_TS.write_text(insert_item_art(ITEM_ART_TS.read_text(), rig, item_id))
     COLLECTION_TS.write_text(insert_landed(COLLECTION_TS.read_text(), item_id))
     print("4. mapped in AVATAR_ITEM_ART and marked landed (release hold unchanged)")
-    staged = [ITEM_ART_TS, COLLECTION_TS]
     if entry and approved:
         copy_front(args, item_id)
         allow = json.loads(ALLOWLIST.read_text())
@@ -272,7 +318,6 @@ def main():
         body["ownerApprovalNote"] += f" {args.owner_look_approved} ({item_id})."
         ALLOWLIST.write_text(json.dumps(allow, indent=2, ensure_ascii=False) + "\n")
         run(["node", "tools/avatar25d/bake-showcase.mjs", "--src", SHOWCASE_ROOT])
-        staged += [ALLOWLIST, ROOT / "tools/avatar25d/showcase-baked.json"]
         print("5. front allowlisted and baked")
     else:
         if entry:
@@ -282,8 +327,10 @@ def main():
         reason = (f"new collection: {item_id} landed without an owner-approved front look; "
                   "it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.")
         COVERAGE_TEST_TS.write_text(insert_showcase_pending(COVERAGE_TEST_TS.read_text(), rig, item_id, reason))
-        staged.append(COVERAGE_TEST_TS)
         print("5. listed as showcase pending")
+
+
+def finish(out_dir, args):
     run(["npm", "run", "build", "-w", "@blumi/domain"])
     run(["node", "tools/avatar25d/bake-stills.mjs"])
     run(["python3", "tools/avatar25d/blink_gate.py", out_dir])
