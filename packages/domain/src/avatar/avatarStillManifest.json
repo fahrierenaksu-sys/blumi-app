@@ -6596,32 +6596,146 @@
         "hair_male_blond_fade": {
           "slot": "hair",
           "rigItemId": "hair_male_blond_fade",
-          "thumb": "hair_male_blond_fade"
+          "thumb": "hair_male_blond_fade",
+          "showcase": {
+            "key": "hair_male_blond_fade__front",
+            "rect": [
+              161,
+              66,
+              287,
+              198
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_male_blond_fade__back",
+              "rect": [
+                142,
+                57,
+                318,
+                207
+              ]
+            }
+          }
         },
         "hair_male_soft_crop": {
           "slot": "hair",
           "rigItemId": "hair_male_soft_crop",
-          "thumb": "hair_male_soft_crop"
+          "thumb": "hair_male_soft_crop",
+          "showcase": {
+            "key": "hair_male_soft_crop__front",
+            "rect": [
+              161,
+              66,
+              287,
+              221
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_male_soft_crop__back",
+              "rect": [
+                129,
+                54,
+                340,
+                233
+              ]
+            }
+          }
         },
         "hair_male_black_side_part": {
           "slot": "hair",
           "rigItemId": "hair_male_black_side_part",
-          "thumb": "hair_male_black_side_part"
+          "thumb": "hair_male_black_side_part",
+          "showcase": {
+            "key": "hair_male_black_side_part__front",
+            "rect": [
+              161,
+              66,
+              287,
+              216
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_male_black_side_part__back",
+              "rect": [
+                140,
+                48,
+                331,
+                234
+              ]
+            }
+          }
         },
         "hair_male_chestnut_waves": {
           "slot": "hair",
           "rigItemId": "hair_male_chestnut_waves",
-          "thumb": "hair_male_chestnut_waves"
+          "thumb": "hair_male_chestnut_waves",
+          "showcase": {
+            "key": "hair_male_chestnut_waves__front",
+            "rect": [
+              156,
+              66,
+              301,
+              264
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_male_chestnut_waves__back",
+              "rect": [
+                118,
+                49,
+                384,
+                364
+              ]
+            }
+          }
         },
         "hair_male_cocoa_quiff": {
           "slot": "hair",
           "rigItemId": "hair_male_cocoa_quiff",
-          "thumb": "hair_male_cocoa_quiff"
+          "thumb": "hair_male_cocoa_quiff",
+          "showcase": {
+            "key": "hair_male_cocoa_quiff__front",
+            "rect": [
+              155,
+              66,
+              293,
+              264
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_male_cocoa_quiff__back",
+              "rect": [
+                111,
+                49,
+                376,
+                354
+              ]
+            }
+          }
         },
         "hair_male_wavy_quiff": {
           "slot": "hair",
           "rigItemId": "hair_male_wavy_quiff",
-          "thumb": "hair_male_wavy_quiff"
+          "thumb": "hair_male_wavy_quiff",
+          "showcase": {
+            "key": "hair_male_wavy_quiff__front",
+            "rect": [
+              153,
+              66,
+              303,
+              258
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_male_wavy_quiff__back",
+              "rect": [
+                119,
+                48,
+                365,
+                340
+              ]
+            }
+          }
         },
         "glasses_boy_black_soft_rect": {
           "slot": "glasses",
