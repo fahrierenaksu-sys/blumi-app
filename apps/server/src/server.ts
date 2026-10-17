@@ -90,6 +90,11 @@ import { registerStreetRoutes } from "./routes/streetRoutes"
 import { createInMemoryStreetRepository, type StreetRepository } from "./street/streetRepository"
 import { createStaticStreetSchema, type StreetSchemaProbe } from "./street/streetSchema"
 import { createStreetService } from "./street/streetService"
+import { createStreetRoomCache } from "./street/streetRoomCache"
+import { listAllowedRealtimeUserIds } from "./auth/realtimeUserBatch"
+
+/** The app refetches the street whenever its thread list changes; rooms are reused across reads this long. */
+const STREET_ROOM_CACHE_TTL_MS = 15_000
 import { withStreetDigests } from "./street/streetDigestHooks"
 import { getRoomSnapshotSelfCheckState } from "./rooms/roomSnapshotRenderer"
 import { computeAvatarArtPackHash, getAvatarPortraitSelfCheckState } from "./avatar/avatarPortrait"
@@ -237,6 +242,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     createPersonalRoomDecorService({
       getOwnedRoomItemIds: async (userId) =>
         (await economyService.getInventory(userId)).ownedRoomItemIds,
+      getOwnedRoomItemIdsForUsers: economyService.getOwnedRoomItemIdsForUsers,
       // stored ownership, held items included: only decides that a stored placement is carried over a save
       getStoredOwnedRoomItemIds: async (userId) =>
         (await economyService.repository.getInventory(userId))?.ownedRoomItemIds ?? [],
@@ -260,8 +266,16 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     listBlockedPartnerIds: (viewerUserId, partnerIds) => partnerIds.length === 0
       ? Promise.resolve([])
       : safetyService.listBlockedUserIdsBetween(viewerUserId, [...partnerIds]),
-    isUserAllowed: (userId, now) => authService.isRealtimeUserAllowed(userId, now),
-    getRoom: (userId) => basePersonalRoomDecorService.get(userId),
+    listAllowedUserIds: (userIds, now) => listAllowedRealtimeUserIds({
+      repository: authService.repository,
+      isRealtimeUserAllowed: (userId) => authService.isRealtimeUserAllowed(userId, now),
+      userIds,
+      now
+    }),
+    getRooms: createStreetRoomCache({
+      getMany: (userIds) => basePersonalRoomDecorService.getMany(userIds),
+      ttlMs: STREET_ROOM_CACHE_TTL_MS
+    }),
     log: { warn: (entry, message) => console.warn(message, entry) }
   })
   const { avatarService, personalRoomDecorService } = options.streetDigestsInSaveTransaction

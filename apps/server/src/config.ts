@@ -707,6 +707,7 @@ export function createConfiguredServerServices(
       repository: streetSaves.roomRepository,
       getOwnedRoomItemIds: async (userId) =>
         (await economyService.getInventory(userId)).ownedRoomItemIds,
+      getOwnedRoomItemIdsForUsers: economyService.getOwnedRoomItemIdsForUsers,
       // stored ownership, held items included: only decides that a stored placement is carried over a save
       getStoredOwnedRoomItemIds: async (userId) =>
         (await economyService.repository.getInventory(userId))?.ownedRoomItemIds ?? [],
@@ -895,6 +896,7 @@ export function createConfiguredServerServices(
   const personalRoomDecorService = createPersonalRoomDecorService({
     getOwnedRoomItemIds: async (userId) =>
       (await economyService.getInventory(userId)).ownedRoomItemIds,
+    getOwnedRoomItemIdsForUsers: economyService.getOwnedRoomItemIdsForUsers,
     // stored ownership, held items included: only decides that a stored placement is carried over a save
     getStoredOwnedRoomItemIds: async (userId) =>
       (await economyService.repository.getInventory(userId))?.ownedRoomItemIds ?? [],

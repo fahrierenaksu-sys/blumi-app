@@ -606,3 +606,29 @@ test("a room within the limit reports nothing held back and sending more than 60
     /up to 60/i
   )
 })
+
+test("reading many rooms matches reading each one, hides unowned items and batches ownership", async () => {
+  // Arrange
+  const ownership = new Map([["user_a", ["room_v2_chair_blush"]], ["user_b", ["room_v2_chair_blush"]]])
+  const batches: string[][] = []
+  const service = createPersonalRoomDecorService({
+    getOwnedRoomItemIds: async (userId) => ownership.get(userId) ?? [],
+    getOwnedRoomItemIdsForUsers: async (userIds) => {
+      batches.push([...userIds])
+      return new Map(userIds.map((userId) => [userId, ownership.get(userId) ?? []]))
+    },
+    isActiveRoomItemId: isTestActiveRoomItemId
+  })
+  for (const userId of ["user_a", "user_b"]) {
+    await service.save(userId, { expectedRevision: 0, decor: DECOR }, new Date("2026-10-17T08:00:00.000Z"))
+  }
+  ownership.set("user_b", [])
+  // Act
+  const many = await service.getMany(["user_a", "user_b", "user_without_room", "user_a"])
+  // Assert
+  assert.deepEqual(many.get("user_a"), await service.get("user_a"))
+  assert.deepEqual(many.get("user_b"), await service.get("user_b"))
+  assert.equal(many.get("user_b")?.decor.placedItems.length, 0, "a chair user_b does not own is left out")
+  assert.equal(many.has("user_without_room"), false)
+  assert.deepEqual(batches, [["user_a", "user_b"]], "one ownership read for the owners that have a room")
+})

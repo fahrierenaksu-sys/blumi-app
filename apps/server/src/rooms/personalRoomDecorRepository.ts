@@ -31,6 +31,8 @@ export interface PersonalRoomDecorSnapshot {
 
 export interface PersonalRoomDecorRepository {
   get(userId: string): Promise<PersonalRoomDecorSnapshot | null>
+  /** Saved rooms for many owners in one read; owners without a saved room are absent. */
+  getMany?(userIds: readonly string[]): Promise<PersonalRoomDecorSnapshot[]>
   /**
    * `missing`: the caller expected a saved revision, but this owner has no
    * saved room (for example a revision cached before the room was removed).
@@ -55,6 +57,12 @@ PersonalRoomDecorRepository {
     async get(userId) {
       const snapshot = snapshots.get(userId)
       return snapshot ? clonePersonalRoomDecorSnapshot(snapshot) : null
+    },
+    async getMany(userIds) {
+      return userIds.flatMap((userId) => {
+        const snapshot = snapshots.get(userId)
+        return snapshot ? [clonePersonalRoomDecorSnapshot(snapshot)] : []
+      })
     },
     async save(input) {
       const current = snapshots.get(input.userId)

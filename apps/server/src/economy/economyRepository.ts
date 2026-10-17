@@ -14,6 +14,8 @@ export interface EconomyInventoryRecord {
 
 export interface EconomyRepository {
   getInventory(userId: string): Promise<EconomyInventoryRecord | null>
+  /** Stored rows for many accounts in one read (no writes); accounts without a row are absent. */
+  getInventories?(userIds: readonly string[]): Promise<EconomyInventoryRecord[]>
   ensureInventory(input: EconomyEnsureInventoryInput): Promise<EconomyInventoryRecord>
   purchaseItem(input: EconomyPurchaseInput): Promise<EconomyInventoryRecord | null>
   applyCoinTransaction(
@@ -133,6 +135,12 @@ export function createInMemoryEconomyRepository(
     async getInventory(userId) {
       const inventory = store.inventoriesByUserId.get(userId)
       return inventory ? cloneInventory(inventory) : null
+    },
+    async getInventories(userIds) {
+      return userIds.flatMap((userId) => {
+        const inventory = store.inventoriesByUserId.get(userId)
+        return inventory ? [cloneInventory(inventory)] : []
+      })
     },
     async ensureInventory(input) {
       const existing = store.inventoriesByUserId.get(input.userId)

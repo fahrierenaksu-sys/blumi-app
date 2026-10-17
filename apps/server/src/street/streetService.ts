@@ -36,9 +36,11 @@ export interface StreetServiceDependencies {
   listMutualPartnerIds(viewerUserId: string): Promise<ReadonlySet<string>>
   /** Partners blocked in either direction (checked here too, not only by the thread list). */
   listBlockedPartnerIds(viewerUserId: string, partnerIds: readonly string[]): Promise<readonly string[]>
-  /** Deleted, banned or suspended accounts read as false. */
-  isUserAllowed(userId: string, now: Date): Promise<boolean>
-  getRoom(userId: string): Promise<StreetRoomSource | null>
+  /** The accounts that may appear, in one read: deleted, banned or suspended accounts are left out. */
+  listAllowedUserIds(userIds: readonly string[], now: Date): Promise<ReadonlySet<string>>
+  /** Saved rooms for many accounts in one batched read; accounts without a room are absent. */
+  getRooms(userIds: readonly string[]): Promise<ReadonlyMap<string, StreetRoomSource>>
+
   /**
    * A room privacy rule that keeps a partner's room from matches. Every window
    * stays closed for that partner. Defaults to open: no such setting exists
@@ -93,18 +95,24 @@ export function createStreetService(deps: StreetServiceDependencies): StreetServ
       const matched = uniqueByPartner(threads, viewerUserId).filter(({ partnerId }) => mutual.has(partnerId))
       const blocked = new Set(await deps.listBlockedPartnerIds(viewerUserId, matched.map(({ partnerId }) => partnerId)))
       const candidates = matched.filter(({ partnerId }) => !blocked.has(partnerId))
-      const allowed = await Promise.all(candidates.map(({ partnerId }) => deps.isUserAllowed(partnerId, now)))
-      const visible = candidates.filter((_, index) => allowed[index]).slice(0, STREET_MAX_WINDOWS)
+      const allowed = await deps.listAllowedUserIds(candidates.map(({ partnerId }) => partnerId), now)
+      const visible = candidates.filter(({ partnerId }) => allowed.has(partnerId)).slice(0, STREET_MAX_WINDOWS)
       const partnerIds = visible.map(({ partnerId }) => partnerId)
-      const [digests, guestUsers, selfRoom] = await Promise.all([
+      const [digests, guestUsers, roomVisibility] = await Promise.all([
         deps.repository.readMany([viewerUserId, ...partnerIds]),
         guests.listUsersWithGuest(partnerIds, edition.id),
-        deps.getRoom(viewerUserId)
+        Promise.all(partnerIds.map((partnerId) => deps.isRoomVisibleToMatches?.(partnerId) ?? Promise.resolve(true)))
       ])
-      const windows = await Promise.all(visible.map(({ thread, partnerId }) =>
-        buildWindow(thread, partnerId, digests.get(partnerId), guestUsers.has(partnerId), edition)
+      const openIds = partnerIds.filter((partnerId, index) => roomVisibility[index] && !digests.get(partnerId)?.windowClosed)
+      // One batched room read for the viewer and every open window.
+      const rooms = await deps.getRooms([viewerUserId, ...openIds])
+      const open = new Set(openIds)
+      const windows = visible.map(({ thread, partnerId }) => buildWindow(
+        thread, partnerId, open.has(partnerId) ? rooms.get(partnerId) ?? null : undefined,
+        digests.get(partnerId), guestUsers.has(partnerId), edition
       ))
-      return {
+      const selfRoom = rooms.get(viewerUserId)
+      const street: StreetResponse = {
         edition: edition.id,
         self: {
           closed: digests.get(viewerUserId)?.windowClosed ?? false,
@@ -112,6 +120,7 @@ export function createStreetService(deps: StreetServiceDependencies): StreetServ
         },
         windows: orderWindows(windows)
       }
+      return street
     },
     async setWindowClosed(userId: string, closed: boolean) {
       await requireSchema()
@@ -130,24 +139,24 @@ export function createStreetService(deps: StreetServiceDependencies): StreetServ
   }
   return Object.freeze(service)
 
-  async function buildWindow(
+  /** `room` is undefined for a closed window and null for an open window without a saved room. */
+  function buildWindow(
     thread: ChatThread,
     partnerId: string,
+    room: StreetRoomSource | null | undefined,
     digest: StreetDigestRecord | undefined,
     hasGuest: boolean,
     edition: StreetEdition
-  ): Promise<StreetWindow> {
+  ): StreetWindow {
     const participant = thread.participants.find((entry) => entry.userId === partnerId)
     const base = {
       threadId: thread.threadId,
       displayName: participant?.displayName?.slice(0, 80) ?? null,
       unread: thread.unreadCount ?? 0
     }
-    const roomVisible = await (deps.isRoomVisibleToMatches?.(partnerId) ?? Promise.resolve(true))
-    if (digest?.windowClosed || !roomVisible) {
+    if (room === undefined) {
       return { ...base, closed: true, avatar: null, room: null, change: null }
     }
-    const room = await deps.getRoom(partnerId)
     return {
       ...base,
       closed: false,

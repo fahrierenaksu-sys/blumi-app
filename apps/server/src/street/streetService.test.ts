@@ -31,8 +31,9 @@ function service(overrides: Partial<StreetServiceDependencies> & { threads: Chat
     listThreads: async () => overrides.threads,
     listMutualPartnerIds: async () => new Set(overrides.mutual),
     listBlockedPartnerIds: async () => [],
-    isUserAllowed: async () => true,
-    getRoom: async () => ({ revision: 3, decor: { roomShellId: "shell", placedItems: [] } }),
+    listAllowedUserIds: async (userIds) => new Set(userIds),
+    getRooms: async (userIds) => new Map(userIds.map((userId) =>
+      [userId, { revision: 3, decor: { roomShellId: "shell", placedItems: [] } }] as const)),
     ...overrides
   })
   return { street, repository }
@@ -78,7 +79,7 @@ test("only mutual, unblocked, allowed partners appear, at most 50", async () => 
     threads: [...partners.map((partner) => thread(partner)), thread("nomatch")],
     mutual: partners,
     listBlockedPartnerIds: async () => ["p0"],
-    isUserAllowed: async (userId) => userId !== "p1"
+    listAllowedUserIds: async (userIds) => new Set(userIds.filter((userId) => userId !== "p1"))
   })
   const result = await street.read(VIEWER, new Date("2026-10-17T08:00:00.000Z"))
   const ids = result.windows.map((window) => window.threadId)
@@ -148,4 +149,27 @@ test("look and room diffs name the most visible change", () => {
   assert.equal(diffStreetRoom([rug], [{ ...rug, x: 3 }]), "layout")
   assert.equal(diffStreetRoom([rug], [rug]), null)
   assert.equal(diffStreetRoom(null, [rug]), null)
+})
+
+test("fifty windows cost one allowed-account read and one room read, not one per partner", async () => {
+  // Arrange
+  const partners = Array.from({ length: 50 }, (_, index) => `p${index}`)
+  const calls = { allowed: 0, rooms: 0, roomOwners: 0 }
+  const { street } = service({
+    threads: partners.map((partner) => thread(partner)),
+    mutual: partners,
+    listAllowedUserIds: async (userIds) => { calls.allowed += 1; return new Set(userIds) },
+    getRooms: async (userIds) => {
+      calls.rooms += 1
+      calls.roomOwners += userIds.length
+      return new Map(userIds.map((userId) => [userId, { revision: 1, decor: { roomShellId: "shell", placedItems: [] } }] as const))
+    }
+  })
+  await street.setWindowClosed("p3", true)
+  // Act
+  const result = await street.read(VIEWER, new Date("2026-10-17T08:00:00.000Z"))
+  // Assert
+  assert.equal(result.windows.length, 50)
+  assert.deepEqual(calls, { allowed: 1, rooms: 1, roomOwners: 50 }, "the viewer plus 49 open windows")
+  assert.ok(result.self.room)
 })
