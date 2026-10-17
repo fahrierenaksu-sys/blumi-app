@@ -14,14 +14,14 @@ from PIL import Image
 
 OUT_DIR = Path("src/features/session/assets/onboarding-scan-laser-v4")
 
-HOT_WHITE = np.array([255, 244, 248], dtype=np.float64)
-HOT_PINK = np.array([255, 92, 132], dtype=np.float64)
+HOT_WHITE = np.array([255, 246, 249], dtype=np.float64)
+LASER_PINK = np.array([255, 52, 104], dtype=np.float64)
 BRAND_PINK = np.array([232, 58, 96], dtype=np.float64)
 SOFT_PINK = np.array([255, 128, 162], dtype=np.float64)
 
 # Display sizes in points; textures are drawn at roughly 4x for @3x screens.
-BEAM_POINTS = (268, 34)
-BEAM_PIXELS = (1072, 136)
+BEAM_POINTS = (268, 24)
+BEAM_PIXELS = (1608, 144)
 
 
 def smoothstep(edge0, edge1, x):
@@ -65,17 +65,17 @@ def beam():
     scale = width / BEAM_POINTS[0]
     x = np.linspace(0.0, 1.0, width)[None, :]
     y = (np.arange(height)[:, None] - (height - 1) / 2.0) / scale
-    # Bright in the middle, tapering to fine points at the emitters.
-    taper = smoothstep(0.0, 0.16, x) * smoothstep(0.0, 0.16, 1.0 - x)
-    centre = 0.78 + 0.22 * np.exp(-((x - 0.5) / 0.34) ** 2)
-    drift = smooth_noise(width, seed=7)[None, :]
-    energy = taper * centre * drift
-    core_width = 0.35 + 0.5 * taper
+    # A real line laser is even along its length and dies off quickly at the ends.
+    taper = smoothstep(0.0, 0.07, x) * smoothstep(0.0, 0.07, 1.0 - x)
+    drift = smooth_noise(width, seed=7, amount=0.05)[None, :]
+    # Fine grain along the core: the speckle every real laser line has.
+    speckle = smooth_noise(width, seed=11, knots=220, amount=0.14)[None, :]
+    energy = taper * drift
     layers = [
-        (0.14 * np.exp(-np.abs(y) / 9.0) * taper, BRAND_PINK),
-        (0.42 * np.exp(-(y / 6.0) ** 2) * energy, BRAND_PINK),
-        (0.78 * np.exp(-(y / (1.9 * core_width)) ** 2) * energy, HOT_PINK),
-        (0.98 * np.exp(-(y / (0.62 * core_width)) ** 2) * np.minimum(1.0, energy * 1.15), HOT_WHITE),
+        (0.07 * np.exp(-np.abs(y) / 3.5) * taper, BRAND_PINK),
+        (0.30 * np.exp(-(y / 1.6) ** 2) * energy, LASER_PINK),
+        (0.95 * np.exp(-(y / 0.55) ** 2) * energy * speckle, LASER_PINK),
+        (1.0 * np.exp(-(y / 0.22) ** 2) * np.minimum(1.0, energy * speckle * 1.1), HOT_WHITE),
     ]
     write("scan_laser_beam.png", composite(layers, height, width))
 
@@ -87,7 +87,7 @@ def curtain():
     y = np.linspace(0.0, 1.0, height)[:, None]
     taper = smoothstep(0.0, 0.2, x) * smoothstep(0.0, 0.2, 1.0 - x)
     falloff = y ** 2.6
-    alpha = 0.16 * falloff * taper
+    alpha = 0.12 * falloff * taper
     write("scan_laser_curtain.png", composite([(alpha, SOFT_PINK)], height, width))
 
 
