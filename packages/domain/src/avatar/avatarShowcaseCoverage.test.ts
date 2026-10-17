@@ -67,10 +67,11 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * 2026-10-16 ~23:00 (OWNER_DECISIONS): the owner approved every price and publishing; the light denim crop jacket
  * (front + erase mask) and the ink twin braids (cleaned back layer) fronts from release_finish/surffix are allowlisted
  * and baked, so their entries are gone.
+ * new collection: hair_male_blond_fade landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
   female: [],
-  male: [],
+  male: ["hair_male_blond_fade"],
 };
 
 const rigs = Object.keys(AVATAR_STILL_MANIFEST.bodies) as AvatarStillRigId[];

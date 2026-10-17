@@ -5931,7 +5931,7 @@
       }
     },
     "male": {
-      "rigSha256": "6450139e53483b57478e394c06715aebfe8a2617d60d0f8441a6adb7528a72db",
+      "rigSha256": "2af53c9ecb221feb78134a475d2c9db8f555609aadf3c9c53dde20f534da4ea4",
       "sheetHeight": 982,
       "canvas": {
         "width": 649,
@@ -6592,6 +6592,11 @@
               ]
             }
           }
+        },
+        "hair_male_blond_fade": {
+          "slot": "hair",
+          "rigItemId": "hair_male_blond_fade",
+          "thumb": "hair_male_blond_fade"
         },
         "glasses_boy_black_soft_rect": {
           "slot": "glasses",
@@ -11698,6 +11703,19 @@
             ]
           },
           {
+            "key": "hair_male_blond_fade__o4p6",
+            "owner": "hair_male_blond_fade",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              195,
+              35,
+              236,
+              178
+            ]
+          },
+          {
             "key": "body__o5",
             "owner": "body",
             "slot": "body",
@@ -12113,6 +12131,19 @@
               16,
               146,
               115
+            ]
+          },
+          {
+            "key": "hair_male_blond_fade__o4p6",
+            "owner": "hair_male_blond_fade",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              60,
+              17,
+              147,
+              113
             ]
           },
           {
