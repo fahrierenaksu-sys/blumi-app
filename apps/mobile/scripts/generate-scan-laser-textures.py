@@ -87,29 +87,10 @@ def curtain():
     y = np.linspace(0.0, 1.0, height)[:, None]
     taper = smoothstep(0.0, 0.2, x) * smoothstep(0.0, 0.2, 1.0 - x)
     falloff = y ** 2.6
-    lines = 0.82 + 0.18 * (0.5 + 0.5 * np.cos(np.arange(height)[:, None] * 2 * np.pi / 6.0))
-    alpha = 0.24 * falloff * taper * lines
+    alpha = 0.16 * falloff * taper
     write("scan_laser_curtain.png", composite([(alpha, SOFT_PINK)], height, width))
-
-
-def flare():
-    """A round hotspot with a thin anamorphic streak."""
-    size = 256
-    axis = np.linspace(-1.0, 1.0, size)
-    dx, dy = np.meshgrid(axis, axis)
-    r = np.hypot(dx, dy)
-    edge = smoothstep(1.0, 0.82, r)
-    streak = np.exp(-(dy / 0.03) ** 2) * np.exp(-np.abs(dx) / 0.38) * smoothstep(1.0, 0.7, np.abs(dx))
-    layers = [
-        (0.42 * np.exp(-(r / 0.42) ** 2) * edge, BRAND_PINK),
-        (0.85 * streak, HOT_PINK),
-        (0.9 * np.exp(-(r / 0.16) ** 2), HOT_PINK),
-        (1.0 * np.exp(-(r / 0.07) ** 2), HOT_WHITE),
-    ]
-    write("scan_laser_flare.png", composite(layers, size, size))
 
 
 if __name__ == "__main__":
     beam()
     curtain()
-    flare()
