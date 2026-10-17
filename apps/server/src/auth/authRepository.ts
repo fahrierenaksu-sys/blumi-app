@@ -274,6 +274,12 @@ export type OtpVerificationResult =
 
 export interface OtpSignInFinalizationInput extends OtpVerificationInput {
   requireExistingAccount?: boolean
+  /**
+   * Account creation only: an existing account for the phone is reported as
+   * `account_exists` and nothing is written, so a second registration never
+   * signs into (and then overwrites) the account that is already there.
+   */
+  requireNewAccount?: boolean
   /** Used only after a trusted external identity provider has verified the phone. */
   verifiedWithoutOtp?: boolean
   newAccount: AccountRecord
@@ -344,6 +350,7 @@ export type PhoneChangeResult =
 export type OtpSignInFinalizationResult =
   | { kind: "terms_required" }
   | { kind: "account_not_found" }
+  | { kind: "account_exists" }
   | { kind: "identity_mismatch"; accountId: string | null }
   | { kind: "verified"; account: AccountRecord; session: SessionRecord }
   | { kind: "invalid"; attemptsRemaining: number }
@@ -733,6 +740,9 @@ export function createInMemoryAuthRepository(
       }
       if (!existingAccount && input.requireExistingAccount) {
         return { kind: input.verifiedWithoutOtp ? "account_not_found" : "terms_required" }
+      }
+      if (existingAccount && input.requireNewAccount) {
+        return { kind: "account_exists" }
       }
       const account = cloneAccount(existingAccount ?? input.newAccount)
       if (!existingAccount && store.moderationPhoneBans.has(input.phoneBanHash(input.phoneNumber))) {

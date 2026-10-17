@@ -119,6 +119,12 @@ export interface AuthService {
     phoneNumber: string,
     options: {
       requireExistingAccount?: boolean
+      /**
+       * Registration: refuse with ACCOUNT_ALREADY_EXISTS instead of signing
+       * into an account the phone already has. The phone is verified at this
+       * point, so only its owner learns that the account exists.
+       */
+      requireNewAccount?: boolean
       acceptedTerms?: {
         version: string
         locale: "en" | "tr"
@@ -568,6 +574,7 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
       const finalization = await repository.finalizeOtpSignIn({
         verifiedWithoutOtp: true,
         requireExistingAccount: options.requireExistingAccount,
+        requireNewAccount: options.requireNewAccount,
         phoneNumber,
         now: now.getTime(),
         maxAttempts: MAX_VERIFY_ATTEMPTS,
@@ -595,6 +602,13 @@ export function createAuthService(options: CreateAuthServiceOptions = {}): AuthS
         throw new AuthError({
           code: "ACCOUNT_RECOVERY_REQUIRED",
           message: "For your security, this phone number needs an account recovery review before you can sign in.",
+          statusCode: 409
+        })
+      }
+      if (finalization.kind === "account_exists") {
+        throw new AuthError({
+          code: "ACCOUNT_ALREADY_EXISTS",
+          message: "You already have a Blumi account with this phone number. Sign in instead.",
           statusCode: 409
         })
       }

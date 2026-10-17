@@ -763,6 +763,10 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
             return { kind: "identity_mismatch", accountId: account?.accountId ?? null }
           }
         }
+        if (account && input.requireNewAccount) {
+          await client.query("COMMIT")
+          return { kind: "account_exists" }
+        }
         if (!account) {
           if (input.requireExistingAccount) {
             await client.query("COMMIT")
@@ -829,6 +833,10 @@ export function createPostgresAuthRepository(pool: Pool): AuthRepository {
           )
           if (insertedAccount.rows[0]) {
             account = mapAccount(insertedAccount.rows[0])
+          } else if (input.requireNewAccount) {
+            // A concurrent registration for this phone won the insert.
+            await client.query("COMMIT")
+            return { kind: "account_exists" }
           } else {
             const canonicalAccount = await client.query(
               `${accountSelectSql()}

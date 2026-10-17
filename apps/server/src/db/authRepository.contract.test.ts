@@ -153,6 +153,34 @@ runRepositoryContract<AuthHarness>({
     })
   },
   cases: {
+    "a registration for a phone that already has an account reports it and writes nothing": async ({ repository }) => {
+      const { auth } = repository
+      const existing = await signUp(auth)
+      const updatedBefore = (await auth.findAccountById(existing.accountId))?.updatedAt
+      const result = await auth.finalizeOtpSignIn({
+        phoneNumber: existing.phoneNumber,
+        now: Date.now(),
+        maxAttempts: MAX_ATTEMPTS,
+        verifiedWithoutOtp: true,
+        requireNewAccount: true,
+        matches: () => true,
+        newAccount: createAccountRecord(existing.phoneNumber, new Date(), TERMS),
+        createSession: () => assert.fail("no session may be created for an existing account"),
+        phoneBanHash
+      })
+      assert.deepEqual(result, { kind: "account_exists" })
+      const after = await auth.getAccountByPhone(existing.phoneNumber)
+      assert.equal(after?.accountId, existing.accountId)
+      assert.equal(after?.updatedAt, updatedBefore)
+      // A phone without an account still registers normally.
+      const fresh = uniquePhone()
+      const created = await auth.finalizeOtpSignIn({
+        phoneNumber: fresh, now: Date.now(), maxAttempts: MAX_ATTEMPTS, verifiedWithoutOtp: true,
+        requireNewAccount: true, matches: () => true,
+        newAccount: createAccountRecord(fresh, new Date(), TERMS), createSession: session, phoneBanHash
+      })
+      assert.equal(created.kind, "verified")
+    },
     "moderation status and accepted terms read back through every account lookup": async ({ repository }) => {
       const account = await signUp(repository.auth)
       await repository.setModeration(account, "banned")

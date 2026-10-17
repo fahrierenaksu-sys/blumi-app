@@ -217,6 +217,7 @@ export async function registerAuthRoutes(
         }
         const result = await authService.signInWithVerifiedPhone(phoneNumber, {
           requireExistingAccount: parsed.authIntent === "sign-in",
+          requireNewAccount: parsed.authIntent === "create",
           acceptedTerms: parsed.authIntent === "create" ? parsed.termsAcceptance : undefined,
           firebaseUid: identity.uid
         }).catch(async (error: unknown) => {
@@ -232,7 +233,7 @@ export async function registerAuthRoutes(
         })
         return reply.code(200).send(toSessionActor(result.account, result.session, result.sessionToken))
       } catch (error) {
-        if (isAuthError(error) && error.code === "ACCOUNT_RECOVERY_REQUIRED") {
+        if (isAuthError(error) && (error.code === "ACCOUNT_RECOVERY_REQUIRED" || error.code === "ACCOUNT_ALREADY_EXISTS")) {
           return reply.code(error.statusCode).send({ code: error.code, error: error.message })
         }
         if (isAuthError(error)) {

@@ -169,3 +169,34 @@ test("a different Firebase uid for a bound phone is routed to manual account rec
     await app.close()
   }
 })
+
+test("registering again with an already used phone says the account exists and leaves it untouched", async () => {
+  const app = createServer({
+    authService: createAuthService(),
+    firebaseAuthVerifier: { async verifyIdToken() {
+      return { uid: "firebase-user-1", phoneNumber: PHONE, authTime: Math.floor(Date.now() / 1000) }
+    } }
+  })
+  const create = { idToken: "firebase-id-token", authIntent: "create", termsAcceptance: { version: "test-terms-v1", locale: "tr" } }
+  try {
+    const first = await app.inject({ method: "POST", url: "/v1/auth/firebase/complete", payload: create })
+    assert.equal(first.statusCode, 200)
+
+    const again = await app.inject({ method: "POST", url: "/v1/auth/firebase/complete", payload: create })
+    assert.equal(again.statusCode, 409)
+    assert.equal(again.json().code, "ACCOUNT_ALREADY_EXISTS")
+    // No session is handed out, so the client cannot replay a new draft over the account.
+    assert.equal(again.json().session, undefined)
+    assert.doesNotMatch(again.body, /\+?\d{10,}/)
+
+    const signedIn = await app.inject({
+      method: "POST",
+      url: "/v1/auth/firebase/complete",
+      payload: { idToken: "firebase-id-token", authIntent: "sign-in" }
+    })
+    assert.equal(signedIn.statusCode, 200)
+    assert.equal(signedIn.json().profile.userId, first.json().profile.userId)
+  } finally {
+    await app.close()
+  }
+})

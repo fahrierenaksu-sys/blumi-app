@@ -9,6 +9,7 @@ export type AuthErrorCode =
   | "ACCOUNT_DELETION_REAUTH_REQUIRED"
   | "ACCOUNT_DELETION_CONFIRMATION_INVALID"
   | "ACCOUNT_RECOVERY_REQUIRED"
+  | "ACCOUNT_ALREADY_EXISTS"
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode
