@@ -185,6 +185,11 @@ export function Avatar25Canvas(props: {
    * Build everything (textures, buffers) but present nothing yet: the surface stays empty and transparent, and the
    * first frame after it turns false is fully drawn (MiniRoom: loads during the stage fade-in, shows at its end).
    */
+  hidden?: boolean
+  /**
+   * Stop animating: one frame is drawn as soon as the avatar is built, then the surface keeps it (a tab in the
+   * background, so she is already there while its page slides in) until this turns false.
+   */
   paused?: boolean
   onStats?: (stats: Avatar25FrameStats) => void
   onReady?: () => void
@@ -193,6 +198,8 @@ export function Avatar25Canvas(props: {
   const ref = useRef<CanvasRef>(null)
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
   const [gpu, setGpu] = useState<GpuState | null>(null)
+  // frames presented by the current GPU state (a paused surface still shows its first one)
+  const presentedFrames = useSharedValue(0)
   const { onReady, onError } = props
   const maxPixelRatio = props.maxPixelRatio ?? Number.POSITIVE_INFINITY
   const instances = useStableInstances(props.instances)
@@ -235,6 +242,7 @@ export function Avatar25Canvas(props: {
       if (cancelled) return
       const textureMB = (await getAvatar25TextureBytes(shared)) / 1e6
       if (cancelled) return
+      presentedFrames.value = 0
       setGpu({
         device: shared.device,
         pipeline: shared.pipeline,
@@ -258,7 +266,7 @@ export function Avatar25Canvas(props: {
         msaa.destroy()
       }
     }
-  }, [instances, maxPixelRatio, onError, onReady, size])
+  }, [instances, maxPixelRatio, onError, onReady, presentedFrames, size])
 
   const stats = useSharedValue({ frames: 0, work: 0, interval: 0, calls: 0 })
   const { driver, onStats } = props
@@ -267,11 +275,13 @@ export function Avatar25Canvas(props: {
   const hasStats = Boolean(onStats)
   const clockFromMount = props.clockStartsAtMount ?? false
   const clockStartMs = useSharedValue(-1)
+  const hidden = props.hidden ?? false
   const paused = props.paused ?? false
 
   useFrameCallback((info) => {
     "worklet"
-    if (!gpu || paused) return
+    if (!gpu || hidden) return
+    if (paused && presentedFrames.value > 0) return
     const t0 = performance.now()
     const { device, pipeline } = gpu
     const texture = gpu.context.getCurrentTexture()
@@ -336,6 +346,7 @@ export function Avatar25Canvas(props: {
     pass.end()
     device.queue.submit([encoder.finish()])
     gpu.context.present()
+    presentedFrames.value += 1
     if (!hasStats) return
     const s = stats.value
     s.frames += 1

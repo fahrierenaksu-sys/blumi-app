@@ -159,11 +159,9 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const roomShell = roomDecorScene?.shell
   const { covered: stageCovered, markPainted: handleStageSceneReady } =
     useMyRoomStageCover(!roomShell, MINI_ROOM_STAGE_READY_CAP_MS)
-  // 2.5D avatars draw into a GPU surface, which must not appear while the stage fades in from
-  // transparent (the whole stage stayed invisible): it loads during the fade and draws its first frame
-  // when the reveal finishes, so the avatar arrives with the room instead of after it.
-  const [stageRevealed, setStageRevealed] = useState(false)
-  const markStageRevealed = useCallback(() => setStageRevealed(true), [])
+  // The stage stays hidden until the room is drawn and the local 2.5D avatar is loaded (capped), then fades in
+  // as one: her GPU surface draws from the first frame of the fade (a surface follows its parents' opacity, as
+  // AvatarHero's cross-fade does), so she arrives with the room instead of after it. While hidden it draws nothing.
   const [localAvatarReady, setLocalAvatarReady] = useState(false)
   const markLocalAvatarReady = useCallback(() => setLocalAvatarReady(true), [])
   const [avatarWaitElapsed, setAvatarWaitElapsed] = useState(false)
@@ -171,10 +169,8 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
     const timer = setTimeout(() => setAvatarWaitElapsed(true), MINI_ROOM_AVATAR_READY_CAP_MS)
     return () => clearTimeout(timer)
   }, [])
-  const stageRevealStyle = useStageRevealStyle(
-    stageCovered || (!localAvatarReady && !avatarWaitElapsed),
-    markStageRevealed
-  )
+  const stageHidden = stageCovered || (!localAvatarReady && !avatarWaitElapsed)
+  const stageRevealStyle = useStageRevealStyle(stageHidden)
   // VIS-04: upright furniture is drawn among the avatars by floor depth.
   const depthScene = useMemo(() => createMiniRoomDepthScene(roomDecorScene), [roomDecorScene])
   // Everything the pose depends on except the keyboard (that is a progress).
@@ -355,7 +351,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       typingUserId={props.typing?.partnerTyping ? partnerUser.userId : undefined}
       motionPolicy={motionPolicy}
       depthScene={depthScene}
-      holdGpuSurfaces={!stageRevealed}
+      holdGpuSurfaces={stageHidden}
       onLocalAvatarReady={markLocalAvatarReady}
     />
   )
