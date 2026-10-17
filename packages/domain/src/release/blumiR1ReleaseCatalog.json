@@ -4311,6 +4311,18 @@
         "^(?:qa_|dev_|test_)",
         "^room_v2_(?:qa_|candidate_)"
       ]
+    },
+    {
+      "scope": "new-collection-art-pending",
+      "productionPublication": false,
+      "itemIdPatterns": [
+        "^hair_male_blond_fade$",
+        "^hair_male_soft_crop$",
+        "^hair_male_black_side_part$",
+        "^hair_male_wavy_quiff$",
+        "^hair_male_cocoa_quiff$",
+        "^hair_male_chestnut_waves$"
+      ]
     }
   ],
   "productionPolicy": {

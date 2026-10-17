@@ -1,6 +1,7 @@
 /**
  * The new collection (2026-10-15, factory design collection_2140 + dresses v2): 10 girl dresses, 2 girl jackets,
- * 4 glasses (2 girl, 2 boy), 6 girl hairs, 3 girl accessories, 3 girl bottoms, 1 pair of girl boots and 5 girl tops. Every ID is NEW (no old ID is renamed or reused).
+ * 4 glasses (2 girl, 2 boy), 6 girl hairs, 3 girl accessories, 3 girl bottoms, 1 pair of girl boots and 5 girl tops; then 6 boy
+ * hairs (2026-10-17, boyhair_1017). Every ID is NEW (no old ID is renamed or reused).
  *
  * Each piece is declared once here. It joins the loadout, economy and mobile catalogs once its art has landed
  * (`NEW_COLLECTION_LANDED_ITEM_IDS`), and until its owner-approved receipt lands the release catalog's held scope
@@ -122,6 +123,14 @@ export const NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze(
   piece("top_girl_rose_pearl_cardigan", "top", "Gül Hırka", 240),
   piece("top_girl_breton_stripe", "top", "Bretan Bluz", 220),
   piece("top_girl_sage_knit_polo", "top", "Triko Polo", 220),
+  // the boy's six 2.5D hairs (boyhair_1017): lead proposal prices on the hair tiers (short cut 260, quiff 300, waves 320),
+  // waiting for the owner's figures; held by `new-collection-art-pending` until their receipts land
+  piece("hair_male_blond_fade", "hair", "Sarı Fade", 260, { bodyId: BOY }),
+  piece("hair_male_soft_crop", "hair", "Yumuşak Kısa Kesim", 260, { bodyId: BOY }),
+  piece("hair_male_black_side_part", "hair", "Siyah Yan Ayrık", 260, { bodyId: BOY }),
+  piece("hair_male_wavy_quiff", "hair", "Dalgalı Quiff", 300, { bodyId: BOY }),
+  piece("hair_male_cocoa_quiff", "hair", "Kakao Quiff", 300, { bodyId: BOY }),
+  piece("hair_male_chestnut_waves", "hair", "Kestane Dalgalar", 320, { bodyId: BOY }),
 ].map((item) => Object.freeze(item)))
 
 export const NEW_COLLECTION_ITEM_IDS: readonly string[] = Object.freeze(NEW_COLLECTION_ITEMS.map((item) => item.itemId))
@@ -175,7 +184,7 @@ export const LANDED_NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.
 /** English fallback title (the catalogs keep an English `name`/`title`; Turkish copy comes from `nameTr`). */
 export function newCollectionEnglishTitle(itemId: string): string {
   return itemId
-    .replace(/^[a-z]+_(girl|boy)_/, "")
+    .replace(/^[a-z]+_(girl|boy|male)_/, "")
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ")
