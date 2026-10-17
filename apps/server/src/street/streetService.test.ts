@@ -173,3 +173,16 @@ test("fifty windows cost one allowed-account read and one room read, not one per
   assert.deepEqual(calls, { allowed: 1, rooms: 1, roomOwners: 50 }, "the viewer plus 49 open windows")
   assert.ok(result.self.room)
 })
+
+test("a partner outside the street rollout never appears, so nobody shows up without their own switch", async () => {
+  // Arrange
+  const { street } = service({
+    threads: [thread("ece"), thread("can")],
+    mutual: ["ece", "can"],
+    isStreetRolledOutTo: (userId) => userId !== "can"
+  })
+  // Act
+  const result = await street.read(VIEWER, new Date("2026-10-17T08:00:00.000Z"))
+  // Assert
+  assert.deepEqual(result.windows.map((window) => window.threadId), ["thread_ece"])
+})

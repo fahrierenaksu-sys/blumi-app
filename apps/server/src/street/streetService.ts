@@ -48,6 +48,11 @@ export interface StreetServiceDependencies {
    * decided on 2026-10-17 that a home is visible to matches by default.
    */
   isRoomVisibleToMatches?(userId: string): Promise<boolean>
+  /**
+   * Whether the street is rolled out to this partner. A partner outside the rollout cannot see
+   * the street or close their window, so they never appear on anyone else's. Defaults to everyone.
+   */
+  isStreetRolledOutTo?(userId: string): boolean
   guests?: StreetGuestProvider
   log?: { warn(entry: Record<string, unknown>, message: string): void }
 }
@@ -94,7 +99,8 @@ export function createStreetService(deps: StreetServiceDependencies): StreetServ
       ])
       const matched = uniqueByPartner(threads, viewerUserId).filter(({ partnerId }) => mutual.has(partnerId))
       const blocked = new Set(await deps.listBlockedPartnerIds(viewerUserId, matched.map(({ partnerId }) => partnerId)))
-      const candidates = matched.filter(({ partnerId }) => !blocked.has(partnerId))
+      const candidates = matched.filter(({ partnerId }) =>
+        !blocked.has(partnerId) && (deps.isStreetRolledOutTo?.(partnerId) ?? true))
       const allowed = await deps.listAllowedUserIds(candidates.map(({ partnerId }) => partnerId), now)
       const visible = candidates.filter(({ partnerId }) => allowed.has(partnerId)).slice(0, STREET_MAX_WINDOWS)
       const partnerIds = visible.map(({ partnerId }) => partnerId)

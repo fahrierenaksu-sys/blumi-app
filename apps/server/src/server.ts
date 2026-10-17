@@ -276,6 +276,8 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       getMany: (userIds) => basePersonalRoomDecorService.getMany(userIds),
       ttlMs: STREET_ROOM_CACHE_TTL_MS
     }),
+    // capabilityService is created below; this runs per request, after it exists.
+    isStreetRolledOutTo: (userId) => isCapabilityRolledOut(capabilityService, userId, "chat_street"),
     log: { warn: (entry, message) => console.warn(message, entry) }
   })
   const { avatarService, personalRoomDecorService } = options.streetDigestsInSaveTransaction
