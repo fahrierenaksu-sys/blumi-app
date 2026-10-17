@@ -7,7 +7,7 @@ import { createRoomPetState, getRoomPetOutput, stepRoomPet } from "./roomPetEngi
 import { isRoomPetEnabled } from "./roomPetFlag"
 import { getRoomPetNeighbours, isRoomPetCellWalkable, isSameRoomPetCell, roomPetCellKey } from "./roomPetGrid"
 import { drawRoomPetInteger, drawRoomPetRandom } from "./roomPetRng"
-import { ROOM_PET_TRICK_UNLOCKS, ROOM_PET_TUNING as T } from "./roomPetTuning"
+import { ROOM_PET_LONGEST_REST_MS, ROOM_PET_TRICK_UNLOCKS, ROOM_PET_TUNING as T } from "./roomPetTuning"
 import { createTestRoomPetMap, runTestRoomPet, TEST_TICK_MS } from "./roomPetTestMap"
 
 const MAP = createTestRoomPetMap()
@@ -124,7 +124,7 @@ test("visitors are greeted with a heart", () => {
 })
 
 test("after a quiet spell the pet sleeps on the nearest rug or bed", () => {
-  const quietTicks = Math.ceil((T.sleepAfterQuietMs + T.idleMaxMs * 3) / TEST_TICK_MS)
+  const quietTicks = Math.ceil((T.sleepAfterQuietMs + ROOM_PET_LONGEST_REST_MS * 2) / TEST_TICK_MS)
   const nearRug = runTestRoomPet({ map: MAP, seed: 8, start: { column: 1, row: 8 }, ticks: quietTicks })
   const nearBed = runTestRoomPet({ map: MAP, seed: 8, start: { column: 10, row: 1 }, ticks: quietTicks })
   const lastRug = nearRug.outputs[nearRug.outputs.length - 1]
@@ -148,7 +148,7 @@ test("sleep spot choice is the nearest free rug or bed, never the sofa or an occ
 })
 
 test("the pet wakes on a tap and never sleeps forever", () => {
-  const quietTicks = Math.ceil((T.sleepAfterQuietMs + T.idleMaxMs * 3) / TEST_TICK_MS)
+  const quietTicks = Math.ceil((T.sleepAfterQuietMs + ROOM_PET_LONGEST_REST_MS * 2) / TEST_TICK_MS)
   const capTicks = Math.ceil(T.sleepMaxMs / TEST_TICK_MS)
   const tapped = runTestRoomPet({
     map: MAP, seed: 8, start: { column: 1, row: 8 }, ticks: quietTicks + 5,
@@ -158,7 +158,9 @@ test("the pet wakes on a tap and never sleeps forever", () => {
   assert.equal(woke.mode, "react")
   assert.equal(woke.emote, "sparkle")
   const left = runTestRoomPet({ map: MAP, seed: 8, start: { column: 1, row: 8 }, ticks: quietTicks + capTicks + 10 })
-  assert.ok(left.outputs.slice(quietTicks + capTicks).some((output) => output.mode !== "sleep"))
+  const fellAsleep = left.outputs.findIndex((output) => output.pose === "sleep")
+  assert.ok(fellAsleep >= 0 && fellAsleep <= quietTicks)
+  assert.ok(left.outputs.slice(fellAsleep, fellAsleep + capTicks + 2).some((output) => output.mode !== "sleep"), "slept past the cap")
 })
 
 function countEntries(outputs: readonly { mode: string }[], mode: string): number[] {
@@ -168,6 +170,41 @@ function countEntries(outputs: readonly { mode: string }[], mode: string): numbe
   })
   return entries
 }
+
+test("between walks the pet rests like a cat: it sits, lies down and gets up before it walks again", () => {
+  const ticks = Math.ceil((20 * 60 * 1000) / TEST_TICK_MS)
+  const restingPoses = new Set<string>(["sit", "curl", "sleep"])
+  const movingPoses = new Set<string>(["walk", "run"])
+  for (const seed of [3, 11, 27]) {
+    const run = runTestRoomPet({ map: MAP, seed, ticks })
+    const poses = new Set<string>(run.outputs.map((output) => output.pose))
+    for (const pose of ["sit", "curl", "walk"]) assert.ok(poses.has(pose), `seed ${seed}: never ${pose}`)
+    const movingTicks = run.outputs.filter((output) => movingPoses.has(output.pose)).length
+    assert.ok(movingTicks / ticks < 0.2, `seed ${seed}: walks ${Math.round((movingTicks / ticks) * 100)}% of the time`)
+    const restingTicks = run.outputs.filter((output) => restingPoses.has(output.pose)).length
+    assert.ok(restingTicks / ticks > 0.5, `seed ${seed}: rests only ${Math.round((restingTicks / ticks) * 100)}% of the time`)
+    run.outputs.forEach((output, index) => {
+      if (index === 0 || !movingPoses.has(output.pose)) return
+      const before = run.outputs[index - 1].pose
+      assert.ok(!restingPoses.has(before), `seed ${seed}, tick ${index}: walked off straight from ${before}`)
+    })
+  }
+})
+
+test("a rest without interruptions never jumps from lying to sitting and every stage lasts a while", () => {
+  const run = runTestRoomPet({ map: MAP, seed: 5, ticks: Math.ceil((10 * 60 * 1000) / TEST_TICK_MS) })
+  let stageStart = 0
+  run.outputs.forEach((output, index) => {
+    if (index === 0) return
+    const before = run.outputs[index - 1]
+    if (before.pose === output.pose) return
+    assert.ok(!(before.pose === "curl" && output.pose === "sit"), `tick ${index}: curl straight to sit`)
+    if (before.mode === "idle" && output.mode === "idle") {
+      assert.ok((index - stageStart) * TEST_TICK_MS >= T.idleMinMs, `tick ${index}: ${before.pose} lasted too short`)
+    }
+    stageStart = index
+  })
+})
 
 test("tap and chat-heart spam is rate limited so the pet is not jittery", () => {
   const tapStarts: number[] = []

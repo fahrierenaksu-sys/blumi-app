@@ -75,6 +75,11 @@ export function getRoomPetClipForHop(pose: RoomPetPose, hopPhase: "approach" | "
   return pose === "hop" && hopPhase === "down" ? "hopDown" : getRoomPetClipForPose(pose)
 }
 
+/** Half a drawn sheet cell's width in stage units (canvas widths): the flipbook draws one cell at the art's shell scale. */
+export function getRoomPetDrawnHalfWidth(layout: RoomPetSpriteSheetLayout, canvasWidth: number): number {
+  return (layout.cellHeightShellPx * (layout.cellWidth / layout.cellHeight)) / canvasWidth / 2
+}
+
 /** How long a clip plays once, from its frame count and fps (a one-shot holds its last frame after this). */
 export function getRoomPetClipDurationMs(clip: RoomPetSpriteClip): number {
   const frameCount = Math.max(clip.frames[45]?.length ?? 0, clip.frames[135]?.length ?? 0)

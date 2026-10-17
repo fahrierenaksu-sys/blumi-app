@@ -14,6 +14,9 @@ import { createRoomPetMap, findNearestFreeRoomPetCell, roomPetCellKey } from "./
  *
  * - Walkable: a lattice cell whose centre is on the drawn floor and outside
  *   every floor piece that blocks movement (its calibrated collision polygon).
+ *   When the screen shows only part of the shell (the phone card crops the
+ *   wide shell's sides), the whole pet must also fit inside that visible
+ *   part, so it never walks into a floor corner the card cuts off.
  * - Rug: a sleep spot on the covered cell nearest the rug's middle.
  * - Bed / sofa: a perch spot at the first seat's approach cell; the renderer
  *   draws the perched pet on the seat's cushion centre (the hip point when a
@@ -63,15 +66,33 @@ export function getRoomPetCellAtStagePoint(projection: RoomV2FloorGridProjection
   return snapRoomV2FloorGridCell(projection, point.x, point.y)
 }
 
+/**
+ * The shell's horizontal range the screen shows (stage x, 0..1) and the pet's
+ * drawn half width in the same units: a cell counts only when the pet drawn on
+ * it stays fully inside the range.
+ */
+export interface RoomPetVisibleStage {
+  readonly minX: number
+  readonly maxX: number
+  readonly petHalfWidth: number
+}
+
+function isInsideVisibleStage(visible: RoomPetVisibleStage | undefined, x: number): boolean {
+  if (!visible) return true
+  return x - visible.petHalfWidth >= visible.minX && x + visible.petHalfWidth <= visible.maxX
+}
+
 function collectWalkableCells(
   projection: RoomV2FloorGridProjection,
-  blockers: readonly (readonly RoomPoint2D[])[]
+  blockers: readonly (readonly RoomPoint2D[])[],
+  visible: RoomPetVisibleStage | undefined
 ): { cell: RoomPetCell; center: RoomPoint2D }[] {
   const cells: { cell: RoomPetCell; center: RoomPoint2D }[] = []
   for (let row = projection.minRow; row <= projection.maxRow; row += 1) {
     for (let column = projection.minColumn; column <= projection.maxColumn; column += 1) {
       const center = getRoomV2FloorGridCellPoint(projection, column, row)
       if (!isRoomV2FloorGridPointOnFloor(projection, center.x, center.y)) continue
+      if (!isInsideVisibleStage(visible, center.x)) continue
       if (blockers.some((polygon) => isPointInPolygon(center, polygon))) continue
       cells.push({ cell: { column, row }, center })
     }
@@ -102,7 +123,8 @@ function toSpot(
   item: RoomV2FurnitureRenderItem,
   projection: RoomV2FloorGridProjection,
   map: RoomPetMap,
-  walkable: readonly { cell: RoomPetCell; center: RoomPoint2D }[]
+  walkable: readonly { cell: RoomPetCell; center: RoomPoint2D }[],
+  visible: RoomPetVisibleStage | undefined
 ): RoomPetSpot | null {
   const kind = getSpotKind(item)
   if (!kind) return null
@@ -117,6 +139,8 @@ function toSpot(
     ? snapped
     : findNearestFreeRoomPetCell(map, snapped, new Set())
   const perchAnchor = seat.cushion ?? { x: seat.seat.x, y: seat.seat.y - seat.seatHeight }
+  // a bed or sofa in a corner the screen cuts off is no perch: the pet would vanish on it
+  if (!isInsideVisibleStage(visible, perchAnchor.x)) return null
   const perchFloor = { x: perchAnchor.x, y: perchAnchor.y + seat.seatHeight }
   return cell ? { id: item.renderId, kind, cell, perchAnchor: { x: perchAnchor.x, y: perchAnchor.y }, perchFloor } : null
 }
@@ -124,14 +148,16 @@ function toSpot(
 export function createRoomPetMapFromRoom(input: {
   readonly projection: RoomV2FloorGridProjection
   readonly furniture: readonly RoomV2FurnitureRenderItem[]
+  /** The part of the shell the screen shows; unset: the whole shell is on screen. */
+  readonly visibleStage?: RoomPetVisibleStage
 }): RoomPetMap {
   const blockers = input.furniture
     .map(getBlockingPolygon)
     .filter((polygon): polygon is readonly RoomPoint2D[] => polygon !== null)
-  const walkable = collectWalkableCells(input.projection, blockers)
+  const walkable = collectWalkableCells(input.projection, blockers, input.visibleStage)
   const floorOnly = createRoomPetMap(walkable.map((entry) => entry.cell), [])
   const spots = input.furniture
-    .map((item) => toSpot(item, input.projection, floorOnly, walkable))
+    .map((item) => toSpot(item, input.projection, floorOnly, walkable, input.visibleStage))
     .filter((spot): spot is RoomPetSpot => spot !== null)
   return createRoomPetMap(floorOnly.cells, spots)
 }

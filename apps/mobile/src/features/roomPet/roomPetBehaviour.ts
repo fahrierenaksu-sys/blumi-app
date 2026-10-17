@@ -3,6 +3,7 @@ import type {
   RoomPetCell,
   RoomPetMap,
   RoomPetPose,
+  RoomPetRestStage,
   RoomPetSpot,
   RoomPetState,
   RoomPetTrick
@@ -66,20 +67,69 @@ function walk(state: RoomPetState, path: readonly RoomPetCell[], stepMs: number,
   }
 }
 
-export function enterRoomPetIdle(state: RoomPetState, atMs: number): RoomPetState {
-  const duration = drawRoomPetInteger(state.rngState, T.idleMinMs, T.idleMaxMs)
-  const poseDraw = drawRoomPetRandom(duration.rngState)
-  const pose: RoomPetPose = poseDraw.value < 0.5 ? "stand" : "sit"
+const REST_POSE: Readonly<Record<RoomPetRestStage, RoomPetPose>> = {
+  settle: "stand",
+  sit: "sit",
+  lie: "curl",
+  getUp: "stand"
+}
+
+const REST_DURATION_MS: Readonly<Record<RoomPetRestStage, readonly [number, number]>> = {
+  settle: [T.settleMinMs, T.settleMaxMs],
+  sit: [T.sitMinMs, T.sitMaxMs],
+  lie: [T.lieMinMs, T.lieMaxMs],
+  getUp: [T.getUpMinMs, T.getUpMaxMs]
+}
+
+function enterRest(state: RoomPetState, stage: RoomPetRestStage, atMs: number): RoomPetState {
+  const [minMs, maxMs] = REST_DURATION_MS[stage]
+  const duration = drawRoomPetInteger(state.rngState, minMs, maxMs)
   return {
     ...state,
-    rngState: poseDraw.rngState,
+    rngState: duration.rngState,
     mode: "idle",
-    goal: null,
+    goal: { kind: "rest", stage },
     path: [],
-    pose,
+    pose: REST_POSE[stage],
     perchSpotId: null,
     modeEndsAtMs: atMs + duration.value
   }
+}
+
+/** Idle starts by stopping to look around; a pet that was lying down gets up first. */
+export function enterRoomPetIdle(state: RoomPetState, atMs: number): RoomPetState {
+  const isLying = state.pose === "curl" || state.pose === "sleep"
+  return enterRest(state, isLying ? "getUp" : "settle", atMs)
+}
+
+function isQuiet(state: RoomPetState, atMs: number): boolean {
+  return atMs - state.lastInteractionMs >= T.sleepAfterQuietMs
+}
+
+/** Quiet for long: doze off here when this is the sleep spot (or there is none), else get up and go to it. */
+function restTowardSleep(state: RoomPetState, map: RoomPetMap, stage: RoomPetRestStage, atMs: number): RoomPetState {
+  const spot = chooseRoomPetSleepSpot(state, map)
+  if (!spot || isSameRoomPetCell(spot.cell, state.cell)) {
+    return arriveRoomPetSleep({ ...state, mode: "sleep", goal: { kind: "sleep", spotId: spot ? spot.id : null } }, map, atMs)
+  }
+  return stage === "settle" ? startRoomPetSleep(state, map, atMs) : enterRest(state, "getUp", atMs)
+}
+
+/**
+ * A rest stage ended. Stopped: usually sit, else walk on. Sitting: often lie
+ * down, else get up. Lying: get up. Up: decide what to do next. When it has
+ * been quiet for long, the rest leads to a nap instead.
+ */
+export function advanceRoomPetRest(state: RoomPetState, map: RoomPetMap, atMs: number): RoomPetState {
+  if (isOwnerSeated(state)) return startRoomPetFollowSeat(state, map, atMs)
+  const stage: RoomPetRestStage = state.goal && state.goal.kind === "rest" ? state.goal.stage : "getUp"
+  if (stage === "getUp") return decideAfterRoomPetIdle(state, map, atMs)
+  if (isQuiet(state, atMs)) return restTowardSleep(state, map, stage, atMs)
+  const draw = drawRoomPetRandom(state.rngState)
+  const next: RoomPetState = { ...state, rngState: draw.rngState }
+  if (stage === "settle") return draw.value < T.sitChance ? enterRest(next, "sit", atMs) : decideAfterRoomPetIdle(next, map, atMs)
+  if (stage === "sit") return enterRest(next, draw.value < T.lieChance ? "lie" : "getUp", atMs)
+  return enterRest(next, "getUp", atMs)
 }
 
 /** Where the pet goes when nothing special is happening. */
@@ -148,15 +198,17 @@ export function startRoomPetSleep(state: RoomPetState, map: RoomPetMap, atMs: nu
 export function arriveRoomPetSleep(state: RoomPetState, map: RoomPetMap, atMs: number): RoomPetState {
   const spotId = state.goal && state.goal.kind === "sleep" ? state.goal.spotId : null
   const spot = map.spots.find((candidate) => candidate.id === spotId)
+  const nap = drawRoomPetInteger(state.rngState, T.sleepMinMs, T.sleepMaxMs)
   return {
     ...state,
+    rngState: nap.rngState,
     mode: "sleep",
     path: [],
     pose: "sleep",
     perchSpotId: spot && spot.kind !== "rug" ? spot.id : null,
     emote: "zzz",
     emoteUntilMs: Number.POSITIVE_INFINITY,
-    modeEndsAtMs: atMs + T.sleepMaxMs
+    modeEndsAtMs: atMs + nap.value
   }
 }
 
@@ -318,7 +370,7 @@ export function startRoomPetReact(
   }
 }
 
-/** Idle timer ran out: sleep when it has been quiet, sometimes hop onto furniture, otherwise wander. */
+/** The pet is up and ready to move: sleep when it has been quiet, sometimes hop onto furniture, otherwise wander. */
 export function decideAfterRoomPetIdle(state: RoomPetState, map: RoomPetMap, atMs: number): RoomPetState {
   if (isOwnerSeated(state)) return startRoomPetFollowSeat(state, map, atMs)
   if (atMs - state.lastInteractionMs >= T.sleepAfterQuietMs) return startRoomPetSleep(state, map, atMs)

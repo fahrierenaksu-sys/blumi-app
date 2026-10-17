@@ -8,11 +8,11 @@ import type {
 } from "./roomPet.types"
 import {
   advanceRoomPetHop,
+  advanceRoomPetRest,
   arriveRoomPetFollowSeat,
   arriveRoomPetGreet,
   arriveRoomPetHop,
   arriveRoomPetSleep,
-  decideAfterRoomPetIdle,
   enterRoomPetDefault,
   enterRoomPetIdle,
   findRoomPetAvatar,
@@ -155,7 +155,7 @@ function moveOneCell(state: RoomPetState, map: RoomPetMap, atMs: number): RoomPe
 
 function arrive(state: RoomPetState, map: RoomPetMap, atMs: number): RoomPetState {
   const goal = state.goal
-  if (!goal || goal.kind === "wander") return enterRoomPetIdle(state, atMs)
+  if (!goal || goal.kind === "wander" || goal.kind === "rest") return enterRoomPetIdle(state, atMs)
   if (goal.kind === "greet") return arriveRoomPetGreet(state, atMs)
   if (goal.kind === "sleep") return arriveRoomPetSleep(state, map, atMs)
   if (goal.kind === "hop") return arriveRoomPetHop(state, atMs)
@@ -166,7 +166,7 @@ function arrive(state: RoomPetState, map: RoomPetMap, atMs: number): RoomPetStat
 function reroute(state: RoomPetState, map: RoomPetMap, atMs: number): RoomPetState {
   const goal = state.goal
   const stopped: RoomPetState = { ...state, path: [] }
-  if (!goal || goal.kind === "wander") return startRoomPetWander(stopped, map, atMs)
+  if (!goal || goal.kind === "wander" || goal.kind === "rest") return startRoomPetWander(stopped, map, atMs)
   if (goal.kind === "sleep") return startRoomPetSleep(stopped, map, atMs)
   if (goal.kind === "hop") return startRoomPetHop(stopped, map, atMs) ?? enterRoomPetDefault(stopped, map, atMs)
   if (goal.kind === "curl") return startRoomPetFollowSeat(stopped, map, atMs)
@@ -182,7 +182,7 @@ function reroute(state: RoomPetState, map: RoomPetMap, atMs: number): RoomPetSta
 }
 
 function endMode(state: RoomPetState, map: RoomPetMap, atMs: number): RoomPetState {
-  if (state.mode === "idle") return decideAfterRoomPetIdle(state, map, atMs)
+  if (state.mode === "idle") return advanceRoomPetRest(state, map, atMs)
   if (state.mode === "hopOnto") return advanceRoomPetHop(state, map, atMs)
   if (state.mode === "sleep") {
     const awake: RoomPetState = { ...state, emote: null, emoteUntilMs: 0, perchSpotId: null, lastInteractionMs: atMs }

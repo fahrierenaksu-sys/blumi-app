@@ -97,3 +97,14 @@ function formatPercent(value: number): `${number}%` {
     : Number(value.toFixed(2))
   return `${formattedValue}%`
 }
+
+/**
+ * The horizontal part of the shell canvas the My Room card shows, in stage
+ * units (0..1). The portrait renderer is wider than the card and centred in
+ * it, so the card cuts off both side corners of the floor.
+ */
+export function getMyRoomVisibleStageXRange(rendererScalePercent: number): { minX: number; maxX: number } {
+  const visibleWidth = rendererScalePercent > 0 ? Math.min(1, 100 / rendererScalePercent) : 1
+  const minX = (1 - visibleWidth) / 2
+  return { minX, maxX: minX + visibleWidth }
+}
