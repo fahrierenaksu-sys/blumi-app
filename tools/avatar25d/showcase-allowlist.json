@@ -9,7 +9,7 @@
       "baseSha256": "7c9e39b72bcc92436747a5e45cfb3e54ce40d04612d27362fae031008da0ffa0",
       "qaPass": "line_1900/REPORT.md (o_g1fix8 16:37 FINAL; G5 starter-shoes waiver = owner yes 2026-10-12 20:07)",
       "ownerApproved": true,
-      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-14 15:23 +0300: the owner approved ('evet') the front looks of hair_girl_bob and hair_girl_pigtails (factory girl_bob_2130 and girl_pigtails_2130 sc/final_r2, shown in girl_preview_1500/girl_wardrobe_now.png; OWNER_DECISIONS.md FRONT SHOWCASE line of 2026-10-14). Ribbon waves and white sneakers are still pending. 2026-10-15 10:38 +0300: the owner approved ('önden görünsün') the front looks of ribbon waves, white sneakers, crop white, crop black, black trousers, jacket and corset (OWNER_DECISIONS.md), conditional on the audit fixes (sneaker hem, trouser hips, waves flecks). Listed here: waves, white sneakers (hem moved to the trousers layer, factory girl_shoes5_1430 FIX r1 hem_move), both crops (factory girl_basics_sc_1640 o_basics_w10/k11), jacket and corset. The black trousers are NOT listed: the hip fix is still open (beta5_fix_1030/REPORT.md), so they keep the 3/4 fallback. 2026-10-15 (chat): the owner approved the starter polo front v6 ('Polo değişikliğini onaylıyorum') and allowed the corset and jacket pins to move to their hip-fix v6 files (front + erase, Workbench integration/card_design/showcase/f2_hem_1545, integration/front_fix_1545/REPORT.md). 2026-10-15 (hip fix, Workbench integration/gpt3_1745/REPORT.md): the black trousers are listed with their v2 front (skin at the hip flare where the base tank showed under both crops) and v2 erase (corset hip specks); this is the audit fix the 10:38 approval was conditional on. The changed look is on the sheet integration/gpt3_1745/t2/SHEET_black_trousers_phone_2x.png. 2026-10-15 19:37 +0300: the owner approved the starter polo front v7 ('Polo v7 değişikliğini onaylıyorum.', OWNER_DECISIONS.md): hem notch filled and stray pink specks removed, file gpt3_1745/top_polo_v7.png; the polo erase is unchanged. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv.",
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-14 15:23 +0300: the owner approved ('evet') the front looks of hair_girl_bob and hair_girl_pigtails (factory girl_bob_2130 and girl_pigtails_2130 sc/final_r2, shown in girl_preview_1500/girl_wardrobe_now.png; OWNER_DECISIONS.md FRONT SHOWCASE line of 2026-10-14). Ribbon waves and white sneakers are still pending. 2026-10-15 10:38 +0300: the owner approved ('önden görünsün') the front looks of ribbon waves, white sneakers, crop white, crop black, black trousers, jacket and corset (OWNER_DECISIONS.md), conditional on the audit fixes (sneaker hem, trouser hips, waves flecks). Listed here: waves, white sneakers (hem moved to the trousers layer, factory girl_shoes5_1430 FIX r1 hem_move), both crops (factory girl_basics_sc_1640 o_basics_w10/k11), jacket and corset. The black trousers are NOT listed: the hip fix is still open (beta5_fix_1030/REPORT.md), so they keep the 3/4 fallback. 2026-10-15 (chat): the owner approved the starter polo front v6 ('Polo değişikliğini onaylıyorum') and allowed the corset and jacket pins to move to their hip-fix v6 files (front + erase, Workbench integration/card_design/showcase/f2_hem_1545, integration/front_fix_1545/REPORT.md). 2026-10-15 (hip fix, Workbench integration/gpt3_1745/REPORT.md): the black trousers are listed with their v2 front (skin at the hip flare where the base tank showed under both crops) and v2 erase (corset hip specks); this is the audit fix the 10:38 approval was conditional on. The changed look is on the sheet integration/gpt3_1745/t2/SHEET_black_trousers_phone_2x.png. 2026-10-15 19:37 +0300: the owner approved the starter polo front v7 ('Polo v7 değişikliğini onaylıyorum.', OWNER_DECISIONS.md): hem notch filled and stray pink specks removed, file gpt3_1745/top_polo_v7.png; the polo erase is unchanged. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv. 2026-10-17 22:24 +0300 (lead report in chat; card-quality lane): the owner approved the straight-front card and showcase layer of the camel ankle boots (Workbench shop/work/card-quality-20261017/shoes/REPORT.md, file integration/card_design/showcase/shoes_front_20261017/shoes_girl_camel_ankle_boots/front.png + erase.png). The published receipt must be reissued with the new bytes.",
       "crops": {
         "head": [
           876,
@@ -284,10 +284,10 @@
         "shoes_girl_camel_ankle_boots": {
           "slot": "shoes",
           "order": 1,
-          "file": "release2_sc/shoes_girl_camel_ankle_boots/front.png",
-          "sha256": "483ecb8d59e56b996fcb63f04680e2d8292856d04ad9ef4da05d08c3b399afe7",
-          "eraseFile": "release2_sc/shoes_girl_camel_ankle_boots/erase.png",
-          "eraseSha256": "c2f2137566d3ebec44420479f0509b3de08ee732f1454b9e2ee4745dc11a12d6"
+          "file": "shoes_front_20261017/shoes_girl_camel_ankle_boots/front.png",
+          "sha256": "db41fd0c7b783784936a8a9b9bbc03c8915ecf00bb792cd4adefaba1659c13bc",
+          "eraseFile": "shoes_front_20261017/shoes_girl_camel_ankle_boots/erase.png",
+          "eraseSha256": "793a33e678e3795b55416ed115639a91e9a8baf2f0fccae99e16a98194076270"
         },
         "dress_girl_black_corset_slit_maxi": {
           "slot": "dress",
@@ -394,7 +394,7 @@
       "baseSha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648",
       "qaPass": "integration/RESUME_INTEGRATION.md STATE 2026-10-13 06:33 (boy SHOWCASE 26/26 full pass); prov_boy_2145/REPORT.md; curls_install_1030/REPORT.md",
       "ownerApproved": true,
-      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv. 2026-10-17 (branch claude/boy-hair-front-shop): the six new boy hairs are listed with their front SHOWCASE layers so the Shop try-on, Discover, profile, chat header and push show the boy facing the camera (owner report from the phone the same day: in the market the boy stands turned sideways, he should face the camera so the hair is seen). Sources: the landed front/back layers of factory boyhair_1017 (fit_A2/sc and fit_B/sc/final, the same layers the published card thumbs are cut from), cleaned by new_collection/clean_boy_hair_c1.py (pinholes inside the chestnut and cocoa hair filled from the surrounding hair colour; white generation-background matte and pale rim pixels removed, alpha only lowered) -> new_collection/<id>/front_c1.png and back_c1.png. The owner approved the look of the six hairs on 2026-10-17 10:23 (OWNER_DECISIONS: male/work/boyhair_1017/contact_sheet.png, whose third row is the front view). These cleaned front layers themselves are NOT yet shown to the owner: their look yes is asked together with the receipt reissue these new runtime files require.",
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv. 2026-10-17 (branch claude/boy-hair-front-shop): the six new boy hairs are listed with their front SHOWCASE layers so the Shop try-on, Discover, profile, chat header and push show the boy facing the camera (owner report from the phone the same day: in the market the boy stands turned sideways, he should face the camera so the hair is seen). Sources: the landed front/back layers of factory boyhair_1017 (fit_A2/sc and fit_B/sc/final, the same layers the published card thumbs are cut from), cleaned by new_collection/clean_boy_hair_c1.py (pinholes inside the chestnut and cocoa hair filled from the surrounding hair colour; white generation-background matte and pale rim pixels removed, alpha only lowered) -> new_collection/<id>/front_c1.png and back_c1.png. The owner approved the look of the six hairs on 2026-10-17 10:23 (OWNER_DECISIONS: male/work/boyhair_1017/contact_sheet.png, whose third row is the front view). These cleaned front layers themselves are NOT yet shown to the owner: their look yes is asked together with the receipt reissue these new runtime files require. 2026-10-17 22:24 +0300 (lead report in chat; card-quality lane): the owner approved the straight-front card and showcase layers of tan loafers, brown loafers, dark leather sneakers and green skate shoes (Workbench shop/work/card-quality-20261017/shoes/REPORT.md, files integration/card_design/showcase/shoes_front_20261017/<id>/front.png + erase.png). Their published receipts must be reissued with the new bytes.",
       "crops": {
         "head": [
           870,
@@ -430,10 +430,10 @@
         "avatar_v2_shoes_male_tan_loafers": {
           "slot": "shoes",
           "order": 1,
-          "file": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_shoes.png",
-          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c2/layers/boy_shoes_erase.png",
-          "sha256": "cda5d23388a91ab1c835bb17d143ff57a4ab41a8a40e7b55acb94403d43603c3",
-          "eraseSha256": "8aad85bd7e8aa32adb28ee4e745d92e97e3257a2224babe691fa4f0b9b20d9ac"
+          "file": "shoes_front_20261017/avatar_v2_shoes_male_tan_loafers/front.png",
+          "eraseFile": "shoes_front_20261017/avatar_v2_shoes_male_tan_loafers/erase.png",
+          "sha256": "93b290dd598818e3b927fc577ad363f5fee866ee6ffcc7892ffeb2fa61e6c01b",
+          "eraseSha256": "2604d3223222050ccf10f726dab50813f71182a8ae08d575eb4a6f2e8c1d00fe"
         },
         "avatar_v2_top_male_forest_collar_sweater": {
           "slot": "top",
@@ -455,10 +455,10 @@
         "avatar_v2_shoes_male_brown_loafers": {
           "slot": "shoes",
           "order": 1,
-          "file": "boy_c12_c13_1915/qa_fix/q_c4/layers/boy_shoes.png",
-          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c4/layers/boy_shoes_erase.png",
-          "sha256": "e412f424ccaf043a1e952dc94e3377532f9b8fe153f34bcfc5f61478991b9076",
-          "eraseSha256": "67b602c8a99a10da0a92bff4c7ae3f25848242257739452c0990d80b7df4a4a9"
+          "file": "shoes_front_20261017/avatar_v2_shoes_male_brown_loafers/front.png",
+          "eraseFile": "shoes_front_20261017/avatar_v2_shoes_male_brown_loafers/erase.png",
+          "sha256": "89e6ec06ff73c054dc95157d553d5a1f7df0ff14950895e49e84f5bb93dda383",
+          "eraseSha256": "059d9eb59357b87c04c08891833e19c11d04ea85f644970b94aaaaeb40253465"
         },
         "avatar_v2_top_male_check_flannel_white_tee": {
           "slot": "top",
@@ -480,10 +480,10 @@
         "avatar_v2_shoes_male_green_skate_shoes": {
           "slot": "shoes",
           "order": 1,
-          "file": "boy_c12_c13_1915/qa_fix/q_c14w/layers/boy_shoes.png",
-          "eraseFile": "boy_c12_c13_1915/qa_fix/q_c14w/layers/boy_shoes_erase.png",
-          "sha256": "8f092a88b6b3b827222a2422e65d8e0c75a474fd660dd56b8117b1ab0d2b71b3",
-          "eraseSha256": "a15f0c528fa415b228a7d552f9d70577db02b18c17900ed2dcbe8f23eb5bfcef"
+          "file": "shoes_front_20261017/avatar_v2_shoes_male_green_skate_shoes/front.png",
+          "eraseFile": "shoes_front_20261017/avatar_v2_shoes_male_green_skate_shoes/erase.png",
+          "sha256": "93eaceaf40be367651f238f7d19597206a016a4957f5dc48287d9b2280fd0690",
+          "eraseSha256": "be2a36d27d8e985aa3f031fc2b1e4890098e9071ee22def81ab29d47236a1bfe"
         },
         "avatar_v2_top_male_white_basic_tee": {
           "slot": "top",
@@ -580,10 +580,10 @@
         "avatar_v2_shoes_male_dark_leather_sneakers": {
           "slot": "shoes",
           "order": 1,
-          "file": "boy_c12_c13_1915/r8/o_c13/layers/boy_shoes.png",
-          "eraseFile": "boy_c12_c13_1915/r8/o_c13/layers/boy_shoes_erase.png",
-          "sha256": "cd31d5c68a00c59c75a3127c9c71da3dfac7d3569f898c8c9ee3a3ec4a679abd",
-          "eraseSha256": "60f22835361af779a4fff07d3245167b80b85b769f5e5c93661173850ba801f0"
+          "file": "shoes_front_20261017/avatar_v2_shoes_male_dark_leather_sneakers/front.png",
+          "eraseFile": "shoes_front_20261017/avatar_v2_shoes_male_dark_leather_sneakers/erase.png",
+          "sha256": "b9e3afc91a5eef4d5a6f7d7ec92b47110ec97d9a2db96cba31072054e1ed06c0",
+          "eraseSha256": "8cd39de91b18de23e3d2f8552735364ec4bd5a7767c77bda6df7266eb8e09982"
         },
         "avatar_v2_top_male_olive_overshirt": {
           "slot": "top",
