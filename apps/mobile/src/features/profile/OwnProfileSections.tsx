@@ -101,7 +101,7 @@ export function ProfilePreviewEntry(props: { copy: OwnProfileCopy; onPress: () =
       style={styles.previewRow}
     >
       <View style={styles.previewIcon}>
-        <Ionicons accessible={false} name="eye" size={20} color={uiTheme.colors.brandPlum} />
+        <Ionicons accessible={false} name="eye" size={20} color="#FFFFFF" />
       </View>
       <View style={styles.addText}>
         <Text style={styles.previewTitle}>{props.copy.previewTitle}</Text>

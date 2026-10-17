@@ -86,7 +86,7 @@ export function AccountRestrictionScreen(props: AccountRestrictionScreenProps) {
               end={{ x: 1, y: 1 }}
               style={styles.iconGradient}
             >
-              <Ionicons name={copy.icon} size={35} color={uiTheme.colors.onPrimary} />
+              <Ionicons name={copy.icon} size={35} color="#FFFFFF" />
             </LinearGradient>
           </View>
           <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   primaryButton: { width: "100%", borderRadius: uiTheme.radius.lg, overflow: "hidden" },
   primaryButtonPressed: { opacity: 0.76 },
   primaryGradient: { paddingVertical: 16, alignItems: "center", justifyContent: "center" },
-  primaryLabel: { ...uiTheme.font.bodyBold, color: uiTheme.colors.onPrimary },
+  primaryLabel: { ...uiTheme.font.bodyBold, color: "#FFFFFF" },
   textButton: { alignItems: "center", paddingVertical: 13 },
   textButtonPressed: { opacity: 0.68 },
   textButtonLabel: { ...uiTheme.font.bodyBold, color: uiTheme.colors.primaryDeep },

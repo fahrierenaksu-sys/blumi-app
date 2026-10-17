@@ -41,7 +41,7 @@ export const shopScreenStyles = StyleSheet.create({
   },
   headerEyebrow: {
     ...uiTheme.font.overline,
-    color: uiTheme.colors.primaryDeep,
+    color: uiTheme.colors.primary,
     letterSpacing: 2.6,
   },
   headerTitle: {
@@ -184,7 +184,7 @@ export const shopScreenStyles = StyleSheet.create({
   trousersWaist: { position: "absolute", top: 1, left: 1, right: 1, height: 6, borderWidth: 1.5, borderBottomWidth: 0 },
   trousersLeg: { position: "absolute", top: 6, width: 6, height: 11, borderWidth: 1.5, borderTopWidth: 0 },
   verticalCategoryLabelActive: {
-    color: uiTheme.colors.primaryDeep,
+    color: uiTheme.colors.primary,
   },
   verticalCategoryCount: {
     ...uiTheme.font.micro,
@@ -198,7 +198,7 @@ export const shopScreenStyles = StyleSheet.create({
     overflow: "hidden",
   },
   verticalCategoryCountActive: {
-    color: uiTheme.colors.primaryDeep,
+    color: uiTheme.colors.primary,
     backgroundColor: "transparent",
   },
   closetProductScroller: {
@@ -226,7 +226,7 @@ export const shopScreenStyles = StyleSheet.create({
   catalogPageButtonDisabled: { opacity: 0.3 },
   catalogPageCount: {
     ...uiTheme.font.micro,
-    color: uiTheme.colors.primaryDeep,
+    color: uiTheme.colors.primary,
     marginHorizontal: 5,
     fontVariant: ["tabular-nums"]
   },

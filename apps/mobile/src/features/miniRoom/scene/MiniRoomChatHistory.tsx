@@ -203,7 +203,7 @@ const HistoryRow = memo(function HistoryRow(props: {
               <Text
                 accessible={false}
                 maxFontSizeMultiplier={1.4}
-                style={[styles.meta, item.delivery === "failed" ? styles.metaFailed : null]}
+                style={[styles.meta, item.mine ? styles.metaMine : null, item.delivery === "failed" ? styles.metaFailed : null]}
               >
                 {metadata}
               </Text>
@@ -216,10 +216,7 @@ const HistoryRow = memo(function HistoryRow(props: {
   )
 })
 
-/** Timestamp ink: the app's textSecondary (4.9:1 or better on both bubbles; the hook harness loads this file without the theme module). */
-const META_INK = "#675B73"
-/** Failed-send ink: the app's dangerInk (6.7:1 or better on both bubbles). */
-const META_FAILED_INK = "#8D2634"
+const META_INK = "#947E9A"
 const RECENT_ROW_GAP = 10
 /** How far a first-appearance row rises into place (points). */
 const ROW_ENTER_RISE = 8
@@ -300,7 +297,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4
   },
+  metaMine: {
+    color: "#98677F"
+  },
   metaFailed: {
-    color: META_FAILED_INK
+    color: "#B4486E"
   }
 })

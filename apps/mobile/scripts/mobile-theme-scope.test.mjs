@@ -10,9 +10,8 @@ function readSource(relativePath) {
   return readFileSync(resolve(mobileRoot, relativePath), "utf8")
 }
 
-// textMuted, primaryDeep and primaryPressed carry the audit D02 contrast values.
-// They are a visible change that still needs the owner's before/after review
-// before ship; no owner approval of these three values is recorded.
+// textMuted, primaryDeep and primaryPressed are the earlier tones: on 2026-10-17 the
+// owner rejected the darker audit D02 values and asked for these back.
 test("generic mobile theme pins the Discovery palette", () => {
   const source = readSource("src/ui/theme.ts")
   const genericThemeSource = source.split("export const blumiEntryTheme =")[0]
@@ -27,12 +26,12 @@ test("generic mobile theme pins the Discovery palette", () => {
     'overlaySoft: "rgba(28, 16, 34, 0.16)"',
     'textPrimary: "#20162A"',
     'textSecondary: "#675B73"',
-    'textMuted: "#736782"',
+    'textMuted: "#9589A4"',
     'border: "#F0E7F6"',
     'borderStrong: "#E7DAF0"',
     'primary: "#F65C9D"',
-    'primaryDeep: "#BE2669"',
-    'primaryPressed: "#EC5394"',
+    'primaryDeep: "#D92A79"',
+    'primaryPressed: "#E24486"',
     'primaryDisabled: "#F7A8CB"',
     'primarySoft: "#FFE2EE"',
     'secondary: "#F3EDF7"',

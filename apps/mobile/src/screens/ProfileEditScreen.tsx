@@ -454,7 +454,7 @@ export function ProfileEditScreen(props: ProfileEditScreenProps) {
                       <Ionicons
                         name={selected ? "checkmark" : "add"}
                         size={20}
-                        color={uiTheme.colors.primaryDeep}
+                        color={uiTheme.colors.primary}
                       />
                     </PressableScale>
                     {selected ? (
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     ...uiTheme.font.overline,
-    color: uiTheme.colors.primaryDeep,
+    color: uiTheme.colors.primary,
   },
   input: {
     ...uiTheme.font.bodyMedium,
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
     color: uiTheme.colors.textMuted,
   },
   segmentTextSelected: {
-    color: uiTheme.colors.primaryDeep,
+    color: uiTheme.colors.primary,
   },
   errorRow: {
     flexDirection: "row",
