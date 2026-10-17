@@ -92,7 +92,7 @@ export const RoomPetFlipbook = memo(function RoomPetFlipbook(props: RoomPetFlipb
       testID={testID}
       style={[styles.place, { width: `${widthFraction * 100}%`, height: `${heightFraction * 100}%` }, placeStyle]}
     >
-      <Pressable onPress={onTap} style={[styles.cell, draw.mirrored ? styles.mirrored : null]}>
+      <Pressable onPress={onTap} accessibilityRole="button" accessibilityLabel="Kedi" style={[styles.cell, draw.mirrored ? styles.mirrored : null]}>
         <Reanimated.View
           pointerEvents="none"
           style={[styles.sheet, { width: `${layout.columns * 100}%`, height: `${layout.rows * 100}%` }, frameStyle]}

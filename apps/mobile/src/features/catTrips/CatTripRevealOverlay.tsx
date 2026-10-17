@@ -64,7 +64,7 @@ export function CatTripRevealOverlay(props: {
       entering={reduceMotion ? undefined : FadeIn.duration(220)}
       exiting={reduceMotion ? undefined : FadeOut.duration(140)}
     >
-      <Pressable style={styles.skip} onPress={close} accessibilityRole="button" testID={`${testID}-later`}>
+      <Pressable style={styles.skip} onPress={close} accessibilityRole="button" accessibilityLabel={CAT_TRIP_COPY.later} testID={`${testID}-later`}>
         <Text style={styles.skipLabel}>{CAT_TRIP_COPY.later}</Text>
       </Pressable>
       <Reanimated.View style={styles.sheet} entering={entering} accessibilityLiveRegion="polite">
@@ -137,6 +137,7 @@ function ActionButton(props: { label: string; primary?: boolean; busy?: boolean;
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ busy: Boolean(busy), disabled: Boolean(busy) }}
       disabled={busy}
       onPress={onPress}
