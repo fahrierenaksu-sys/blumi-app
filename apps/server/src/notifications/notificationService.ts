@@ -86,7 +86,13 @@ export interface NotificationService {
   removeDevice(userId: string, pushToken: string): Promise<void>
   getPreferences(userId: string): Promise<NotificationPreferences>
   updatePreferences(userId: string, preferences: NotificationPreferences, fields?: (keyof NotificationPreferences)[]): Promise<NotificationPreferences>
-  sendPushToUser(userId: string, notification: PushNotification, discoveryWatch?: import("../matches/matchRepository").DiscoveryWatchClaim): Promise<PushQueueResult>
+  sendPushToUser(
+    userId: string,
+    notification: PushNotification,
+    discoveryWatch?: import("../matches/matchRepository").DiscoveryWatchClaim,
+    /** `availableAt` holds the push in the outbox until then (the cat's teasers wait for their moment). */
+    options?: { availableAt?: Date }
+  ): Promise<PushQueueResult>
   dispatchDue(now?: Date): Promise<void>
   /** Called after new deliveries are durably queued, so a worker can dispatch them at once. */
   onDeliveriesQueued?(listener: () => void): () => void
@@ -308,7 +314,7 @@ export function createNotificationService(
       await repository.savePreferences(normalizedUserId, normalizedPreferences, fields)
       return repository.getPreferences(normalizedUserId)
     },
-    async sendPushToUser(userId, notification, discoveryWatch) {
+    async sendPushToUser(userId, notification, discoveryWatch, sendOptions) {
       const normalizedUserId = normalizeUserId(userId)
       // Validated before any read; the locale only picks the copy, so it is
       // read only for a recipient with a device (one round trip less per
@@ -330,7 +336,11 @@ export function createNotificationService(
         await resolveLocale(normalizedUserId, notification.data?.type)
       )
       const queuedAt = now()
-      const availableAt = new Date(queuedAt.getTime() +
+      // A held push is judged (quiet hours, caps) at the moment it will go out.
+      const heldUntil = sendOptions?.availableAt && sendOptions.availableAt.getTime() > queuedAt.getTime()
+        ? sendOptions.availableAt
+        : undefined
+      const availableAt = heldUntil ?? new Date(queuedAt.getTime() +
         (normalizedNotification.data?.type === "chat.message" ? chatMessagePushHoldMs : 0))
       const deliveries = deliveryDevices.map((device) => ({
         deliveryId: normalizeDeliveryId(deliveryIdFactory()),
@@ -349,7 +359,7 @@ export function createNotificationService(
           userId: normalizedUserId,
           notificationType: policy.type,
           dedupeKey: discoveryWatch ? `discovery-watch:${normalizedUserId}:${discoveryWatch.generation}` : policy.dedupeKey,
-          now: queuedAt,
+          now: heldUntil ?? queuedAt,
           deliveries,
           discoveryWatch
         })
@@ -708,6 +718,13 @@ function resolveNotificationPolicy(
       return policyFor("message", eventKey("lobby-invite", notification.data?.inviteId), queuedAt)
     case "connection.matched":
       return policyFor("match", eventKey("connection", notification.data?.miniRoomId), queuedAt)
+    // One teaser per trip and side. Its own opt-in ("Kedi haberleri",
+    // push_enabled, default off, migration 079) is checked by the cat trip
+    // service when it queues and again at send time; the policy row stays
+    // "match" so the notification_type CHECKs (036) need no change.
+    case "cat.trip_owner":
+    case "cat.trip_host":
+      return policyFor("match", eventKey(type, notification.data?.tripId), queuedAt)
     default:
       return null
   }

@@ -76,6 +76,8 @@ const OYUN_FLOOR = [
   "room_v3_tvunit_oyun_game",
   "room_v3_pouf_oyun_bunnypink",
   "room_v3_pouf_oyun_bearpurple",
+  "room_v3_pouf_oyun_bunnymint",
+  "room_v3_pouf_oyun_bunnyyellow",
   "room_v3_rug_oyun_checker",
   "room_v3_rug_oyun_cloud",
   "room_v3_rug_oyun_tea"
@@ -88,10 +90,16 @@ const TALL = ["room_v3_bookshelf_oyun_cream", "room_v3_dresser_oyun_honey", "roo
 /** Seats she can really sit on (drawn pose `sit_chair`). */
 const SEATING: Record<string, string[]> = {
   room_v3_bed_oyun_gingham: ["s0", "s1"],
-  room_v3_teaset_oyun_flower: ["s0", "s1"]
+  room_v3_teaset_oyun_flower: ["s0", "s1"],
+  // chair height since 2026-10-17, so the drawn sitting pose fits them
+  room_v3_pouf_oyun_bunnypink: ["s0"],
+  room_v3_pouf_oyun_bearpurple: ["s0"],
+  room_v3_pouf_oyun_bunnymint: ["s0"],
+  room_v3_pouf_oyun_bunnyyellow: ["s0"]
 }
+const POUFS = ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple", "room_v3_pouf_oyun_bunnymint", "room_v3_pouf_oyun_bunnyyellow"]
 /** Pieces whose only seats are `sit_low`: pose-pending, so they stand as decor. */
-const POSE_PENDING = ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple", "room_v3_teaset_japon_zaisu"]
+const POSE_PENDING = ["room_v3_teaset_japon_zaisu"]
 const ROTATIONS: RoomFurnitureRotation[] = ["front", "right", "back", "left"]
 const SHELL = calibrateRoomShell({
   id: "room_v2_shell_blumi_world_v1",
@@ -201,7 +209,7 @@ test("each floor piece stands on its item.json cells (w x d, turned for odd rota
   }
 })
 
-test("the bed and the flower tea set seat two in every rotation and she can walk to every seat; every other piece is decor", () => {
+test("the bed and the flower tea set seat two and each pouf one in every rotation; she can walk to every seat; every other piece is decor", () => {
   for (const [id, seatIds] of Object.entries(SEATING)) {
     assert.equal(item(id).interactionType, "seat")
     assert.equal(item(id).seatSpec?.capacity, seatIds.length)
@@ -243,7 +251,7 @@ test("a pouf's authored seat opens toward its approach cell at every rotation", 
   // yaw 0 faces +Z (toward the camera at rotation 0), 90 +X, 180 -Z, 270 -X; the approach cell lies on that side.
   const side = (yaw: number, [i, j]: number[], [w, d]: number[]) =>
     yaw === 0 ? j >= d : yaw === 90 ? i >= w : yaw === 180 ? j < 0 : i < 0
-  for (const id of ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple"]) {
+  for (const id of POUFS) {
     const raw = JSON.parse(readFileSync(join(__dirname, id, "item.json"), "utf8")) as {
       rotations: Record<string, { footprint_cells: number[]; seats: { facing_yaw_deg: number; approach_cell: number[] }[] }>
     }
@@ -291,7 +299,7 @@ test("she draws behind a tall piece from behind and in front of it from the fron
   }
 })
 
-test("a tap anywhere on the Oyun bed's or the flower tea set's drawn back layer, in every rotation, is a tap on it", () => {
+test("a tap anywhere on an Oyun seat's drawn back layer (bed, flower tea set, poufs), in every rotation, is a tap on it", () => {
   for (const id of Object.keys(SEATING)) {
     for (const r of [0, 1, 2, 3] as const) {
       const key = `${id}_layered_r${r}_back`
@@ -355,6 +363,7 @@ const OYUN_ROOM: { id: string; i: number; j: number; rotation: RoomFurnitureRota
   { id: "room_v3_bed_oyun_gingham", i: 2, j: 6, rotation: "front" },
   { id: "room_v3_nightstand_oyun_honey", i: 2, j: 11, rotation: "front" },
   { id: "room_v3_snacktable_oyun_round", i: 8, j: 8, rotation: "front" },
+  // the pouf is pushed up to the snack table it faces: she comes from its side
   { id: "room_v3_pouf_oyun_bunnypink", i: 11, j: 8, rotation: "front" }
 ]
 
@@ -369,5 +378,50 @@ test("a furnished Oyun room holds together: every piece valid beside the others,
   }
   for (const hotspot of createRoomWorldHotspotsFromRoomV2Scene({ shell: SHELL, renderItems: pieces })) {
     assert.ok(canWalk(pieces, hotspot.approachPoint!), `${hotspot.id}: unreachable`)
+  }
+})
+
+test("two poufs facing each other, side by side or one cell apart: she walks to both seats from their sides and faces the other", () => {
+  for (const id of POUFS) {
+    // "front" faces -X and "back" faces +X: the one at the larger i looks toward the other
+    for (const gap of [0, 1, 2]) {
+      const pieces = [onCell(id, 6, 8, "back"), onCell(id, 8 + gap, 8, "front")]
+      assert.ok(validateRoomV2FurniturePlacement({ scene: { shell: SHELL, renderItems: [pieces[0]!] }, candidate: pieces[1]! }).isValid, `${id} gap ${gap}`)
+      const hotspots = createRoomWorldHotspotsFromRoomV2Scene({ shell: SHELL, renderItems: pieces })
+      assert.equal(hotspots.length, 2, `${id} gap ${gap}`)
+      assert.notEqual(hotspots[0]!.facing, hotspots[1]!.facing, `${id} gap ${gap}: both face the same way`)
+      for (const hotspot of hotspots) assert.ok(canWalk(pieces, hotspot.approachPoint!), `${id} gap ${gap} ${hotspot.id}: unreachable`)
+    }
+    const views = [onCell(id, 6, 8, "back"), onCell(id, 8, 8, "front")].map((piece) => piece.layered25d!.seats[0]!)
+    assert.deepEqual(views.map((seat) => seat.view).sort(), ["back", "front"], id)
+  }
+})
+
+test("seen from behind, a pouf sitter rests on the cushion: its near rim covers her from just under the hip", () => {
+  const raw = (id: string) => JSON.parse(readFileSync(join(__dirname, id, "item.json"), "utf8")) as {
+    rotations: Record<string, { seats: { avatar_view: string; hip_px: number[]; card_clip_below_px?: number }[] }>
+  }
+  for (const id of POUFS) {
+    for (const r of ["0", "1"]) {
+      const seat = raw(id).rotations[r]!.seats[0]!
+      assert.ok(seat.avatar_view.startsWith("back"), `${id} r${r}`)
+      const [hx, hy] = [Math.round(seat.hip_px[0]!), Math.round(seat.hip_px[1]!)]
+      const front = PNG.sync.read(readFileSync(join(__dirname, id, `r${r}_front.png`)))
+      const alpha = (x: number, y: number) => front.data[(y * front.width + x) * 4 + 3]!
+      assert.ok(alpha(hx, hy + 6) > 200, `${id} r${r}: the cushion covers her just under the hip`)
+      // the straight cut only trims what the cushion already covers
+      assert.ok(seat.card_clip_below_px! > hy + 6 && seat.card_clip_below_px! < hy + 30, `${id} r${r}`)
+      assert.ok(alpha(hx, Math.ceil(seat.card_clip_below_px!)) > 200, `${id} r${r}: covered at the cut`)
+    }
+  }
+})
+
+test("a chair keeps its front approach even when another piece stands there: only a pouf is reached from its side", () => {
+  const chair = onCell("room_v3_teaset_oyun_flower", 8, 8, "front")
+  assert.equal(chair.seatWorldPoints!.some((seat) => seat.alternativeApproaches), false)
+  for (const id of POUFS) {
+    for (const rotation of ROTATIONS) {
+      assert.equal(onCell(id, 8, 8, rotation).seatWorldPoints![0]!.alternativeApproaches?.length, 3, `${id} ${rotation}`)
+    }
   }
 })

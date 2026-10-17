@@ -72,6 +72,11 @@ import { createAccountRecoveryService, type AccountRecoveryService } from "./acc
 import { createReferralService, type ReferralService } from "./referrals/referralService"
 import { registerReferralRoutes } from "./routes/referralRoutes"
 import { registerPersonalRoomDecorRoutes } from "./routes/personalRoomDecorRoutes"
+import { registerCatTripRoutes } from "./routes/catTripRoutes"
+import { createDisabledCatTripService } from "./catTrips/catTripWiring"
+import type { CatTripService } from "./catTrips/catTripService"
+import { registerRoomPetRoutes } from "./routes/roomPetRoutes"
+import type { RoomPetService } from "./roomPets/roomPetService"
 import {
   createCapabilityService,
   isCapabilityRolledOut,
@@ -81,6 +86,16 @@ import {
 import { registerCapabilityRoutes } from "./routes/capabilityRoutes"
 import { createChatReceiptService } from "./chat/chatReceiptService"
 import { registerChatPreferencesRoutes } from "./routes/chatPreferencesRoutes"
+import { registerStreetRoutes } from "./routes/streetRoutes"
+import { createInMemoryStreetRepository, type StreetRepository } from "./street/streetRepository"
+import { createStaticStreetSchema, type StreetSchemaProbe } from "./street/streetSchema"
+import { createStreetService } from "./street/streetService"
+import { createStreetRoomCache } from "./street/streetRoomCache"
+import { listAllowedRealtimeUserIds } from "./auth/realtimeUserBatch"
+
+/** The app refetches the street whenever its thread list changes; rooms are reused across reads this long. */
+const STREET_ROOM_CACHE_TTL_MS = 15_000
+import { withStreetDigests } from "./street/streetDigestHooks"
 import { getRoomSnapshotSelfCheckState } from "./rooms/roomSnapshotRenderer"
 import { computeAvatarArtPackHash, getAvatarPortraitSelfCheckState } from "./avatar/avatarPortrait"
 import {
@@ -156,10 +171,20 @@ interface CreateServerOptions {
   accountRecoveryService?: AccountRecoveryService
   referralService?: ReferralService
   personalRoomDecorService?: PersonalRoomDecorService
+  /** The traveling cat (BLUMI_CAT_TRIPS_ENABLED); default: disabled. */
+  catTripService?: CatTripService
+  /** The room pet, only when BLUMI_ROOM_PET_ENABLED=1; absent means its routes do not exist. */
+  roomPetService?: RoomPetService
   roomSnapshotService?: RoomSnapshotService
   /** Push sender pictures; must be the instance the notification service links to. */
   notificationPortraits?: NotificationPortraitService
   capabilityService?: CapabilityService
+  /** Sokağım storage (migration 080); in-memory by default. */
+  streetRepository?: StreetRepository
+  /** Whether migration 080 is applied; in-memory storage is always ready. */
+  streetSchema?: StreetSchemaProbe
+  /** PostgreSQL: the auth and room repositories already write the street record inside each save's transaction. */
+  streetDigestsInSaveTransaction?: boolean
   /** Side effects that responses do not wait for; drained when the app closes. */
   afterResponseTasks?: AfterResponseTasks
 }
@@ -190,7 +215,7 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
   const revenueCatPurchaseVerifier =
     options.revenueCatPurchaseVerifier ??
     createUnavailableRevenueCatPurchaseVerifier()
-  const avatarService = options.avatarService ?? createAvatarService({
+  const baseAvatarService = options.avatarService ?? createAvatarService({
     authService,
     economyService
   })
@@ -212,17 +237,64 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       })
     }
   })
-  const personalRoomDecorService =
+  const basePersonalRoomDecorService =
     options.personalRoomDecorService ??
     createPersonalRoomDecorService({
       getOwnedRoomItemIds: async (userId) =>
         (await economyService.getInventory(userId)).ownedRoomItemIds,
+      getOwnedRoomItemIdsForUsers: economyService.getOwnedRoomItemIdsForUsers,
       // stored ownership, held items included: only decides that a stored placement is carried over a save
       getStoredOwnedRoomItemIds: async (userId) =>
         (await economyService.repository.getInventory(userId))?.ownedRoomItemIds ?? [],
       isActiveRoomItemId: economyService.isActiveRoomItemId,
       roomSnapshotService
     })
+  const catTripService = options.catTripService ?? createDisabledCatTripService()
+  const streetSchema = options.streetSchema ?? createStaticStreetSchema(true)
+  const streetService = createStreetService({
+    repository: options.streetRepository ?? createInMemoryStreetRepository(),
+    isSchemaReady: () => streetSchema.isReady(),
+    listThreads: async (viewerUserId, limit) => (await chatService.listThreadsPage(viewerUserId, { limit })).threads,
+    listMutualPartnerIds: async (viewerUserId) => {
+      const [matches, connections] = await Promise.all([
+        matchService.repository.listMatchesForUser(viewerUserId),
+        options.connectionService?.repository.listMatchesForUser(viewerUserId) ?? Promise.resolve([])
+      ])
+      return new Set([...matches, ...connections].flatMap((match) => match.participantUserIds)
+        .filter((userId) => userId !== viewerUserId))
+    },
+    listBlockedPartnerIds: (viewerUserId, partnerIds) => partnerIds.length === 0
+      ? Promise.resolve([])
+      : safetyService.listBlockedUserIdsBetween(viewerUserId, [...partnerIds]),
+    listAllowedUserIds: (userIds, now) => listAllowedRealtimeUserIds({
+      repository: authService.repository,
+      isRealtimeUserAllowed: (userId) => authService.isRealtimeUserAllowed(userId, now),
+      userIds,
+      now
+    }),
+    getRooms: createStreetRoomCache({
+      getMany: (userIds) => basePersonalRoomDecorService.getMany(userIds),
+      ttlMs: STREET_ROOM_CACHE_TTL_MS
+    }),
+    // capabilityService is created below; this runs per request, after it exists.
+    // No build floor for partners: the server keeps no per-user record of the app build or of the capabilities a
+    // member's build declared (they arrive only on that member's own requests), so a partner inside the rollout on
+    // an older build still appears here and cannot close their window. Adding a floor needs a durable "street seen"
+    // marker (a new migration after 080). Until it exists, `chat_street` stays limited to internal QA users.
+    isStreetRolledOutTo: (userId) => isCapabilityRolledOut(capabilityService, userId, "chat_street"),
+    log: { warn: (entry, message) => console.warn(message, entry) }
+  })
+  const { avatarService, personalRoomDecorService } = options.streetDigestsInSaveTransaction
+    ? { avatarService: baseAvatarService, personalRoomDecorService: basePersonalRoomDecorService }
+    : withStreetDigests({
+    avatarService: baseAvatarService,
+    personalRoomDecorService: basePersonalRoomDecorService,
+    getSessionLoadout: async (sessionToken, now) => {
+      const session = await authService.getSession(sessionToken, now)
+      return session ? { userId: session.account.userId, loadout: session.account.profile.avatar.loadout ?? null } : null
+    },
+    streetService
+  })
   const capabilityService = options.capabilityService ?? createCapabilityService({
     manifest: parseCapabilityManifest(process.env.BLUMI_CAPABILITY_MANIFEST).manifest
   })
@@ -359,8 +431,10 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     referralService,
     personalRoomDecorService,
     roomSnapshotService,
+    catTripService,
     capabilityService,
     chatReceiptService,
+    streetService,
     accountRecoveryService,
     connectionManager,
     connectionService: options.connectionService,
@@ -408,8 +482,13 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     await registerCommerceRoutes(instance, routeServices)
     await registerNotificationRoutes(instance, routeServices)
     await registerChatPreferencesRoutes(instance, routeServices)
+    await registerStreetRoutes(instance, routeServices)
     await registerReferralRoutes(instance, routeServices)
     await registerPersonalRoomDecorRoutes(instance, routeServices)
+    await registerCatTripRoutes(instance, routeServices)
+    if (options.roomPetService) {
+      await registerRoomPetRoutes(instance, { authService, roomPetService: options.roomPetService })
+    }
     await registerRoomSnapshotRoutes(instance, routeServices)
     await registerNotificationPortraitRoutes(instance, {
       notificationPortraits: options.notificationPortraits ?? createNotificationPortraitService({})

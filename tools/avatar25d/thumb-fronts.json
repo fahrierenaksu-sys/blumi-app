@@ -1171,6 +1171,132 @@
           "sha256": "0625cd31cb0b10f0b09e932ce32c609a10669ae5064934ef4e50d43a9aaeb1b7"
         }
       ]
+    },
+    "hair_male_black_side_part": {
+      "sha256": "941c0a979fabceba10581789225bfa646f1c15073026a908627f5029f2f831cf",
+      "size": [
+        256,
+        186
+      ],
+      "sources": [
+        {
+          "file": "black_side_part_front_tp_thumbsrc.png",
+          "sha256": "689b28e01d2bb2bddfa24ecec00dfa374d49fd4e760eb993eae98fc641285a91"
+        },
+        {
+          "file": "black_side_part_back_tp_thumbsrc.png",
+          "sha256": "629fc490ce286d34500a9aed5393126c5fb3f8ea63ae4cbece6ead8936683576"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_blond_fade": {
+      "sha256": "5e0be461add7e3dad33dd6acb0f1c75f4db24c5361d44e9b904aa550ed41ef85",
+      "size": [
+        256,
+        174
+      ],
+      "sources": [
+        {
+          "file": "blond_fade_front_tp_nofade.png",
+          "sha256": "89132b7801500f6e960d22e20139ede8a5f1539fa668045905bb825b81605cba"
+        },
+        {
+          "file": "back_tp.png",
+          "sha256": "bc2074efacf4651d68f7a901021d788550181f58875273ffa32265f4c3bc774c"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_chestnut_waves": {
+      "sha256": "63b58abe04df83c576537c5d009f7b09792c5c915beb9e51ea72a33f22681c79",
+      "size": [
+        256,
+        176
+      ],
+      "sources": [
+        {
+          "file": "chestnut_waves_front_tp_thumbsrc.png",
+          "sha256": "e99e55f7a2bc35c57f31cc894a886a328fb5933e7a14e5aa08f74d8ded2735fa"
+        },
+        {
+          "file": "chestnut_waves_back_rt_thumbsrc.png",
+          "sha256": "cbdcb0863b95eec659b2e056b6a6ce4536e3dc33cb98a626d41603d427c21e2e"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_cocoa_quiff": {
+      "sha256": "76b0f02cfacd624d068d046b0d9b97e7d8d5b379f88be0196f6639070c5fbbb9",
+      "size": [
+        256,
+        174
+      ],
+      "sources": [
+        {
+          "file": "cocoa_quiff_front_tp_thumbsrc.png",
+          "sha256": "5300cb05e0cfc328c137d7d13c2a10368d0fb19004213c69e09779898f6a2b2f"
+        },
+        {
+          "file": "cocoa_quiff_back_rt_thumbsrc.png",
+          "sha256": "1bbb8650951ed74738daf4741da7fe4ad264b0938ac821052b55070c81f2b7c6"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_soft_crop": {
+      "sha256": "fba69e892756ef94f53599216b2bea4243621147f2e51f24a99e416ddc6e4341",
+      "size": [
+        256,
+        174
+      ],
+      "sources": [
+        {
+          "file": "soft_crop_front_tp_thumbsrc.png",
+          "sha256": "0b55dd7878d0071cbe54fb474d56652754aef89c6968455173832f59877c3d82"
+        },
+        {
+          "file": "soft_crop_back_tp_thumbsrc.png",
+          "sha256": "b866abdae55d14549875623981e595b087964c2614a0c6670e095a66ffec3310"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_wavy_quiff": {
+      "sha256": "884bab37123cc3da2c676a6f948df347f1d005a93eac1da02abbc44612739d6b",
+      "size": [
+        256,
+        183
+      ],
+      "sources": [
+        {
+          "file": "wavy_quiff_front_tp_thumbsrc.png",
+          "sha256": "64269ae1a757dbac5ffd1325fd32df91d3d4f17e31f893fe31b4e5280427659c"
+        },
+        {
+          "file": "wavy_quiff_back_rt_thumbsrc.png",
+          "sha256": "2336f5a305fed4c7c3d128d8c13a812269016c20e91180caa6c70559ab0a8144"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
     }
   }
 }

@@ -264,6 +264,16 @@ export interface RoomV2SeatWorldPoint {
   approach: RoomAnchor
   exit: RoomAnchor
   /**
+   * A seat she may also reach from its sides or back (a round pouf): spots beside the piece, tried in order when
+   * another piece stands on `approach` (two poufs facing each other, a pouf at a table). She still sits facing `facing`.
+   */
+  alternativeApproaches?: RoomAnchor[]
+  /**
+   * Layered pieces: the centre of this seat's cushion top on screen, midway from the hip point to the
+   * cushion's front edge (where a pet sits). Unset: the hip point, `seatHeight` above `seat`.
+   */
+  cushion?: RoomAnchor
+  /**
    * Layered pieces: this seat's place in the far-to-near draw order of the piece's sitters
    * (0 = drawn first). Unset: every seat of the piece draws at the same depth.
    */

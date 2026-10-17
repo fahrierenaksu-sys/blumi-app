@@ -16,6 +16,7 @@ import { getInboxCopy, type InboxCopy } from "../features/chat/inboxCopy"
 import Reanimated, {
   Easing,
   ReduceMotion,
+  useAnimatedScrollHandler,
   useSharedValue,
   withRepeat,
   withSequence,
@@ -57,6 +58,9 @@ import {
   unpinConversation
 } from "../features/inbox/inboxConversationPrefsModel"
 import { useInboxConversationPrefs } from "../features/inbox/inboxConversationPrefsStore"
+import { StreetRail } from "../features/street/StreetRail"
+import { nextStreetCollapsed } from "../features/street/streetModel"
+import { scheduleOnRN } from "react-native-worklets"
 import type { SessionActor } from "../features/session/sessionModel"
 
 type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
@@ -171,6 +175,17 @@ export function InboxScreen(props: InboxScreenProps) {
     })
   }, [actionsCopy, conversationPrefs, copy, currentUserId, now, threads, timeFormatter, unreadSignature])
   const listRef = useRef<FlatList<(typeof threadRows)[number]>>(null)
+  // Sokağım shrinks to portholes while the list scrolls (hysteresis, one JS hop per change).
+  const [streetCollapsed, setStreetCollapsed] = useState(false)
+  const streetCollapsedOnUi = useSharedValue(false)
+  const handleListScroll = useAnimatedScrollHandler((event) => {
+    const next = nextStreetCollapsed(streetCollapsedOnUi.value, event.contentOffset.y)
+    if (next === streetCollapsedOnUi.value) return
+    streetCollapsedOnUi.value = next
+    scheduleOnRN(setStreetCollapsed, next)
+  })
+  const openOwnRoom = useCallback(() => navigation.navigate("MyRoom"), [navigation])
+  const openSettings = useCallback(() => navigation.navigate("Settings"), [navigation])
   const scrollToTop = useCallback(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion })
   }, [reduceMotion])
@@ -324,6 +339,16 @@ export function InboxScreen(props: InboxScreenProps) {
           />
         </Reanimated.View>
 
+        <StreetRail
+          sessionActor={sessionActor}
+          locale={locale === "en" ? "en" : "tr"}
+          refreshKey={threadKeySignature}
+          collapsed={streetCollapsed}
+          fallbackName={copy.unknownPartner}
+          onOpenChat={openThread}
+          onOpenOwnRoom={openOwnRoom}
+          onOpenSettings={openSettings}
+        />
         <View style={styles.listArea}>
           {/* Rows are 88–99 pt (one or two preview lines, Dynamic Type), so
               FlatList measures them instead of assuming a fixed height. A
@@ -340,6 +365,8 @@ export function InboxScreen(props: InboxScreenProps) {
             windowSize={5}
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
+            onScroll={handleListScroll}
+            scrollEventThrottle={16}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -515,7 +542,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...uiTheme.font.overline,
-    color: uiTheme.colors.primaryDeep
+    color: uiTheme.colors.primary
   },
   headerCount: {
     ...uiTheme.font.caption,
@@ -598,7 +625,7 @@ const emptyStyles = StyleSheet.create({
     justifyContent: "center"
   },
   ctaText: {
-    color: uiTheme.colors.onPrimary,
+    color: "#FFFFFF",
     ...uiTheme.font.bodySmall,
     fontWeight: "800"
   }

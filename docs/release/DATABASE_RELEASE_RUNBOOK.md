@@ -3,6 +3,25 @@
 This is an implementation and verification guide, not a release approval. The
 founder-facing status remains in `LAUNCH_CONTROL.md`.
 
+## Migrations 077-080 applied (2026-10-17)
+
+Owner approved in the current conversation. Production now has
+`077_cat_trips.sql`, `078_room_pets.sql`, `079_cat_trip_prefs.sql` and
+`080_street.sql` applied, and their checksums are locked in
+`migrations.applied.json`:
+
+- `077_cat_trips.sql` `1d7a9d690d3bfa63a62462e0d31d972fb6ecaa19ce3b3290a4cbaa0740c23ef9`
+- `078_room_pets.sql` `4a7f3000f1174288f1c608aad9600b5afca252a7de56c3fe20c908fc876e3b45`
+- `079_cat_trip_prefs.sql` `f59a5ec4483107bf92666ce824ca772be5e97589a0b216b7f1e2299678667327`
+- `080_street.sql` `3cf4179d5e83790495d4a9bbc383aa2229c4b3ddffb1a80865aab889155752c6`
+
+Pre-apply dump `/Users/evrenevren/BlumiReleaseBackups/scheduled-public-2026-10-17T09-05-44-470Z-19063.dump`,
+SHA-256 `491286507a724a01e0ef3234405c4919366159586c87e7b0494d87cfa1f0f985`;
+restore proof log `/Users/evrenevren/BlumiArtWorkbench/avatar25-v2/integration/release3/fixes2/restore_proof2.log`.
+Production still lacks 070, 071, 074, 075 and 076 (optional readiness
+migrations; unchanged). The pets, cat-trip and street features stay behind
+their flags (off) until the owner enables them.
+
 ## Current state (2026-10-02)
 
 Superseding OTP update, 2026-10-10: owner authorized deployment and OTP-only

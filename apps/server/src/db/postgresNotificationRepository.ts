@@ -278,6 +278,8 @@ export function createPostgresNotificationRepository(
              WHEN $2 <> 'message' AND (
                SELECT count(*) FROM blumi_notification_policy_events
                 WHERE user_id = $1 AND notification_type <> 'message' AND created_at > $4::timestamptz - INTERVAL '1 hour'
+                  -- A push held for later (a cat teaser) counts only in the hour it is sent.
+                  AND created_at <= $4::timestamptz
              ) >= max_pushes_per_hour THEN 'frequency_cap'
              ELSE 'queued'
            END AS reason
@@ -381,6 +383,8 @@ export function createPostgresNotificationRepository(
              WHEN $2 <> 'message' AND (
                SELECT count(*) FROM blumi_notification_policy_events
                 WHERE user_id = $1 AND notification_type <> 'message' AND created_at > $4::timestamptz - INTERVAL '1 hour'
+                  -- A push held for later (a cat teaser) counts only in the hour it is sent.
+                  AND created_at <= $4::timestamptz
              ) >= max_pushes_per_hour THEN 'frequency_cap'
              ELSE 'queued'
            END AS reason

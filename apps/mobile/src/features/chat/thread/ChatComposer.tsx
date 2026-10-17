@@ -192,7 +192,7 @@ export function ChatComposer({
               end={{ x: 1, y: 1 }}
               style={styles.sendButtonGradient}
             >
-              <Ionicons name="arrow-up" size={22} color={uiTheme.colors.onPrimary} />
+              <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
             </LinearGradient>
           </GesturePressableScale>
         </Animated.View>

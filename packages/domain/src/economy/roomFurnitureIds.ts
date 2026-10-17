@@ -32,6 +32,9 @@ export const ROOM_V3_FURNITURE: readonly {
   { itemId: "room_v3_tvunit_oyun_game", title: "Oyun Game TV Unit", priceCoins: 300 },
   { itemId: "room_v3_pouf_oyun_bunnypink", title: "Oyun Bunny Pouf", priceCoins: 120 },
   { itemId: "room_v3_pouf_oyun_bearpurple", title: "Oyun Bear Pouf", priceCoins: 120 },
+  // colourways of the bunny pouf (owner, 2026-10-17): same pouf, same price
+  { itemId: "room_v3_pouf_oyun_bunnymint", title: "Oyun Mint Bunny Pouf", priceCoins: 120 },
+  { itemId: "room_v3_pouf_oyun_bunnyyellow", title: "Oyun Yellow Bunny Pouf", priceCoins: 120 },
   { itemId: "room_v3_rug_oyun_checker", title: "Oyun Checker Rug", priceCoins: 180 },
   { itemId: "room_v3_rug_oyun_cloud", title: "Oyun Cloud Rug", priceCoins: 180 },
   { itemId: "room_v3_rug_oyun_tea", title: "Oyun Tea Rug", priceCoins: 120 },

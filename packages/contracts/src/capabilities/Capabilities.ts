@@ -21,7 +21,8 @@ export const CAPABILITY_KEYS = [
   "chat_message_edit",
   "room_chat_bubbles_v2",
   "room_editor_v2",
-  "avatar_world_25d"
+  "avatar_world_25d",
+  "chat_street"
 ] as const
 
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number]

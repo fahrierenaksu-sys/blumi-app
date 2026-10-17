@@ -110,6 +110,16 @@ const sourceFiles = [
   "src/features/roomWorld/myRoomInteractionModel.test.ts",
   "src/features/roomWorld/roomWorldRoomV2Projection.ts",
   "src/features/roomWorld/roomWorldRoomV2Projection.test.ts",
+  "src/features/roomPet/roomPetEngine.test.ts",
+  "src/features/roomPet/roomPetRoomAdapter.test.ts",
+  "src/features/roomPet/roomPetRoomScene.test.ts",
+  "src/features/roomPet/roomPetServerModel.ts",
+  "src/features/roomPet/roomPetServerModel.test.ts",
+  "src/features/catTrips/catTripFlag.ts",
+  "src/features/catTrips/catTripModel.ts",
+  "src/features/catTrips/catTripModel.test.ts",
+  "src/features/catTrips/catTripCopy.ts",
+  "src/features/catTrips/catTripCopy.test.ts",
 ]
 
 try {
@@ -204,6 +214,12 @@ try {
       join(outputDirectory, "features/roomWorld/roomTapMarkerModel.test.js"),
       join(outputDirectory, "features/roomWorld/myRoomInteractionModel.test.js"),
       join(outputDirectory, "features/roomWorld/roomWorldRoomV2Projection.test.js"),
+      join(outputDirectory, "features/roomPet/roomPetEngine.test.js"),
+      join(outputDirectory, "features/roomPet/roomPetRoomAdapter.test.js"),
+      join(outputDirectory, "features/roomPet/roomPetRoomScene.test.js"),
+      join(outputDirectory, "features/roomPet/roomPetServerModel.test.js"),
+      join(outputDirectory, "features/catTrips/catTripModel.test.js"),
+      join(outputDirectory, "features/catTrips/catTripCopy.test.js"),
     ],
     {
       cwd: workspaceRoot,
@@ -268,6 +284,9 @@ try {
       "src/features/roomV2/furniture/layeredFurnitureSofa.test.ts",
       "src/features/roomV2/furniture/layeredFurnitureJapon.test.ts",
       "src/features/roomV2/furniture/layeredFurnitureOyun.test.ts",
+      // A bed is sat on from its camera-facing long edge, facing us, in every rotation; a chair turned away is
+      // sat on facing the way it is turned
+      "src/features/roomV2/furniture/layeredEdgeSeats.test.ts",
       // The painter's order by floor boxes (nearer neighbour over farther, small rug over big) and wall pieces
       // never hung over each other
       "src/features/roomV2/roomV2FloorDrawOrder.test.ts",

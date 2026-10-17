@@ -69,5 +69,9 @@
   "068_session_reuse_detection_and_firebase_uid.sql": "a475eecbf15c0cb7d0ee7e06ff84d5cdae9269299590b843b19fc84a3647e0ee",
   "069_moderation_phone_bans.sql": "2fc97b071b0f06fbffa94a85ee4e904b79f3148d53175cc31f76b018f7dceaa1",
   "072_firebase_sms_admission.sql": "7ce728adc69e7b285d5631440a1da71b807a038a483ce2ce597706906b80c18e",
-  "073_sms_verification_outcomes.sql": "5452a289e0abb048ba67d89382105124838226633d16b6833020cb70558082dc"
+  "073_sms_verification_outcomes.sql": "5452a289e0abb048ba67d89382105124838226633d16b6833020cb70558082dc",
+  "077_cat_trips.sql": "1d7a9d690d3bfa63a62462e0d31d972fb6ecaa19ce3b3290a4cbaa0740c23ef9",
+  "078_room_pets.sql": "4a7f3000f1174288f1c608aad9600b5afca252a7de56c3fe20c908fc876e3b45",
+  "079_cat_trip_prefs.sql": "f59a5ec4483107bf92666ce824ca772be5e97589a0b216b7f1e2299678667327",
+  "080_street.sql": "3cf4179d5e83790495d4a9bbc383aa2229c4b3ddffb1a80865aab889155752c6"
 }

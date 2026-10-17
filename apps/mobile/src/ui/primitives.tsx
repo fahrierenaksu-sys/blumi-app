@@ -100,7 +100,7 @@ interface SharedButtonProps {
 export function PrimaryButton(props: SharedButtonProps) {
   const { label, onPress, disabled = false, busy = false, style, icon, testID, tone = "default" } = props
   const buttonTheme = tone === "entry" ? blumiEntryTheme : uiTheme
-  // Entry draws this action dark plum with a white label; the app draws it pink with a plum label.
+  // Entry draws this action dark plum, the app draws it pink; both carry a white label.
   const labelColor = tone === "entry" ? buttonTheme.colors.textInverted : buttonTheme.colors.onPrimary
   return (
     <View>
@@ -115,9 +115,6 @@ export function PrimaryButton(props: SharedButtonProps) {
           styles.primaryButton,
           !disabled ? buttonTheme.shadow.glowSubtle : null,
           pressed && !disabled ? styles.primaryButtonPressed : null,
-          // The entry disabled fill is already a muted rose that keeps its white label
-          // at 3:1; fading it as well would drop the label to about 2:1.
-          disabled && tone !== "entry" ? styles.primaryButtonDisabled : null,
           style
         ]}
         testID={testID}
@@ -431,9 +428,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonPressed: {
     opacity: 0.92,
-  },
-  primaryButtonDisabled: {
-    opacity: 0.65,
   },
   primaryButtonText: {
     ...uiTheme.font.bodyBold,

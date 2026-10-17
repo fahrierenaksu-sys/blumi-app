@@ -33,6 +33,8 @@ export const FURNITURE_NAMES_TR: Readonly<Record<string, string>> = {
   room_v3_tvunit_oyun_game: "Oyun TV Ünitesi",
   room_v3_pouf_oyun_bunnypink: "Tavşan Puf",
   room_v3_pouf_oyun_bearpurple: "Ayıcık Puf",
+  room_v3_pouf_oyun_bunnymint: "Nane Tavşan Puf",
+  room_v3_pouf_oyun_bunnyyellow: "Sarı Tavşan Puf",
   room_v3_rug_oyun_checker: "Dama Halı",
   room_v3_rug_oyun_cloud: "Bulut Halı",
   room_v3_rug_oyun_tea: "Çay Saati Halısı",

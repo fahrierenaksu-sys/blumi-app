@@ -657,7 +657,7 @@ const styles = StyleSheet.create({
   },
   giftChipText: {
     ...uiTheme.font.micro,
-    color: uiTheme.colors.primaryDeep,
+    color: uiTheme.colors.primary,
     fontWeight: "800",
     letterSpacing: 0.6
   },

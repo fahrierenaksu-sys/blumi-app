@@ -4,6 +4,11 @@
 
 Snapshot: 2026-10-15. The 2026-10-15 update below is the newest status; the OTP security update is current for 2026-10-10 and the At a glance rows retain their own dated evidence. Recheck volatile statuses before acting.
 
+## Update — 2026-10-17: migrations 077-080 applied
+
+- **External verified:** with the owner's approval, production now has `077_cat_trips.sql`, `078_room_pets.sql`, `079_cat_trip_prefs.sql` and `080_street.sql` applied; checksums are locked in `apps/server/db/migrations.applied.json` and listed in the [database runbook](./DATABASE_RELEASE_RUNBOOK.md). Pre-apply dump SHA-256 `491286507a724a01e0ef3234405c4919366159586c87e7b0494d87cfa1f0f985`, restore proof recorded there.
+- **Open:** 070, 071, 074, 075 and 076 are still not applied (optional readiness migrations). The pets, cat-trip and street features ship with their flags off; nothing from `wip/pets-fix` is pushed or live.
+
 ## Update — 2026-10-15: release branch, live build and open gates
 
 - **Tested:** the 2026-10-14 release audit verified `fc35013a` (TestFlight build 20), including the isolated PostgreSQL gate (435/435 tests in 63 suites).

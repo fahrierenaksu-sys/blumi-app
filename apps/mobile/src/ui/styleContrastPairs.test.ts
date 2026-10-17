@@ -29,9 +29,9 @@ function listStyleSources(directory: string): string[] {
 
 const sample = (body: string) => `import { StyleSheet } from "react-native"\nconst s = StyleSheet.create({ ${body} })`
 
-test("a white label on a pink action surface is found and fails", () => {
+test("a white label on a pale pink action surface is found and fails", () => {
   const pairs = findStyleContrastPairs("x.ts", sample(`
-    done: { backgroundColor: uiTheme.colors.primary },
+    done: { backgroundColor: uiTheme.colors.primaryDisabled },
     doneText: { color: "#FFFFFF" }`), uiTheme.colors)
   assert.equal(pairs.length, 1)
   assert.equal(pairs[0].surfaceStyle, "done")
@@ -48,7 +48,7 @@ test("an active label is paired with the active surface, and the pressed surface
     ["chipTextActive@chipActive", "sendText@send", "sendText@sendPressed"])
 })
 
-test("a plum label on a pink button is paired by the button's name and passes", () => {
+test("a white label on a pink button is paired by the button's name and passes", () => {
   const [pair] = findStyleContrastPairs("x.ts", sample(`
     doneButton: { backgroundColor: uiTheme.colors.primary },
     doneText: { color: uiTheme.colors.onPrimary }`), uiTheme.colors)
@@ -60,8 +60,8 @@ test("a label meant for dark or pink fills is not judged against the page", () =
   assert.deepEqual(findStyleContrastPairs("x.ts", sample(`label: { color: uiTheme.colors.textInverted }`), uiTheme.colors), [])
 })
 
-test("a pink token used as text with no background is checked on the page surface", () => {
-  const [pair] = findStyleContrastPairs("x.ts", sample(`caption: { color: uiTheme.colors.primary }`), uiTheme.colors)
+test("a pale pink token used as text with no background is checked on the page surface", () => {
+  const [pair] = findStyleContrastPairs("x.ts", sample(`caption: { color: uiTheme.colors.blobPink }`), uiTheme.colors)
   assert.equal(pair.surfaceStyle, "page surface")
   assert.ok(pair.ratio < pair.minimum)
 })

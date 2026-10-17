@@ -115,7 +115,7 @@ export const wardrobeV2Styles = StyleSheet.create({
     elevation: 3,
   },
   doneText: {
-    color: uiTheme.colors.onPrimary,
+    color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
     fontSize: 14,
     lineHeight: 20,
@@ -208,7 +208,7 @@ export const wardrobeV2Styles = StyleSheet.create({
     backgroundColor: uiTheme.colors.primary,
   },
   lockedPreviewActionText: {
-    color: uiTheme.colors.onPrimary,
+    color: "#FFFFFF",
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
     lineHeight: 18,

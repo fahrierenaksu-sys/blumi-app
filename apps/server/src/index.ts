@@ -109,6 +109,10 @@ const retentionWorker = startPeriodicWorker({
   run: () => services.retentionService.purgeExpired(), intervalMs: 600_000, firstRunDelayMs: startupJitterMs(600_000),
   reportError: (error) => console.error("Retention cleanup failed", safeOperationalErrorKind(error))
 })
+const catTripRetentionWorker = startPeriodicWorker({
+  run: () => services.catTripService.purgeExpired().then(() => undefined), intervalMs: 600_000, firstRunDelayMs: startupJitterMs(600_000),
+  reportError: (error) => console.error("Cat trip retention failed", safeOperationalErrorKind(error))
+})
 const discoveryWatchWorker = startDiscoveryWatchWorker({
   matchService: services.matchService,
   safetyService: services.safetyService,
@@ -136,6 +140,9 @@ const app = createServer({
   },
   authService: services.authService,
   capabilityService: services.capabilityService,
+  streetRepository: services.streetRepository,
+  streetSchema: services.streetSchema,
+  streetDigestsInSaveTransaction: services.streetDigestsInSaveTransaction,
   firebaseAuthVerifier,
   // Only a loopback, in-memory development API can carry QA auth (config.ts).
   localQaOtpEnabled: isLocalQaOtpEnabled(config),
@@ -157,6 +164,8 @@ const app = createServer({
   safetyService: services.safetyService,
   accountRecoveryService: services.accountRecoveryService,
   personalRoomDecorService: services.personalRoomDecorService,
+  catTripService: services.catTripService,
+  roomPetService: services.roomPetService,
   roomSnapshotService: services.roomSnapshotService,
   logger: config.nodeEnv !== "test",
   nodeEnv: config.nodeEnv,
@@ -197,6 +206,7 @@ async function start() {
   // Learn whether migration 070 is applied before serving, so the first
   // capability answers already include receipts (the probe never throws).
   await services.chatReceiptSchema.isReady()
+  await services.streetSchema.isReady()
   await app.listen({ port: config.port, host: config.host })
   await realtimeServer.listen({
     port: config.realtimePort,
@@ -225,7 +235,8 @@ const shutdown = createGracefulShutdown({
     () => ticketCleanupWorker.stop(),
     () => rateBudgetCleanupWorker.stop(),
     () => discoverySnapshotCleanupWorker.stop(),
-    () => retentionWorker.stop()
+    () => retentionWorker.stop(),
+    () => catTripRetentionWorker.stop()
   ],
   drainOutgoing: () => connectionManager.closeFanout(),
   closeData: () => services.close()

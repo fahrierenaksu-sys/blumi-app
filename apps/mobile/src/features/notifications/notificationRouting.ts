@@ -2,6 +2,7 @@ export type NotificationDestination =
   | { route: "ChatThread"; params: { threadId: string; roomInviteAccept?: string } }
   | { route: "Inbox" }
   | { route: "Lobby" }
+  | { route: "MyRoom" }
 
 /**
  * Where a notification response opens. `enter_room` is the room invite's
@@ -34,6 +35,8 @@ export function resolveNotificationDestination(
   if (type === "discovery.match") return { route: "Inbox" }
   if (type === "discovery.watch_match") return { route: "Lobby" }
   if (type === "mini_room.invite") return { route: "Lobby" }
+  // The cat teasers name no one; My Room shows the reveal on focus.
+  if (type === "cat.trip_owner" || type === "cat.trip_host") return { route: "MyRoom" }
   return null
 }
 

@@ -99,6 +99,6 @@ const styles = StyleSheet.create({
   amount: { color: uiTheme.colors.textPrimary, fontSize: 16, fontWeight: "800" },
   amountLabel: { color: uiTheme.colors.textSecondary, fontSize: 11 },
   price: { color: uiTheme.colors.textPrimary, fontSize: 14, fontWeight: "700", marginLeft: "auto" },
-  buy: { color: uiTheme.colors.primaryDeep, fontSize: 12, fontWeight: "800" },
+  buy: { color: uiTheme.colors.primary, fontSize: 12, fontWeight: "800" },
   notice: { color: uiTheme.colors.textSecondary, fontSize: 11, lineHeight: 16 }
 })

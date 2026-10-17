@@ -141,9 +141,10 @@ test("the 10 QA-only room ids are reserved: legacy and never sold", () => {
   }
 })
 
-test("the 27 approved 2.5D pieces and the blush chair are sellable with a receipt or held without one; the starter bed never is", () => {
-  assert.equal(ROOM_V3_IDS.length, 27)
-  assert.equal(new Set(ROOM_V3_IDS).size, 27)
+test("the 29 approved 2.5D pieces and the blush chair are sellable with a receipt or held without one; the starter bed never is", () => {
+  // 27 approved 2026-10-10, plus the bunny pouf's mint and yellow colourways the owner approved on 2026-10-17
+  assert.equal(ROOM_V3_IDS.length, 29)
+  assert.equal(new Set(ROOM_V3_IDS).size, 29)
   const receiptedIds = new Set(BLUMI_R1_RELEASE_CATALOG.publishedItems.map((item) => item.itemId))
   for (const id of [...ROOM_V3_IDS, "room_v2_chair_blush"]) {
     // a piece is either receipted (sellable, held by no scope) or held (never sold): never both, never neither

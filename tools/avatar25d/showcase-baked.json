@@ -992,28 +992,28 @@
         "key": "base__front",
         "canvas": {
           "width": 600,
-          "height": 1555
+          "height": 1557
         },
         "ground": [
           300,
-          1538
+          1540
         ],
         "windows": {
           "card": [
             0,
             0,
             600,
-            1555
+            1557
           ],
           "head": [
             105,
-            13,
+            15,
             400,
             400
           ],
           "push": [
             25,
-            13,
+            15,
             560,
             560
           ]
@@ -1029,7 +1029,7 @@
           "key": "avatar_v2_top_male_navy_knit_polo__front",
           "rect": [
             96,
-            369,
+            371,
             414,
             393
           ],
@@ -1039,7 +1039,7 @@
             "key": "avatar_v2_top_male_navy_knit_polo__under",
             "rect": [
               52,
-              359,
+              361,
               500,
               426
             ]
@@ -1049,7 +1049,7 @@
           "key": "avatar_v2_bottom_male_cream_pleated_trousers__front",
           "rect": [
             21,
-            726,
+            728,
             568,
             698
           ],
@@ -1059,7 +1059,7 @@
             "key": "avatar_v2_bottom_male_cream_pleated_trousers__under",
             "rect": [
               22,
-              714,
+              716,
               568,
               600
             ]
@@ -1069,7 +1069,7 @@
           "key": "avatar_v2_shoes_male_tan_loafers__front",
           "rect": [
             82,
-            1393,
+            1395,
             448,
             140
           ],
@@ -1079,7 +1079,7 @@
             "key": "avatar_v2_shoes_male_tan_loafers__under",
             "rect": [
               84,
-              1362,
+              1364,
               438,
               176
             ]
@@ -1089,7 +1089,7 @@
           "key": "avatar_v2_top_male_forest_collar_sweater__front",
           "rect": [
             52,
-            369,
+            371,
             500,
             452
           ],
@@ -1099,7 +1099,7 @@
             "key": "avatar_v2_top_male_forest_collar_sweater__under",
             "rect": [
               52,
-              359,
+              361,
               500,
               426
             ]
@@ -1109,7 +1109,7 @@
           "key": "avatar_v2_bottom_male_charcoal_trousers__front",
           "rect": [
             21,
-            726,
+            728,
             569,
             677
           ],
@@ -1119,7 +1119,7 @@
             "key": "avatar_v2_bottom_male_charcoal_trousers__under",
             "rect": [
               22,
-              714,
+              716,
               568,
               600
             ]
@@ -1129,7 +1129,7 @@
           "key": "avatar_v2_shoes_male_brown_loafers__front",
           "rect": [
             83,
-            1385,
+            1387,
             444,
             152
           ],
@@ -1139,7 +1139,7 @@
             "key": "avatar_v2_shoes_male_brown_loafers__under",
             "rect": [
               84,
-              1362,
+              1364,
               438,
               176
             ]
@@ -1149,7 +1149,7 @@
           "key": "avatar_v2_top_male_check_flannel_white_tee__front",
           "rect": [
             54,
-            369,
+            371,
             496,
             509
           ],
@@ -1159,7 +1159,7 @@
             "key": "avatar_v2_top_male_check_flannel_white_tee__under",
             "rect": [
               52,
-              359,
+              361,
               500,
               426
             ]
@@ -1169,7 +1169,7 @@
           "key": "avatar_v2_bottom_male_grey_wide_jeans__front",
           "rect": [
             22,
-            726,
+            728,
             568,
             718
           ],
@@ -1179,7 +1179,7 @@
             "key": "avatar_v2_bottom_male_grey_wide_jeans__under",
             "rect": [
               22,
-              714,
+              716,
               568,
               600
             ]
@@ -1189,7 +1189,7 @@
           "key": "avatar_v2_shoes_male_green_skate_shoes__front",
           "rect": [
             75,
-            1397,
+            1399,
             470,
             148
           ],
@@ -1199,7 +1199,7 @@
             "key": "avatar_v2_shoes_male_green_skate_shoes__under",
             "rect": [
               84,
-              1362,
+              1364,
               438,
               177
             ]
@@ -1209,7 +1209,7 @@
           "key": "avatar_v2_top_male_white_basic_tee__front",
           "rect": [
             78,
-            369,
+            371,
             450,
             415
           ],
@@ -1219,7 +1219,7 @@
             "key": "avatar_v2_top_male_white_basic_tee__under",
             "rect": [
               52,
-              359,
+              361,
               500,
               426
             ]
@@ -1229,7 +1229,7 @@
           "key": "avatar_v2_bottom_male_black_straight_trousers__front",
           "rect": [
             40,
-            726,
+            728,
             549,
             640
           ],
@@ -1239,7 +1239,7 @@
             "key": "avatar_v2_bottom_male_black_straight_trousers__under",
             "rect": [
               22,
-              714,
+              716,
               568,
               600
             ]
@@ -1249,7 +1249,7 @@
           "key": "avatar_v2_shoes_male_black_clean_sneakers__front",
           "rect": [
             79,
-            1360,
+            1362,
             455,
             179
           ],
@@ -1259,7 +1259,7 @@
             "key": "avatar_v2_shoes_male_black_clean_sneakers__under",
             "rect": [
               84,
-              1362,
+              1364,
               438,
               176
             ]
@@ -1269,7 +1269,7 @@
           "key": "avatar_v2_top_male_black_basic_tee__front",
           "rect": [
             82,
-            369,
+            371,
             444,
             416
           ],
@@ -1279,7 +1279,7 @@
             "key": "avatar_v2_top_male_black_basic_tee__under",
             "rect": [
               52,
-              359,
+              361,
               500,
               426
             ]
@@ -1289,7 +1289,7 @@
           "key": "avatar_v2_bottom_male_black_pocket_trousers__front",
           "rect": [
             22,
-            726,
+            728,
             568,
             640
           ],
@@ -1299,7 +1299,7 @@
             "key": "avatar_v2_bottom_male_black_pocket_trousers__under",
             "rect": [
               22,
-              714,
+              716,
               568,
               600
             ]
@@ -1309,7 +1309,7 @@
           "key": "avatar_v2_shoes_male_black_everyday_sneakers__front",
           "rect": [
             75,
-            1360,
+            1362,
             459,
             178
           ],
@@ -1319,7 +1319,7 @@
             "key": "avatar_v2_shoes_male_black_everyday_sneakers__under",
             "rect": [
               84,
-              1362,
+              1364,
               438,
               176
             ]
@@ -1329,7 +1329,7 @@
           "key": "avatar_v2_top_male_black_embroidered_sweatshirt__front",
           "rect": [
             30,
-            397,
+            399,
             547,
             428
           ],
@@ -1339,7 +1339,7 @@
             "key": "avatar_v2_top_male_black_embroidered_sweatshirt__under",
             "rect": [
               52,
-              359,
+              361,
               500,
               426
             ]
@@ -1349,7 +1349,7 @@
           "key": "avatar_v2_bottom_male_cream_drawstring_trousers__front",
           "rect": [
             114,
-            666,
+            668,
             437,
             749
           ],
@@ -1359,7 +1359,7 @@
             "key": "avatar_v2_bottom_male_cream_drawstring_trousers__under",
             "rect": [
               22,
-              714,
+              716,
               568,
               600
             ]
@@ -1369,7 +1369,7 @@
           "key": "avatar_v2_shoes_male_cream_chunky_sneakers__front",
           "rect": [
             72,
-            1344,
+            1346,
             461,
             201
           ],
@@ -1379,7 +1379,7 @@
             "key": "avatar_v2_shoes_male_cream_chunky_sneakers__under",
             "rect": [
               84,
-              1362,
+              1364,
               437,
               178
             ]
@@ -1389,7 +1389,7 @@
           "key": "avatar_v2_top_male_taupe_waffle_blouson__front",
           "rect": [
             41,
-            369,
+            371,
             524,
             438
           ],
@@ -1399,7 +1399,7 @@
             "key": "avatar_v2_top_male_taupe_waffle_blouson__under",
             "rect": [
               52,
-              359,
+              361,
               500,
               426
             ]
@@ -1409,7 +1409,7 @@
           "key": "avatar_v2_bottom_male_ecru_wide_trousers__front",
           "rect": [
             132,
-            701,
+            703,
             347,
             706
           ],
@@ -1419,7 +1419,7 @@
             "key": "avatar_v2_bottom_male_ecru_wide_trousers__under",
             "rect": [
               22,
-              714,
+              716,
               568,
               600
             ]
@@ -1429,7 +1429,7 @@
           "key": "avatar_v2_shoes_male_dark_leather_sneakers__front",
           "rect": [
             81,
-            1372,
+            1374,
             443,
             170
           ],
@@ -1439,7 +1439,7 @@
             "key": "avatar_v2_shoes_male_dark_leather_sneakers__under",
             "rect": [
               84,
-              1362,
+              1364,
               438,
               177
             ]
@@ -1449,7 +1449,7 @@
           "key": "avatar_v2_top_male_olive_overshirt__front",
           "rect": [
             56,
-            369,
+            371,
             495,
             497
           ],
@@ -1459,7 +1459,7 @@
             "key": "avatar_v2_top_male_olive_overshirt__under",
             "rect": [
               52,
-              359,
+              361,
               500,
               426
             ]
@@ -1469,7 +1469,7 @@
           "key": "avatar_v2_bottom_male_dark_straight_jeans__front",
           "rect": [
             39,
-            726,
+            728,
             551,
             650
           ],
@@ -1479,7 +1479,7 @@
             "key": "avatar_v2_bottom_male_dark_straight_jeans__under",
             "rect": [
               22,
-              714,
+              716,
               568,
               600
             ]
@@ -1489,7 +1489,7 @@
           "key": "avatar_v2_shoes_male_sand_desert_boots__front",
           "rect": [
             80,
-            1365,
+            1367,
             454,
             169
           ],
@@ -1499,7 +1499,7 @@
             "key": "avatar_v2_shoes_male_sand_desert_boots__under",
             "rect": [
               84,
-              1362,
+              1364,
               438,
               176
             ]
@@ -1509,7 +1509,7 @@
           "key": "avatar_v2_hair_male_blue_black_curls__front",
           "rect": [
             155,
-            66,
+            68,
             300,
             322
           ],
@@ -1519,7 +1519,7 @@
             "key": "avatar_v2_hair_male_blue_black_curls__back",
             "rect": [
               124,
-              51,
+              53,
               364,
               337
             ]
@@ -1529,7 +1529,7 @@
           "key": "avatar_v2_hair_male_textured_twists__front",
           "rect": [
             163,
-            67,
+            69,
             284,
             193
           ],
@@ -1539,7 +1539,7 @@
             "key": "avatar_v2_hair_male_textured_twists__back",
             "rect": [
               137,
-              61,
+              63,
               348,
               201
             ]
@@ -1549,7 +1549,7 @@
           "key": "glasses_boy_black_soft_rect__front",
           "rect": [
             177,
-            237,
+            239,
             251,
             72
           ],
@@ -1560,16 +1560,136 @@
           "key": "glasses_boy_gunmetal_round__front",
           "rect": [
             178,
-            229,
+            231,
             248,
             89
           ],
           "order": 5,
           "slot": "glasses"
+        },
+        "hair_male_blond_fade": {
+          "key": "hair_male_blond_fade__front",
+          "rect": [
+            161,
+            68,
+            287,
+            209
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "hair_male_blond_fade__back",
+            "rect": [
+              142,
+              59,
+              318,
+              218
+            ]
+          }
+        },
+        "hair_male_soft_crop": {
+          "key": "hair_male_soft_crop__front",
+          "rect": [
+            161,
+            68,
+            287,
+            221
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "hair_male_soft_crop__back",
+            "rect": [
+              129,
+              56,
+              340,
+              233
+            ]
+          }
+        },
+        "hair_male_black_side_part": {
+          "key": "hair_male_black_side_part__front",
+          "rect": [
+            161,
+            68,
+            287,
+            224
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "hair_male_black_side_part__back",
+            "rect": [
+              140,
+              50,
+              331,
+              242
+            ]
+          }
+        },
+        "hair_male_wavy_quiff": {
+          "key": "hair_male_wavy_quiff__front",
+          "rect": [
+            153,
+            68,
+            303,
+            258
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "hair_male_wavy_quiff__back",
+            "rect": [
+              119,
+              18,
+              365,
+              372
+            ]
+          }
+        },
+        "hair_male_cocoa_quiff": {
+          "key": "hair_male_cocoa_quiff__front",
+          "rect": [
+            155,
+            68,
+            293,
+            264
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "hair_male_cocoa_quiff__back",
+            "rect": [
+              111,
+              10,
+              375,
+              394
+            ]
+          }
+        },
+        "hair_male_chestnut_waves": {
+          "key": "hair_male_chestnut_waves__front",
+          "rect": [
+            156,
+            68,
+            301,
+            264
+          ],
+          "order": 4,
+          "slot": "hair",
+          "back": {
+            "key": "hair_male_chestnut_waves__back",
+            "rect": [
+              119,
+              19,
+              383,
+              396
+            ]
+          }
         }
       },
       "files": {
-        "base__front": "28fe5c8a680d37f0a2813244ae3e9bc5f3139f6eb218c8db66fd7f9c8b1534f8",
+        "base__front": "8497eb272fab3dd4709960e7d2d74fca8a9926b94cd5ad75b3f6e9c6b6488800",
         "avatar_v2_top_male_navy_knit_polo__front": "4c8c1052659ae920fb1469d879d6cc6fdb62bdebe33b27d2043c5b6d252ec963",
         "avatar_v2_top_male_navy_knit_polo__under": "278c9e0fd1122af5e665fd3fd17520c305612c2e1ae11a2c4f11e96aadc7da51",
         "avatar_v2_bottom_male_cream_pleated_trousers__front": "a99f5c18939d5f6d4d281c7dbdf4636b57ef4aeca4c363e423d95150e74cef60",
@@ -1623,7 +1743,19 @@
         "avatar_v2_hair_male_textured_twists__front": "d7e39b7a0a3b0259d4ea9630e40c0c45b07f7279933b73a9ea3d47d1800bad7e",
         "avatar_v2_hair_male_textured_twists__back": "c622c28daad5aa4d5a0def0ade148cc76879cb3c8a311cbe2419e13bb7e0600c",
         "glasses_boy_black_soft_rect__front": "789877fe519a9a8f9aad9af32deae8ad89442c43eb2b69912314a98b8325a0a0",
-        "glasses_boy_gunmetal_round__front": "d16c83ca33acd264f633cce55c58a4b80e04136dc3251d5b5e66330d87de06d7"
+        "glasses_boy_gunmetal_round__front": "d16c83ca33acd264f633cce55c58a4b80e04136dc3251d5b5e66330d87de06d7",
+        "hair_male_blond_fade__front": "2779a92441ef6e584c8cedc7e60b5ea08dd7dbc228744d1b4c7661f902c40d91",
+        "hair_male_blond_fade__back": "e4396476d58dbd92f0e2633e0ee491c45d249e4b795ae6d1e133e5a4d0e6082e",
+        "hair_male_soft_crop__front": "59130e3cd0014e71ba9f8152f95ca933ec91753381167f6e8eef8fc51d00f743",
+        "hair_male_soft_crop__back": "37a9573e75fb19dfccccaecb918d8aee88ed01d049c89f448c49a13b11cac515",
+        "hair_male_black_side_part__front": "d6bddd073ce67a67697e24b18fd63f5e6c1b3a0409a8aa4b1fa5e006ac470da7",
+        "hair_male_black_side_part__back": "c3d323682f7d6c4cc31e734511efd2c0fe9e37d475649eef91222ced8193e0a0",
+        "hair_male_wavy_quiff__front": "b34595bb7c489185d30eef6b9a937f1e86e1298f6682bc27f0ac17140e3f7166",
+        "hair_male_wavy_quiff__back": "abac6fda3b48f084f1ecc5ce9d4c6b76809e557f83368602b0f99c6d4f587806",
+        "hair_male_cocoa_quiff__front": "8658d57d7513e982ab3be948bb8e4a4162acd6426c9c903643ea95b259c5d856",
+        "hair_male_cocoa_quiff__back": "9b97d3e5e798891fcd5d27553700e7a8d74732cb457a702f3a9f7d892fee2395",
+        "hair_male_chestnut_waves__front": "d52fdf613f978900d191c2d450c350985f157b8d0c7389f1ee6f07f6b5fc0801",
+        "hair_male_chestnut_waves__back": "d9c619188614172242f8bf67e43525cdc2ec889fa06ec838c3212e07e91d6cc4"
       }
     }
   }

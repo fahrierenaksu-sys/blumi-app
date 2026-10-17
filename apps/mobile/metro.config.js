@@ -28,6 +28,13 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(workspaceRoot, "node_modules")
 ]
+// Agent worktrees under .claude/ are full repo copies whose installs churn while Metro runs and crash its file map.
+const claudeDirPattern = new RegExp(`^${path.resolve(workspaceRoot, ".claude").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[/\\\\].*`)
+const existingBlockList = config.resolver.blockList
+config.resolver.blockList = [
+  ...(Array.isArray(existingBlockList) ? existingBlockList : existingBlockList ? [existingBlockList] : []),
+  claudeDirPattern
+]
 config.resolver.disableHierarchicalLookup = false
 config.resolver.assetExts = [...new Set([...(config.resolver.assetExts ?? []), "webp"])]
 

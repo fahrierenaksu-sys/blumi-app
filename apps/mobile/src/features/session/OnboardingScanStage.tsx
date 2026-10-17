@@ -7,13 +7,22 @@ import Animated, {
 } from "react-native-reanimated"
 import { blumiEntryTheme as uiTheme } from "../../ui/theme"
 import { ONBOARDING_SCAN_FRAMES } from "./OnboardingGreetingPair"
+import { OnboardingScanLaser, scanBeamY } from "./OnboardingScanLaser"
 
 /** Sweep progress at which the beam crosses the centre of each character row. */
 const ROW_PASS_PROGRESS = [0.34, 0.63] as const
 
-const SCAN_LASER = require(
-  "./assets/onboarding-scan-beam-v3-runtime/blumi_scan_laser_v3.png"
+const CELL_HEIGHT = 78
+const CELL_BORDER = 1
+const CHARACTER_HEIGHT = 76
+const GRID_GAP = uiTheme.spacing.sm
+/** Top of each row's character image, relative to the scan layer's centre. */
+const ROW_CHARACTER_TOP = [0, 1].map(
+  (row) => -(CELL_HEIGHT * 2 + GRID_GAP) / 2 + row * (CELL_HEIGHT + GRID_GAP) + CELL_BORDER
 )
+/** Unscanned characters wait as faint silhouettes until the beam reaches them. */
+const UNSCANNED_OPACITY = 0.26
+const SCANNED_OPACITY = 0.94
 
 interface OnboardingScanStageProps {
   scanRows: SharedValue<number>
@@ -28,22 +37,6 @@ export function OnboardingScanStage({
   onAssetLoad,
   onAssetError
 }: OnboardingScanStageProps) {
-  const beamStyle = useAnimatedStyle(() => ({
-    // The beam eases in and out instead of appearing and vanishing at the edges.
-    opacity: interpolate(scanSweep.value, [0, 0.08, 0.9, 1], [0, 1, 1, 0], Extrapolation.CLAMP),
-    transform: [{ translateY: interpolate(scanSweep.value, [0, 1], [-142, 150]) }]
-  }))
-  // A small irregular pulse sells the optical energy without introducing a
-  // separate JS timer or an aggressive repeating flash.
-  const laserStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      scanSweep.value,
-      [0, 0.18, 0.42, 0.7, 1],
-      [0.66, 0.88, 0.74, 0.94, 0.78],
-      Extrapolation.CLAMP
-    )
-  }))
-
   return (
     <View pointerEvents="none" style={styles.scanLayer} testID="onboarding-scan-stage">
       <View style={styles.scanGrid}>
@@ -59,22 +52,11 @@ export function OnboardingScanStage({
           />
         ))}
       </View>
-      <Animated.View style={[styles.scanLine, beamStyle]}>
-        <View style={styles.scanTrail} />
-        <Animated.Image
-          onLoad={onAssetLoad ? () => onAssetLoad(ONBOARDING_SCAN_FRAMES.length) : undefined}
-          onError={onAssetError}
-          accessibilityIgnoresInvertColors
-          resizeMode="stretch"
-          source={SCAN_LASER}
-          style={[styles.scanLaserImage, laserStyle]}
-        />
-        <View style={styles.scanGlow} />
-        <View style={styles.scanCore} />
-        <View style={styles.scanSpecular} />
-        <View style={styles.scanEdgeLeft} />
-        <View style={styles.scanEdgeRight} />
-      </Animated.View>
+      <OnboardingScanLaser
+        onError={onAssetError}
+        onLoad={onAssetLoad ? () => onAssetLoad(ONBOARDING_SCAN_FRAMES.length) : undefined}
+        scanSweep={scanSweep}
+      />
     </View>
   )
 }
@@ -98,11 +80,11 @@ function ScanCell({
   const column = index % 3
   const pass = ROW_PASS_PROGRESS[row] ?? 1
   const presenceRange = [row * 0.22, Math.min(1, row * 0.22 + 0.42)]
-  const colorRange = [Math.max(0, row * 0.34), Math.min(1, row * 0.34 + 0.36)]
   // Outer columns bounce a beat later so the row reads as a wave, not a block.
   const offset = column === 1 ? 0 : 0.025
   const bounceRange = [pass - 0.1 + offset, pass + offset, pass + 0.14 + offset]
   const glowRange = [pass - 0.08, pass, pass + 0.16]
+  const characterTop = ROW_CHARACTER_TOP[row] ?? 0
 
   const glowStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scanSweep.value, glowRange, [0, 1, 0], Extrapolation.CLAMP)
@@ -118,16 +100,24 @@ function ScanCell({
       ]
     }
   })
-  const characterStyle = useAnimatedStyle(() => ({
-    opacity:
-      interpolate(scanRows.value, presenceRange, [0, 1], Extrapolation.CLAMP) *
-      interpolate(scanSweep.value, colorRange, [0.2, 0.88], Extrapolation.CLAMP)
+  const presenceStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scanRows.value, presenceRange, [0, 1], Extrapolation.CLAMP)
+  }))
+  // The beam colours each character exactly where it has passed: the full
+  // colour copy is clipped to everything above the beam line.
+  const revealStyle = useAnimatedStyle(() => ({
+    height: interpolate(
+      scanBeamY(scanSweep.value) - characterTop,
+      [0, CHARACTER_HEIGHT],
+      [0, CHARACTER_HEIGHT],
+      Extrapolation.CLAMP
+    )
   }))
 
   return (
     <View style={styles.scanCell}>
       <Animated.View pointerEvents="none" style={[styles.scanCellGlow, glowStyle]} />
-      <Animated.View style={liftStyle}>
+      <Animated.View style={[liftStyle, presenceStyle]}>
         <Animated.Image
           onLoad={onAssetLoad ? () => onAssetLoad(index) : undefined}
           onError={onAssetError}
@@ -135,8 +125,17 @@ function ScanCell({
           fadeDuration={0}
           resizeMode="contain"
           source={source}
-          style={[styles.scanCharacter, characterStyle]}
+          style={[styles.scanCharacter, styles.unscanned]}
         />
+        <Animated.View style={[styles.revealClip, revealStyle]}>
+          <Animated.Image
+            accessibilityIgnoresInvertColors
+            fadeDuration={0}
+            resizeMode="contain"
+            source={source}
+            style={[styles.scanCharacter, styles.scanned]}
+          />
+        </Animated.View>
       </Animated.View>
     </View>
   )
@@ -155,16 +154,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: uiTheme.spacing.sm
+    gap: GRID_GAP
   },
   scanCell: {
     width: 72,
-    height: 78,
+    height: CELL_HEIGHT,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "flex-end",
     overflow: "hidden",
-    borderWidth: 1,
+    borderWidth: CELL_BORDER,
     borderColor: `${uiTheme.colors.primaryDeep}1F`,
     backgroundColor: "rgba(255,255,255,0.44)"
   },
@@ -181,70 +180,19 @@ const styles = StyleSheet.create({
   },
   scanCharacter: {
     width: 56,
-    height: 76
+    height: CHARACTER_HEIGHT
   },
-  scanLine: {
-    position: "absolute",
-    width: 268,
-    height: 30,
-    alignItems: "center",
-    justifyContent: "center"
+  unscanned: {
+    opacity: UNSCANNED_OPACITY
   },
-  // A restrained trail above the moving core gives the eye a clear scan
-  // direction without turning the beam into a thick painted stroke.
-  scanTrail: {
+  revealClip: {
     position: "absolute",
     top: 0,
-    width: 256,
-    height: 15,
-    borderRadius: 8,
-    backgroundColor: "rgba(235, 71, 108, 0.055)"
+    left: 0,
+    right: 0,
+    overflow: "hidden"
   },
-  scanGlow: {
-    position: "absolute",
-    width: 264,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "rgba(232, 58, 96, 0.16)",
-    shadowColor: "#E83A60",
-    shadowOpacity: 0.34,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 0 }
-  },
-  scanLaserImage: {
-    position: "absolute",
-    width: 268,
-    height: 26
-  },
-  scanCore: {
-    position: "absolute",
-    width: 258,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: "#E83A60"
-  },
-  scanSpecular: {
-    position: "absolute",
-    width: 224,
-    height: 1,
-    borderRadius: 1,
-    backgroundColor: "rgba(255,255,255,0.82)",
-    transform: [{ translateY: -1 }]
-  },
-  scanEdgeLeft: {
-    position: "absolute",
-    left: 3,
-    width: 7,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(232,58,96,0.48)"
-  },
-  scanEdgeRight: {
-    position: "absolute",
-    right: 3,
-    width: 7,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(232,58,96,0.48)"
+  scanned: {
+    opacity: SCANNED_OPACITY
   }
 })

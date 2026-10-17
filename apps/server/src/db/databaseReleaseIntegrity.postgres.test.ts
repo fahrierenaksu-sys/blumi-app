@@ -8,6 +8,10 @@ import { disposablePostgresSkip, disposablePostgresUrl } from "./disposablePostg
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 
+// Retired on purpose in 29b43912; inventories keep them (LEGACY_ROOM_ITEM_IDS).
+const RETIRED_ROOM_ID = "room_v2_cozy_bed"
+const RETIRED_ROOM_ID_2 = "room_v2_table_round"
+
 test("inventory constraints and atomic purchase survive concurrent requests", {
   skip: disposablePostgresSkip().skip
 }, async () => {
@@ -96,14 +100,19 @@ test("release audit detects catalog drift, duplicate ownership, and exposed API 
     await pool.query(
       `INSERT INTO blumi_economy_inventories
        (user_id, coins, owned_avatar_item_ids, owned_room_item_ids, updated_at)
-       VALUES ($1, 1250, ARRAY[$2, $2, $3], '{}', NOW())`,
-      [userId, "avatar_v2_top_default", "avatar_v2_top_unknown_release_audit"]
+       VALUES ($1, 1250, ARRAY[$2, $2, $3], ARRAY[$4, $5, $6], NOW())`,
+      [userId, "avatar_v2_top_default", "avatar_v2_top_unknown_release_audit",
+        RETIRED_ROOM_ID, RETIRED_ROOM_ID_2, "room_v2_unknown_release_audit"]
     )
     const cleanGrants = await auditDatabaseRelease(pool)
     assert.equal(cleanGrants.missingMigrations, 0)
     assert.equal(cleanGrants.changedMigrations, 0)
     assert.equal(cleanGrants.duplicateAvatarInventoryRows, 1)
     assert.equal(cleanGrants.unknownOwnedAvatarIds, 1)
+    // Retired room furniture users still own is kept on purpose: counted apart, not a finding.
+    // An id no catalog and no retired list knows is still a finding.
+    assert.equal(cleanGrants.retiredOwnedRoomIds, 2)
+    assert.equal(cleanGrants.unknownOwnedRoomIds, 1)
     assert.equal(cleanGrants.exposedTables, 0)
     assert.equal(cleanGrants.exposedFunctions, 0)
 

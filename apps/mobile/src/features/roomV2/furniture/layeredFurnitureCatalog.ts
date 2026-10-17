@@ -53,9 +53,11 @@ export const ROOM_AVATAR_25D_LAYERED_FLOOR_ENTRIES: readonly LayeredCatalogEntry
   { id: "room_v3_snacktable_oyun_round", name: "Oyun Round Snack Table", category: "table" },
   { id: "room_v3_teaset_oyun_flower", name: "Oyun Flower Tea Set", category: "seating" },
   { id: "room_v3_tvunit_oyun_game", name: "Oyun Game TV Unit", category: "misc" },
-  // the pouf's `sit_low` seat is pose-pending: it is a cushion to look at until that pose is drawn
+  // chair-height poufs (2026-10-17): sat on in the drawn sitting pose, reached from any side
   { id: "room_v3_pouf_oyun_bunnypink", name: "Oyun Bunny Pouf", category: "seating" },
   { id: "room_v3_pouf_oyun_bearpurple", name: "Oyun Bear Pouf", category: "seating" },
+  { id: "room_v3_pouf_oyun_bunnymint", name: "Oyun Mint Bunny Pouf", category: "seating" },
+  { id: "room_v3_pouf_oyun_bunnyyellow", name: "Oyun Yellow Bunny Pouf", category: "seating" },
   { id: "room_v3_rug_oyun_checker", name: "Oyun Checker Rug", category: "rug", flat: true },
   { id: "room_v3_rug_oyun_cloud", name: "Oyun Cloud Rug", category: "rug", flat: true },
   { id: "room_v3_rug_oyun_tea", name: "Oyun Tea Rug", category: "rug", flat: true }

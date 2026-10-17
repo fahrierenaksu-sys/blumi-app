@@ -633,7 +633,7 @@ export const registerStyles = StyleSheet.create({
   },
   recoveryPrimaryText: {
     ...uiTheme.font.bodyBold,
-    color: uiTheme.colors.onPrimary
+    color: "#FFFFFF"
   },
   footerArea: {
     alignItems: "flex-start",

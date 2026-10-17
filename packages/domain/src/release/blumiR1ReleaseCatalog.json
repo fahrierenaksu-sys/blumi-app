@@ -4037,46 +4037,54 @@
       "itemType": "room",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-approval-2026-10-17-poufs",
+        "sourceCommit": "0a114b754fe7f30c85c560d76def865d9612aa3c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_POUFS.md",
+          "manifestSha256": "9c3ca7236d8a17493d909e97ea7efa77086dc344c9040821491e0e3a1a4e03e8"
         },
         "assets": [
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r0_back.png",
-            "sha256": "006e0e0bb7cc8b9debcd724537218100afcce33eabd66fb70a028ab24e14bff7"
+            "sha256": "230b8bdbf170df71a2f8671b62c5b9cca3727bc73c5dba0872096dfacff25fd5"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r0_front.png",
+            "sha256": "42cbe3bbe0d00e84715f514eed71e5ddcfe1eb7219f93abf4566a29f42158c54"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r0_shadow.png",
-            "sha256": "c117ddf0dc2480891ac3487356b0870c4451355749bb1baeacfbebb88c6bb4f8"
+            "sha256": "c6f4f60d305732b9ff2cf5b312d295748e17076d413e9d2cf24872d589578002"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r1_back.png",
-            "sha256": "1e35a8e9b0b9291ed44d53411b8b24de1252f952e8dc1e2f19efaf4e9272247f"
+            "sha256": "2ad537e3174dff014b79fb53e5ab3f04eb6a6bc3c24e71ce65d4a600012a6121"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r1_front.png",
+            "sha256": "32d5dde95afa923e19ae10bdc856f4ea6d2d2d82108571c63492a7cabd44dcfa"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r1_shadow.png",
-            "sha256": "c799beff0e954a29d4ea9602dc7c2f5bcb6ba8bc5f7afc7bf959960c6676ac7d"
+            "sha256": "26ba3956a0f172434e2bd88fe92e62fe0eaaee92708ecab64dd4468a850ee05a"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r2_back.png",
-            "sha256": "d9927062bb18950af67ac09426cb1331402937a251603fc6a1e558bb2dd2af1d"
+            "sha256": "02f047746c0873582c1b84e51891e647b695206bf06cd547144d31acfc816375"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r2_shadow.png",
-            "sha256": "b6fe0d53d1c77193df4d56f8d19fdc29b45974eee4bfa19027c8963230368113"
+            "sha256": "a6ab8e49bdd38ee177f92dc4da531e288beea2a1c2a4f0f6d5859ed409ddd266"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r3_back.png",
-            "sha256": "fbc65cce9f27e2ccd4531f6b42cd8298815cfea802ec397b8bb253883d94a7a0"
+            "sha256": "b54201c14a13725398c09a1bda39cebcec0ec2e86c46e0e46f3712e7c5baef3a"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnypink/r3_shadow.png",
-            "sha256": "c704c9e4f6532e72d2a630390429294e03f66f202be1cd1f7405a59548185515"
+            "sha256": "af94b39925e41f859d979dcb693a851cc4f272c59c56aac99cfd7d0c9d95eaad"
           }
         ]
       }
@@ -4086,46 +4094,168 @@
       "itemType": "room",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-approval-2026-10-17-poufs",
+        "sourceCommit": "0a114b754fe7f30c85c560d76def865d9612aa3c",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_POUFS.md",
+          "manifestSha256": "9c3ca7236d8a17493d909e97ea7efa77086dc344c9040821491e0e3a1a4e03e8"
         },
         "assets": [
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r0_back.png",
-            "sha256": "b43693f7fb721caa44ac229cc434b4f2ae15d14d69c5047d3c0a9a556f3731d4"
+            "sha256": "5703b52b01f25bd52eeaf564baefd4135503c67ee2fce54b0dd301b02c598cbe"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r0_front.png",
+            "sha256": "6eca478bbb0aeee58907cd094f18a9476e7d76d1612bc97e690750b15c1f363a"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r0_shadow.png",
-            "sha256": "a8e6bd690cb79408d557cd71b03bdfa7db43f091345dbfb2abc75363de1bbee2"
+            "sha256": "39d6e6d9b1b20838a86b1cf06f53c5d41bb91a0c2cea340de0d277e110ff79fa"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r1_back.png",
-            "sha256": "8e7c1ceabee080e930cd64881221d24063a4379218e395cdf21503cf1c15e241"
+            "sha256": "8bffc4abb953b42dd06625b32a48ec484ce44d3e858913b5fad94cc0b4a1921d"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r1_front.png",
+            "sha256": "b9e5eade786d43be14ce853969540830d2f1fa133b5e30aeb15d4d522e6ab922"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r1_shadow.png",
-            "sha256": "4ea87023d3c91c349f6075942259d9754a20c3c03c74fb9274a45fe87500aacc"
+            "sha256": "eb0c2e048a8eaf7beb138cf189dcc9406378af220b6c32a3f5462e933b9a7f5e"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r2_back.png",
-            "sha256": "750d46dc8c2d0b46efda8b95fd932b35f391092ab5d96af2698714e280255122"
+            "sha256": "467f1045fcc01c9bef4db53e3ba8b48fc1b4d0bad9acd145376a0ae343645d42"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r2_shadow.png",
-            "sha256": "e6982466fc1d878dca38fd7504f4bad14296e3fd566a979fd354b1a3b290aeac"
+            "sha256": "8d8c02a8ca80f870eb7dd2d610f7a9299063805d012c039358df1f917ebd4491"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r3_back.png",
-            "sha256": "b16171df478bddc52a6b33352e31933d9d2cdf18258508d588479daf36e64b1d"
+            "sha256": "243898b79e41108709ce0f9db6aef3da6dd16086a2175941617bb2c46aeaa817"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bearpurple/r3_shadow.png",
-            "sha256": "c3590b89066350d950062018e7cd4bf40aeab4d7528bb7146fc92a92193957e7"
+            "sha256": "3f39fd0eb993058adc51906f97ee6eb2e6467822e4a2a5bd8034dbb62f0c45fe"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_pouf_oyun_bunnymint",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17-poufs",
+        "sourceCommit": "0a114b754fe7f30c85c560d76def865d9612aa3c",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_POUFS.md",
+          "manifestSha256": "9c3ca7236d8a17493d909e97ea7efa77086dc344c9040821491e0e3a1a4e03e8"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r0_back.png",
+            "sha256": "53cf41853b9fd8050b69173f7faf89adc86a682b829475cc63ee4b13c97b2ed4"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r0_front.png",
+            "sha256": "d2e6e0b04fa78814a4ccb295b677eff950d60b252a6fcb5140cc3b29ff6564b2"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r0_shadow.png",
+            "sha256": "c6f4f60d305732b9ff2cf5b312d295748e17076d413e9d2cf24872d589578002"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r1_back.png",
+            "sha256": "daa6110429a4816e0194dc521b09023c217b7e6e455bc790767a6d6779318eae"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r1_front.png",
+            "sha256": "2d62dfba734d2e45fc7886d2bf9366130fff8eeede3f55ee5c3c30d3c177afe3"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r1_shadow.png",
+            "sha256": "26ba3956a0f172434e2bd88fe92e62fe0eaaee92708ecab64dd4468a850ee05a"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r2_back.png",
+            "sha256": "efa0123dcf47e5c90077fd6c0434acfee82b3de69b2db790b26dac89512120bf"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r2_shadow.png",
+            "sha256": "a6ab8e49bdd38ee177f92dc4da531e288beea2a1c2a4f0f6d5859ed409ddd266"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r3_back.png",
+            "sha256": "4a58f082da2aebcf5c25d2615396e7b5526e8b290602f507d6f82a0f5b51cc57"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnymint/r3_shadow.png",
+            "sha256": "af94b39925e41f859d979dcb693a851cc4f272c59c56aac99cfd7d0c9d95eaad"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "room_v3_pouf_oyun_bunnyyellow",
+      "itemType": "room",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-approval-2026-10-17-poufs",
+        "sourceCommit": "0a114b754fe7f30c85c560d76def865d9612aa3c",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_POUFS.md",
+          "manifestSha256": "9c3ca7236d8a17493d909e97ea7efa77086dc344c9040821491e0e3a1a4e03e8"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r0_back.png",
+            "sha256": "4badeaf3a4fb0459c0a1d6e96aeceedb6f382aa0fe40ba91bf2a7709d3dc7f73"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r0_front.png",
+            "sha256": "09ec26a24e8efe4df41e8f51ed48412cfb24945a76203c70b7bfd154bc121062"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r0_shadow.png",
+            "sha256": "c6f4f60d305732b9ff2cf5b312d295748e17076d413e9d2cf24872d589578002"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r1_back.png",
+            "sha256": "fdaa33e9c7799e131cced2d018655355727435334402a61532a80fd4a6447209"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r1_front.png",
+            "sha256": "e85dbbce9327ef54cd3d928ad7885cfa3a7f39c5b34abdd0e24d89c7aad77cb3"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r1_shadow.png",
+            "sha256": "26ba3956a0f172434e2bd88fe92e62fe0eaaee92708ecab64dd4468a850ee05a"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r2_back.png",
+            "sha256": "0abb6efb2582568f202c01fa3e81e779e978b971fd855bc444f4f3d46f5fb122"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r2_shadow.png",
+            "sha256": "a6ab8e49bdd38ee177f92dc4da531e288beea2a1c2a4f0f6d5859ed409ddd266"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r3_back.png",
+            "sha256": "5b631f42adc207373f60e55ba442eae585093cb68c0760ca26fbff491d54eb82"
+          },
+          {
+            "path": "apps/mobile/src/features/roomV2/furniture/room_v3_pouf_oyun_bunnyyellow/r3_shadow.png",
+            "sha256": "af94b39925e41f859d979dcb693a851cc4f272c59c56aac99cfd7d0c9d95eaad"
           }
         ]
       }
@@ -4291,6 +4421,228 @@
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v3_poster_oyun_controller/right_shadow.png",
             "sha256": "0c837e357f6c9a5f54d7c1c3575f94f2fb4fd320b1be632ddc0e06ed735f83d0"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_blond_fade",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-reissue-2026-10-17-boy-hairs",
+        "sourceCommit": "0f30051a545cbc281d7e0e2350aa65b792b72a31",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "01b6a6f8e534fe3ca8def74f7be20b8999590db0820f78f86b3e99b64078827e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_blond_fade__o4p6.webp",
+            "sha256": "afd9de7140ab854379aae43b838d86e373cf2ffa5eb27b46a50904f2f6778097"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_blond_fade__o4p6.webp",
+            "sha256": "8c866e1a25085d807760f5fd97825d8a965773cb2cdd47ce19613426d05f1fb2"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_blond_fade__back.webp",
+            "sha256": "e4396476d58dbd92f0e2633e0ee491c45d249e4b795ae6d1e133e5a4d0e6082e"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_blond_fade__front.webp",
+            "sha256": "2779a92441ef6e584c8cedc7e60b5ea08dd7dbc228744d1b4c7661f902c40d91"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_blond_fade.webp",
+            "sha256": "5e0be461add7e3dad33dd6acb0f1c75f4db24c5361d44e9b904aa550ed41ef85"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_soft_crop",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-reissue-2026-10-17-boy-hairs",
+        "sourceCommit": "0f30051a545cbc281d7e0e2350aa65b792b72a31",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "01b6a6f8e534fe3ca8def74f7be20b8999590db0820f78f86b3e99b64078827e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_soft_crop__o4p6.webp",
+            "sha256": "05cd7913d248b0e3fbd140ca93eec02106640172d690d293c02d6fc8ab909cb7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_soft_crop__o4p6.webp",
+            "sha256": "e8b47243f38c83643c4f6cd5e3fc02e76ff5bb9b69f2a1704cd6b9b3518b59aa"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_soft_crop__back.webp",
+            "sha256": "37a9573e75fb19dfccccaecb918d8aee88ed01d049c89f448c49a13b11cac515"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_soft_crop__front.webp",
+            "sha256": "59130e3cd0014e71ba9f8152f95ca933ec91753381167f6e8eef8fc51d00f743"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_soft_crop.webp",
+            "sha256": "fba69e892756ef94f53599216b2bea4243621147f2e51f24a99e416ddc6e4341"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_black_side_part",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-reissue-2026-10-17-boy-hairs",
+        "sourceCommit": "0f30051a545cbc281d7e0e2350aa65b792b72a31",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "01b6a6f8e534fe3ca8def74f7be20b8999590db0820f78f86b3e99b64078827e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_black_side_part__o4p6.webp",
+            "sha256": "977117213e7469e32df369065121965b72c4e15c8d1a3831bd3f8133eeb34542"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_black_side_part__o4p6.webp",
+            "sha256": "5dfc5083d150e375d9090500b728d99bdeed108539539916d88e323b0ce782d7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_black_side_part__back.webp",
+            "sha256": "c3d323682f7d6c4cc31e734511efd2c0fe9e37d475649eef91222ced8193e0a0"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_black_side_part__front.webp",
+            "sha256": "d6bddd073ce67a67697e24b18fd63f5e6c1b3a0409a8aa4b1fa5e006ac470da7"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_black_side_part.webp",
+            "sha256": "941c0a979fabceba10581789225bfa646f1c15073026a908627f5029f2f831cf"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_wavy_quiff",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-reissue-2026-10-17-boy-hairs",
+        "sourceCommit": "0f30051a545cbc281d7e0e2350aa65b792b72a31",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "01b6a6f8e534fe3ca8def74f7be20b8999590db0820f78f86b3e99b64078827e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_wavy_quiff__o4p6.webp",
+            "sha256": "38a9a5951ba87e646ce1c7e97f6c41306890eab03aa0a3f862d3c59f1c9cf1a4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_wavy_quiff__o4p6.webp",
+            "sha256": "9516c715e78c4d46cd3bdee42ec4d61e30fe06c74255f4e4b96f5e8d2c9665ce"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_wavy_quiff__back.webp",
+            "sha256": "abac6fda3b48f084f1ecc5ce9d4c6b76809e557f83368602b0f99c6d4f587806"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_wavy_quiff__front.webp",
+            "sha256": "b34595bb7c489185d30eef6b9a937f1e86e1298f6682bc27f0ac17140e3f7166"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_wavy_quiff.webp",
+            "sha256": "884bab37123cc3da2c676a6f948df347f1d005a93eac1da02abbc44612739d6b"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_cocoa_quiff",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-reissue-2026-10-17-boy-hairs",
+        "sourceCommit": "0f30051a545cbc281d7e0e2350aa65b792b72a31",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "01b6a6f8e534fe3ca8def74f7be20b8999590db0820f78f86b3e99b64078827e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_cocoa_quiff__o4p6.webp",
+            "sha256": "0186b3ac1021e46c35c74308a4c55f398e54c838168fd7b14848880f449fa9b6"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_cocoa_quiff__o4p6.webp",
+            "sha256": "d4c4bd4a6d41985727b91c503d55924caf41862f9bb7183cf7b6969d06ec7dfe"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_cocoa_quiff__back.webp",
+            "sha256": "9b97d3e5e798891fcd5d27553700e7a8d74732cb457a702f3a9f7d892fee2395"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_cocoa_quiff__front.webp",
+            "sha256": "8658d57d7513e982ab3be948bb8e4a4162acd6426c9c903643ea95b259c5d856"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_cocoa_quiff.webp",
+            "sha256": "76b0f02cfacd624d068d046b0d9b97e7d8d5b379f88be0196f6639070c5fbbb9"
+          }
+        ]
+      }
+    },
+    {
+      "itemId": "hair_male_chestnut_waves",
+      "itemType": "avatar",
+      "receipt": {
+        "schemaVersion": "blumi-asset-promotion-receipt-v1",
+        "receiptId": "owner-reissue-2026-10-17-boy-hairs",
+        "sourceCommit": "0f30051a545cbc281d7e0e2350aa65b792b72a31",
+        "independentReviewer": "owner",
+        "reviewedAt": "2026-10-17",
+        "evidence": {
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_BOY_HAIRS.md",
+          "manifestSha256": "01b6a6f8e534fe3ca8def74f7be20b8999590db0820f78f86b3e99b64078827e"
+        },
+        "assets": [
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/bust/hair_male_chestnut_waves__o4p6.webp",
+            "sha256": "175d3decd59635c449230dd2e0811a4eee00ac7f17f2ad83531b3102636179bc"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/full/hair_male_chestnut_waves__o4p6.webp",
+            "sha256": "f6f04cb38fbb256066fe2b648b571d9c5c1b3e5c931a44ac64991db4e4f89719"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_chestnut_waves__back.webp",
+            "sha256": "d9c619188614172242f8bf67e43525cdc2ec889fa06ec838c3212e07e91d6cc4"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/hair_male_chestnut_waves__front.webp",
+            "sha256": "d52fdf613f978900d191c2d450c350985f157b8d0c7389f1ee6f07f6b5fc0801"
+          },
+          {
+            "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/hair_male_chestnut_waves.webp",
+            "sha256": "63b58abe04df83c576537c5d009f7b09792c5c915beb9e51ea72a33f22681c79"
           }
         ]
       }

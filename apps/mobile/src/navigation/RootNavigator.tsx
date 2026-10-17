@@ -864,6 +864,7 @@ export function RootNavigator() {
                     }
                     onRequestPushPermission={pushRegistration.requestPermission}
                     readReceiptsCapability={resolvedCapabilities.chat_read_receipts}
+                    streetCapability={resolvedCapabilities.chat_street}
                   />
                 )}
               </Stack.Screen>

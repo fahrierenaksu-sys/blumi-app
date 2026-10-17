@@ -30,3 +30,4 @@ export * from "./realtime/ServerEventSchemas";
 export * from "./api/CoreApiSchemas";
 export * from "./capabilities/Capabilities";
 export * from "./miniRooms/MiniRoomMotion";
+export * from "./street/StreetSchemas";
