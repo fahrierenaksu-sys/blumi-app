@@ -57,9 +57,20 @@ test("real PostgreSQL export includes the pet, cat switches, trips, souvenirs an
   const owner = createAccountRecord("+905559991301")
   const host = createAccountRecord("+905559991302")
   const blockedHost = createAccountRecord("+905559991303")
+  const formerHost = createAccountRecord("+905559991304")
+  const bannedHost = createAccountRecord("+905559991305")
+  const suspendedHost = createAccountRecord("+905559991306")
+  const everyone = [owner, host, blockedHost, formerHost, bannedHost, suspendedHost]
   try {
     const auth = createPostgresAuthRepository(pool)
-    for (const account of [owner, host, blockedHost]) await auth.saveAccount(account)
+    for (const account of everyone) await auth.saveAccount(account)
+    // Still matched today: host, blockedHost, bannedHost, suspendedHost. formerHost unmatched after the trip ended.
+    for (const [index, partner] of [host, blockedHost, bannedHost, suspendedHost].entries()) {
+      await pool.query("INSERT INTO blumi_matches(match_id,participant_a_user_id,participant_b_user_id,matched_at) VALUES($1,$2,$3,NOW())",
+        [`export-match-${index}`, partner.userId, owner.userId])
+    }
+    await pool.query("UPDATE blumi_accounts SET moderation_status = 'banned' WHERE user_id = $1", [bannedHost.userId])
+    await pool.query("UPDATE blumi_accounts SET moderation_status = 'suspended', suspended_until = NOW() + interval '1 day' WHERE user_id = $1", [suspendedHost.userId])
     await pool.query(`INSERT INTO blumi_room_pets(pet_id,user_id,species_item_id,name,created_at,updated_at)
       VALUES('export-pet',$1,'pet_cat_blumi_v1','Pamuk',NOW(),NOW())`, [owner.userId])
     await pool.query("INSERT INTO blumi_cat_trip_prefs(user_id,push_enabled,updated_at) VALUES($1,true,NOW())", [owner.userId])
@@ -76,6 +87,10 @@ test("real PostgreSQL export includes the pet, cat switches, trips, souvenirs an
     await trip("unmatched", host.userId, 0, past(4, 0), past(4, 2), { ownerRevealed: past(4, 3), hostRevealed: past(4, 1), endReason: "unmatch" })
     await trip("blocked", blockedHost.userId, 0, past(3, 0), past(3, 2), { ownerRevealed: past(3, 3), hostRevealed: past(3, 1) })
     await trip("future", host.userId, 0, past(-2, 0), past(-2, 2))
+    const finished = { ownerRevealed: past(2, 3), hostRevealed: past(2, 1) }
+    await trip("unmatched-later", formerHost.userId, 0, past(2, 0), past(2, 2), finished)
+    await trip("banned-later", bannedHost.userId, 0, past(6, 0), past(6, 2), { ownerRevealed: past(6, 3), hostRevealed: past(6, 1) })
+    await trip("suspended-later", suspendedHost.userId, 0, past(7, 0), past(7, 2), { ownerRevealed: past(7, 3), hostRevealed: past(7, 1) })
     await pool.query("INSERT INTO blumi_safety_blocks(actor_user_id,blocked_user_id,created_at) VALUES($1,$2,NOW())", [blockedHost.userId, owner.userId])
     await pool.query(`INSERT INTO blumi_cat_souvenirs(souvenir_id,owner_user_id,trip_id,souvenir_key,rarity,acquired_at)
       VALUES('export-souvenir',$1,'revealed','leaf','common',NOW())`, [owner.userId])
@@ -101,7 +116,11 @@ test("real PostgreSQL export includes the pet, cat switches, trips, souvenirs an
     assert.equal(owned.get("unrevealed")?.host_user_id, null, "no reveal, no host")
     assert.equal(owned.get("unmatched")?.host_user_id, null, "an unmatch hides the host")
     assert.equal(owned.get("blocked")?.host_user_id, null, "a block hides the host")
+    assert.equal(owned.get("unmatched-later")?.host_user_id, null, "an unmatch after a finished trip hides the host")
+    assert.equal(owned.get("banned-later")?.host_user_id, null, "a ban after a finished trip hides the host")
+    assert.equal(owned.get("suspended-later")?.host_user_id, null, "a current suspension hides the host")
     for (const entry of mine.catTrips) assert.equal(entry.owner_user_id, null, "the owner's own id is never a counterpart")
+    assert.equal(byId((await read(formerHost)).catTrips).get("unmatched-later")?.owner_user_id, null, "and the owner from the host")
     const hosted = byId((await read(host)).catTrips)
     assert.equal(hosted.get("revealed")?.owner_user_id, owner.userId, "the host sees the owner after their reveal")
     assert.equal(hosted.get("revealed")?.host_user_id, null)
@@ -112,7 +131,8 @@ test("real PostgreSQL export includes the pet, cat switches, trips, souvenirs an
     assert.equal((await read(host)).roomPet, null)
   } finally {
     await pool.query("DELETE FROM blumi_safety_blocks WHERE actor_user_id = $1", [blockedHost.userId]).catch(() => undefined)
-    await pool.query("DELETE FROM blumi_accounts WHERE user_id = ANY($1)", [[owner.userId, host.userId, blockedHost.userId]]).catch(() => undefined)
+    await pool.query("DELETE FROM blumi_matches WHERE match_id LIKE 'export-match-%'").catch(() => undefined)
+    await pool.query("DELETE FROM blumi_accounts WHERE user_id = ANY($1)", [everyone.map((account) => account.userId)]).catch(() => undefined)
     await pool.end()
   }
 })

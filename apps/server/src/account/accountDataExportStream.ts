@@ -36,8 +36,10 @@ const optionalSections = [
   ["catTripPrefs", "blumi_cat_trip_prefs", "SELECT travel_enabled, host_enabled, push_enabled, updated_at FROM blumi_cat_trip_prefs WHERE user_id = $1", true],
   ["streetWindow", "blumi_street_digests", "SELECT window_closed, look_kind, look_changed_at, room_kind, room_changed_at, updated_at FROM blumi_street_digests WHERE user_id = $1", true],
   ["catTripDays", "blumi_cat_trip_days", "SELECT day_key, planned_at FROM blumi_cat_trip_days WHERE owner_user_id = $1 ORDER BY day_key ASC", false],
-  // The counterpart follows the app's rules: the owner learns the host after opening the reveal of a finished
-  // trip, the host learns the owner after opening theirs, and never after a block, unmatch or removed account.
+  // The counterpart follows the app's rules (catTripService pairProblem): the owner learns the host after opening
+  // the reveal of a finished trip, the host learns the owner after opening theirs, and only while the pair still
+  // has no block, is still mutually matched and both accounts exist and are not banned or suspended. That check is
+  // made now, not when the trip ended, so an unmatch, ban or suspension after a finished trip hides it as well.
   // Trips that have not started yet are left out.
   ["catTrips", "blumi_cat_trips", `SELECT trip.trip_id, CASE WHEN trip.owner_user_id = $1 THEN 'owner' ELSE 'host' END AS role,
       CASE WHEN counterpart_visible AND trip.owner_user_id = $1 AND trip.owner_revealed_at IS NOT NULL AND trip.ends_at <= now()
@@ -50,7 +52,14 @@ const optionalSections = [
     CROSS JOIN LATERAL (SELECT (trip.end_reason IS NULL OR trip.end_reason NOT IN ('block', 'unmatch', 'account'))
       AND NOT EXISTS (SELECT 1 FROM blumi_safety_blocks block
         WHERE (block.actor_user_id = trip.owner_user_id AND block.blocked_user_id = trip.host_user_id)
-           OR (block.actor_user_id = trip.host_user_id AND block.blocked_user_id = trip.owner_user_id)) AS counterpart_visible) visibility
+           OR (block.actor_user_id = trip.host_user_id AND block.blocked_user_id = trip.owner_user_id))
+      AND EXISTS (SELECT 1 FROM blumi_matches pair
+        WHERE (pair.participant_a_user_id = trip.owner_user_id AND pair.participant_b_user_id = trip.host_user_id)
+           OR (pair.participant_a_user_id = trip.host_user_id AND pair.participant_b_user_id = trip.owner_user_id))
+      AND (SELECT count(*) FROM blumi_accounts member
+        WHERE member.user_id IN (trip.owner_user_id, trip.host_user_id)
+          AND (member.moderation_status NOT IN ('banned', 'suspended')
+            OR (member.moderation_status = 'suspended' AND member.suspended_until <= now()))) = 2 AS counterpart_visible) visibility
     WHERE (trip.owner_user_id = $1 OR trip.host_user_id = $1) AND trip.starts_at <= now()
     ORDER BY trip.starts_at ASC, trip.trip_id ASC`, false],
   ["catSouvenirs", "blumi_cat_souvenirs", "SELECT souvenir_id, trip_id, souvenir_key, rarity, acquired_at FROM blumi_cat_souvenirs WHERE owner_user_id = $1 ORDER BY acquired_at ASC, souvenir_id ASC", false],
