@@ -89,9 +89,16 @@ export type RoomPetEvent =
   | { readonly type: "chatHeart" }
   | { readonly type: "tap" }
 
-/** What the pet is walking toward and what it does on arrival. */
+/**
+ * Resting between walks, like a real cat: it stops and looks around
+ * (settle), sits, sometimes lies down curled, and gets up before it moves on.
+ */
+export type RoomPetRestStage = "settle" | "sit" | "lie" | "getUp"
+
+/** What the pet is walking toward and what it does on arrival; while idle, which rest stage it is in. */
 export type RoomPetGoal =
   | { readonly kind: "wander" }
+  | { readonly kind: "rest"; readonly stage: RoomPetRestStage }
   | { readonly kind: "greet"; readonly avatarKey: string; readonly deadlineMs: number; readonly greeted: boolean }
   | { readonly kind: "sleep"; readonly spotId: string | null }
   | { readonly kind: "hop"; readonly spotId: string; readonly phase: "approach" | "up" | "perch" | "down" }

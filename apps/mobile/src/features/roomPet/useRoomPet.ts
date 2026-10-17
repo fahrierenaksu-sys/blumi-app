@@ -4,7 +4,7 @@ import type { RoomPoint2D, RoomV2FurnitureRenderItem, RoomV2RenderItem } from ".
 import type { RoomV2FloorGridProjection } from "../roomV2/roomV2FloorGrid"
 import type { RoomPetAvatar, RoomPetEvent, RoomPetMap, RoomPetState } from "./roomPet.types"
 import { createRoomPetState, stepRoomPet } from "./roomPetEngine"
-import { createRoomPetMapFromRoom, getRoomPetCellAtStagePoint } from "./roomPetRoomAdapter"
+import { createRoomPetMapFromRoom, getRoomPetCellAtStagePoint, type RoomPetVisibleStage } from "./roomPetRoomAdapter"
 import { getRoomPetNextWakeMs, getRoomPetOwnerEvents, resolveRoomPetDraw, type RoomPetDraw } from "./roomPetRoomScene"
 
 /**
@@ -25,6 +25,8 @@ export interface UseRoomPetInput {
   readonly projection: RoomV2FloorGridProjection | null
   readonly furniture: readonly RoomV2FurnitureRenderItem[]
   readonly renderItems: readonly RoomV2RenderItem[]
+  /** The part of the shell the screen shows; the pet never walks outside it. Unset: the whole shell. */
+  readonly visibleStage?: RoomPetVisibleStage
   /** The owner's avatar as it is now (live walk point included); null when it is not in the room. */
   readonly readOwner: () => RoomPetOwnerSnapshot | null
 }
@@ -52,11 +54,17 @@ function createSeed(): number {
  */
 export function useRoomPet(input: UseRoomPetInput): RoomPetController {
   const { isEnabled, isActive, projection, furniture, renderItems, readOwner } = input
+  const visibleMinX = input.visibleStage?.minX
+  const visibleMaxX = input.visibleStage?.maxX
+  const petHalfWidth = input.visibleStage?.petHalfWidth
   const map = useMemo<RoomPetMap | null>(() => {
     if (!isEnabled || !projection) return null
-    const built = createRoomPetMapFromRoom({ projection, furniture })
+    const visibleStage = visibleMinX !== undefined && visibleMaxX !== undefined && petHalfWidth !== undefined
+      ? { minX: visibleMinX, maxX: visibleMaxX, petHalfWidth }
+      : undefined
+    const built = createRoomPetMapFromRoom({ projection, furniture, visibleStage })
     return built.cells.length > 0 ? built : null
-  }, [furniture, isEnabled, projection])
+  }, [furniture, isEnabled, petHalfWidth, projection, visibleMaxX, visibleMinX])
   const [draw, setDraw] = useState<RoomPetDraw | null>(null)
   const stateRef = useRef<RoomPetState | null>(null)
   const ownerRef = useRef<RoomPetAvatar | null>(null)
