@@ -1573,7 +1573,7 @@
             161,
             68,
             287,
-            198
+            209
           ],
           "order": 4,
           "slot": "hair",
@@ -1583,7 +1583,7 @@
               142,
               59,
               318,
-              207
+              218
             ]
           }
         },
@@ -1613,7 +1613,7 @@
             161,
             68,
             287,
-            216
+            224
           ],
           "order": 4,
           "slot": "hair",
@@ -1623,7 +1623,7 @@
               140,
               50,
               331,
-              234
+              242
             ]
           }
         },
@@ -1744,17 +1744,17 @@
         "avatar_v2_hair_male_textured_twists__back": "c622c28daad5aa4d5a0def0ade148cc76879cb3c8a311cbe2419e13bb7e0600c",
         "glasses_boy_black_soft_rect__front": "789877fe519a9a8f9aad9af32deae8ad89442c43eb2b69912314a98b8325a0a0",
         "glasses_boy_gunmetal_round__front": "d16c83ca33acd264f633cce55c58a4b80e04136dc3251d5b5e66330d87de06d7",
-        "hair_male_blond_fade__front": "1b8f12da35f6127d5f7ba0eb7cc0f7dbb0b626e3a9e030f7e50a6bab10a99937",
-        "hair_male_blond_fade__back": "7487b80b1d90bb4d173337bb760429b60cc7332ec90def51e80848844eded7a5",
-        "hair_male_soft_crop__front": "36516632871f4381bdc667f61458407afe1d506e4e975480dad857107e5f0a6d",
-        "hair_male_soft_crop__back": "24d8a46857996589fa22cde5fe25f9671a1ab6716ca23b18e2953de0d4b23aa8",
-        "hair_male_black_side_part__front": "1259d22a0e3083623ddfab5773be30fb138e9db3db39b767ec686fb98f21e171",
-        "hair_male_black_side_part__back": "53902dffac46e8a86defb9b497c6a779cd6e948bfa89ce5d08670856fa8498dd",
-        "hair_male_wavy_quiff__front": "407a55266bb072a793cf3a9a8766559a782dc89ca8a6de8977789cad2d73f5c4",
+        "hair_male_blond_fade__front": "2779a92441ef6e584c8cedc7e60b5ea08dd7dbc228744d1b4c7661f902c40d91",
+        "hair_male_blond_fade__back": "e4396476d58dbd92f0e2633e0ee491c45d249e4b795ae6d1e133e5a4d0e6082e",
+        "hair_male_soft_crop__front": "59130e3cd0014e71ba9f8152f95ca933ec91753381167f6e8eef8fc51d00f743",
+        "hair_male_soft_crop__back": "37a9573e75fb19dfccccaecb918d8aee88ed01d049c89f448c49a13b11cac515",
+        "hair_male_black_side_part__front": "d6bddd073ce67a67697e24b18fd63f5e6c1b3a0409a8aa4b1fa5e006ac470da7",
+        "hair_male_black_side_part__back": "c3d323682f7d6c4cc31e734511efd2c0fe9e37d475649eef91222ced8193e0a0",
+        "hair_male_wavy_quiff__front": "b34595bb7c489185d30eef6b9a937f1e86e1298f6682bc27f0ac17140e3f7166",
         "hair_male_wavy_quiff__back": "abac6fda3b48f084f1ecc5ce9d4c6b76809e557f83368602b0f99c6d4f587806",
-        "hair_male_cocoa_quiff__front": "214ff0b3e6473a27befd1d6692b5c7720d8888fb31e5a712b0f12763897a731e",
+        "hair_male_cocoa_quiff__front": "8658d57d7513e982ab3be948bb8e4a4162acd6426c9c903643ea95b259c5d856",
         "hair_male_cocoa_quiff__back": "9b97d3e5e798891fcd5d27553700e7a8d74732cb457a702f3a9f7d892fee2395",
-        "hair_male_chestnut_waves__front": "590116282c142ffeb2ad4a105f139f6346fdd79ede39cc92e0f487036d125289",
+        "hair_male_chestnut_waves__front": "d52fdf613f978900d191c2d450c350985f157b8d0c7389f1ee6f07f6b5fc0801",
         "hair_male_chestnut_waves__back": "d9c619188614172242f8bf67e43525cdc2ec889fa06ec838c3212e07e91d6cc4"
       }
     }
