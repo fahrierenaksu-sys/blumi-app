@@ -29,7 +29,7 @@ export interface RoomPetView {
  * is a starter name the member can change with PUT /v1/users/me/pet/name.
  */
 export const ROOM_PET_STARTER_SPECIES_ID = ROOM_PET_CAT_SPECIES_ID
-export const ROOM_PET_STARTER_NAME = "Pamuk"
+export const ROOM_PET_STARTER_NAME = "Badem"
 
 export type RoomPetNameRefusal = RoomPetNameProblem | "not_allowed"
 
