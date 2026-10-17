@@ -73,10 +73,13 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * new collection: hair_male_chestnut_waves landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  * new collection: hair_male_cocoa_quiff landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  * new collection: hair_male_wavy_quiff landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
+ * 2026-10-17 (claude/boy-hair-front-shop): the owner reported from the phone that the Shop shows the boy turned sideways
+ * with the new hairs; the six hairs are allowlisted with their cleaned front layers (look of the six approved 10:23 on
+ * the sheet with the front row; the cleaned layers go to the owner with the receipt reissue), so their entries are gone.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
   female: [],
-  male: ["hair_male_blond_fade", "hair_male_soft_crop", "hair_male_black_side_part", "hair_male_chestnut_waves", "hair_male_cocoa_quiff", "hair_male_wavy_quiff"],
+  male: [],
 };
 
 const rigs = Object.keys(AVATAR_STILL_MANIFEST.bodies) as AvatarStillRigId[];
