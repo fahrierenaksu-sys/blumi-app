@@ -793,6 +793,32 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     [addSpeechBubble]
   )
 
+  /**
+   * A greeting emote: an idle or speaking figure waves for `durationMs`, then stands. A walk, a seat or a
+   * newer server step simply takes over. Presentation only: nothing is sent.
+   */
+  const playWaveGesture = useCallback<MiniRoomStore["playWaveGesture"]>((userId, durationMs) => {
+    setAvatars((current) => {
+      const avatar = current[userId]
+      if (!avatar || (avatar.motion !== "idle" && avatar.motion !== "speaking")) return current
+      return { ...current, [userId]: { ...avatar, motion: "emoting" } }
+    })
+    // Kept beside the speech timers (cleared with them on a new scene and on unmount) under its own key.
+    const timerKey = `wave:${userId}`
+    const previousTimer = speechMotionTimersRef.current.get(timerKey)
+    if (previousTimer) clearTimeout(previousTimer)
+    const timer = setTimeout(() => {
+      if (speechMotionTimersRef.current.get(timerKey) !== timer) return
+      speechMotionTimersRef.current.delete(timerKey)
+      setAvatars((current) => {
+        const avatar = current[userId]
+        if (!avatar || avatar.motion !== "emoting") return current
+        return { ...current, [userId]: { ...avatar, motion: "idle" } }
+      })
+    }, Math.max(0, durationMs))
+    speechMotionTimersRef.current.set(timerKey, timer)
+  }, [])
+
   const dismissSpeechBubble = useCallback<MiniRoomStore["dismissSpeechBubble"]>(
     (bubbleId) => {
       publishSpeech(dismissMiniRoomSpeech(speechRef.current, bubbleId))
@@ -862,7 +888,8 @@ export function useMiniRoomSceneStore(input: UseMiniRoomSceneStoreInput): MiniRo
     addSpeechBubble,
     sayPhrase,
     sayPhrases,
-    dismissSpeechBubble
+    dismissSpeechBubble,
+    playWaveGesture
   }
 }
 

@@ -15,9 +15,17 @@ interface MiniRoomAvatarMotionInput {
 
 /** 2.5D avatar: the whole avatar's 2.5D spec, or null (the seam is not installed, or an item has no art). */
 export function getMiniRoomAvatar25dSpec(input: MiniRoomAvatarMotionInput): RoomAvatar25dSpec | null {
+  const state = toRoomAvatarMotionState(input.motion)
+  const spec = roomAvatar25d.resolveRoomAvatar25d({
+    loadout: input.appearance.avatarLoadout,
+    state,
+    direction: input.facing
+  })
+  // The wave only decorates a standing figure: without its art she keeps standing, never vanishes.
+  if (spec || state !== "waving") return spec
   return roomAvatar25d.resolveRoomAvatar25d({
     loadout: input.appearance.avatarLoadout,
-    state: toRoomAvatarMotionState(input.motion),
+    state: "idle",
     direction: input.facing
   })
 }
@@ -37,5 +45,7 @@ function toRoomAvatarMotionState(
   motion: AvatarState["motion"]
 ): RoomV2AvatarMotionState {
   if (motion === "walking" || motion === "sitting") return motion
+  // A greeting emote plays the rig's own wave (the drawn character is unchanged).
+  if (motion === "emoting") return "waving"
   return "idle"
 }
