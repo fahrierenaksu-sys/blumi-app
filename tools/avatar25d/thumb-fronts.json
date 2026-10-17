@@ -1172,6 +1172,27 @@
         }
       ]
     },
+    "hair_male_black_side_part": {
+      "sha256": "491f4b1b68527d7e8b2f2864cd3a7dfd61a0d988a0d81cc26ddafaae53b7fc86",
+      "size": [
+        256,
+        181
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "583c84456493ff3c02652c0f3f822d80896f362d8c40919cb5b1947c35766611"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "e3a796634ae6f987753bebb6cb03238d8b58e9728eab36d100aa4fd0240449ea"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
     "hair_male_blond_fade": {
       "sha256": "aa4c3c5985a5d179ce63e8e803cb0d33f950600a03e3d7619e5a7b1314eda494",
       "size": [

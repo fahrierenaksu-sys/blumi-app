@@ -5931,7 +5931,7 @@
       }
     },
     "male": {
-      "rigSha256": "29403f8c38f0d46bda55ed084c95eaef752fa7220196452bc5dc037e92f74845",
+      "rigSha256": "519047ea9b79a8082303bfb03d33f89a0a4e250fc4bfeec312539dfe2a1acb4f",
       "sheetHeight": 982,
       "canvas": {
         "width": 649,
@@ -6602,6 +6602,11 @@
           "slot": "hair",
           "rigItemId": "hair_male_soft_crop",
           "thumb": "hair_male_soft_crop"
+        },
+        "hair_male_black_side_part": {
+          "slot": "hair",
+          "rigItemId": "hair_male_black_side_part",
+          "thumb": "hair_male_black_side_part"
         },
         "glasses_boy_black_soft_rect": {
           "slot": "glasses",
@@ -11734,6 +11739,19 @@
             ]
           },
           {
+            "key": "hair_male_black_side_part__o4p6",
+            "owner": "hair_male_black_side_part",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              187,
+              25,
+              257,
+              210
+            ]
+          },
+          {
             "key": "body__o5",
             "owner": "body",
             "slot": "body",
@@ -12175,6 +12193,19 @@
               14,
               152,
               115
+            ]
+          },
+          {
+            "key": "hair_male_black_side_part__o4p6",
+            "owner": "hair_male_black_side_part",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              55,
+              11,
+              160,
+              132
             ]
           },
           {
