@@ -16,7 +16,6 @@ import { getInboxCopy, type InboxCopy } from "../features/chat/inboxCopy"
 import Reanimated, {
   Easing,
   ReduceMotion,
-  useAnimatedScrollHandler,
   useSharedValue,
   withRepeat,
   withSequence,
@@ -59,8 +58,6 @@ import {
 } from "../features/inbox/inboxConversationPrefsModel"
 import { useInboxConversationPrefs } from "../features/inbox/inboxConversationPrefsStore"
 import { StreetRail } from "../features/street/StreetRail"
-import { nextStreetCollapsed } from "../features/street/streetModel"
-import { scheduleOnRN } from "react-native-worklets"
 import type { SessionActor } from "../features/session/sessionModel"
 
 type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
@@ -76,7 +73,7 @@ type InboxScreenProps = NativeStackScreenProps<RootStackParamList, "Inbox"> & {
   onHideThreadForMe?: (threadId: string, throughMessageId?: string) => void
 }
 
-const CONVERSATION_ROW_GAP = uiTheme.spacing.sm + 2
+const CONVERSATION_ROW_GAP = 0
 const ItemSpacer = () => <View style={styles.itemSpacer} />
 
 /* ── Main InboxScreen ───────────────────────────────────────── */
@@ -175,15 +172,6 @@ export function InboxScreen(props: InboxScreenProps) {
     })
   }, [actionsCopy, conversationPrefs, copy, currentUserId, now, threads, timeFormatter, unreadSignature])
   const listRef = useRef<FlatList<(typeof threadRows)[number]>>(null)
-  // Sokağım shrinks to portholes while the list scrolls (hysteresis, one JS hop per change).
-  const [streetCollapsed, setStreetCollapsed] = useState(false)
-  const streetCollapsedOnUi = useSharedValue(false)
-  const handleListScroll = useAnimatedScrollHandler((event) => {
-    const next = nextStreetCollapsed(streetCollapsedOnUi.value, event.contentOffset.y)
-    if (next === streetCollapsedOnUi.value) return
-    streetCollapsedOnUi.value = next
-    scheduleOnRN(setStreetCollapsed, next)
-  })
   const openOwnRoom = useCallback(() => navigation.navigate("MyRoom"), [navigation])
   const openSettings = useCallback(() => navigation.navigate("Settings"), [navigation])
   const scrollToTop = useCallback(() => {
@@ -275,6 +263,26 @@ export function InboxScreen(props: InboxScreenProps) {
   const handleGoDiscover = useCallback(() => {
     navigation.navigate("Lobby")
   }, [navigation])
+  // Sokağım and the "Messages" label scroll away with the list, as one page (like a messages app's notes row).
+  const listHeader = useMemo(() => (
+    <Reanimated.View style={headerAnim}>
+      <StreetRail
+        sessionActor={sessionActor}
+        locale={locale === "en" ? "en" : "tr"}
+        refreshKey={threadKeySignature}
+        fallbackName={copy.unknownPartner}
+        onOpenChat={openThread}
+        onOpenOwnRoom={openOwnRoom}
+        onOpenSettings={openSettings}
+      />
+      {threads.length > 0 ? (
+        <View style={styles.sectionRow}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>{copy.messagesHeading}</Text>
+          <Text numberOfLines={1} style={styles.sectionCount}>{copy.conversationCount(threads.length)}</Text>
+        </View>
+      ) : null}
+    </Reanimated.View>
+  ), [copy, headerAnim, locale, openOwnRoom, openSettings, openThread, sessionActor, threadKeySignature, threads.length])
   const renderThreadRow = useCallback(({ item }: {
     item: (typeof threadRows)[number]
   }) => (
@@ -310,47 +318,8 @@ export function InboxScreen(props: InboxScreenProps) {
           <Text accessibilityRole="header" numberOfLines={1} style={styles.titleBarText}>{copy.title}</Text>
         </View>
 
-        <Reanimated.View style={[styles.header, headerAnim]}>
-          {/* The count has its own reserved slot, so the header keeps one
-              height and one title before and after conversations arrive. */}
-          <View style={styles.eyebrowRow}>
-            <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
-            <Text
-              accessibilityElementsHidden={threads.length === 0}
-              importantForAccessibility={threads.length === 0 ? "no" : "auto"}
-              numberOfLines={1}
-              style={[styles.headerCount, threads.length === 0 ? styles.headerCountHidden : null]}
-            >
-              {copy.conversationCount(threads.length)}
-            </Text>
-          </View>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {copy.inboxTitle}
-          </Text>
-          <Text style={styles.headerSubhead}>
-            {copy.headerSubhead}
-          </Text>
-          {/* Gradient underline */}
-          <LinearGradient
-            colors={[uiTheme.colors.primary, uiTheme.colors.primarySoft, "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.headerUnderline}
-          />
-        </Reanimated.View>
-
-        <StreetRail
-          sessionActor={sessionActor}
-          locale={locale === "en" ? "en" : "tr"}
-          refreshKey={threadKeySignature}
-          collapsed={streetCollapsed}
-          fallbackName={copy.unknownPartner}
-          onOpenChat={openThread}
-          onOpenOwnRoom={openOwnRoom}
-          onOpenSettings={openSettings}
-        />
         <View style={styles.listArea}>
-          {/* Rows are 88–99 pt (one or two preview lines, Dynamic Type), so
+          {/* Rows are about 74 pt (one preview line; more with Dynamic Type), so
               FlatList measures them instead of assuming a fixed height. A
               thread moving to the top slides there without a jump. No
               removeClippedSubviews: on a short list with entrance and layout
@@ -365,8 +334,7 @@ export function InboxScreen(props: InboxScreenProps) {
             windowSize={5}
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
-            onScroll={handleListScroll}
-            scrollEventThrottle={16}
+            ListHeaderComponent={listHeader}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -520,7 +488,7 @@ const styles = StyleSheet.create({
     paddingTop: uiTheme.spacing.sm
   },
   titleBar: {
-    minHeight: 60,
+    minHeight: 48,
     justifyContent: "center",
     paddingHorizontal: 2
   },
@@ -528,46 +496,26 @@ const styles = StyleSheet.create({
     ...uiTheme.font.heading,
     color: uiTheme.colors.textPrimary
   },
-  header: {
-    gap: uiTheme.spacing.xxs,
-    paddingHorizontal: 2,
-    paddingTop: uiTheme.spacing.sm,
-    paddingBottom: uiTheme.spacing.md
-  },
-  eyebrowRow: {
+  sectionRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
-    gap: uiTheme.spacing.sm
+    gap: uiTheme.spacing.sm,
+    paddingHorizontal: 2,
+    paddingTop: uiTheme.spacing.md,
+    paddingBottom: uiTheme.spacing.xs
   },
-  eyebrow: {
-    ...uiTheme.font.overline,
-    color: uiTheme.colors.primary
+  sectionTitle: {
+    ...uiTheme.font.subheading,
+    fontWeight: "800",
+    color: uiTheme.colors.textPrimary
   },
-  headerCount: {
+  sectionCount: {
     ...uiTheme.font.caption,
     color: uiTheme.colors.textMuted
   },
-  headerCountHidden: {
-    opacity: 0
-  },
   listArea: {
     flex: 1
-  },
-  headerTitle: {
-    ...uiTheme.font.title,
-    color: uiTheme.colors.textPrimary
-  },
-  headerSubhead: {
-    ...uiTheme.font.bodySmall,
-    color: uiTheme.colors.textSecondary,
-    marginTop: 2
-  },
-  headerUnderline: {
-    height: 3,
-    borderRadius: 2,
-    width: "40%",
-    marginTop: uiTheme.spacing.xs
   },
   scroll: {
     paddingBottom: uiTheme.spacing.xxl

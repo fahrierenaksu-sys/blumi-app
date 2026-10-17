@@ -13,7 +13,7 @@ import { uiTheme } from "../../ui/theme"
 import type { InboxConversationActionsCopy } from "./inboxConversationActionsCopy"
 
 /** Height of a row with a one-line preview; the skeleton uses it. Rows are measured, not assumed. */
-export const INBOX_ROW_ESTIMATED_HEIGHT = 88
+export const INBOX_ROW_ESTIMATED_HEIGHT = 74
 
 export interface ConversationCardProps {
   threadId: string
@@ -74,13 +74,6 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
         pressedScale={0.98}
         onPressIn={onWarm}
       >
-        <LinearGradient
-          colors={uiTheme.gradients.primary}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={cardStyles.leftAccent}
-        />
-
         {/* The chat thread carries no verified presence state. */}
         <View style={cardStyles.avatarWrap}>
           <ParticipantAvatar
@@ -107,7 +100,7 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
             ) : null}
           </View>
           {props.lastBody ? (
-            <Text style={[cardStyles.preview, hasUnread ? cardStyles.previewUnread : null]} numberOfLines={2}>
+            <Text style={[cardStyles.preview, hasUnread ? cardStyles.previewUnread : null]} numberOfLines={1}>
               {props.previewPrefix ? <Text style={cardStyles.previewPrefix}>{props.previewPrefix}</Text> : null}
               {props.lastBody}
             </Text>
@@ -131,9 +124,7 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
                 </Text>
               </LinearGradient>
             </View>
-          ) : (
-            <Ionicons name="chevron-forward" size={20} color={uiTheme.colors.textMuted} />
-          )}
+          ) : null}
         </View>
       </PressableScale>
   )
@@ -157,35 +148,20 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
 )
 
 const cardStyles = StyleSheet.create({
+  // A flat row, as in a messages app: no card, border or shadow; the avatar and bold unread text carry it.
   card: {
     flexDirection: "row",
     alignItems: "center",
     gap: uiTheme.spacing.md,
-    padding: uiTheme.spacing.md,
-    paddingLeft: uiTheme.spacing.md + 4,
-    borderRadius: uiTheme.radius.xl,
-    borderCurve: "continuous",
-    backgroundColor: uiTheme.colors.surface,
-    borderWidth: 1,
-    borderColor: uiTheme.colors.border,
-    overflow: "hidden",
-    position: "relative",
-    ...uiTheme.shadow.float
-  },
-  leftAccent: {
-    position: "absolute",
-    left: 0,
-    top: 8,
-    bottom: 8,
-    width: 2.5,
-    borderRadius: 2
+    paddingVertical: uiTheme.spacing.sm,
+    paddingHorizontal: 2
   },
   avatarWrap: {
     position: "relative"
   },
   body: {
     flex: 1,
-    gap: 3
+    gap: 2
   },
   nameRow: {
     flexDirection: "row",

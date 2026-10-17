@@ -2,9 +2,8 @@ import type { AccountRecoveryLocale } from "../session/accountRecoveryCopy"
 
 export interface InboxCopy {
   title: string
-  eyebrow: string
-  inboxTitle: string
-  headerSubhead: string
+  /** The label over the conversation list. */
+  messagesHeading: string
   startWithSpark: string
   roomInvitation: string
   opening: string
@@ -34,9 +33,7 @@ export interface InboxCopy {
 const COPY: Record<AccountRecoveryLocale, InboxCopy> = {
   en: {
     title: "Chats",
-    eyebrow: "Conversations",
-    inboxTitle: "Your inbox",
-    headerSubhead: "Conversations from mutual matches.",
+    messagesHeading: "Messages",
     startWithSpark: "Start with a spark.",
     roomInvitation: "Blumi Room invitation",
     opening: "Opening your conversations…",
@@ -63,9 +60,7 @@ const COPY: Record<AccountRecoveryLocale, InboxCopy> = {
   },
   tr: {
     title: "Sohbetler",
-    eyebrow: "Konuşmalar",
-    inboxTitle: "Gelen kutun",
-    headerSubhead: "Karşılıklı eşleşmelerinden konuşmalar.",
+    messagesHeading: "Mesajlar",
     startWithSpark: "Bir kıvılcımla başla.",
     roomInvitation: "Blumi Oda daveti",
     opening: "Konuşmaların açılıyor…",

@@ -23,13 +23,12 @@ export function StreetRail(props: {
   sessionActor: SessionActor
   locale: "tr" | "en"
   refreshKey: string
-  collapsed: boolean
   fallbackName: string
   onOpenChat: (threadId: string) => void
   onOpenOwnRoom: () => void
   onOpenSettings: () => void
 }) {
-  const { sessionActor, collapsed, onOpenChat } = props
+  const { sessionActor, onOpenChat } = props
   const { resolvedCapabilities } = useAvatarV2()
   const copy = useMemo(() => getStreetCopy(props.locale), [props.locale])
   const reduceMotion = useReducedMotion()
@@ -70,21 +69,16 @@ export function StreetRail(props: {
         index={index}
         copy={copy}
         fallbackName={props.fallbackName}
-        porthole={collapsed}
         wakeUp={wakeUp}
         onPress={onPress}
         onOpenChat={item.kind === "window" ? () => onOpenChat(item.window.threadId) : undefined}
       />
     )
-  }, [collapsed, copy, markOpened, onOpenChat, props, sessionActor.profile.avatar, street, wakeUp])
+  }, [copy, markOpened, onOpenChat, props, sessionActor.profile.avatar, street, wakeUp])
 
   if (!view || !street) return null
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Text accessibilityRole="header" style={styles.title}>{copy.title}</Text>
-        <Text style={styles.note} numberOfLines={1}>{view.note}</Text>
-      </View>
       {device.infoCardSeen ? null : (
         <View style={styles.info} accessibilityRole="summary">
           <Text style={styles.infoTitle}>{copy.infoTitle}</Text>
@@ -113,7 +107,6 @@ export function StreetRail(props: {
         contentContainerStyle={styles.rail}
         ItemSeparatorComponent={RailGap}
       />
-      {view.footer && !collapsed ? <Text style={styles.footer}>{view.footer}</Text> : null}
       <StreetRoomPeek
         window={peek}
         previous={peek ? previousStreetSnapshot(device, peek, street.edition) : null}
@@ -132,11 +125,7 @@ function RailGap() {
 
 const styles = StyleSheet.create({
   root: { marginHorizontal: -SIDE_PADDING, paddingBottom: 8 },
-  header: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", paddingHorizontal: SIDE_PADDING, marginBottom: 6 },
-  title: { color: uiTheme.colors.textPrimary, fontSize: 15, fontWeight: "700" },
-  note: { color: uiTheme.colors.textMuted, fontSize: 12, flexShrink: 1, marginLeft: 12 },
-  rail: { paddingHorizontal: SIDE_PADDING, paddingTop: 8, paddingBottom: 4 },
-  footer: { color: uiTheme.colors.textSecondary, fontSize: 13, paddingHorizontal: SIDE_PADDING, marginTop: 6 },
+  rail: { paddingHorizontal: SIDE_PADDING, paddingTop: 2, paddingBottom: 4 },
   info: { marginHorizontal: SIDE_PADDING, marginBottom: 8, padding: 12, borderRadius: 16, backgroundColor: uiTheme.colors.surfaceSoft, gap: 4 },
   infoTitle: { color: uiTheme.colors.textPrimary, fontWeight: "700" },
   infoBody: { color: uiTheme.colors.textSecondary, fontSize: 13 },
