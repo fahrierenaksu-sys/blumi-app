@@ -19,6 +19,7 @@ import {
   type RoomCalibration
 } from "../calibration/roomCalibration"
 import { getFloorBoxCellQuads } from "../calibration/roomCalibrationScene"
+import { withCameraSideEdgeSeats } from "./layeredEdgeSeats"
 import rawBlushChair from "./room_v2_chair_blush/item.json"
 import rawJaponArmchair from "./room_v3_armchair_japon_cream/item.json"
 import rawJaponBed from "./room_v3_bed_japon_sakura/item.json"
@@ -191,7 +192,22 @@ export function parseLayeredFurnitureSpec(raw: unknown): LayeredFurnitureSpec {
     const ids = rotations[r].seats.map((seat) => seat.id)
     if (new Set(ids).size !== ids.length) throw new Error(`rotations.${r}.seats ids must be unique`)
   }
-  return { id, scale, cell: finite(footprint.cell, "footprint.cell"), rotations }
+  return { id, scale, cell: finite(footprint.cell, "footprint.cell"), rotations: cameraSideEdgeSeats(root, rotations) }
+}
+
+/** A bed (`sit_edge`) is sat on from whichever long edge faces the camera (layeredEdgeSeats). */
+function cameraSideEdgeSeats(
+  root: Record<string, unknown>,
+  rotations: Record<LayeredRotationIndex, LayeredFurnitureRotation>
+): Record<LayeredRotationIndex, LayeredFurnitureRotation> {
+  const interactions = Array.isArray(root.interactions) ? root.interactions : []
+  if (!interactions.includes("sit_edge")) return rotations
+  const camera = record(root.camera, "camera")
+  return withCameraSideEdgeSeats(rotations, {
+    yawDeg: finite(camera.yaw_deg, "camera.yaw_deg"),
+    pitchDeg: finite(camera.pitch_deg, "camera.pitch_deg"),
+    pxPerWorldUnit: finite(root.px_per_world_unit, "px_per_world_unit")
+  })
 }
 
 function parseSeat(raw: unknown, path: string): LayeredFurnitureSeat {
