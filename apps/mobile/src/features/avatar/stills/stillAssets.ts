@@ -443,6 +443,7 @@ export const AVATAR_STILL_ASSETS: Readonly<Record<string, number>> = {
   "male/bust/glasses_boy_black_soft_rect__o4p5": require("./layers/male/bust/glasses_boy_black_soft_rect__o4p5.webp"),
   "male/bust/glasses_boy_gunmetal_round__o4p5": require("./layers/male/bust/glasses_boy_gunmetal_round__o4p5.webp"),
   "male/bust/hair_male_blond_fade__o4p6": require("./layers/male/bust/hair_male_blond_fade__o4p6.webp"),
+  "male/bust/hair_male_soft_crop__o4p6": require("./layers/male/bust/hair_male_soft_crop__o4p6.webp"),
   "male/full/avatar_v2_bottom_male_black_pocket_trousers__o1__bottom": require("./layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o1__bottom.webp"),
   "male/full/avatar_v2_bottom_male_black_pocket_trousers__o1__bottom-cut": require("./layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o1__bottom-cut.webp"),
   "male/full/avatar_v2_bottom_male_black_pocket_trousers__o1p3": require("./layers/male/full/avatar_v2_bottom_male_black_pocket_trousers__o1p3.webp"),
@@ -566,6 +567,7 @@ export const AVATAR_STILL_ASSETS: Readonly<Record<string, number>> = {
   "male/full/glasses_boy_black_soft_rect__o4p5": require("./layers/male/full/glasses_boy_black_soft_rect__o4p5.webp"),
   "male/full/glasses_boy_gunmetal_round__o4p5": require("./layers/male/full/glasses_boy_gunmetal_round__o4p5.webp"),
   "male/full/hair_male_blond_fade__o4p6": require("./layers/male/full/hair_male_blond_fade__o4p6.webp"),
+  "male/full/hair_male_soft_crop__o4p6": require("./layers/male/full/hair_male_soft_crop__o4p6.webp"),
   "male/showcase/avatar_v2_bottom_male_black_pocket_trousers__front": require("./layers/male/showcase/avatar_v2_bottom_male_black_pocket_trousers__front.webp"),
   "male/showcase/avatar_v2_bottom_male_black_pocket_trousers__under": require("./layers/male/showcase/avatar_v2_bottom_male_black_pocket_trousers__under.webp"),
   "male/showcase/avatar_v2_bottom_male_black_straight_trousers__front": require("./layers/male/showcase/avatar_v2_bottom_male_black_straight_trousers__front.webp"),
@@ -650,4 +652,5 @@ export const AVATAR_STILL_ASSETS: Readonly<Record<string, number>> = {
   "male/thumb/glasses_boy_black_soft_rect": require("./layers/male/thumb/glasses_boy_black_soft_rect.webp"),
   "male/thumb/glasses_boy_gunmetal_round": require("./layers/male/thumb/glasses_boy_gunmetal_round.webp"),
   "male/thumb/hair_male_blond_fade": require("./layers/male/thumb/hair_male_blond_fade.webp"),
+  "male/thumb/hair_male_soft_crop": require("./layers/male/thumb/hair_male_soft_crop.webp"),
 }

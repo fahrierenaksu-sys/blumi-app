@@ -1192,6 +1192,27 @@
           "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
         }
       ]
+    },
+    "hair_male_soft_crop": {
+      "sha256": "0b84f317670f9f52938de5cb23571b59b60b64fcd5a1478b77ddb8415e96b43d",
+      "size": [
+        256,
+        175
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "15d1f52934ceb035d21f8b67f4df9733d7a54137c31d49a08aa480c650281547"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "985a551a8228a21198b658e568c559bd7f6c3fbf787814f0066204b76605727b"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
     }
   }
 }
