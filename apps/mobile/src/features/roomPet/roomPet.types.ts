@@ -26,6 +26,8 @@ export interface RoomPetSpot {
   readonly cell: RoomPetCell
   /** Bed and sofa: the stage point the renderer draws a perched pet at. Rug: unset. */
   readonly perchAnchor?: { readonly x: number; readonly y: number }
+  /** Bed and sofa: the floor point under `perchAnchor`; a perched pet depth-sorts by it, like a seated avatar. */
+  readonly perchFloor?: { readonly x: number; readonly y: number }
 }
 
 export interface RoomPetMap {

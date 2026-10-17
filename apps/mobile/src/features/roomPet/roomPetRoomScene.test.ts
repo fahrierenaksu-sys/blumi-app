@@ -302,3 +302,45 @@ test("the play hop trick jumps in place: its path starts and ends where the pet 
   assert.equal(play?.clip, "hopPlay")
   assert.deepEqual(play?.hop, { from: play?.foot, to: play?.foot })
 })
+
+test("after hop_up the cat perches on the seat's cushion centre and depth-sorts by the floor under it", () => {
+  // Arrange: a seat whose hip sits 0.05 above the floor and whose cushion centre is in front of the hip
+  const approach = cellPoint(walkableCellNear(0, 2))
+  const hipFloor = { x: SOFA_CENTER.x, y: SOFA_CENTER.y - 0.02 }
+  const cushion = { x: hipFloor.x + 0.004, y: hipFloor.y - 0.05 + 0.015 }
+  const sofa: RoomV2FurnitureRenderItem = {
+    ...SOFA,
+    interactionType: "seat",
+    seatWorldPoints: [{ id: "left", facing: "front", seatHeight: 0.05, seat: hipFloor, cushion, approach, exit: approach }]
+  }
+  const map = createRoomPetMapFromRoom({ projection: PROJECTION, furniture: [sofa] })
+  const spot = map.spots.find((candidate) => candidate.id === "sofa_1")
+  assert.ok(spot)
+  const pet = petAt(spot.cell)
+  const draw = (state: RoomPetState) => resolveRoomPetDraw({ isEnabled: true, projection: PROJECTION, map, state, renderItems: [sofa] })
+  // Act
+  const up = draw({ ...pet, pose: "hop", perchSpotId: "sofa_1", goal: { kind: "hop", spotId: "sofa_1", phase: "up" } })
+  const perch = draw({ ...pet, pose: "perch", perchSpotId: "sofa_1", goal: { kind: "hop", spotId: "sofa_1", phase: "perch" } })
+  // Assert: on the cushion, not at the hip point or the floor under it
+  assert.ok(up?.hop && perch)
+  assert.deepEqual(perch.foot, cushion)
+  assert.deepEqual(up.hop.to, cushion, "hop_up lands on the cushion centre")
+  assert.notDeepEqual(perch.foot, { x: hipFloor.x, y: hipFloor.y - 0.05 })
+  const underCushion = { x: cushion.x, y: cushion.y + 0.05 }
+  assert.equal(perch.beforeRenderId, getRoomPetBeforeRenderId([sofa], underCushion, "sofa_1"))
+  assert.equal(up.beforeRenderId, perch.beforeRenderId, "the jumping pet sorts like the perched one")
+})
+
+test("a seat without cushion data perches the cat on the hip point, seatHeight above the seat's floor point", () => {
+  const approach = cellPoint(walkableCellNear(0, 2))
+  const hipFloor = { x: SOFA_CENTER.x, y: SOFA_CENTER.y - 0.02 }
+  const sofa: RoomV2FurnitureRenderItem = {
+    ...SOFA,
+    interactionType: "seat",
+    seatWorldPoints: [{ id: "left", facing: "front", seatHeight: 0.05, seat: hipFloor, approach, exit: approach }]
+  }
+  const spot = createRoomPetMapFromRoom({ projection: PROJECTION, furniture: [sofa] }).spots.find((candidate) => candidate.id === "sofa_1")
+  assert.ok(spot?.perchAnchor && spot.perchFloor)
+  assert.ok(Math.abs(spot.perchAnchor.y - (hipFloor.y - 0.05)) < 1e-9)
+  assert.deepEqual(spot.perchFloor, hipFloor)
+})

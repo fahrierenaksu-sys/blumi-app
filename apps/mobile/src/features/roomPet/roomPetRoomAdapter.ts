@@ -16,7 +16,8 @@ import { createRoomPetMap, findNearestFreeRoomPetCell, roomPetCellKey } from "./
  *   every floor piece that blocks movement (its calibrated collision polygon).
  * - Rug: a sleep spot on the covered cell nearest the rug's middle.
  * - Bed / sofa: a perch spot at the first seat's approach cell; the renderer
- *   draws the perched pet at the seat point.
+ *   draws the perched pet on the seat's cushion centre (the hip point when a
+ *   seat has no cushion data) and depth-sorts it by the floor point under it.
  */
 
 /** Rugs without a polygon: the inner part of the drawn rectangle counts as covered. */
@@ -115,7 +116,9 @@ function toSpot(
   const cell = map.walkableKeys.has(roomPetCellKey(snapped))
     ? snapped
     : findNearestFreeRoomPetCell(map, snapped, new Set())
-  return cell ? { id: item.renderId, kind, cell, perchAnchor: { x: seat.seat.x, y: seat.seat.y } } : null
+  const perchAnchor = seat.cushion ?? { x: seat.seat.x, y: seat.seat.y - seat.seatHeight }
+  const perchFloor = { x: perchAnchor.x, y: perchAnchor.y + seat.seatHeight }
+  return cell ? { id: item.renderId, kind, cell, perchAnchor: { x: perchAnchor.x, y: perchAnchor.y }, perchFloor } : null
 }
 
 export function createRoomPetMapFromRoom(input: {

@@ -100,14 +100,15 @@ export function resolveRoomPetDraw(input: {
   const clip = state.mode === "greet" && state.pose === "happy" ? "greet" : getRoomPetClipForHop(state.pose, hopGoal ? hopGoal.phase : null)
   const hopSpot = state.pose === "hop" && hopGoal ? map.spots.find((spot) => spot.id === hopGoal.spotId) : undefined
   const hop = getHopPath(clip, foot, floorFoot, hopSpot?.perchAnchor ?? null)
-  const depthSpotId = perchSpot?.id ?? (hop && hopSpot ? hopSpot.id : null)
+  const depthSpot = perchSpot ?? (hop && hopSpot ? hopSpot : undefined)
+  const depthFoot = depthSpot?.perchFloor ?? foot
   return {
     foot,
     clip,
     heading: drawn.heading,
     mirrored: drawn.mirrored,
     emote: state.emote,
-    beforeRenderId: getRoomPetBeforeRenderId(input.renderItems, foot, depthSpotId),
+    beforeRenderId: getRoomPetBeforeRenderId(input.renderItems, depthFoot, depthSpot?.id ?? null),
     moveMs: isMoving ? state.stepMs : 0,
     hop
   }
