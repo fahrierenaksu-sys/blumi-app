@@ -277,6 +277,10 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       ttlMs: STREET_ROOM_CACHE_TTL_MS
     }),
     // capabilityService is created below; this runs per request, after it exists.
+    // No build floor for partners: the server keeps no per-user record of the app build or of the capabilities a
+    // member's build declared (they arrive only on that member's own requests), so a partner inside the rollout on
+    // an older build still appears here and cannot close their window. Adding a floor needs a durable "street seen"
+    // marker (a new migration after 080). Until it exists, `chat_street` stays limited to internal QA users.
     isStreetRolledOutTo: (userId) => isCapabilityRolledOut(capabilityService, userId, "chat_street"),
     log: { warn: (entry, message) => console.warn(message, entry) }
   })
