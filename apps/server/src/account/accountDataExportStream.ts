@@ -36,10 +36,23 @@ const optionalSections = [
   ["catTripPrefs", "blumi_cat_trip_prefs", "SELECT travel_enabled, host_enabled, push_enabled, updated_at FROM blumi_cat_trip_prefs WHERE user_id = $1", true],
   ["streetWindow", "blumi_street_digests", "SELECT window_closed, look_kind, look_changed_at, room_kind, room_changed_at, updated_at FROM blumi_street_digests WHERE user_id = $1", true],
   ["catTripDays", "blumi_cat_trip_days", "SELECT day_key, planned_at FROM blumi_cat_trip_days WHERE owner_user_id = $1 ORDER BY day_key ASC", false],
-  ["catTrips", "blumi_cat_trips", `SELECT trip_id, CASE WHEN owner_user_id = $1 THEN 'owner' ELSE 'host' END AS role,
-      CASE WHEN owner_user_id = $1 OR host_revealed_at IS NOT NULL THEN owner_user_id END AS owner_user_id,
-      host_user_id, day_key, starts_at, ends_at, kind, status, ended_at, end_reason, owner_revealed_at, host_revealed_at, created_at
-    FROM blumi_cat_trips WHERE owner_user_id = $1 OR host_user_id = $1 ORDER BY starts_at ASC, trip_id ASC`, false],
+  // The counterpart follows the app's rules: the owner learns the host after opening the reveal of a finished
+  // trip, the host learns the owner after opening theirs, and never after a block, unmatch or removed account.
+  // Trips that have not started yet are left out.
+  ["catTrips", "blumi_cat_trips", `SELECT trip.trip_id, CASE WHEN trip.owner_user_id = $1 THEN 'owner' ELSE 'host' END AS role,
+      CASE WHEN counterpart_visible AND trip.owner_user_id = $1 AND trip.owner_revealed_at IS NOT NULL AND trip.ends_at <= now()
+        THEN trip.host_user_id END AS host_user_id,
+      CASE WHEN counterpart_visible AND trip.host_user_id = $1 AND trip.host_revealed_at IS NOT NULL
+        THEN trip.owner_user_id END AS owner_user_id,
+      trip.day_key, trip.starts_at, trip.ends_at, trip.kind, trip.status, trip.ended_at, trip.end_reason,
+      trip.owner_revealed_at, trip.host_revealed_at, trip.created_at
+    FROM blumi_cat_trips trip
+    CROSS JOIN LATERAL (SELECT (trip.end_reason IS NULL OR trip.end_reason NOT IN ('block', 'unmatch', 'account'))
+      AND NOT EXISTS (SELECT 1 FROM blumi_safety_blocks block
+        WHERE (block.actor_user_id = trip.owner_user_id AND block.blocked_user_id = trip.host_user_id)
+           OR (block.actor_user_id = trip.host_user_id AND block.blocked_user_id = trip.owner_user_id)) AS counterpart_visible) visibility
+    WHERE (trip.owner_user_id = $1 OR trip.host_user_id = $1) AND trip.starts_at <= now()
+    ORDER BY trip.starts_at ASC, trip.trip_id ASC`, false],
   ["catSouvenirs", "blumi_cat_souvenirs", "SELECT souvenir_id, trip_id, souvenir_key, rarity, acquired_at FROM blumi_cat_souvenirs WHERE owner_user_id = $1 ORDER BY acquired_at ASC, souvenir_id ASC", false],
 ] as const
 
