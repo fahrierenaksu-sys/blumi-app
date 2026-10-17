@@ -619,6 +619,34 @@ test("a part drawn in some poses only (poseOnly, e.g. the boy's wave-only hip pa
   assert.ok(v.items.bottom_male_c3.mesh.ranges.some((r) => r.poseOnly?.join() === "wave"), "the bottom's wave-only hip patch is exported")
 })
 
+test("a seated-only part (poseOnly ['sit'], e.g. a dress's seated bodice and lap) is drawn in sit frames only, its standing twin never seated", () => {
+  // Arrange: a worn item whose always-on torso part is split, as the factory does for a dress's seated waist,
+  // into a standing twin (stand, walk, wave) and a seated-only copy; the shipped rig itself is left untouched
+  const id = "top_crop_white"
+  const base = rig.views.front.items[id]
+  const torso = base.mesh.ranges.findIndex((r) => r.layer === "torso" && !r.poseOnly)
+  assert.ok(torso >= 0, "the item has an always-on torso part")
+  const ranges = base.mesh.ranges.map((r, i) => (i === torso ? { ...r, poseOnly: ["sit" as const] } : r))
+  const split: Rig25Item = { ...base, mesh: { ...base.mesh, ranges } }
+  const splitRig: Rig25 = { ...rig, views: { ...rig.views, front: { ...rig.views.front, items: { ...rig.views.front.items, [id]: split } } } }
+  const compiled = compileAvatar(splitRig, "front", [id])
+  const drawnIn = (k: number) => new Set(compiled.indexData.subarray(compiled.variants[k * 2], compiled.variants[k * 2] + compiled.variants[k * 2 + 1]))
+  const offset = splitRig.views.front.mesh.pos.length / 2
+  const vertices = Array.from(split.mesh.index.slice(ranges[torso].start, ranges[torso].start + ranges[torso].count), (i) => i + offset)
+  const shownIn = (k: number) => vertices.filter((i) => drawnIn(k).has(i)).length
+
+  // Act + Assert: every vertex in the seated frame, none standing, waving or walking
+  assert.ok(vertices.length > 0)
+  assert.equal(shownIn(VARIANT_SIT), vertices.length, "seated")
+  assert.equal(shownIn(VARIANT_STAND), 0, "standing")
+  assert.equal(shownIn(poseVariant("wave", -1)), 0, "waving")
+  for (let k = VARIANT_WALK0; k * 2 < compiled.variants.length; k++) assert.equal(shownIn(k), 0, `walk variant ${k}`)
+  // the unchanged rig draws the same part in every pose (the split, not the renderer, makes it seated-only)
+  const plain = compileAvatar(rig, "front", [id])
+  const plainIn = (k: number) => new Set(plain.indexData.subarray(plain.variants[k * 2], plain.variants[k * 2] + plain.variants[k * 2 + 1]))
+  assert.equal(vertices.filter((i) => plainIn(VARIANT_STAND).has(i)).length, vertices.length, "the plain part stands")
+})
+
 test("blinking, an avatar applies the eye patches of its worn items only, on the texture layer their page loads into", () => {
   const BLINK_ITEM_STRIDE = 7
   for (const [rigName, r] of Object.entries(RIGS)) {
