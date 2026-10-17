@@ -126,6 +126,42 @@ export function updateSessionActorProfile(
   }
 }
 
+/**
+ * Message the session API throws when account creation answers 409
+ * ACCOUNT_ALREADY_EXISTS: the verified phone already has a Blumi account. The
+ * register screen replaces it with localized copy and a sign-in action.
+ */
+export const ACCOUNT_ALREADY_EXISTS_MESSAGE =
+  "You already have a Blumi account with this phone number. Sign in instead."
+
+export function isAccountAlreadyExistsMessage(message: string | null): boolean {
+  return message === ACCOUNT_ALREADY_EXISTS_MESSAGE
+}
+
+const VERIFIED_PHONE_UNAVAILABLE_MESSAGE =
+  "Your phone verification has expired. Sign in with a new code."
+
+/**
+ * Signs into the existing account of a phone that was just verified for a
+ * registration the server refused with ACCOUNT_ALREADY_EXISTS. Reuses that
+ * verification, so no second SMS is sent; the server still requires the proof
+ * to be recent.
+ */
+export async function signInExistingFirebaseAccount(
+  baseHttpUrl: string,
+  readVerifiedIdToken: () => Promise<string | null>,
+  fetcher: typeof fetch = fetch
+): Promise<SessionActor> {
+  let idToken: string | null
+  try {
+    idToken = await readVerifiedIdToken()
+  } catch {
+    idToken = null
+  }
+  if (!idToken) throw new Error(VERIFIED_PHONE_UNAVAILABLE_MESSAGE)
+  return completeFirebaseAccount(baseHttpUrl, { idToken, authIntent: "sign-in" }, fetcher)
+}
+
 export async function completeFirebaseAccount(
   baseHttpUrl: string,
   input: FirebaseAccountCompletionInput,
@@ -146,6 +182,13 @@ export async function completeFirebaseAccount(
     (payload as { code?: unknown } | null)?.code === "ACCOUNT_RECOVERY_REQUIRED"
   ) {
     throw new Error(ACCOUNT_RECOVERY_REQUIRED_MESSAGE)
+  }
+
+  if (
+    response.status === 409 &&
+    (payload as { code?: unknown } | null)?.code === "ACCOUNT_ALREADY_EXISTS"
+  ) {
+    throw new Error(ACCOUNT_ALREADY_EXISTS_MESSAGE)
   }
 
   if (!response.ok) {

@@ -43,6 +43,9 @@ export interface AuthEntryCopy {
   sendingCode: string
   codeNotSent: string
   resendFailed: string
+  accountExistsTitle: string
+  accountExistsBody: string
+  accountExistsSignIn: string
   freshCodeSent: string
   codeExpiresSoon: string
   changePhoneNumber: string
@@ -119,6 +122,9 @@ const COPY: Record<AccountRecoveryLocale, AuthEntryCopy> = {
     sendingCode: "Sending your SMS code…",
     codeNotSent: "The code could not be sent. Try again below.",
     resendFailed: "A new code could not be sent. Your previous code may still work.",
+    accountExistsTitle: "You already have an account with this number",
+    accountExistsBody: "We didn’t create a new one, and your existing world is unchanged. Sign in to continue where you left off.",
+    accountExistsSignIn: "Sign in to my account",
     freshCodeSent: "A fresh code is on its way.",
     codeExpiresSoon: "Code sent. It expires in a few minutes.",
     changePhoneNumber: "Change phone number",
@@ -193,6 +199,9 @@ const COPY: Record<AccountRecoveryLocale, AuthEntryCopy> = {
     sendingCode: "SMS kodun gönderiliyor…",
     codeNotSent: "Kod gönderilemedi. Aşağıdan tekrar dene.",
     resendFailed: "Yeni kod gönderilemedi. Önceki kodun hâlâ geçerli olabilir.",
+    accountExistsTitle: "Bu numarayla zaten bir hesabın var",
+    accountExistsBody: "Yeni hesap açmadık, mevcut dünyan olduğu gibi duruyor. Kaldığın yerden devam etmek için giriş yap.",
+    accountExistsSignIn: "Hesabıma giriş yap",
     freshCodeSent: "Yeni kod yolda.",
     codeExpiresSoon: "Kod gönderildi. Birkaç dakika içinde geçerliliğini yitirir.",
     changePhoneNumber: "Telefon numarasını değiştir",

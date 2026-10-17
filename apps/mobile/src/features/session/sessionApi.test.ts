@@ -1009,3 +1009,51 @@ test("Firebase completion maps 409 ACCOUNT_RECOVERY_REQUIRED to the recovery mes
     (error: Error) => error.message === ACCOUNT_RECOVERY_REQUIRED_MESSAGE
   )
 })
+
+test("Firebase registration for a phone that already has an account asks the user to sign in", async () => {
+  const fetcher = (async () => new Response(
+    JSON.stringify({ code: "ACCOUNT_ALREADY_EXISTS", error: "Server wording" }),
+    { status: 409, headers: { "content-type": "application/json" } }
+  )) as typeof fetch
+  await assert.rejects(
+    sessionApi.completeFirebaseAccount(API, {
+      idToken: "firebase-id-token",
+      authIntent: "create",
+      termsAcceptance: TEST_TERMS_ACCEPTANCE
+    }, fetcher),
+    (error: Error) => sessionApi.isAccountAlreadyExistsMessage(error.message)
+  )
+})
+
+test("signing into the existing account reuses the verified phone as a sign-in, never a registration", async () => {
+  const bodies: unknown[] = []
+  const actor = await sessionApi.signInExistingFirebaseAccount(API, async () => "verified-id-token", (async (_url, init) => {
+    bodies.push(JSON.parse(String(init?.body)))
+    return new Response(JSON.stringify({
+      session: {
+        accountId: "account-1",
+        sessionId: "session-2",
+        mode: "production",
+        userId: "user-1",
+        sessionToken: "production-token",
+        expiresAt: "2999-01-01T00:00:00.000Z",
+        onboarding: { profile: "complete", avatar: "complete", room: "complete" }
+      },
+      profile: { userId: "user-1", displayName: "Ece", avatar: { presetId: "dusk" } }
+    }), { status: 200 })
+  }) as typeof fetch)
+  assert.deepEqual(bodies, [{ idToken: "verified-id-token", authIntent: "sign-in" }])
+  assert.equal(actor.session.userId, "user-1")
+})
+
+test("signing into the existing account without a verified phone asks for a new code and sends nothing", async () => {
+  let requests = 0
+  const fetcher = (async () => { requests += 1; return new Response("{}") }) as typeof fetch
+  for (const readToken of [async () => null, async () => { throw new Error("native") }]) {
+    await assert.rejects(
+      sessionApi.signInExistingFirebaseAccount(API, readToken, fetcher),
+      /new code/
+    )
+  }
+  assert.equal(requests, 0)
+})

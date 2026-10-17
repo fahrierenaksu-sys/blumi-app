@@ -312,6 +312,7 @@ export function RootNavigator() {
     completeIntro,
     requestVerificationCode,
     registerSessionActor,
+    signInExistingAccount,
     registerSessionActorWithDraft,
     startDemoSession,
     completeProfileSetup,
@@ -925,6 +926,7 @@ export function RootNavigator() {
                       )
                     }
                     onClearError={clearErrorMessage}
+                    onSignInExistingAccount={signInExistingAccount}
                   />
                 )}
               </Stack.Screen>
@@ -948,6 +950,7 @@ export function RootNavigator() {
                         : registerSessionActor(input)
                     }
                     onClearError={clearErrorMessage}
+                    onSignInExistingAccount={signInExistingAccount}
                   />
                 )}
               </Stack.Screen>

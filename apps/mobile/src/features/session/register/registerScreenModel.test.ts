@@ -5,6 +5,7 @@ import {
   canEditRegisterCode,
   RESEND_COOLDOWN_SECONDS,
   canSubmitRegisterVerification,
+  resolveAccountExistsNotice,
   resolveCodeRequestFailure,
   resolveCodeRequestSuccess,
   resolveSmsNoticeCard,
@@ -311,6 +312,26 @@ test("a code that could not be sent is never drawn as a success", () => {
     requestTone: sent.smsNoticeTone,
     authCopy: en
   }), { text: en.freshCodeSent, tone: "success" })
+})
+
+test("a registration refused for an existing account offers sign-in in both languages", () => {
+  assert.deepEqual(resolveAccountExistsNotice({
+    authIntent: "create", accountExists: true, canSignIn: true, authCopy: tr
+  }), {
+    title: "Bu numarayla zaten bir hesabın var",
+    body: tr.accountExistsBody,
+    actionLabel: tr.accountExistsSignIn
+  })
+  assert.equal(resolveAccountExistsNotice({
+    authIntent: "create", accountExists: true, canSignIn: true, authCopy: en
+  })?.title, en.accountExistsTitle)
+  for (const input of [
+    { authIntent: "sign-in" as const, accountExists: true, canSignIn: true },
+    { authIntent: "create" as const, accountExists: false, canSignIn: true },
+    { authIntent: "create" as const, accountExists: true, canSignIn: false }
+  ]) {
+    assert.equal(resolveAccountExistsNotice({ ...input, authCopy: en }), null)
+  }
 })
 
 test("the resend control announces and shows the remaining cooldown", () => {

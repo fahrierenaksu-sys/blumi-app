@@ -11,6 +11,7 @@ import {
 } from "../registerPhonePanelModel"
 import { RegisterWorldHero } from "../RegisterWorldHero"
 import { BlumiSetupShell } from "../setupFlow/BlumiSetupShell"
+import { RegisterAccountExistsNotice } from "./RegisterAccountExistsNotice"
 import { RegisterErrorNotice } from "./RegisterErrorNotice"
 import { RegisterFormMetaRow } from "./RegisterFormMetaRow"
 import { RegisterLegalLinks } from "./RegisterLegalLinks"
@@ -34,6 +35,7 @@ export function RegisterCreateView({
   register,
   layout,
   errorMessage,
+  accountExists = null,
   motionActive,
   formTransition,
   handoffEntrance,
@@ -46,6 +48,8 @@ export function RegisterCreateView({
   register: RegisterFlowController
   layout: RegisterLayout
   errorMessage: string | null
+  /** Replaces the error notice when the verified phone already has an account. */
+  accountExists?: { title: string; body: string; actionLabel: string; onSignIn: () => void } | null
   motionActive: boolean
   formTransition: ReturnType<typeof useSelectionTransition>
   handoffEntrance: ReturnType<typeof useEntranceAnimation>
@@ -66,7 +70,15 @@ export function RegisterCreateView({
       backDisabled={busy}
       collapseHeadingOnKeyboard={keyboardLayout.collapseHeadingOnKeyboard}
       collapseStageOnKeyboard
-      feedback={errorMessage ? (
+      feedback={accountExists ? (
+        <RegisterAccountExistsNotice
+          title={accountExists.title}
+          body={accountExists.body}
+          actionLabel={accountExists.actionLabel}
+          busy={busy}
+          onSignIn={accountExists.onSignIn}
+        />
+      ) : errorMessage ? (
         <RegisterErrorNotice message={errorMessage} />
       ) : null}
       motionActive={motionActive}

@@ -1,6 +1,9 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { goBackOrFallback } from "../navigation/rootNavigationModel"
-import type { RegisterAccountInput } from "../features/session/sessionApi"
+import {
+  isAccountAlreadyExistsMessage,
+  type RegisterAccountInput
+} from "../features/session/sessionApi"
 import {
   localizeSessionErrorMessage,
   resolveAccountRecoveryLocale
@@ -12,7 +15,10 @@ import { RegisterCharacterHero } from "./RegisterCharacterHero"
 import { useEntranceAnimation, useSelectionTransition } from "../ui/animations"
 import { RegisterCreateView } from "../features/session/register/RegisterCreateView"
 import { RegisterSignInView } from "../features/session/register/RegisterSignInView"
-import { resolveSignInHeroCopy } from "../features/session/register/registerScreenModel"
+import {
+  resolveAccountExistsNotice,
+  resolveSignInHeroCopy
+} from "../features/session/register/registerScreenModel"
 import { useRegisterFlowController } from "../features/session/register/useRegisterFlowController"
 import { useRegisterLayout } from "../features/session/register/useRegisterLayout"
 import type { UserAvatar } from "../features/avatarV2/avatarV2.types"
@@ -26,6 +32,8 @@ type RegisterScreenProps = NativeStackScreenProps<
   onRequestVerificationCode: (input: { phoneNumber: string }) => Promise<void>
   onRegister: (input: RegisterAccountInput) => Promise<void>
   onClearError: () => void
+  /** Signs into the account a just-verified phone already has (create flow). */
+  onSignInExistingAccount?: () => Promise<void>
   onCreateFlowStageChange?: (stage: "phone" | "otp") => void
   returnToPhoneRequest?: number
   createFlowAvatar?: Partial<UserAvatar> | null
@@ -45,6 +53,7 @@ export function RegisterScreen({
   onRequestVerificationCode,
   onRegister,
   onClearError,
+  onSignInExistingAccount,
   onCreateFlowStageChange,
   returnToPhoneRequest,
   createFlowAvatar,
@@ -88,6 +97,16 @@ export function RegisterScreen({
   const openTerms = (): void => navigation.navigate("Legal", { type: "terms" })
 
   if (authIntent === "create") {
+    const accountExistsNotice = resolveAccountExistsNotice({
+      authIntent,
+      accountExists: isAccountAlreadyExistsMessage(sessionErrorMessage),
+      canSignIn: onSignInExistingAccount !== undefined,
+      authCopy
+    })
+    const signInExistingAccount = (): void => {
+      // The session state shows any failure; nothing else to do here.
+      onSignInExistingAccount?.().catch(() => undefined)
+    }
     return (
       <RegisterCreateView
         authCopy={authCopy}
@@ -95,6 +114,9 @@ export function RegisterScreen({
         register={register}
         layout={layout}
         errorMessage={errorMessage}
+        accountExists={accountExistsNotice
+          ? { ...accountExistsNotice, onSignIn: signInExistingAccount }
+          : null}
         motionActive={motionActive}
         formTransition={formTransition}
         handoffEntrance={handoffEntrance}

@@ -71,6 +71,7 @@ export interface PreAuthSetupFlowScreenProps extends SetupNavigationProps {
   onRequestVerificationCode: (input: { phoneNumber: string }) => Promise<void>
   onRegister: (input: RegisterAccountInput) => Promise<void>
   onClearError: () => void
+  onSignInExistingAccount?: () => Promise<void>
 }
 
 type PreAuthSetupDraft = PreAuthSetupFlowScreenProps["draft"]
@@ -154,6 +155,7 @@ export function PreAuthSetupFlowScreen({
   onRequestVerificationCode,
   onRegister,
   onClearError,
+  onSignInExistingAccount,
   entryMotion
 }: PreAuthSetupFlowScreenProps) {
   const isFocused = useIsFocused()
@@ -474,6 +476,7 @@ export function PreAuthSetupFlowScreen({
               captureProductEvent(event.name, event.properties)
             }}
             onClearError={onClearError}
+            onSignInExistingAccount={onSignInExistingAccount}
             onCreateFlowStageChange={handleRegisterStageChange}
             returnToPhoneRequest={returnToPhoneRequest}
             createFlowAvatar={renderedDraft.avatar}

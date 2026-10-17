@@ -435,6 +435,41 @@ export const registerStyles = StyleSheet.create({
     ...uiTheme.font.bodySmall,
     color: uiTheme.colors.dangerInk
   },
+  accountExistsBox: {
+    gap: uiTheme.spacing.xs,
+    borderRadius: uiTheme.radius.md,
+    padding: uiTheme.spacing.sm,
+    backgroundColor: uiTheme.colors.warningSoft
+  },
+  accountExistsHeader: {
+    flexDirection: "row",
+    gap: uiTheme.spacing.sm,
+    alignItems: "center"
+  },
+  accountExistsTitle: {
+    flex: 1,
+    ...uiTheme.font.captionBold,
+    fontSize: uiTheme.font.bodySmall.fontSize,
+    lineHeight: uiTheme.font.bodySmall.lineHeight,
+    color: uiTheme.colors.warningInk
+  },
+  accountExistsBody: {
+    ...uiTheme.font.bodySmall,
+    color: uiTheme.colors.warningInk
+  },
+  signInExistingButton: {
+    minHeight: 44,
+    alignSelf: "flex-start",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: uiTheme.spacing.md,
+    borderRadius: uiTheme.radius.md,
+    backgroundColor: uiTheme.colors.primaryDeep
+  },
+  signInExistingButtonText: {
+    ...uiTheme.font.captionBold,
+    color: uiTheme.colors.textInverted
+  },
   submitWrap: {
     borderRadius: 20,
     overflow: "hidden",

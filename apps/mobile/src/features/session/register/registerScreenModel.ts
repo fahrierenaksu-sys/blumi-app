@@ -224,6 +224,25 @@ export function resolveSmsNoticeCard(input: {
   }
 }
 
+/**
+ * Registration refused because the verified phone already has an account:
+ * say so and offer sign-in instead of a generic error. Only the create flow
+ * shows it, and only when the screen can actually sign the user in.
+ */
+export function resolveAccountExistsNotice(input: {
+  authIntent: RegisterAuthIntent
+  accountExists: boolean
+  canSignIn: boolean
+  authCopy: Pick<AuthEntryCopy, "accountExistsTitle" | "accountExistsBody" | "accountExistsSignIn">
+}): { title: string; body: string; actionLabel: string } | null {
+  if (input.authIntent !== "create" || !input.accountExists || !input.canSignIn) return null
+  return {
+    title: input.authCopy.accountExistsTitle,
+    body: input.authCopy.accountExistsBody,
+    actionLabel: input.authCopy.accountExistsSignIn
+  }
+}
+
 export function resolveResendControl(
   resendCooldownSeconds: number,
   busy: boolean,

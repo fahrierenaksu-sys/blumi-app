@@ -38,6 +38,7 @@ import {
   completeProductionOnboardingStep,
   acknowledgeAccountModeration,
   completeFirebaseAccount,
+  signInExistingFirebaseAccount,
   AccountAccessError,
   fetchProductionAccountSnapshot,
   type RegisterAccountInput,
@@ -49,6 +50,7 @@ import {
 import { revokeProductionSessionAfterPushCleanup } from "./sessionPushCleanup"
 import {
   confirmFirebasePhoneCode,
+  getFirebaseCurrentIdToken,
   requestFirebasePhoneCode,
   signOutFirebasePhoneAuth,
   type FirebasePhoneConfirmation
@@ -124,6 +126,8 @@ export interface UseSessionStateResult {
   completeIntro: () => Promise<void>
   requestVerificationCode: (input: SendVerificationCodeInput) => Promise<void>
   registerSessionActor: (input: RegisterAccountInput) => Promise<void>
+  /** After ACCOUNT_ALREADY_EXISTS: signs the just-verified phone into its account. */
+  signInExistingAccount: () => Promise<void>
   registerSessionActorWithDraft: (
     input: RegisterAccountInput,
     draft: PreAuthOnboardingDraft<
@@ -635,6 +639,26 @@ export function useSessionState(): UseSessionStateResult {
     },
     [mutationCoordinator]
   )
+
+  const signInExistingAccount = useCallback(async (): Promise<void> => {
+    const replacement = mutationCoordinator.beginReplacement()
+    setIsBootstrapping(true)
+    setErrorMessage(null)
+    try {
+      const nextSessionActor = await signInExistingFirebaseAccount(
+        MOBILE_HTTP_BASE_URL,
+        getFirebaseCurrentIdToken
+      )
+      firebasePhoneConfirmationRef.current = null
+      await mutationCoordinator.replace(nextSessionActor, replacement)
+      setAccountModeration(null)
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+      throw error
+    } finally {
+      setIsBootstrapping(false)
+    }
+  }, [mutationCoordinator])
 
   const registerSessionActorWithDraft = useCallback(
     async (
@@ -1178,6 +1202,7 @@ export function useSessionState(): UseSessionStateResult {
     completeIntro,
     requestVerificationCode,
     registerSessionActor,
+    signInExistingAccount,
     registerSessionActorWithDraft,
     startDemoSession,
     completeProfileSetup,
