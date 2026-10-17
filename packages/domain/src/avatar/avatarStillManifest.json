@@ -58,9 +58,9 @@
               "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__under",
               "rect": [
                 146,
-                1408,
+                1366,
                 317,
-                181
+                223
               ]
             }
           }
@@ -82,9 +82,9 @@
               "key": "avatar_v2_shoes_white_clean_sneakers__under",
               "rect": [
                 136,
-                1408,
+                1366,
                 330,
-                179
+                221
               ]
             }
           }
@@ -96,19 +96,19 @@
           "showcase": {
             "key": "shoes_girl_camel_ankle_boots__front",
             "rect": [
-              131,
-              1343,
-              346,
-              246
+              149,
+              1365,
+              309,
+              235
             ],
             "order": 1,
             "under": {
               "key": "shoes_girl_camel_ankle_boots__under",
               "rect": [
-                134,
-                1408,
-                334,
-                179
+                174,
+                1366,
+                260,
+                8
               ]
             }
           }
@@ -132,7 +132,7 @@
                 11,
                 669,
                 583,
-                757
+                658
               ]
             }
           }
@@ -235,7 +235,7 @@
                 11,
                 669,
                 583,
-                757
+                658
               ]
             }
           }
@@ -320,7 +320,7 @@
                 11,
                 669,
                 583,
-                757
+                658
               ]
             }
           }
@@ -405,7 +405,7 @@
                 11,
                 669,
                 583,
-                757
+                658
               ]
             }
           }
@@ -490,7 +490,7 @@
                 11,
                 669,
                 583,
-                757
+                658
               ]
             }
           }
@@ -1128,7 +1128,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -1175,7 +1175,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -1222,7 +1222,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -1269,7 +1269,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -1316,7 +1316,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -1340,7 +1340,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -1364,7 +1364,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -1388,7 +1388,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -1412,7 +1412,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -1436,7 +1436,7 @@
                 11,
                 413,
                 583,
-                1013
+                914
               ]
             }
           }
@@ -5897,7 +5897,7 @@
         "key": "base__front",
         "canvas": {
           "width": 607,
-          "height": 1599
+          "height": 1610
         },
         "ground": [
           302,
@@ -5908,7 +5908,7 @@
             0,
             0,
             607,
-            1599
+            1610
           ],
           "head": [
             103,
@@ -5976,19 +5976,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_tan_loafers__front",
             "rect": [
-              82,
-              1395,
-              448,
-              140
+              117,
+              1393,
+              380,
+              163
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_tan_loafers__under",
               "rect": [
-                84,
-                1364,
-                438,
-                176
+                154,
+                1354,
+                303,
+                52
               ]
             }
           }
@@ -6000,19 +6000,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_sand_desert_boots__front",
             "rect": [
-              80,
-              1367,
-              454,
-              169
+              120,
+              1362,
+              374,
+              191
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_sand_desert_boots__under",
               "rect": [
-                84,
-                1364,
-                438,
-                176
+                162,
+                1354,
+                287,
+                16
               ]
             }
           }
@@ -6024,19 +6024,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_brown_loafers__front",
             "rect": [
-              83,
-              1387,
-              444,
-              152
+              121,
+              1390,
+              370,
+              166
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_brown_loafers__under",
               "rect": [
-                84,
-                1364,
-                438,
-                176
+                154,
+                1354,
+                303,
+                45
               ]
             }
           }
@@ -6048,19 +6048,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_cream_chunky_sneakers__front",
             "rect": [
-              72,
-              1346,
-              461,
-              201
+              117,
+              1369,
+              377,
+              204
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_cream_chunky_sneakers__under",
               "rect": [
-                84,
-                1364,
-                437,
-                178
+                160,
+                1354,
+                292,
+                26
               ]
             }
           }
@@ -6072,19 +6072,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_dark_leather_sneakers__front",
             "rect": [
-              81,
-              1374,
-              443,
-              170
+              118,
+              1376,
+              374,
+              176
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_dark_leather_sneakers__under",
               "rect": [
-                84,
-                1364,
-                438,
-                177
+                158,
+                1354,
+                295,
+                29
               ]
             }
           }
@@ -6096,19 +6096,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_green_skate_shoes__front",
             "rect": [
-              75,
-              1399,
-              470,
-              148
+              122,
+              1354,
+              370,
+              185
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_green_skate_shoes__under",
               "rect": [
-                84,
-                1364,
-                438,
-                177
+                163,
+                1354,
+                286,
+                10
               ]
             }
           }
@@ -6120,19 +6120,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_black_clean_sneakers__front",
             "rect": [
-              79,
-              1362,
-              455,
-              179
+              120,
+              1361,
+              371,
+              185
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_black_clean_sneakers__under",
               "rect": [
-                84,
-                1364,
-                438,
-                176
+                162,
+                1354,
+                287,
+                14
               ]
             }
           }
@@ -6144,19 +6144,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_black_everyday_sneakers__front",
             "rect": [
-              75,
-              1362,
-              459,
-              178
+              107,
+              1353,
+              395,
+              199
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_black_everyday_sneakers__under",
               "rect": [
-                84,
-                1364,
-                438,
-                176
+                163,
+                1354,
+                286,
+                8
               ]
             }
           }
@@ -12538,7 +12538,7 @@
         "key": "base__front",
         "canvas": {
           "width": 600,
-          "height": 1557
+          "height": 1582
         },
         "ground": [
           300,
@@ -12549,7 +12549,7 @@
             0,
             0,
             600,
-            1557
+            1582
           ],
           "head": [
             105,

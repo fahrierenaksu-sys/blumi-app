@@ -8,7 +8,7 @@
         "key": "base__front",
         "canvas": {
           "width": 607,
-          "height": 1599
+          "height": 1610
         },
         "ground": [
           302,
@@ -19,7 +19,7 @@
             0,
             0,
             607,
-            1599
+            1610
           ],
           "head": [
             103,
@@ -77,7 +77,7 @@
               11,
               669,
               583,
-              757
+              658
             ]
           }
         },
@@ -95,9 +95,9 @@
             "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__under",
             "rect": [
               146,
-              1408,
+              1366,
               317,
-              181
+              223
             ]
           }
         },
@@ -195,9 +195,9 @@
             "key": "avatar_v2_shoes_white_clean_sneakers__under",
             "rect": [
               136,
-              1408,
+              1366,
               330,
-              179
+              221
             ]
           }
         },
@@ -297,7 +297,7 @@
               11,
               669,
               583,
-              757
+              658
             ]
           }
         },
@@ -548,7 +548,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -590,7 +590,7 @@
               11,
               669,
               583,
-              757
+              658
             ]
           }
         },
@@ -610,7 +610,7 @@
               11,
               669,
               583,
-              757
+              658
             ]
           }
         },
@@ -630,27 +630,27 @@
               11,
               669,
               583,
-              757
+              658
             ]
           }
         },
         "shoes_girl_camel_ankle_boots": {
           "key": "shoes_girl_camel_ankle_boots__front",
           "rect": [
-            131,
-            1343,
-            346,
-            246
+            149,
+            1365,
+            309,
+            235
           ],
           "order": 1,
           "slot": "shoes",
           "under": {
             "key": "shoes_girl_camel_ankle_boots__under",
             "rect": [
-              134,
-              1408,
-              334,
-              179
+              174,
+              1366,
+              260,
+              8
             ]
           }
         },
@@ -670,7 +670,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -690,7 +690,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -710,7 +710,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -730,7 +730,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -750,7 +750,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -770,7 +770,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -790,7 +790,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -810,7 +810,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -830,7 +830,7 @@
               11,
               413,
               583,
-              1013
+              914
             ]
           }
         },
@@ -898,13 +898,13 @@
         }
       },
       "files": {
-        "base__front": "d38a58efa3511d866831270f02de5d7d54c3bcd85346affdf744d9f3d5dda9eb",
+        "base__front": "f5ce813d4e69aee61ce24d9bd4d2a00e40bc81f24343833439011b9fad5ed6ed",
         "avatar_v2_top_coral_wave_polo__front": "dfdfc464e1234775b7a7ca76543fabbdb12b0ec66cf6bf7accbc60dc65d252b5",
         "avatar_v2_top_coral_wave_polo__under": "dab2ed8f1d44594f4692823b0cf050f9bd83bb4164d901e3ab8ade5264adac4d",
         "avatar_v2_bottom_coral_wave_pants__front": "239b9a0e231bcec5bee786fb8790efde4f95416fa97953fa6e719ad71ca03437",
-        "avatar_v2_bottom_coral_wave_pants__under": "962906d211666b1a55d9ab3bca39a0e3741d4cc5bbb69337584415d4c90d1669",
+        "avatar_v2_bottom_coral_wave_pants__under": "030d0747721110daf4dd5bca26dab272571c21dfa24b0ccf0cfd37a6176a4030",
         "avatar_v2_shoes_mint_ribbon_court_sneakers__front": "6eeb193d0ca5bf09ceb22b8cdcc32aaf599fe79d31692491f868caed49a3833c",
-        "avatar_v2_shoes_mint_ribbon_court_sneakers__under": "fb3d717739fcdcbbd09e9321efe8d1513e0bcef4a22f731c4c309a05a8a96cc8",
+        "avatar_v2_shoes_mint_ribbon_court_sneakers__under": "bdd039a84629ac00477415aae26e91581d24f7c64e593e5c0fe298c01a89f2df",
         "avatar_v2_hair_ink_pageboy_star__front": "76351dc1d6eee23becbb7dbee0fa26a4baf5b8d7741a31c88cb0ed1b935b1353",
         "avatar_v2_hair_ink_pageboy_star__back": "9e098edf7ef166638839578a5584ccdb7d8e67a9cf0a1a3c32e64903e71ccc01",
         "hair_girl_bob__front": "b0cc6a150dd3b7b8d8544a95b2ac9bd29f6330f03285d895e75e8ea15b3cd4ad",
@@ -914,7 +914,7 @@
         "avatar_v2_hair_mocha_ribbon_waves__front": "4e3ec96f1ab8bbd359ef0261fcd836c59eca5a03f7d9ae222e6f2380f66ff3ab",
         "avatar_v2_hair_mocha_ribbon_waves__back": "abc296f4d272afcdfd300a97230119c69ff4290da73ced8bbb3ae0c911d83e2e",
         "avatar_v2_shoes_white_clean_sneakers__front": "248d2599bc906355a80f2a133402e514abc51b6c9c0bc5a86cc4a4a8f324dfce",
-        "avatar_v2_shoes_white_clean_sneakers__under": "454fedb294d345c2ebc97ba3bd93dfa74f4e02d96e95b4c49472d425e107b97a",
+        "avatar_v2_shoes_white_clean_sneakers__under": "ddefe3bb42449717518e4a1bd62d00cc4cbf68064b36e629a155052c3e4dd44a",
         "avatar_v2_top_white_cute_crop_top__front": "3f4d9d111588ec92617d1201944fb64d0be000cc5ea461ca72f07f825afc515e",
         "avatar_v2_top_white_cute_crop_top__under": "436c39675ac316919f559621e07073ce2e2ebf15f7705f01d85265d122b84924",
         "avatar_v2_top_black_cute_crop_top__front": "4c5e38553dbe5fa2e0be653030c42987f64efffa89265f67410484baacd43d73",
@@ -924,7 +924,7 @@
         "top_powder_blue_ribbon_corset_top__front": "37f7aba56ea04a275ec5bc2b17d4b301e4a18d577f27e66458e7196914e9154f",
         "top_powder_blue_ribbon_corset_top__under": "cf40c955267e0e4061b5dfd57a5b27f66e54680ba636b581f0f6924e91b8e221",
         "avatar_v2_bottom_black_highwaist_trousers__front": "5662c55f963758bb49a8f630ad353ca76c33230d3d7c1806f6bd95d9b7fb3c72",
-        "avatar_v2_bottom_black_highwaist_trousers__under": "4ebcfe0d85e3cccc227014011fbc0fa9721618c85a44ebde2a42014cc63aa6e3",
+        "avatar_v2_bottom_black_highwaist_trousers__under": "50d784b7608dc562acceb83f5df8e5b567b5eed6384099609aff483335b6642b",
         "jacket_girl_light_denim_crop__front": "400d5d22faffba4171742173691bf13b6966224b7fa21ac1747278946824349a",
         "jacket_girl_light_denim_crop__under": "50fe94678f2f705bc58bb7af57394b88cfdc803e08b0734f0a698442f9e2f8d8",
         "hair_girl_ink_twin_braids__front": "1489ab6d1cb9569cc4592e83269dec632a00934d612c04be845fa69c29506ec6",
@@ -949,35 +949,35 @@
         "top_girl_sage_knit_polo__front": "df423d5dbf26b38972dc4ed6b4c7311fcaec4b44e28d7c9d646961599b0d0286",
         "top_girl_sage_knit_polo__under": "64d231e76383b94b11e68db005060274d2a814b234695baed1009908fac57c6d",
         "dress_girl_wine_gingham_tie__front": "2a3e0113b4c7fe7ab9f8ea87be4bb380793347837dff78ac6b9a3e14a2eaf396",
-        "dress_girl_wine_gingham_tie__under": "98ebbd9f176f06984898e48d48ce17e7f91af8e55bd7d4e82bab36d0bd74d1c1",
+        "dress_girl_wine_gingham_tie__under": "6ac4922d25dcc9c3249520886f632f8fefdccd371c5cd07d52bc7eadb5ad3cdf",
         "necklace_girl_pearl_drop__front": "bcd7560179c1e982a1363ee0d112c3b4db92ba81da5dbd2ce324c2e3236fd6ad",
         "bag_girl_camel_mini__front": "4ec56a8ddd209983daaf2bb10375566b37f51dcd34875621fa34291057835b4b",
         "bottom_girl_wine_midi_skirt__front": "106f0340967b65e1686f833108443169461bf047696f52379c2a0ab7c23c9945",
-        "bottom_girl_wine_midi_skirt__under": "e79d28cac29301cef73231d55eb3a9462a13975584593cba8cfea289d34f5739",
+        "bottom_girl_wine_midi_skirt__under": "e1b207efcac71cc8da09b6e53348e99e6993f19ac6dd9f3fb10b94874946ebf9",
         "bottom_girl_wide_jeans__front": "900bed50fe1c9ce1faf31f5969a88a16f3a829fd06884ab319cee37f2c64a597",
-        "bottom_girl_wide_jeans__under": "726796e46552414482fa60695895f1b579bda92f8fe280a362509e998724c4cc",
+        "bottom_girl_wide_jeans__under": "4a4eb2f79b418a997771e5b752be7ba54f87d4a2d371f21f52e69780dacdfd68",
         "bottom_girl_ecru_trousers__front": "c9dd800ea84dbdba1ce75be216d7c53a616facbce56550b9d7d8be3fae3caa99",
-        "bottom_girl_ecru_trousers__under": "475e89961e4fa173efc07d27e0bde0e79b9fb900a2c8d30f2d3afdaf0aa04e6a",
-        "shoes_girl_camel_ankle_boots__front": "1d4e4d3132b2612dfc6baac4c6aa38f3e8f71e9d5b4d9f4df1afe009554cbefc",
-        "shoes_girl_camel_ankle_boots__under": "11adb197f9bbf887ec00034a9aeaeb5bcc179600d4712fda9d5300cf324551bb",
+        "bottom_girl_ecru_trousers__under": "87c696180af774d54fcd4d182ac490c101691294c88062bc1917c8e8f02b58c8",
+        "shoes_girl_camel_ankle_boots__front": "0eddfcf0310aa29c41a375fc57ddd40102a24a282bb58a418731d75959a30579",
+        "shoes_girl_camel_ankle_boots__under": "f5ad83f651a25e7c0b2636c8496493c18d2e187bd61e84fbed6c063c143db004",
         "dress_girl_black_corset_slit_maxi__front": "223ff90cec11b5a762bd7e889a9f499110ed40716e6f7db23d2ce3993d0856cb",
-        "dress_girl_black_corset_slit_maxi__under": "1270fd740633e7145132098d68833160c901009f0c59676fd404ee356f40968b",
+        "dress_girl_black_corset_slit_maxi__under": "41fac2c463ec7175e55f55f1c9b24acfab4475480a54c73d31a865b1155ee695",
         "dress_girl_terracotta_patchwork_halter_bias_maxi__front": "b5bb7225edd28ab1634d087e923e934fb1c04a6702b72aed8e11d4a2b15d0a2b",
-        "dress_girl_terracotta_patchwork_halter_bias_maxi__under": "9d41274175747efd0ea5feb1d7e34994177ae3d56023ab874b42dd5e4d7d3a15",
+        "dress_girl_terracotta_patchwork_halter_bias_maxi__under": "7af2866e5abb04d397ddff2bfecae9f6939bf7b5ed1e7f571cf2af84519ca586",
         "dress_girl_denim_milkmaid_button_midi__front": "79a658e56cf68019a92af569ecb154a91d9def232bd9bed6dbc426466e0aefc2",
-        "dress_girl_denim_milkmaid_button_midi__under": "5628cf0248c3ed2075027d1a82225fa5a239f6ae27069807989182c2bb81d773",
+        "dress_girl_denim_milkmaid_button_midi__under": "99fad10fdfff7d21a5eef9ccc021852496e7e3fc3e6935e58057eb60cb844d86",
         "dress_girl_cream_one_shoulder_tie_midi__front": "540f09a1962a11167d21977fd9c577c6b135554d0f0e6bfd8e308305aa2e9fa7",
-        "dress_girl_cream_one_shoulder_tie_midi__under": "cc41dda4e9343f61e8e55552ade41a5524120b576fa812c96da2896104ccd327",
+        "dress_girl_cream_one_shoulder_tie_midi__under": "56c3c6fd777ff75fd3e689760d0cc30fc98ee2d9f27c52d6aaee07aed32d1d9b",
         "dress_girl_denim_pinafore_mini__front": "81627c75e6ae1fc4435c52224b9ffa6c1e9158799b2da3eab9faf3d5e69b0c94",
-        "dress_girl_denim_pinafore_mini__under": "e148c6223ffe73e6207496f7f8c78a8efee480a97c83beb832bf2d974d4b81c5",
+        "dress_girl_denim_pinafore_mini__under": "96ed21e03af3397f867a49ddf54b9677848a9a855f09f53efde40d7df82b0e92",
         "dress_girl_sage_shirred_tiered_mini__front": "0eb27d6337c293db5a0852de850d57462e7ba4a819f69bb03a57d2eaf67c1d5a",
-        "dress_girl_sage_shirred_tiered_mini__under": "e3fda1a6eda315635425e4641ad9fbc6feb124be8871d53134d61c8300810d75",
+        "dress_girl_sage_shirred_tiered_mini__under": "4dd9167197123b6527e805af156dde21ea1ac9d9156978db9338961a8dcaf7d4",
         "dress_girl_black_corset_flare_mini__front": "6b858edd7ce82b2939e3879e1eb4de2a0bc6d89b2c9ced53159d226bcc9e2f78",
-        "dress_girl_black_corset_flare_mini__under": "c0fe0421679a411dd9a8d50f18ebc99bf4ba28dd9f75ebab88995a82bd9601c0",
+        "dress_girl_black_corset_flare_mini__under": "8adcb94edbc24f056ea84fcc839d49015bb1513d8df9483e6dc99cf4f71fa46b",
         "dress_girl_butter_square_puff_mini__front": "e7225be8768e75d7960f552b559df645704592787b151a1e4b86ff65fa0280e3",
-        "dress_girl_butter_square_puff_mini__under": "f74d6a13cc83a2ee23c686310e9cfb1ff2262d090354c55d1b2d090992392e6e",
+        "dress_girl_butter_square_puff_mini__under": "57700f5d782a94dfe26d92c21efa27f2fdf9a56c26a336a7c3bacad780ca7850",
         "dress_girl_cream_one_shoulder_mini__front": "fc66120641b1e425d94c8122e2d161e713b96f93706d119f2b7738ceeae71562",
-        "dress_girl_cream_one_shoulder_mini__under": "6cb6ca6ce7ba07fc892a41ddb79a481e8f506c3f21d6199bb60aa0be250126b8",
+        "dress_girl_cream_one_shoulder_mini__under": "9e832c476d55b682fee9820d5cb42907911e8c2c28b1167ca96c2d1d825d8c9b",
         "glasses_girl_gold_round__front": "dee1459b7e5ba0e4561eb410fde25c42b4fb5effa989ef99bcfa0239ec3e1470",
         "glasses_girl_rose_soft_cateye__front": "92c7f36a26b4916eb9e68ed83bc9aa1981a78d74ba5c682901f05a75e1474827",
         "hair_girl_caramel_braid_crown__front": "da229470e0117513debaeb97bd46c44a363fd70cbb9f79d71fd4b5a68ead140b",
@@ -992,7 +992,7 @@
         "key": "base__front",
         "canvas": {
           "width": 600,
-          "height": 1557
+          "height": 1582
         },
         "ground": [
           300,
@@ -1003,7 +1003,7 @@
             0,
             0,
             600,
-            1557
+            1582
           ],
           "head": [
             105,
@@ -1068,20 +1068,20 @@
         "avatar_v2_shoes_male_tan_loafers": {
           "key": "avatar_v2_shoes_male_tan_loafers__front",
           "rect": [
-            82,
-            1395,
-            448,
-            140
+            117,
+            1393,
+            380,
+            163
           ],
           "order": 1,
           "slot": "shoes",
           "under": {
             "key": "avatar_v2_shoes_male_tan_loafers__under",
             "rect": [
-              84,
-              1364,
-              438,
-              176
+              154,
+              1354,
+              303,
+              52
             ]
           }
         },
@@ -1128,20 +1128,20 @@
         "avatar_v2_shoes_male_brown_loafers": {
           "key": "avatar_v2_shoes_male_brown_loafers__front",
           "rect": [
-            83,
-            1387,
-            444,
-            152
+            121,
+            1390,
+            370,
+            166
           ],
           "order": 1,
           "slot": "shoes",
           "under": {
             "key": "avatar_v2_shoes_male_brown_loafers__under",
             "rect": [
-              84,
-              1364,
-              438,
-              176
+              154,
+              1354,
+              303,
+              45
             ]
           }
         },
@@ -1188,20 +1188,20 @@
         "avatar_v2_shoes_male_green_skate_shoes": {
           "key": "avatar_v2_shoes_male_green_skate_shoes__front",
           "rect": [
-            75,
-            1399,
-            470,
-            148
+            122,
+            1354,
+            370,
+            185
           ],
           "order": 1,
           "slot": "shoes",
           "under": {
             "key": "avatar_v2_shoes_male_green_skate_shoes__under",
             "rect": [
-              84,
-              1364,
-              438,
-              177
+              163,
+              1354,
+              286,
+              10
             ]
           }
         },
@@ -1248,20 +1248,20 @@
         "avatar_v2_shoes_male_black_clean_sneakers": {
           "key": "avatar_v2_shoes_male_black_clean_sneakers__front",
           "rect": [
-            79,
-            1362,
-            455,
-            179
+            120,
+            1361,
+            371,
+            185
           ],
           "order": 1,
           "slot": "shoes",
           "under": {
             "key": "avatar_v2_shoes_male_black_clean_sneakers__under",
             "rect": [
-              84,
-              1364,
-              438,
-              176
+              162,
+              1354,
+              287,
+              14
             ]
           }
         },
@@ -1308,20 +1308,20 @@
         "avatar_v2_shoes_male_black_everyday_sneakers": {
           "key": "avatar_v2_shoes_male_black_everyday_sneakers__front",
           "rect": [
-            75,
-            1362,
-            459,
-            178
+            107,
+            1353,
+            395,
+            199
           ],
           "order": 1,
           "slot": "shoes",
           "under": {
             "key": "avatar_v2_shoes_male_black_everyday_sneakers__under",
             "rect": [
-              84,
-              1364,
-              438,
-              176
+              163,
+              1354,
+              286,
+              8
             ]
           }
         },
@@ -1368,20 +1368,20 @@
         "avatar_v2_shoes_male_cream_chunky_sneakers": {
           "key": "avatar_v2_shoes_male_cream_chunky_sneakers__front",
           "rect": [
-            72,
-            1346,
-            461,
-            201
+            117,
+            1369,
+            377,
+            204
           ],
           "order": 1,
           "slot": "shoes",
           "under": {
             "key": "avatar_v2_shoes_male_cream_chunky_sneakers__under",
             "rect": [
-              84,
-              1364,
-              437,
-              178
+              160,
+              1354,
+              292,
+              26
             ]
           }
         },
@@ -1428,20 +1428,20 @@
         "avatar_v2_shoes_male_dark_leather_sneakers": {
           "key": "avatar_v2_shoes_male_dark_leather_sneakers__front",
           "rect": [
-            81,
-            1374,
-            443,
-            170
+            118,
+            1376,
+            374,
+            176
           ],
           "order": 1,
           "slot": "shoes",
           "under": {
             "key": "avatar_v2_shoes_male_dark_leather_sneakers__under",
             "rect": [
-              84,
-              1364,
-              438,
-              177
+              158,
+              1354,
+              295,
+              29
             ]
           }
         },
@@ -1488,20 +1488,20 @@
         "avatar_v2_shoes_male_sand_desert_boots": {
           "key": "avatar_v2_shoes_male_sand_desert_boots__front",
           "rect": [
-            80,
-            1367,
-            454,
-            169
+            120,
+            1362,
+            374,
+            191
           ],
           "order": 1,
           "slot": "shoes",
           "under": {
             "key": "avatar_v2_shoes_male_sand_desert_boots__under",
             "rect": [
-              84,
-              1364,
-              438,
-              176
+              162,
+              1354,
+              287,
+              16
             ]
           }
         },
@@ -1689,55 +1689,55 @@
         }
       },
       "files": {
-        "base__front": "8497eb272fab3dd4709960e7d2d74fca8a9926b94cd5ad75b3f6e9c6b6488800",
+        "base__front": "65958f3f462b9d7367954f6dd7072b41b0852382e75dffeceba89ba3e2d476bc",
         "avatar_v2_top_male_navy_knit_polo__front": "4c8c1052659ae920fb1469d879d6cc6fdb62bdebe33b27d2043c5b6d252ec963",
         "avatar_v2_top_male_navy_knit_polo__under": "278c9e0fd1122af5e665fd3fd17520c305612c2e1ae11a2c4f11e96aadc7da51",
         "avatar_v2_bottom_male_cream_pleated_trousers__front": "a99f5c18939d5f6d4d281c7dbdf4636b57ef4aeca4c363e423d95150e74cef60",
         "avatar_v2_bottom_male_cream_pleated_trousers__under": "cfd899a014abbe8a40636c134d03543c62ae7cd59485d6dff67d5dfa9f7552d2",
-        "avatar_v2_shoes_male_tan_loafers__front": "356286aa0713dff45d30fd1d415812bc49972ed00f1420e36652d85ab97b072d",
-        "avatar_v2_shoes_male_tan_loafers__under": "b813fb55f99e4eec5b984f107efab6932916311785150e391032825f463703bd",
+        "avatar_v2_shoes_male_tan_loafers__front": "31e6b879e2f68ac6266119150c488ae38fd2c616edd084c5d066dc4c84949984",
+        "avatar_v2_shoes_male_tan_loafers__under": "538be6c7487d9dfb350a21e03896506a18c515cd895a422707e1b52a8af90fd6",
         "avatar_v2_top_male_forest_collar_sweater__front": "fe836e9065f0cfde5760a0c6f6bd6baeb836d31043b3fd881a1c5b434baa98d3",
         "avatar_v2_top_male_forest_collar_sweater__under": "df3390345562c8283514e3a0210a953995f0d0cf8577517b465bee1397a6e6a5",
         "avatar_v2_bottom_male_charcoal_trousers__front": "65b51ba73e108b2878f6d940e49dc8303b3ea201978b9a8ddcaa27913c6c4b9c",
         "avatar_v2_bottom_male_charcoal_trousers__under": "3187f6c830388bad39c2e2343c3243309fc332d78836841c65e5a2094e3bcb64",
-        "avatar_v2_shoes_male_brown_loafers__front": "406b795672be8b0ea8755c42d475d53d4ba5152686960f7508b37ec7e2badeed",
-        "avatar_v2_shoes_male_brown_loafers__under": "f87b68f5c3057eb523d9925ba4a3a308788e7035795aa1b4011a7fdabdd6e1d4",
+        "avatar_v2_shoes_male_brown_loafers__front": "1bcdba8bd61be84c67ace44813445a917885e2bcbb1a141248ab4f4d86e9d9c4",
+        "avatar_v2_shoes_male_brown_loafers__under": "c727ba074e152e273f679b28c45395962b784db0b494c0f3d25d6837042dd0f2",
         "avatar_v2_top_male_check_flannel_white_tee__front": "9bf892fe53310a580ae933a287babdbd8f42df42a84a83a16d575fbba1ac217e",
         "avatar_v2_top_male_check_flannel_white_tee__under": "208db49319746094a0cabef52a7f99f9fdb9fa094f3ebc29f6b78134830c00f8",
         "avatar_v2_bottom_male_grey_wide_jeans__front": "c6b419715e1f44e19ca2639ac031ab057db8a06fe24f8d52fbacecd971b1135b",
         "avatar_v2_bottom_male_grey_wide_jeans__under": "57a3ec91ed9278825202a0cb52893005343246d41cd9ed19d1ce113e8e4a6484",
-        "avatar_v2_shoes_male_green_skate_shoes__front": "39ada18867fbd94bdd1ea022693e674bcfb8b6112ab5ebbf0af0033e47080252",
-        "avatar_v2_shoes_male_green_skate_shoes__under": "24214e0a9e84a0232e426889f3fd48992b8ca2253928df900375b6abf7127636",
+        "avatar_v2_shoes_male_green_skate_shoes__front": "3627a4c50a3c0ae1e74a5299f41ceb9014963964b433d27177d401212fa5141a",
+        "avatar_v2_shoes_male_green_skate_shoes__under": "93dd2d7c3836c081510c5c550774ed0745c8e216fc64407e319a95a72a06c2ea",
         "avatar_v2_top_male_white_basic_tee__front": "d81a419e1fa263f729991244a6e5cd26acd064024e7f754b75a806a660967a7e",
         "avatar_v2_top_male_white_basic_tee__under": "58a1360a94b85cb12cea9bcb2dda185bbf8de60846754c2f0273cde5965db29a",
         "avatar_v2_bottom_male_black_straight_trousers__front": "00ee334c7a769d07b5f596e3c578b2f9a97c3c1135e53db63afc8594cca61bae",
         "avatar_v2_bottom_male_black_straight_trousers__under": "5c8d0eeb9047be35a7e0b3775fc840ce382eec390025fffca4adb659ff71c48c",
-        "avatar_v2_shoes_male_black_clean_sneakers__front": "551a3e078cc67f4bf2a56850f4d95f2a739fdf9746fd3946cde9e98cf053970d",
-        "avatar_v2_shoes_male_black_clean_sneakers__under": "e17ee6d9aaef4ed4a393585da3b4b9c4dc56721316cdd4ba0069c1d6f1b22417",
+        "avatar_v2_shoes_male_black_clean_sneakers__front": "2e5015fbc5dbed2c8e5dbea00975df4bb402452167ac0a162dd9d319bdfad149",
+        "avatar_v2_shoes_male_black_clean_sneakers__under": "401185bf6a941151df1e3a0b0cc17ddc3225baa4bbb3afdaf5ccf2ed82dc013c",
         "avatar_v2_top_male_black_basic_tee__front": "b59671430f6dceaa1b6922828ce4d2989331466e04530679f888c6f6cd176443",
         "avatar_v2_top_male_black_basic_tee__under": "7cb38db8eb84e2be92c816124565fc0fdaeb7e9415dd58fd38e4c6208109ed34",
         "avatar_v2_bottom_male_black_pocket_trousers__front": "e40ae393dc03213a4d4b9bf5e2c2c8d16b7becec40d6cb8dd1cec163e1a543d0",
         "avatar_v2_bottom_male_black_pocket_trousers__under": "2c28b872071c48323ace3e0c97fc76b22ece07cf1b0ab87ea466b2a88aa4cfd6",
-        "avatar_v2_shoes_male_black_everyday_sneakers__front": "d7d0f1b1c72643001bfd455ba399b306b31bfa53886f313864f1a49bc21e2987",
-        "avatar_v2_shoes_male_black_everyday_sneakers__under": "aef4ed2e5b4b603d530a345570da2b12dc4fa18675b09c55b3ce179c0b91abf6",
+        "avatar_v2_shoes_male_black_everyday_sneakers__front": "e52d732492807cb091e8e886e39def3a313d3d989c81a66bb1a295f494a865f7",
+        "avatar_v2_shoes_male_black_everyday_sneakers__under": "4fcb5286d1d167a5a8b6a7a9055641c7ee34160419bb0586f94d58862c6d50a7",
         "avatar_v2_top_male_black_embroidered_sweatshirt__front": "6b94ce0d4a25747fbb1fa514aa34c5acdbb9ffaf2609741cf7905e94cc1f965b",
         "avatar_v2_top_male_black_embroidered_sweatshirt__under": "b05df95b7d714c899d3025e97d5aa88297607ce8e40255aedc20a4fdeb169f05",
         "avatar_v2_bottom_male_cream_drawstring_trousers__front": "6168145ca0769dd701f44ccd1ff6615cb94e86beb81d43bc3c7e8a7600926bd8",
         "avatar_v2_bottom_male_cream_drawstring_trousers__under": "ab39eac0fe97aaebf360ed4b31ad893d6bbde2d8e6e6909bb8e93d2c51246558",
-        "avatar_v2_shoes_male_cream_chunky_sneakers__front": "d19d389e3707fe04dccb551b2d234c35588f34eb6a352a175c0f39bcd5660c14",
-        "avatar_v2_shoes_male_cream_chunky_sneakers__under": "042265e5e9d1ffe7d1eeb8c9dd52eba8c0821ea30674c74b2b4bb9ff1a96712d",
+        "avatar_v2_shoes_male_cream_chunky_sneakers__front": "2acc151a314bd8eef6ba98e10cd0946ebee4bafc9eeda2f01817757052b98a99",
+        "avatar_v2_shoes_male_cream_chunky_sneakers__under": "108952a6d3e72b93a204c14298a6876d500f312cfc8b7cbdccc2cf0b0791e5ee",
         "avatar_v2_top_male_taupe_waffle_blouson__front": "d99043f171ffc35eed08538e618717f3a543632724ae9f541529a93f9eb072b3",
         "avatar_v2_top_male_taupe_waffle_blouson__under": "f3d097a1cddd172854ccaa251fc8f89afd1b6868d48cda0cc035c313d2a8e1f9",
         "avatar_v2_bottom_male_ecru_wide_trousers__front": "7815509a463daf7fe8c2606570cc2e6fbf2e306b7b5793c6716780649a1f90da",
         "avatar_v2_bottom_male_ecru_wide_trousers__under": "39cb56d9c4ad06ed4bea43f09d32abdffa50eba55efde926144142f0314ce1e4",
-        "avatar_v2_shoes_male_dark_leather_sneakers__front": "9d024f24101761adbe396127b65cd1f8c7a7d1959226e85b56391e1e6fc4fadf",
-        "avatar_v2_shoes_male_dark_leather_sneakers__under": "79df03dbe38493909806ec99495a61975d9b963a947e6651f9cb027582e48536",
+        "avatar_v2_shoes_male_dark_leather_sneakers__front": "52c1c0115d6e9d9ac5906286d98814c5a0223a0ec400943a4286a8e3c35fe193",
+        "avatar_v2_shoes_male_dark_leather_sneakers__under": "6b95e55e9f39081a48ead2e24d8532d0644ef050b6013fa92ccb3596b1868e4c",
         "avatar_v2_top_male_olive_overshirt__front": "3fec9c16dba781a9c930d26e5d8622e88a9631986b2c1e9da466b6ad57a648da",
         "avatar_v2_top_male_olive_overshirt__under": "0c9b54d326af933df001fbb0a270dfe1d933d1c80795a8c39448ef6ea87646c7",
         "avatar_v2_bottom_male_dark_straight_jeans__front": "552a3a76b30ad2944bc9902667a664bd0ea493da181c655d37a1687f1273a841",
         "avatar_v2_bottom_male_dark_straight_jeans__under": "ed5eb6fc4e99f94aa5f2d2647108b11c84b0764e7f79622ca4702526f6e9f46f",
-        "avatar_v2_shoes_male_sand_desert_boots__front": "fe82b29f92a36d10e8774652dcf8b0ae39996c3cbc2c5c629a8da3f358a58315",
-        "avatar_v2_shoes_male_sand_desert_boots__under": "17b9b40f3553a71ee94e500429462e92741bfda384d91729b35d0667827c5db8",
+        "avatar_v2_shoes_male_sand_desert_boots__front": "e40b7cb876f936114557f3cd09d8ab5386768b3306db502613a92487b70d8b34",
+        "avatar_v2_shoes_male_sand_desert_boots__under": "c1e4443c852ca11cc54433337e583e36f81efae2e086e1f6a9f806e681337b43",
         "avatar_v2_hair_male_blue_black_curls__front": "0714e1c1c5784f419858feda6953b6b335628fc283ae4bed9752dcbe0fa8559c",
         "avatar_v2_hair_male_blue_black_curls__back": "18fc442b11f536ee9af1effd36cf9bc099cfa9b7042ee8e5704c9e32da2a52c8",
         "avatar_v2_hair_male_textured_twists__front": "d7e39b7a0a3b0259d4ea9630e40c0c45b07f7279933b73a9ea3d47d1800bad7e",
