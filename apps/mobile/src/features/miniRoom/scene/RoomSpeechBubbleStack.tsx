@@ -19,8 +19,8 @@ export interface RoomSpeechBubbleStackProps {
   /** One speaker's lines, oldest first; the newest is drawn at the bottom. */
   bubbles: readonly SpeechBubble[]
   placement: RoomSpeechBubblePlacement
-  /** Lifted above the partner's stack when the two chibis stand close. */
-  raised: boolean
+  /** Height (px) above the anchor box's bottom, already lifted when the stack is raised over the partner's. */
+  bottomPx: number
   animate: boolean
   onDismissBubble: (bubbleId: string) => void
   dismissBubbleLabel: string
@@ -33,7 +33,7 @@ export interface RoomSpeechBubbleStackProps {
  * text; the newest line's tail always points at the chibi.
  */
 export const RoomSpeechBubbleStack = memo(function RoomSpeechBubbleStack(props: RoomSpeechBubbleStackProps) {
-  const { bubbles, placement, raised, animate, onDismissBubble, dismissBubbleLabel } = props
+  const { bubbles, placement, bottomPx, animate, onDismissBubble, dismissBubbleLabel } = props
   if (bubbles.length === 0) return null
   const newestId = bubbles[bubbles.length - 1]?.id
   const motion = animate ? FULL_MOTION : REDUCED_MOTION
@@ -44,7 +44,7 @@ export const RoomSpeechBubbleStack = memo(function RoomSpeechBubbleStack(props: 
         styles.stack,
         placement === "left" ? styles.stackLeft : null,
         placement === "right" ? styles.stackRight : null,
-        raised ? styles.stackRaised : null
+        { bottom: bottomPx }
       ]}
     >
       {bubbles.map((bubble) => {
@@ -104,7 +104,6 @@ const styles = StyleSheet.create({
   stack: {
     position: "absolute",
     left: "50%",
-    bottom: 130,
     width: STACK_WIDTH,
     marginLeft: -STACK_WIDTH / 2,
     flexDirection: "column",
@@ -120,9 +119,6 @@ const styles = StyleSheet.create({
   stackRight: {
     marginLeft: -SIDE_ANCHOR,
     alignItems: "flex-start"
-  },
-  stackRaised: {
-    bottom: 168
   },
   line: {
     maxWidth: "100%"

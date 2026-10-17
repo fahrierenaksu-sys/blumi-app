@@ -75,7 +75,7 @@ function render(bubbles: SpeechBubble[], animate: boolean) {
   const root = Stack({
     bubbles,
     placement: "center",
-    raised: false,
+    bottomPx: 130,
     animate,
     onDismissBubble: (id) => { dismissed.push(id) },
     dismissBubbleLabel: "Dismiss"
@@ -206,7 +206,7 @@ test("a speaker's new line leaves the body/depth subtree and the other speaker's
         "./RoomSpeechBubbleStack": { RoomSpeechBubbleStack: "RoomSpeechBubbleStack" },
         "./RoomTypingBubble": { RoomTypingBubble: "RoomTypingBubble" }
       },
-      real: ["./miniRoomSpeechStack"],
+      real: ["./miniRoomSpeechStack", "./miniRoomAvatarStageModel"],
       inertUnknown: true
     }
   )
