@@ -86,6 +86,7 @@ import { useMyRoomAvatarWalk } from "../features/roomWorld/useMyRoomAvatarWalk"
 import { useMyRoomPetSlot } from "../features/roomPet/useMyRoomPetSlot"
 import { IS_BLUMI_ROOM_PET_ENABLED } from "../features/roomPet/roomPetFlag"
 import { useCatTrips } from "../features/catTrips/useCatTrips"
+import { useServerRoomPet } from "../features/roomPet/useServerRoomPet"
 import { CatTripRevealOverlay } from "../features/catTrips/CatTripRevealOverlay"
 import { CatRoomStrip } from "../features/catTrips/CatSouvenirShelf"
 import {
@@ -385,9 +386,12 @@ export function MyRoomScreen({
     return { point: { x: pose.x, y: pose.y }, seatFurnitureId: seatedFurnitureRenderIdRef.current ?? null }
   }, [readAvatarPose])
   // Traveling cat (flag EXPO_PUBLIC_BLUMI_CAT_TRIPS, off by default): while it is away the basket is empty.
-  const catTrips = useCatTrips({ sessionActor, isFocused: useIsFocused() })
+  const isRoomFocused = useIsFocused()
+  const catTrips = useCatTrips({ sessionActor, isFocused: isRoomFocused })
+  // The server decides whether this member has a cat (it grants the starter cat on the first read).
+  const hasServerRoomPet = useServerRoomPet({ sessionActor, isFocused: isRoomFocused, isEnabled: IS_BLUMI_ROOM_PET_ENABLED })
   const petDepthSlot = useMyRoomPetSlot({
-    isEnabled: IS_BLUMI_ROOM_PET_ENABLED && !catTrips.isOwnCatAway,
+    isEnabled: hasServerRoomPet && !catTrips.isOwnCatAway,
     shell: baseRoomScene.shell,
     sceneItems: baseRoomScene.renderItems,
     renderItems,

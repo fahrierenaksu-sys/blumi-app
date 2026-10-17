@@ -3,7 +3,7 @@ import test from "node:test"
 import { ROOM_PET_CAT_SPECIES_ID } from "@blumi/domain"
 import type { RoomPetSchemaProbe } from "../roomPets/roomPetSchema"
 import { createInMemoryRoomPetRepository } from "../roomPets/roomPetRepository"
-import { createRoomCatOwnership, createRoomPetService, isRoomPetEnabled } from "../roomPets/roomPetService"
+import { ROOM_PET_STARTER_NAME, createRoomCatOwnership, createRoomPetService, isRoomPetEnabled } from "../roomPets/roomPetService"
 import { createAdversarialServer } from "./adversarialFixture"
 
 const PET_ROUTES = [
@@ -59,27 +59,44 @@ test("every pet route needs a signed-in member", async () => {
   })
 })
 
-test("a member adopts one starter pet, a second adopt is refused and the first pet is kept", async () => {
+test("the first read grants exactly one starter cat and repeat reads never add another", async () => {
   await withServer({}, async (server) => {
     const ada = await server.createAccount("ada")
-    const empty = await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })
-    assert.equal(empty.statusCode, 200, empty.body)
-    assert.equal(empty.json().pet, null)
-    assert.deepEqual(empty.json().speciesIds, [ROOM_PET_CAT_SPECIES_ID])
+    const first = await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })
+    assert.equal(first.statusCode, 200, first.body)
+    assert.equal(first.json().pet.speciesItemId, ROOM_PET_CAT_SPECIES_ID)
+    assert.equal(first.json().pet.name, ROOM_PET_STARTER_NAME)
+    assert.equal(first.json().pet.userId, undefined, "the response never carries a user id")
+    assert.deepEqual(first.json().speciesIds, [ROOM_PET_CAT_SPECIES_ID])
 
-    const adopted = await server.call("POST", "/v1/users/me/pet/adopt", { token: ada.sessionToken, payload: adoptBody("  Pamuk  ") })
+    const reads = await Promise.all([1, 2, 3].map(() => server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })))
+    for (const read of reads) assert.equal(read.json().pet.petId, first.json().pet.petId)
+
+    const adoptAgain = await server.call("POST", "/v1/users/me/pet/adopt", { token: ada.sessionToken, payload: adoptBody("Tekir") })
+    assert.equal(adoptAgain.statusCode, 409)
+    assert.equal(adoptAgain.json().code, "ROOM_PET_ALREADY_ADOPTED")
+    assert.equal((await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })).json().pet.name, ROOM_PET_STARTER_NAME)
+  })
+})
+
+test("concurrent first reads on the service grant one cat, not one per request", async () => {
+  const repository = createInMemoryRoomPetRepository()
+  const roomPetService = createRoomPetService({ repository })
+  const results = await Promise.all([1, 2, 3, 4, 5].map(() => roomPetService.getMyPet("member_a")))
+  const petIds = new Set(results.map((result) => (result.outcome === "ok" ? result.pet.petId : "none")))
+  assert.equal(petIds.size, 1)
+  assert.ok(!petIds.has("none"))
+})
+
+test("a member who adopts before the first read keeps the chosen name", async () => {
+  await withServer({}, async (server) => {
+    const ada = await server.createAccount("ada")
+    const adopted = await server.call("POST", "/v1/users/me/pet/adopt", { token: ada.sessionToken, payload: adoptBody("  Minnoş  ") })
     assert.equal(adopted.statusCode, 201, adopted.body)
-    assert.equal(adopted.json().pet.name, "Pamuk", "the name is trimmed")
-    assert.equal(adopted.json().pet.speciesItemId, ROOM_PET_CAT_SPECIES_ID)
-    assert.equal(adopted.json().pet.userId, undefined, "the response never carries a user id")
-
-    const again = await server.call("POST", "/v1/users/me/pet/adopt", { token: ada.sessionToken, payload: adoptBody("Tekir") })
-    assert.equal(again.statusCode, 409)
-    assert.equal(again.json().code, "ROOM_PET_ALREADY_ADOPTED")
-
+    assert.equal(adopted.json().pet.name, "Minnoş", "the name is trimmed")
     const mine = await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })
-    assert.equal(mine.json().pet.name, "Pamuk")
     assert.equal(mine.json().pet.petId, adopted.json().pet.petId)
+    assert.equal(mine.json().pet.name, "Minnoş")
   })
 })
 
@@ -90,7 +107,8 @@ test("only species from the server's fixed list can be adopted", async () => {
       const response = await server.call("POST", "/v1/users/me/pet/adopt", { token: ada.sessionToken, payload: { speciesItemId, name: "Pamuk" } })
       assert.equal(response.statusCode, 400, speciesItemId)
     }
-    assert.equal((await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })).json().pet, null)
+    const mine = await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })
+    assert.equal(mine.json().pet.speciesItemId, ROOM_PET_CAT_SPECIES_ID, "a refused species never becomes the pet")
   })
 })
 
@@ -110,7 +128,6 @@ test("pet names go through the community filter and refuse phone-like, empty, lo
       assert.equal(response.statusCode, 400, `${reason}: ${response.body}`)
       assert.equal(response.json().reason, reason)
     }
-    assert.equal((await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })).json().pet, null)
 
     const adopted = await server.call("POST", "/v1/users/me/pet/adopt", { token: ada.sessionToken, payload: adoptBody("Kedi 2026") })
     assert.equal(adopted.statusCode, 201, "four digits are still a name")
@@ -133,25 +150,23 @@ test("another member can neither read nor rename my pet", async () => {
   await withServer({}, async (server) => {
     const ada = await server.createAccount("ada")
     const bob = await server.createAccount("bob")
-    await server.call("POST", "/v1/users/me/pet/adopt", { token: ada.sessionToken, payload: adoptBody("Pamuk") })
+    await server.call("POST", "/v1/users/me/pet/adopt", { token: ada.sessionToken, payload: adoptBody("Ayva") })
+    const adaPetId = (await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })).json().pet.petId
 
-    const bobRead = await server.call("GET", "/v1/users/me/pet", { token: bob.sessionToken })
-    assert.equal(bobRead.json().pet, null, "bob sees only his own (missing) pet")
     const bobRename = await server.call("PUT", "/v1/users/me/pet/name", { token: bob.sessionToken, payload: { name: "Tekir" } })
-    assert.equal(bobRename.statusCode, 404)
+    assert.equal(bobRename.statusCode, 404, "bob has no pet yet, and ada's is not his")
     assert.equal(bobRename.json().code, "ROOM_PET_NOT_FOUND")
-    for (const path of [`/v1/users/${ada.userId}/pet`, `/v1/users/me/pet?userId=${ada.userId}`]) {
-      const probe = await server.call("GET", path, { token: bob.sessionToken })
-      assert.ok(probe.statusCode === 404 || probe.json().pet === null, path)
-    }
     // A smuggled owner field never moves the adopt onto another member.
     const bobAdopt = await server.call("POST", "/v1/users/me/pet/adopt", {
       token: bob.sessionToken, payload: { ...adoptBody("Tekir"), userId: ada.userId }
     })
     assert.equal(bobAdopt.statusCode, 201, "bob's own first pet is not blocked by ada's")
+    for (const path of ["/v1/users/me/pet", `/v1/users/${ada.userId}/pet`, `/v1/users/me/pet?userId=${ada.userId}`]) {
+      const probe = await server.call("GET", path, { token: bob.sessionToken })
+      assert.ok(probe.statusCode === 404 || probe.json().pet.petId !== adaPetId, path)
+    }
     assert.equal((await server.call("GET", "/v1/users/me/pet", { token: bob.sessionToken })).json().pet.name, "Tekir")
-
-    assert.equal((await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })).json().pet.name, "Pamuk")
+    assert.equal((await server.call("GET", "/v1/users/me/pet", { token: ada.sessionToken })).json().pet.name, "Ayva")
   })
 })
 
@@ -186,6 +201,9 @@ test("cat ownership answers from the pet record and is not authoritative while t
   assert.equal(await ownership.hasCat("member_b"), false)
   assert.equal(await roomPetService.deleteUserData("member_a"), 1)
   assert.equal(await ownership.hasCat("member_a"), false, "account deletion erases the pet")
+  assert.equal(await ownership.hasCat("member_c"), false)
+  await roomPetService.getMyPet("member_c")
+  assert.equal(await ownership.hasCat("member_c"), true, "the first read's starter cat can travel")
 })
 
 test("pet events report outcome codes only, never a name or a user id", async () => {

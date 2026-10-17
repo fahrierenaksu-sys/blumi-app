@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import {
+  ROOM_PET_CAT_SPECIES_ID,
   ROOM_PET_CAT_SPECIES_IDS,
   ROOM_PET_SPECIES_IDS,
   isRoomPetSpeciesId,
@@ -22,9 +23,17 @@ export interface RoomPetView {
   updatedAt: string
 }
 
+/**
+ * Every member gets the white cat once the pet flag is on: the server grants
+ * it on the first read, so the app never decides that a cat exists. The name
+ * is a starter name the member can change with PUT /v1/users/me/pet/name.
+ */
+export const ROOM_PET_STARTER_SPECIES_ID = ROOM_PET_CAT_SPECIES_ID
+export const ROOM_PET_STARTER_NAME = "Pamuk"
+
 export type RoomPetNameRefusal = RoomPetNameProblem | "not_allowed"
 
-export type RoomPetReadResult = { outcome: "unavailable" } | { outcome: "ok"; pet: RoomPetView | null; speciesIds: readonly string[] }
+export type RoomPetReadResult = { outcome: "unavailable" } | { outcome: "ok"; pet: RoomPetView; speciesIds: readonly string[] }
 
 export type RoomPetAdoptResult =
   | { outcome: "unavailable" }
@@ -75,12 +84,26 @@ export function createRoomPetService(input: {
     return checked
   }
 
+  // One row per member, decided atomically by the repository: concurrent first reads grant exactly one cat.
+  async function grantStarterCat(userId: string): Promise<RoomPetRecord> {
+    const result = await repository.adopt({
+      petId: idFactory(),
+      userId,
+      speciesItemId: ROOM_PET_STARTER_SPECIES_ID,
+      name: ROOM_PET_STARTER_NAME,
+      createdAt: now().toISOString()
+    })
+    if (result.outcome === "adopted") report("room_pet.starter_granted")
+    return result.pet
+  }
+
   return {
     isAvailable,
     async getMyPet(userId) {
       if (!(await isAvailable())) return { outcome: "unavailable" }
-      const pet = await repository.findByUser(userId)
-      return { outcome: "ok", pet: pet ? toView(pet) : null, speciesIds: ROOM_PET_SPECIES_IDS }
+      const existing = await repository.findByUser(userId)
+      const pet = existing ?? (await grantStarterCat(userId))
+      return { outcome: "ok", pet: toView(pet), speciesIds: ROOM_PET_SPECIES_IDS }
     },
     async adopt(userId, request) {
       if (!(await isAvailable())) return { outcome: "unavailable" }
