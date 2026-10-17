@@ -150,6 +150,7 @@ try {
       resolve(workspaceRoot, "src/features/avatar/renderer/avatar25BodySwap.test.ts"),
       resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Life.test.ts"),
       resolve(workspaceRoot, "src/features/avatar/renderer/avatar25Astc.test.ts"),
+      resolve(workspaceRoot, "src/features/avatar/renderer/avatar25PageCache.test.ts"),
       // baked stills (plan 2.2): match the rigs (L13), bundled, cover the art map (R4), live draw order
       resolve(workspaceRoot, "src/features/avatar/stills/avatarStills.test.ts"),
       // front (showcase) bake: only allowlisted, hash-approved stills are baked
