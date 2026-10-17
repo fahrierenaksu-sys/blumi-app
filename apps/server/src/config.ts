@@ -56,6 +56,8 @@ import {
   type ChatReceiptSchemaProbe
 } from "./chat/chatReceiptSchema"
 import { createPostgresStreetRepository } from "./db/postgresStreetRepository"
+import { createPostgresStreetSaveTransaction } from "./db/postgresStreetDigestSaves"
+import { withStreetDigestSaves } from "./street/streetDigestSaves"
 import { createInMemoryStreetRepository, type StreetRepository } from "./street/streetRepository"
 import { createStaticStreetSchema, createStreetSchemaProbe, type StreetSchemaProbe } from "./street/streetSchema"
 import { createChatHidePointSchemaProbe, createChatHideSchemaProbe } from "./chat/chatHideSchema"
@@ -223,6 +225,8 @@ export interface ConfiguredServerServices {
   /** Sokağım storage and whether migration 080 is applied (the `chat_street` runtime gate). */
   streetRepository: StreetRepository
   streetSchema: StreetSchemaProbe
+  /** True when the save repositories write the street record in the save's own transaction (PostgreSQL). */
+  streetDigestsInSaveTransaction?: boolean
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
   authRateLimiter?: SharedRateBudget
@@ -649,8 +653,15 @@ export function createConfiguredServerServices(
       lockedSendTimeoutMs: resolveLockedSendTimeoutMs(DEFAULT_PUSH_PROVIDER_TIMEOUT_MS, config.databasePool),
       ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService, catTripService }), notificationPortraits)
     })
+    // A loadout or room save writes its street record in the same transaction (spec §2).
+    const streetSaves = withStreetDigestSaves({
+      authRepository: createPostgresAuthRepository(pool),
+      roomRepository: createPostgresPersonalRoomDecorRepository(pool),
+      runInTransaction: createPostgresStreetSaveTransaction(pool),
+      isStreetReady: () => streetSchema.isReady()
+    })
     const authService = createAuthService({
-      repository: createPostgresAuthRepository(pool),
+      repository: streetSaves.authRepository,
       accountDataExporter: createPostgresAccountDataExporter(pool),
       smsProvider,
       codeFactory,
@@ -693,7 +704,7 @@ export function createConfiguredServerServices(
       }
     })
     const personalRoomDecorService = createPersonalRoomDecorService({
-      repository: createPostgresPersonalRoomDecorRepository(pool),
+      repository: streetSaves.roomRepository,
       getOwnedRoomItemIds: async (userId) =>
         (await economyService.getInventory(userId)).ownedRoomItemIds,
       // stored ownership, held items included: only decides that a stored placement is carried over a save
@@ -757,6 +768,7 @@ export function createConfiguredServerServices(
       roomPetService,
       streetSchema,
       streetRepository,
+      streetDigestsInSaveTransaction: true,
       authService,
       chatService,
       economyService,

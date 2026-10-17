@@ -178,6 +178,8 @@ interface CreateServerOptions {
   streetRepository?: StreetRepository
   /** Whether migration 080 is applied; in-memory storage is always ready. */
   streetSchema?: StreetSchemaProbe
+  /** PostgreSQL: the auth and room repositories already write the street record inside each save's transaction. */
+  streetDigestsInSaveTransaction?: boolean
   /** Side effects that responses do not wait for; drained when the app closes. */
   afterResponseTasks?: AfterResponseTasks
 }
@@ -262,7 +264,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
     getRoom: (userId) => basePersonalRoomDecorService.get(userId),
     log: { warn: (entry, message) => console.warn(message, entry) }
   })
-  const { avatarService, personalRoomDecorService } = withStreetDigests({
+  const { avatarService, personalRoomDecorService } = options.streetDigestsInSaveTransaction
+    ? { avatarService: baseAvatarService, personalRoomDecorService: basePersonalRoomDecorService }
+    : withStreetDigests({
     avatarService: baseAvatarService,
     personalRoomDecorService: basePersonalRoomDecorService,
     getSessionLoadout: async (sessionToken, now) => {

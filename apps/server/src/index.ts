@@ -142,6 +142,7 @@ const app = createServer({
   capabilityService: services.capabilityService,
   streetRepository: services.streetRepository,
   streetSchema: services.streetSchema,
+  streetDigestsInSaveTransaction: services.streetDigestsInSaveTransaction,
   firebaseAuthVerifier,
   // Only a loopback, in-memory development API can carry QA auth (config.ts).
   localQaOtpEnabled: isLocalQaOtpEnabled(config),

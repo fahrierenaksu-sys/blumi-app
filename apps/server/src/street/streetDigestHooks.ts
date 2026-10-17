@@ -7,7 +7,8 @@ import type { StreetService } from "./streetService"
  * Wraps the loadout and room save paths so a committed change writes the
  * street digest right after it (spec §2). The digest follows the save; it
  * never blocks or fails it (`StreetService.record*` swallow and log by kind).
- * Open: the spec asks for the same transaction as the save.
+ * In-memory storage only: PostgreSQL writes the record inside the save's own
+ * transaction (`withStreetDigestSaves`) and the server skips this wrapper.
  */
 export function withStreetDigests(input: {
   avatarService: AvatarService
