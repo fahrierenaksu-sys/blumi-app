@@ -132,7 +132,7 @@ export function calibrateLayeredWallRenderItem(
     width: shape.width,
     height: shape.height,
     anchor: shape.anchor,
-    wallPlacement: { wall: fit.wall, isValid: fit.isValid && isMountHeightValid(spec, item, c), strip: fit.strip },
+    wallPlacement: { wall: fit.wall, isValid: fit.isValid && isMountHeightValid(spec, item, c), strip: fit.strip, cover: fit.cover },
     layered25d: { ...(layers.shadow ? { shadowAsset: layers.shadow } : {}), seats: [] }
   }
 }

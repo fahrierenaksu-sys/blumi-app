@@ -1,10 +1,11 @@
 /**
  * MiniRoom depth (VIS-04 / ROOM-05): avatars sort against furniture by their
  * floor depth, so an avatar behind a sofa is drawn behind it and in front of
- * it when in front. The rule is My Room's (`compareRoomV2RenderItems`): layer
+ * it when in front. The rule is My Room's (`sortRoomV2RenderItems`): layer
  * first, then floor depth (the item's floor pivot y, the avatar's feet y),
- * then render id. A seated avatar keeps its seat's render depth, just in
- * front of the furniture it sits on.
+ * then render id, with pieces on floor cells ordered by their floor boxes. A
+ * seated avatar keeps its seat's render depth, just in front of the furniture
+ * it sits on.
  *
  * Functions marked 'worklet' run on the UI thread so React hears only when an
  * avatar actually passes in front of or behind something.
@@ -15,7 +16,7 @@ import {
   type MyRoomAvatarDepthNeighbour
 } from "../../roomWorld/myRoomAvatarWalkModel"
 import { createRoomWorldHotspotsFromRoomV2Scene } from "../../roomWorld/roomWorldRoomV2Projection"
-import { compareRoomV2RenderItems } from "../../roomV2/roomV2Selectors"
+import { sortRoomV2RenderItems } from "../../roomV2/roomV2Selectors"
 import {
   createMiniRoomLayeredSeats,
   NO_MINI_ROOM_LAYERED_SEATS,
@@ -66,10 +67,9 @@ export function canMiniRoomFurnitureOccludeAvatars(item: RoomV2FurnitureRenderIt
 
 export function createMiniRoomDepthScene(scene: ResolvedRoomV2Scene | undefined): MiniRoomDepthScene {
   if (!scene?.shell) return EMPTY_MINI_ROOM_DEPTH_SCENE
-  const occluders = scene.renderItems
+  const occluders = sortRoomV2RenderItems(scene.renderItems
     .filter((item): item is RoomV2FurnitureRenderItem =>
-      item.kind === "furniture" && canMiniRoomFurnitureOccludeAvatars(item))
-    .sort(compareRoomV2RenderItems)
+      item.kind === "furniture" && canMiniRoomFurnitureOccludeAvatars(item)))
   const seatDepthByHotspotId: Record<string, number> = {}
   for (const hotspot of createRoomWorldHotspotsFromRoomV2Scene(scene)) {
     if (hotspot.renderDepth !== undefined) seatDepthByHotspotId[hotspot.id] = hotspot.renderDepth

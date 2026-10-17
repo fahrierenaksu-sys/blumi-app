@@ -268,6 +268,9 @@ try {
       "src/features/roomV2/furniture/layeredFurnitureSofa.test.ts",
       "src/features/roomV2/furniture/layeredFurnitureJapon.test.ts",
       "src/features/roomV2/furniture/layeredFurnitureOyun.test.ts",
+      // The painter's order by floor boxes (nearer neighbour over farther, small rug over big) and wall pieces
+      // never hung over each other
+      "src/features/roomV2/roomV2FloorDrawOrder.test.ts",
       // "Odayı düzenle" on the calibrated grid: every drop lands on the cells, spot and drawing its drag previewed;
       // the held piece's hit box and ghost where it is drawn; floor-cell diamonds while placing; settle, sparkle
       // and soft turn end at rest; wall pieces on the measured walls (magnet), a turn nudged to the nearest free
