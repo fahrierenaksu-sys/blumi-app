@@ -27,6 +27,8 @@ export function StreetRail(props: {
   onOpenChat: (threadId: string) => void
   onOpenOwnRoom: () => void
   onOpenSettings: () => void
+  /** The "find neighbours" slot opens Discover. */
+  onOpenDiscover: () => void
 }) {
   const { sessionActor, onOpenChat } = props
   const { resolvedCapabilities } = useAvatarV2()
@@ -58,7 +60,7 @@ export function StreetRail(props: {
     const onPress = () => {
       hapticLight()
       if (item.kind === "self") return props.onOpenOwnRoom()
-      if (item.kind !== "window") return
+      if (item.kind === "empty") return props.onOpenDiscover()
       if (item.window.closed) return onOpenChat(item.window.threadId)
       if (street) markOpened(item.window, street.edition)
       setPeek(item.window)

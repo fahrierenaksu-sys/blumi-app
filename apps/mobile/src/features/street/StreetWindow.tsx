@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons"
 import type { StreetRoom, StreetWindow as StreetWindowData } from "@blumi/contracts"
 import { memo, useEffect } from "react"
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native"
@@ -46,11 +47,19 @@ export const StreetWindowView = memo(function StreetWindowView(props: {
 
   if (item.kind === "empty") {
     return (
-      <View style={[styles.slot, { width }]} accessible accessibilityLabel={copy.emptyWindow}>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={copy.emptyWindow}
+        accessibilityHint={copy.buildingStreet}
+        onPress={props.onPress}
+        style={[styles.slot, { width }]}
+      >
         <View style={styles.bubbleSpace} />
-        <View style={[styles.glass, styles.emptyGlass]} />
-        <Text style={styles.name} numberOfLines={1}>{copy.emptyWindow}</Text>
-      </View>
+        <View style={[styles.glass, styles.emptyGlass]}>
+          <Ionicons name="add" size={28} color={uiTheme.colors.primaryDeep} />
+        </View>
+        <Text style={[styles.name, styles.inviteName]} numberOfLines={1}>{copy.emptyWindow}</Text>
+      </PressableScale>
     )
   }
   const isSelf = item.kind === "self"
@@ -109,7 +118,8 @@ const styles = StyleSheet.create({
     borderColor: uiTheme.colors.surface,
     backgroundColor: uiTheme.colors.avatarBackground
   },
-  emptyGlass: { borderStyle: "dashed", borderColor: uiTheme.colors.borderStrong, backgroundColor: "transparent" },
+  emptyGlass: { borderStyle: "dashed", borderColor: uiTheme.colors.primarySoft, backgroundColor: uiTheme.colors.surface, alignItems: "center", justifyContent: "center" },
+  inviteName: { color: uiTheme.colors.primaryDeep },
   night: { backgroundColor: "#2B2140" },
   curtains: { flex: 1, flexDirection: "row" },
   curtain: { flex: 1, backgroundColor: uiTheme.colors.primarySoft, borderWidth: 1, borderColor: uiTheme.colors.surface },

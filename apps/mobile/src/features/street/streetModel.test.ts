@@ -29,14 +29,14 @@ function jsonResponse(status: number, body: unknown) {
   return async () => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 }
 
-test("0 matches: your window, two empty windows and the inviting street text, never a zero", () => {
+test("0 matches: your window, one find-neighbours slot and the inviting street text, never a zero", () => {
   const view = buildStreetView(street([]), copy, new Set())
-  assert.deepEqual(view.slots.map((slot) => slot.kind), ["self", "empty", "empty"])
+  assert.deepEqual(view.slots.map((slot) => slot.kind), ["self", "empty"])
   assert.equal(view.footer, copy.buildingStreet)
   assert.ok(!/\b0\b/.test(`${view.note} ${view.footer}`))
 })
 
-test("1 match: your window, theirs and one empty window", () => {
+test("1 match: your window, theirs and one find-neighbours slot", () => {
   const view = buildStreetView(street([window("ece")]), copy, new Set())
   assert.deepEqual(view.slots.map((slot) => slot.kind), ["self", "window", "empty"])
   assert.equal(view.footer, copy.growingStreet)

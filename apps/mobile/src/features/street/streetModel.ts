@@ -18,11 +18,11 @@ export interface StreetView {
   changedCount: number
 }
 
-/** The server orders the windows; the client keeps that order and adds "Sen" and the empty windows for 0 or 1 match. */
+/** The server orders the windows; the client keeps that order, puts "Sen" first and, with 0 or 1 match, one "find neighbours" slot last. */
 export function buildStreetView(street: StreetResponse, copy: StreetCopy, seenThreadIds: ReadonlySet<string>): StreetView {
   const windows = street.windows
   const changedCount = windows.filter((window) => window.change !== null).length
-  const emptyCount = windows.length === 0 ? 2 : windows.length === 1 ? 1 : 0
+  const hasInvite = windows.length <= 1
   const slots: StreetSlot[] = [
     { kind: "self", key: "self", closed: street.self.closed, room: street.self.room },
     ...windows.map((window): StreetSlot => ({
@@ -31,7 +31,7 @@ export function buildStreetView(street: StreetResponse, copy: StreetCopy, seenTh
       window,
       isNew: window.change !== null && !seenThreadIds.has(window.threadId)
     })),
-    ...Array.from({ length: emptyCount }, (_, index): StreetSlot => ({ kind: "empty", key: `empty-${index}` }))
+    ...(hasInvite ? [{ kind: "empty", key: "empty-0" } as const] : [])
   ]
   return {
     slots,

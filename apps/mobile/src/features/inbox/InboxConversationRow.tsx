@@ -93,39 +93,40 @@ export const ConversationCard = memo(function ConversationCard(props: Conversati
             {props.isPinned ? (
               <Ionicons name="pin" size={14} color={uiTheme.colors.primaryDeep} style={cardStyles.pin} />
             ) : null}
+          </View>
+          {/* Preview and time share one line ("… · 6 dk"), so the row uses its full width. */}
+          <View style={cardStyles.previewRow}>
+            {props.lastBody ? (
+              <Text style={[cardStyles.preview, hasUnread ? cardStyles.previewUnread : null]} numberOfLines={1}>
+                {props.previewPrefix ? <Text style={cardStyles.previewPrefix}>{props.previewPrefix}</Text> : null}
+                {props.lastBody}
+              </Text>
+            ) : (
+              <Text style={cardStyles.previewEmpty} numberOfLines={1}>{props.copy.startWithSpark}</Text>
+            )}
             {props.lastTime ? (
               <Text style={[cardStyles.time, hasUnread ? cardStyles.timeUnread : null]} numberOfLines={1}>
-                {props.lastTime}
+                {` · ${props.lastTime}`}
               </Text>
             ) : null}
           </View>
-          {props.lastBody ? (
-            <Text style={[cardStyles.preview, hasUnread ? cardStyles.previewUnread : null]} numberOfLines={1}>
-              {props.previewPrefix ? <Text style={cardStyles.previewPrefix}>{props.previewPrefix}</Text> : null}
-              {props.lastBody}
-            </Text>
-          ) : (
-            <Text style={cardStyles.previewEmpty}>{props.copy.startWithSpark}</Text>
-          )}
         </View>
 
-        <View style={cardStyles.trailing}>
-          {hasUnread ? (
-            <View style={cardStyles.unreadWrap}>
-              <UnreadGlow pulse={props.unreadPulse} />
-              <LinearGradient
-                colors={uiTheme.gradients.primary}
-                style={cardStyles.unreadBadge}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={cardStyles.unreadBadgeText} maxFontSizeMultiplier={1.3} numberOfLines={1}>
-                  {props.unreadBadge}
-                </Text>
-              </LinearGradient>
-            </View>
-          ) : null}
-        </View>
+        {hasUnread ? (
+          <View style={cardStyles.unreadWrap}>
+            <UnreadGlow pulse={props.unreadPulse} />
+            <LinearGradient
+              colors={uiTheme.gradients.primary}
+              style={cardStyles.unreadBadge}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={cardStyles.unreadBadgeText} maxFontSizeMultiplier={1.3} numberOfLines={1}>
+                {props.unreadBadge}
+              </Text>
+            </LinearGradient>
+          </View>
+        ) : null}
       </PressableScale>
   )
 }, (previous, next) =>
@@ -166,11 +167,14 @@ const cardStyles = StyleSheet.create({
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: uiTheme.spacing.xs
   },
+  previewRow: {
+    flexDirection: "row",
+    alignItems: "baseline"
+  },
   name: {
-    flex: 1,
+    flexShrink: 1,
     color: uiTheme.colors.textPrimary,
     ...uiTheme.font.subheading,
     fontFamily: "Inter_600SemiBold",
@@ -194,6 +198,7 @@ const cardStyles = StyleSheet.create({
     fontWeight: "800"
   },
   preview: {
+    flexShrink: 1,
     color: uiTheme.colors.textSecondary,
     ...uiTheme.font.bodySmall
   },
@@ -208,14 +213,10 @@ const cardStyles = StyleSheet.create({
     fontWeight: "600"
   },
   previewEmpty: {
+    flexShrink: 1,
     color: uiTheme.colors.textSecondary,
     ...uiTheme.font.bodySmall,
     fontStyle: "italic"
-  },
-  trailing: {
-    minWidth: 22,
-    alignItems: "center",
-    justifyContent: "center"
   },
   unreadWrap: {
     minWidth: 22,

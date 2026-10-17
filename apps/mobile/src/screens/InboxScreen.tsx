@@ -274,6 +274,7 @@ export function InboxScreen(props: InboxScreenProps) {
         onOpenChat={openThread}
         onOpenOwnRoom={openOwnRoom}
         onOpenSettings={openSettings}
+        onOpenDiscover={handleGoDiscover}
       />
       {threads.length > 0 ? (
         <View style={styles.sectionRow}>
@@ -282,7 +283,7 @@ export function InboxScreen(props: InboxScreenProps) {
         </View>
       ) : null}
     </Reanimated.View>
-  ), [copy, headerAnim, locale, openOwnRoom, openSettings, openThread, sessionActor, threadKeySignature, threads.length])
+  ), [copy, handleGoDiscover, headerAnim, locale, openOwnRoom, openSettings, openThread, sessionActor, threadKeySignature, threads.length])
   const renderThreadRow = useCallback(({ item }: {
     item: (typeof threadRows)[number]
   }) => (
