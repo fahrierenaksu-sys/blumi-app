@@ -1,0 +1,23 @@
+appId: com.blumi.mobile
+env:
+  SLOT: "1"
+  NAME: "Maestro"
+  AGE: "25"
+  GENDER: "woman"
+---
+- runFlow: ../subflows/sign_in.yaml
+- runFlow: ../subflows/onboarding_if_needed.yaml
+- tapOn:
+    text: "Discover|Keşfet"
+- extendedWaitUntil:
+    visible: "Like.*|Profili beğen|Profili geç"
+    timeout: 30000
+- takeScreenshot: out/02_discover_deck
+- swipe:
+    direction: LEFT
+    duration: 400
+- takeScreenshot: out/02_discover_after_swipe
+- tapOn:
+    text: "Like.*|Profili beğen"
+    optional: true
+- takeScreenshot: out/02_discover_after_like

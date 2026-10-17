@@ -1,0 +1,29 @@
+# Env: ITEM_SLUG (itemId minus its avatar_v2_<type>_ prefix, e.g. male_navy_knit_polo).
+appId: com.blumi.mobile
+---
+- tapOn:
+    text: "Shop|Mağaza"
+- assertVisible:
+    id: "shop-header-title"
+- takeScreenshot: out/shop_list_${ITEM_SLUG}
+- scrollUntilVisible:
+    element:
+      id: "shop-item-${ITEM_SLUG}"
+    timeout: 30000
+- tapOn:
+    id: "shop-item-${ITEM_SLUG}"
+- assertVisible:
+    id: "shop-preview-primary-action"
+- takeScreenshot: out/shop_item_${ITEM_SLUG}
+- tapOn:
+    id: "shop-preview-primary-action"
+- assertVisible:
+    id: "shop-checkout-sheet"
+- takeScreenshot: out/shop_checkout_${ITEM_SLUG}
+- tapOn:
+    id: "shop-checkout-confirm"
+- extendedWaitUntil:
+    notVisible:
+      id: "shop-checkout-sheet"
+    timeout: 15000
+- takeScreenshot: out/shop_bought_${ITEM_SLUG}

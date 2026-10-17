@@ -1,0 +1,8 @@
+appId: com.blumi.mobile
+env:
+  SLOT: "1"
+---
+- runFlow: ../subflows/sign_in.yaml
+- takeScreenshot: out/01_after_sign_in
+- assertNotVisible:
+    id: "register-phone-step"

@@ -1,0 +1,12 @@
+appId: com.blumi.mobile
+---
+- tapOn:
+    text: "My Room|Odam"
+- extendedWaitUntil:
+    visible:
+      id: "my-room-production-stage"
+    timeout: 20000
+- tapOn:
+    text: "Open Avatar Studio|Avatar Stüdyosu’nu aç"
+- assertVisible:
+    id: "wardrobe-done"

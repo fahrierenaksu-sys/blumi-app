@@ -49,3 +49,6 @@ app-example
 
 # Disposable test runner output (apps/mobile/scripts/run-*.mjs); removed after each run
 /apps/mobile/.blumi-*-tests-*/
+
+# Maestro screenshots
+e2e/maestro/out/

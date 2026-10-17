@@ -1,0 +1,14 @@
+# Local QA sign-in via deep link. Env: SLOT (1 = girl, 2 = boy). Needs a dev build with
+# EXPO_PUBLIC_BLUMI_LOCAL_QA_AUTH=1 + a loopback API started with `npm run server:qa`.
+appId: com.blumi.mobile
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- openLink: "blumi://qa-sign-in?slot=${SLOT}"
+# Fresh memory accounts land in setup; returning ones land on a main tab.
+- extendedWaitUntil:
+    visible:
+      id: "setup-flow-panel|pre-auth-setup-flow|profile-setup-display-name"
+    optional: true
+    timeout: 30000

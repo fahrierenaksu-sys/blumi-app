@@ -1,0 +1,15 @@
+appId: com.blumi.mobile
+env:
+  SLOT: "2"
+  ITEM_SLUG: "male_navy_knit_polo"
+---
+- runFlow: ../subflows/sign_in.yaml
+- runFlow: ../subflows/shop_buy.yaml
+- assertVisible:
+    id: "shop-coin-balance"
+- runFlow: ../subflows/open_wardrobe.yaml
+- tapOn:
+    id: "wardrobe-category-top"
+- assertVisible:
+    id: "wardrobe-item-${ITEM_SLUG}"
+- takeScreenshot: out/03_boy_inventory
