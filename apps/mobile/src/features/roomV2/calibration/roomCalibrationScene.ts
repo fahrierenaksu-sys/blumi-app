@@ -153,7 +153,8 @@ export function calibrateFurnitureRenderItem(
             ...seat,
             seat: shift(seat.seat, delta),
             approach: shift(seat.approach, delta),
-            exit: shift(seat.exit, delta)
+            exit: shift(seat.exit, delta),
+            ...(seat.cushion ? { cushion: shift(seat.cushion, delta) } : {})
           }))
         }
       : {}),

@@ -459,7 +459,9 @@ function resolvePolicyReason(input: {
     event.userId === userId &&
     event.reason === "queued" &&
     event.notificationType !== "message" &&
-    Date.parse(event.occurredAt) > oneHourAgo
+    Date.parse(event.occurredAt) > oneHourAgo &&
+    // A push held for later (a cat teaser) counts only in the hour it is sent.
+    Date.parse(event.occurredAt) <= now.getTime()
   ).length >= preferences.maxPushesPerHour) return "frequency_cap"
   return "queued"
 }

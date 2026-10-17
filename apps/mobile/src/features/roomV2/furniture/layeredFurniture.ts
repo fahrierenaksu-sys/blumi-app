@@ -353,7 +353,7 @@ export function calibrateLayeredFurnitureRenderItem(
     floorBox: placed,
     renderOffset: { x: drawPoint.x - item.x, y: drawPoint.y - item.y },
     seatWorldPoints: rotation.seats.map((s, index) => ({
-      ...layeredSeatWorldPoint(s, placed, centre, diamond, c, spec.seatAccess === "any_side"),
+      ...layeredSeatWorldPoint(s, placed, centre, diamond, c, spec.scale, spec.seatAccess === "any_side"),
       drawRank: drawOrder.indexOf(index)
     })),
     layered25d: {
@@ -370,6 +370,7 @@ function layeredSeatWorldPoint(
   centre: FloorPoint,
   footprint: RoomPoint2D[],
   c: RoomCalibration,
+  spriteScale: number,
   anySide: boolean
 ): RoomV2SeatWorldPoint {
   // the seat point is the floor point under the hip (walking and the seat hotspot live on the floor); the hip is
@@ -377,6 +378,7 @@ function layeredSeatWorldPoint(
   const underHip = floorToStageFraction(c, { x: centre.x + seat.hipWorld[0], z: centre.z + seat.hipWorld[2] })
   const yaw = (seat.facingYawDeg * Math.PI) / 180
   const facing = { x: Math.sin(yaw), z: Math.cos(yaw) }
+  const seatHeight = (seat.hipWorld[1] * verticalPxPerUnit(c)) / c.canvas.height
   const cellCentre = (cell: [number, number]) => roundStage(floorToStageFraction(c, clearOfFootprint({
     x: placed.minX + (cell[0] + 0.5) * c.cell,
     z: placed.minZ + (cell[1] + 0.5) * c.cell
@@ -386,8 +388,13 @@ function layeredSeatWorldPoint(
     facing: seat.avatarView === "frontM" ? "right" : seat.avatarView.startsWith("back") ? "back" : "front",
     // the hip's height above the floor as a stage share (the shared sitting offset; the 2.5D body lifts her hip
     // exactly this far above the seat point)
-    seatHeight: (seat.hipWorld[1] * verticalPxPerUnit(c)) / c.canvas.height,
+    seatHeight,
     seat: roundStage(underHip),
+    // midway from the hip point to the cushion's front edge, both on the cushion top (sprite px -> stage share)
+    cushion: roundStage({
+      x: underHip.x + (seat.frontEdgePx[0] - seat.hipPx[0]) / 2 / spriteScale / c.canvas.width,
+      y: underHip.y - seatHeight + (seat.frontEdgePx[1] - seat.hipPx[1]) / 2 / spriteScale / c.canvas.height
+    }),
     approach: cellCentre(seat.approachCell),
     exit: cellCentre(seat.exitCell),
     ...(anySide ? { alternativeApproaches: sideApproaches(facing, placed, footprint, c) } : {})

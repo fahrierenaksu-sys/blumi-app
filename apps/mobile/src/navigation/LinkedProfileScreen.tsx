@@ -417,7 +417,7 @@ const styles = {
     backgroundColor: uiTheme.colors.primary
   },
   actionText: {
-    color: uiTheme.colors.onPrimary,
+    color: "#FFFFFF",
     ...uiTheme.font.bodySmall,
     fontWeight: "800" as const
   },

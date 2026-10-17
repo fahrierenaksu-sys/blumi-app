@@ -14,7 +14,7 @@ export function PendingInviteStrip(props: { pendingInvites: PendingInviteMemory[
   return (
     <View style={styles.pendingInviteStrip}>
       <View style={styles.pendingInviteIcon}>
-        <Ionicons name="heart" size={17} color={uiTheme.colors.primaryDeep} />
+        <Ionicons name="heart" size={17} color={uiTheme.colors.primary} />
       </View>
       <View style={styles.pendingInviteCopy}>
         <Text style={styles.pendingInviteTitle}>

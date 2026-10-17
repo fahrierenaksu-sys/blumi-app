@@ -143,6 +143,12 @@ export interface ChatRepository {
    * (one indexed read; blocks are the caller's to filter).
    */
   listChatPartnerUserIds(userId: string): Promise<string[]>
+  /**
+   * How many messages (either side's) each chat partner of `userId` has in
+   * the thread between them with `sentAt` in [since, until]. Counts only: no
+   * body or sender is read. A partner with none in the window is left out.
+   */
+  countMessagesByPartnerBetween(userId: string, since: Date, until: Date): Promise<Array<{ partnerUserId: string; messageCount: number }>>
   saveThread(thread: ChatThread): Promise<void>
   listMessages(
     threadId: string,
@@ -389,6 +395,21 @@ export function createInMemoryChatRepository(
         .filter((thread) => thread.participantUserIds.includes(userId))
         .flatMap((thread) => thread.participantUserIds)
         .filter((id) => id !== userId))]
+    },
+    async countMessagesByPartnerBetween(userId, since, until) {
+      const counts = new Map<string, number>()
+      for (const thread of store.threads.values()) {
+        if (!thread.participantUserIds.includes(userId)) continue
+        const inWindow = (store.messagesByThread.get(thread.threadId) ?? []).filter((message) => {
+          const sentAt = Date.parse(message.sentAt)
+          return sentAt >= since.getTime() && sentAt <= until.getTime()
+        }).length
+        if (inWindow === 0) continue
+        for (const partner of thread.participantUserIds.filter((id) => id !== userId)) {
+          counts.set(partner, (counts.get(partner) ?? 0) + inWindow)
+        }
+      }
+      return [...counts].map(([partnerUserId, messageCount]) => ({ partnerUserId, messageCount }))
     },
     async saveThread(thread) {
       if (!store.threads.has(thread.threadId)) store.threads.set(thread.threadId, cloneThread(thread))

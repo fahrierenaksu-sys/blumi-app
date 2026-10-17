@@ -20,6 +20,8 @@ import { createConnectionManager } from "../realtime/connectionManager"
 import { createRealtimeTicketService } from "../realtime/realtimeTicketService"
 import { createRoomService } from "../rooms/roomService"
 import { createSafetyService } from "../safety/safetyService"
+import { createInMemoryRoomPetRepository } from "../roomPets/roomPetRepository"
+import { createRoomPetService, type RoomPetService } from "../roomPets/roomPetService"
 import { createServer } from "../server"
 
 export const ADMIN_KEY: AdminSigningKey = { keyId: "adversarial-k1", secret: Buffer.alloc(32, 7) }
@@ -66,6 +68,12 @@ export function createAdversarialServer(options: {
   /** Receipt suites pin the `chat_read_receipts` rollout and the chat schema state. */
   capabilityService?: CapabilityService
   chatRepository?: ChatRepository
+  catTripService?: import("../catTrips/catTripService").CatTripService
+  /**
+   * Defaults to an enabled in-memory pet so the matrix sweeps the flag-gated
+   * pet routes; null builds the server as with BLUMI_ROOM_PET_ENABLED off.
+   */
+  roomPetService?: RoomPetService | null
 } = {}) {
   // An injected service lets a suite run the same routes on the PostgreSQL repository.
   const authService = options.authService ?? createAuthService()
@@ -90,6 +98,10 @@ export function createAdversarialServer(options: {
   const app = createServer({
     authService,
     capabilityService: options.capabilityService,
+    catTripService: options.catTripService,
+    roomPetService: options.roomPetService === null
+      ? undefined
+      : options.roomPetService ?? createRoomPetService({ repository: createInMemoryRoomPetRepository() }),
     chatService,
     safetyService,
     matchService,

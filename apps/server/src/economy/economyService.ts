@@ -1,3 +1,4 @@
+import { mapWithConcurrency } from "../shared/mapWithConcurrency"
 import {
   AVATAR_ITEM_RULES,
   isAvatarItemRetired,
@@ -27,10 +28,17 @@ import {
 import { PublicRequestError } from "../errors/publicRequestError"
 import { createLegacyFreeWardrobeGrant, type AccountCreatedAtLookup } from "./legacyFreeWardrobeGrant"
 
+const INVENTORY_READ_CONCURRENCY = 4
+
 export interface EconomyService {
   repository: EconomyRepository
   /** Room items this server sells or grants and that are not retired: placement and the inventory read use it. */
   isActiveRoomItemId?(itemId: string): boolean
+  /**
+   * Active owned room items for many accounts, read only (never grants): stored ownership plus the
+   * default room items every inventory gets on its first read. One query when the repository batches.
+   */
+  getOwnedRoomItemIdsForUsers?(userIds: readonly string[]): Promise<ReadonlyMap<string, readonly string[]>>
   getInventory(userId: string, now?: Date): Promise<EconomyInventoryRecord>
   purchaseItem(
     userId: string,
@@ -142,6 +150,19 @@ export function createEconomyService(
   return {
     repository,
     isActiveRoomItemId,
+    async getOwnedRoomItemIdsForUsers(userIds) {
+      const unique = [...new Set(userIds)]
+      const rows = repository.getInventories
+        ? await repository.getInventories(unique)
+        : (await mapWithConcurrency(unique, INVENTORY_READ_CONCURRENCY, (userId) => repository.getInventory(userId)))
+          .flatMap((row) => (row ? [row] : []))
+      const stored = new Map(rows.map((row) => [row.userId, row.ownedRoomItemIds]))
+      const defaults = getDefaultOwnedItemIds("room", catalog)
+      return new Map(unique.map((userId) => [
+        userId,
+        [...new Set([...(stored.get(userId) ?? []), ...defaults])].filter(isActiveRoomItemId)
+      ]))
+    },
     async getInventory(userId, now = new Date()) {
       const existing = await repository.getInventory(userId)
       const ownedAvatarItemIds = existing?.ownedAvatarItemIds ?? []

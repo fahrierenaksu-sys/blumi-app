@@ -262,7 +262,7 @@ const cardStyles = StyleSheet.create({
     justifyContent: "center"
   },
   unreadBadgeText: {
-    color: uiTheme.colors.onPrimary,
+    color: uiTheme.colors.textInverted,
     ...uiTheme.font.captionBold,
     letterSpacing: 0
   }

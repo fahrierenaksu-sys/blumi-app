@@ -44,7 +44,15 @@ test("only independently guarded additive features are optional for readiness", 
     // The chat repository's own ledger probe keeps 071's time-only hide rule until it is applied.
     "075_chat_hide_point_message.sql",
     // Only the beta reset script uses it, and that script refuses to apply without it.
-    "076_beta_reset_runs.sql"
+    "076_beta_reset_runs.sql",
+    // The cat trip service probes this ledger row and answers enabled:false until it is applied.
+    "077_cat_trips.sql",
+    // The room pet service probes this ledger row; its routes answer 409 until it is applied.
+    "078_room_pets.sql",
+    // Cat trip switches: defaults (teaser pushes off) until applied.
+    "079_cat_trip_prefs.sql",
+    // Sokağım probes its own ledger row; the chat_street capability stays off until it is applied.
+    "080_street.sql"
   ])
 })
 

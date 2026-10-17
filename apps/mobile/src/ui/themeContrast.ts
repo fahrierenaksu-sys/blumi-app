@@ -9,11 +9,17 @@
  * `testing/styleContrastPairs.ts` and checked by `styleContrastPairs.test.ts`.
  */
 
-/** Minimum ratios: WCAG 1.4.3 for text, and a legibility floor for disabled labels. */
+/**
+ * Minimum ratios: a legibility floor set by the owner's chosen palette, not WCAG AA.
+ * On 2026-10-17 the owner rejected the darker AA tones (plum labels on pink, deeper
+ * pinks and reds) and restored the earlier ones (white on primary pink is 3.03:1, pink
+ * on soft pink 2.5:1). These floors sit just under that palette, so a colour that is
+ * less readable than it still fails. Bold labels on pink actions count as large text.
+ */
 export const MIN_CONTRAST = {
-  text: 4.5,
-  largeText: 3,
-  disabledText: 3
+  text: 2.4,
+  largeText: 2,
+  disabledText: 1.5
 } as const
 
 export type ContrastRole = keyof typeof MIN_CONTRAST
@@ -64,7 +70,7 @@ export function themeTextPairs(theme: ContrastTheme): readonly ThemeTextPair[] {
     { use: "pink links and soft-button labels", foreground: c.primaryDeep, backgrounds: [c.surface, c.background, c.primarySoft], role: "text" },
     { use: "secondary button label", foreground: c.secondaryText, backgrounds: [c.secondary, c.secondaryPressed], role: "text" },
     { use: "chip label", foreground: c.chipText, backgrounds: [c.chipBackground], role: "text" },
-    { use: "label on pink actions", foreground: c.onPrimary, backgrounds: [c.primary, c.primaryPressed, ...theme.gradients.primary], role: "text" },
+    { use: "label on pink actions", foreground: c.onPrimary, backgrounds: [c.primary, c.primaryPressed, ...theme.gradients.primary], role: "largeText" },
     { use: "label on a disabled pink action", foreground: c.onPrimary, backgrounds: [c.primaryDisabled], role: "disabledText" },
     { use: "white label on dark and deep actions", foreground: c.textInverted, backgrounds: [c.actionDark, c.actionDarkPressed, c.primaryDeep, c.danger], role: "text" },
     { use: "success ink on its soft fill", foreground: c.successInk, backgrounds: [c.successSoft], role: "text" },

@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...uiTheme.font.overline,
-    color: uiTheme.colors.primaryDeep,
+    color: uiTheme.colors.primary,
   },
   title: {
     ...uiTheme.font.subheading,
@@ -150,6 +150,6 @@ const styles = StyleSheet.create({
   },
   acceptText: {
     ...uiTheme.font.bodyBold,
-    color: uiTheme.colors.onPrimary,
+    color: "#FFFFFF",
   },
 })

@@ -24,6 +24,8 @@ export interface SafetyRouteServices {
   safetyService: SafetyService
   miniRoomService?: MiniRoomService
   connectionManager: ConnectionManager
+  /** A block brings a traveling cat home at once; reads re-check it anyway. */
+  catTripService?: Pick<import("../catTrips/catTripService").CatTripService, "endTripsBetween">
 }
 
 // Per verified person, counted before any validation (2026-10-01). The
@@ -100,7 +102,7 @@ export async function registerSafetyRoutes(
   app: FastifyInstance,
   services: SafetyRouteServices
 ): Promise<void> {
-  const { authService, safetyService, miniRoomService, connectionManager } = services
+  const { authService, safetyService, miniRoomService, connectionManager, catTripService } = services
   const reportLimiter = createFixedWindowLimiter({ max: REPORTS_PER_PERSON_PER_MINUTE })
   const blockLimiter = createFixedWindowLimiter({ max: BLOCKS_PER_PERSON_PER_MINUTE })
 
@@ -209,6 +211,8 @@ export async function registerSafetyRoutes(
         type: "safety.user_blocked",
         payload: { blockedUserId: block.blockedUserId }
       })
+      // Never fails the block: a cat trip is also re-checked on every read.
+      await catTripService?.endTripsBetween(resolved.account.userId, block.blockedUserId, "block").catch(() => 0)
       const endedRooms = await miniRoomService?.separateUserPair(
         resolved.account.userId,
         block.blockedUserId

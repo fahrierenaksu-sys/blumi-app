@@ -188,16 +188,14 @@ export function ShopPreviewPanel(props: {
             </View>
           ) : null}
           {product && presentation ? <View
+            // One overlay per mode: native views keep an edge that a re-render only sets to undefined,
+            // so reusing the room overlay for the avatar left its left inset and pulled the text over the figure.
+            key={avatarPreview ? "avatar-product-overlay" : "room-product-overlay"}
             style={[
               styles.roomHeroTopOverlay,
               avatarPreview ? styles.avatarInfoOverlay : null,
               showCombination ? styles.combinationOverlay : null,
-              {
-                left: avatarPreview ? undefined : layoutMetrics.preview.overlayInset,
-                right: layoutMetrics.preview.overlayInset,
-                top: showCombination ? 4 : layoutMetrics.preview.overlayInset,
-                bottom: showCombination ? 4 : avatarPreview ? 10 : undefined
-              }
+              productOverlayEdges(layoutMetrics.preview.overlayInset, avatarPreview, showCombination)
             ]}
           >
             {showCombination ? (
@@ -296,8 +294,7 @@ export function ShopPreviewPanel(props: {
               </Text>
             </View>}
           </View> : avatarPreview ? (
-            <View style={[styles.roomHeroTopOverlay, styles.avatarInfoOverlay, {
-              left: undefined,
+            <View key="avatar-showcase-overlay" style={[styles.roomHeroTopOverlay, styles.avatarInfoOverlay, {
               right: layoutMetrics.preview.overlayInset,
               top: layoutMetrics.preview.overlayInset
             }]}>
@@ -376,6 +373,13 @@ const ShopAvatarDrawing = memo(function ShopAvatarDrawing(props: {
     </View>
   )
 })
+
+/** Overlay edges per mode, never undefined: the avatar overlay sits on the right beside the figure. */
+function productOverlayEdges(inset: number, avatarPreview: boolean, showCombination: boolean) {
+  const top = showCombination ? 4 : inset
+  if (showCombination) return avatarPreview ? { right: inset, top, bottom: 4 } : { left: inset, right: inset, top, bottom: 4 }
+  return avatarPreview ? { right: inset, top, bottom: 10 } : { left: inset, right: inset, top }
+}
 
 // Match the stage's child alignment; the extra slot owns no drawing geometry.
 const drawingSlotStyle = {

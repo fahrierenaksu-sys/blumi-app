@@ -1,4 +1,5 @@
 import { isLegacyItemId } from "@blumi/domain"
+import { mapWithConcurrency } from "../shared/mapWithConcurrency"
 import { PublicRequestError } from "../errors/publicRequestError"
 import {
   clonePersonalRoomDecor,
@@ -25,9 +26,13 @@ const SUPPORTED_PERSONAL_ROOM_SHELL_IDS = new Set([
  */
 export type ClientPersonalRoomDecorSnapshot = PersonalRoomDecorSnapshot & { hiddenItemCount?: number }
 
+const ROOM_READ_CONCURRENCY = 4
+
 export interface PersonalRoomDecorService {
   repository: PersonalRoomDecorRepository
   get(userId: string): Promise<ClientPersonalRoomDecorSnapshot | null>
+  /** `get` for many owners (the street): one room read and one inventory read when both stores batch. */
+  getMany(userIds: readonly string[]): Promise<ReadonlyMap<string, ClientPersonalRoomDecorSnapshot>>
   save(
     userId: string,
     input: { expectedRevision: number; decor: unknown },
@@ -46,6 +51,8 @@ export interface PersonalRoomDecorService {
 export function createPersonalRoomDecorService(options: {
   repository?: PersonalRoomDecorRepository
   getOwnedRoomItemIds(userId: string): Promise<readonly string[]>
+  /** Batched `getOwnedRoomItemIds` for `getMany`; without it each owner is read on its own, a few at a time. */
+  getOwnedRoomItemIdsForUsers?: (userIds: readonly string[]) => Promise<ReadonlyMap<string, readonly string[]>>
   /**
    * Ownership as stored, including items that are not active (held or retired). Only used to decide that a stored
    * placement of an owned, inactive item is carried over a save; it never makes an item placeable. Defaults to
@@ -76,6 +83,19 @@ export function createPersonalRoomDecorService(options: {
         await options.getOwnedRoomItemIds(normalizedUserId)
       )
       return toClientRoom(stored, ownedItemIds)
+    },
+    async getMany(userIds) {
+      const owners = [...new Set(userIds.map(normalizeUserId))]
+      const storedRooms = repository.getMany
+        ? await repository.getMany(owners)
+        : (await mapWithConcurrency(owners, ROOM_READ_CONCURRENCY, (owner) => repository.get(owner)))
+          .flatMap((room) => (room ? [room] : []))
+      const withRooms = storedRooms.map((room) => room.userId)
+      const owned = options.getOwnedRoomItemIdsForUsers
+        ? await options.getOwnedRoomItemIdsForUsers(withRooms)
+        : new Map(await mapWithConcurrency(withRooms, ROOM_READ_CONCURRENCY,
+          async (owner) => [owner, await options.getOwnedRoomItemIds(owner)] as const))
+      return new Map(storedRooms.map((room) => [room.userId, toClientRoom(room, new Set(owned.get(room.userId) ?? []))]))
     },
     async save(userId, input, now = new Date()) {
       const normalizedUserId = normalizeUserId(userId)

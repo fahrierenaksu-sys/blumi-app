@@ -10,7 +10,7 @@ test("account export whitelists public account data and retains real terms accep
   for await (const chunk of createEmptyAccountDataExporter().streamExport(account, metadata)) json += chunk
   const payload = JSON.parse(json)
   assert.equal(payload.account.phoneNumber, account.phoneNumber)
-  assert.equal(Object.keys(payload.data).length, 11)
+  assert.equal(Object.keys(payload.data).length, 17, "release 3 adds pet, cat and street sections")
   assert.equal(payload.data.inventory, null)
   assert.deepEqual(payload.data.messages, [])
   assert.equal("moderation" in payload.account, false)

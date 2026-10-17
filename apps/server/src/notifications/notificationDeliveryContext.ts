@@ -34,6 +34,11 @@ export interface NotificationRelevanceDependencies {
    * would announce something already seen (the conversation was open).
    */
   hasUnreadMessagesFrom?(userId: string, senderUserIds: readonly string[]): Promise<boolean>
+  /**
+   * Whether a cat trip teaser still describes the trip (not cancelled by a
+   * block, unmatch or lost account; for a host, the cat is still there).
+   */
+  isCatTripTeaserCurrent?(userId: string, tripId: string, role: "owner" | "host"): Promise<boolean>
 }
 
 /**
@@ -110,6 +115,7 @@ export function createNotificationDeliveryHooks(services: () => {
   }
   safetyService: Pick<NotificationRelevanceDependencies, "hasBlockBetween">
   miniRoomService: { repository: { findInvite: NotificationRelevanceDependencies["findRoomInvite"] } }
+  catTripService?: { isTeaserCurrent(userId: string, tripId: string, role: "owner" | "host"): Promise<boolean> }
 }, portraits?: Pick<NotificationPortraitService, "urlFor">): {
   resolveRecipientLocale: (userId: string) => Promise<PushLocale | undefined>
   resolveRecipientBadge: (userId: string) => Promise<number>
@@ -132,6 +138,7 @@ export function createNotificationDeliveryHooks(services: () => {
       hasBlockBetween: (userAId, userBId) => services().safetyService.hasBlockBetween(userAId, userBId),
       findThread: (threadId) => services().chatService.repository.findThread(threadId),
       findRoomInvite: (inviteId) => services().miniRoomService.repository.findInvite(inviteId),
+      isCatTripTeaserCurrent: (userId, tripId, role) => services().catTripService?.isTeaserCurrent(userId, tripId, role) ?? Promise.resolve(true),
       hasUnreadMessagesFrom: async (userId, senderUserIds) => {
         const counts = await services().chatService.repository.countUnreadMessagesBySender(userId)
         return counts.some((entry) => entry.unreadCount > 0 && senderUserIds.includes(entry.senderUserId))
@@ -181,6 +188,11 @@ export function createNotificationRelevanceCheck(
         return notBlockedWith(userId, data.partnerUserId)
       case "discovery.watch_match":
         return notBlockedWith(userId, data.profileId)
+      case "cat.trip_owner":
+      case "cat.trip_host":
+        // Fail closed: without the trip check a teaser is never sent.
+        if (!data.tripId || !dependencies.isCatTripTeaserCurrent) return false
+        return dependencies.isCatTripTeaserCurrent(userId, data.tripId, data.type === "cat.trip_owner" ? "owner" : "host")
       default:
         return true
     }

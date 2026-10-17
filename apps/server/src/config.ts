@@ -55,6 +55,11 @@ import {
   createStaticChatReceiptSchema,
   type ChatReceiptSchemaProbe
 } from "./chat/chatReceiptSchema"
+import { createPostgresStreetRepository } from "./db/postgresStreetRepository"
+import { createPostgresStreetSaveTransaction } from "./db/postgresStreetDigestSaves"
+import { withStreetDigestSaves } from "./street/streetDigestSaves"
+import { createInMemoryStreetRepository, type StreetRepository } from "./street/streetRepository"
+import { createStaticStreetSchema, createStreetSchemaProbe, type StreetSchemaProbe } from "./street/streetSchema"
 import { createChatHidePointSchemaProbe, createChatHideSchemaProbe } from "./chat/chatHideSchema"
 import {
   DEFAULT_CAPABILITY_ROLLOUTS,
@@ -73,6 +78,10 @@ import { createPostgresPresenceRepository } from "./db/postgresPresenceRepositor
 import { createPostgresReactionRepository } from "./db/postgresReactionRepository"
 import { createPostgresRoomRepository } from "./db/postgresRoomRepository"
 import { createPostgresPersonalRoomDecorRepository } from "./db/postgresPersonalRoomDecorRepository"
+import { createPostgresRoomPetRepository } from "./db/postgresRoomPetRepository"
+import { createInMemoryRoomPetRepository } from "./roomPets/roomPetRepository"
+import { createRoomPetSchemaProbe } from "./roomPets/roomPetSchema"
+import { createRoomCatOwnership, createRoomPetService, isRoomPetEnabled, type RoomPetService } from "./roomPets/roomPetService"
 import { createPostgresRoomSnapshotRepository } from "./db/postgresRoomSnapshotRepository"
 import { createPostgresSafetyRepository } from "./db/postgresSafetyRepository"
 import {
@@ -103,6 +112,13 @@ import {
   type NotificationService
 } from "./notifications/notificationService"
 import { createNotificationDeliveryHooks } from "./notifications/notificationDeliveryContext"
+import { createInMemoryCatTripRepository } from "./catTrips/catTripRepository"
+import { createCatTripSchemaProbe } from "./catTrips/catTripSchema"
+import { createCatTripPrefsSchemaProbe, createCatTripPrefsStore } from "./catTrips/catTripPrefs"
+import { createPostgresCatTripPrefsRepository } from "./db/postgresCatTripPrefsRepository"
+import type { CatTripService } from "./catTrips/catTripService"
+import { createConfiguredCatTripService, resolveCatTripsConfig } from "./catTrips/catTripWiring"
+import { createPostgresCatTripRepository } from "./db/postgresCatTripRepository"
 import { resolvePublicApiOrigin } from "./notifications/notificationPortraitLinks"
 import {
   createNotificationPortraitService,
@@ -203,6 +219,14 @@ export interface ConfiguredServerServices {
   capabilityService: CapabilityService
   /** Whether migration 070 is applied; warmed at startup. */
   chatReceiptSchema: ChatReceiptSchemaProbe
+  catTripService: CatTripService
+  /** Present only when BLUMI_ROOM_PET_ENABLED=1 (default off: no pet routes). */
+  roomPetService?: RoomPetService
+  /** Sokağım storage and whether migration 080 is applied (the `chat_street` runtime gate). */
+  streetRepository: StreetRepository
+  streetSchema: StreetSchemaProbe
+  /** True when the save repositories write the street record in the save's own transaction (PostgreSQL). */
+  streetDigestsInSaveTransaction?: boolean
   discoverySnapshots: DiscoverySnapshotService
   sharedRateLimiter: SharedRateBudget
   authRateLimiter?: SharedRateBudget
@@ -619,16 +643,25 @@ export function createConfiguredServerServices(
     }) : undefined
     const checkSchemaReadiness = createSchemaReadinessCheck(pool)
     const chatReceiptSchema = createChatReceiptSchemaProbe(pool)
-    const capabilityService = createConfiguredCapabilityService(chatReceiptSchema)
+    const streetSchema = createStreetSchemaProbe(pool)
+    const streetRepository = createPostgresStreetRepository(pool)
+    const capabilityService = createConfiguredCapabilityService(chatReceiptSchema, streetSchema)
     const notificationService = createNotificationService({
       repository: createPostgresNotificationRepository(pool),
       pushProvider,
       // Removal and account deletion wait for the dispatch's locks under lock_timeout.
       lockedSendTimeoutMs: resolveLockedSendTimeoutMs(DEFAULT_PUSH_PROVIDER_TIMEOUT_MS, config.databasePool),
-      ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }), notificationPortraits)
+      ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService, catTripService }), notificationPortraits)
+    })
+    // A loadout or room save writes its street record in the same transaction (spec §2).
+    const streetSaves = withStreetDigestSaves({
+      authRepository: createPostgresAuthRepository(pool),
+      roomRepository: createPostgresPersonalRoomDecorRepository(pool),
+      runInTransaction: createPostgresStreetSaveTransaction(pool),
+      isStreetReady: () => streetSchema.isReady()
     })
     const authService = createAuthService({
-      repository: createPostgresAuthRepository(pool),
+      repository: streetSaves.authRepository,
       accountDataExporter: createPostgresAccountDataExporter(pool),
       smsProvider,
       codeFactory,
@@ -671,9 +704,10 @@ export function createConfiguredServerServices(
       }
     })
     const personalRoomDecorService = createPersonalRoomDecorService({
-      repository: createPostgresPersonalRoomDecorRepository(pool),
+      repository: streetSaves.roomRepository,
       getOwnedRoomItemIds: async (userId) =>
         (await economyService.getInventory(userId)).ownedRoomItemIds,
+      getOwnedRoomItemIdsForUsers: economyService.getOwnedRoomItemIdsForUsers,
       // stored ownership, held items included: only decides that a stored placement is carried over a save
       getStoredOwnedRoomItemIds: async (userId) =>
         (await economyService.repository.getInventory(userId))?.ownedRoomItemIds ?? [],
@@ -709,11 +743,33 @@ export function createConfiguredServerServices(
       livekitTokenService,
       economyService
     })
+    // The pet row goes with the account through its foreign key (078).
+    const roomPetService = isRoomPetEnabled(process.env)
+      ? createRoomPetService({
+        repository: createPostgresRoomPetRepository(pool),
+        schema: createRoomPetSchemaProbe(pool),
+        report: reportRoomPetEvent
+      })
+      : undefined
+    const catTripService = createConfiguredCatTripService({
+      config: resolveCatTripsConfig(process.env, config.nodeEnv),
+      repository: createPostgresCatTripRepository(pool),
+      schema: createCatTripSchemaProbe(pool),
+      prefs: createCatTripPrefsStore(createPostgresCatTripPrefsRepository(pool), createCatTripPrefsSchemaProbe(pool)),
+      authService, chatService, matchService, safetyService, notificationService,
+      catOwnership: createRoomCatOwnership(roomPetService),
+      report: reportCatTripEvent
+    })
     return {
       afterResponseTasks,
       onVerifiedPhone,
       capabilityService,
       chatReceiptSchema,
+      catTripService,
+      roomPetService,
+      streetSchema,
+      streetRepository,
+      streetDigestsInSaveTransaction: true,
       authService,
       chatService,
       economyService,
@@ -779,7 +835,7 @@ export function createConfiguredServerServices(
 
   const notificationService = createNotificationService({
     pushProvider,
-    ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService }), notificationPortraits)
+    ...createNotificationDeliveryHooks(() => ({ authService, chatService, safetyService, miniRoomService, catTripService }), notificationPortraits)
   })
   const authService = createAuthService({
     smsProvider,
@@ -787,9 +843,16 @@ export function createConfiguredServerServices(
     otpHmacSecret: config.otpHmacSecret,
     sessionCacheTtlMs: config.sessionCacheTtlMs,
     accountDeletionHandlers: [
+      // In-memory storage has no foreign keys: erase the account's cat trips and souvenirs explicitly.
+      (account) => catTripService.deleteUserData(account.userId).then(() => undefined),
+      // In-memory storage has no foreign keys: erase the account's room pet explicitly.
+      (account) => roomPetService?.deleteUserData(account.userId).then(() => undefined) ?? Promise.resolve(),
       (account) => notificationService.repository.removeAllDevices(account.userId)
     ]
   })
+  const roomPetService = isRoomPetEnabled(process.env)
+    ? createRoomPetService({ repository: createInMemoryRoomPetRepository(), report: reportRoomPetEvent })
+    : undefined
   const accountRecoveryService = createAccountRecoveryService({ authService })
   const safetyService = createSafetyService({
     isKnownUser: async (userId) => Boolean(await authService.repository.findAccountByUserId(userId))
@@ -833,6 +896,7 @@ export function createConfiguredServerServices(
   const personalRoomDecorService = createPersonalRoomDecorService({
     getOwnedRoomItemIds: async (userId) =>
       (await economyService.getInventory(userId)).ownedRoomItemIds,
+    getOwnedRoomItemIdsForUsers: economyService.getOwnedRoomItemIdsForUsers,
     // stored ownership, held items included: only decides that a stored placement is carried over a save
     getStoredOwnedRoomItemIds: async (userId) =>
       (await economyService.repository.getInventory(userId))?.ownedRoomItemIds ?? [],
@@ -887,10 +951,22 @@ export function createConfiguredServerServices(
 
   // In-memory storage has no migrations: receipts depend on the manifest only.
   const chatReceiptSchema = createStaticChatReceiptSchema(true)
+  const catTripService = createConfiguredCatTripService({
+    config: resolveCatTripsConfig(process.env, config.nodeEnv),
+    repository: createInMemoryCatTripRepository(),
+    authService, chatService, matchService, safetyService, notificationService,
+    catOwnership: createRoomCatOwnership(roomPetService),
+    report: reportCatTripEvent
+  })
+  const streetSchema = createStaticStreetSchema(true)
   return {
     afterResponseTasks,
-    capabilityService: createConfiguredCapabilityService(chatReceiptSchema),
+    capabilityService: createConfiguredCapabilityService(chatReceiptSchema, streetSchema),
     chatReceiptSchema,
+    catTripService,
+    roomPetService,
+    streetSchema,
+    streetRepository: createInMemoryStreetRepository(),
     authService,
     chatService,
     economyService,
@@ -923,7 +999,10 @@ export function createConfiguredServerServices(
   }
 }
 
-function createConfiguredCapabilityService(chatReceiptSchema: ChatReceiptSchemaProbe): CapabilityService {
+function createConfiguredCapabilityService(
+  chatReceiptSchema: ChatReceiptSchemaProbe,
+  streetSchema: StreetSchemaProbe
+): CapabilityService {
   // Typing stores nothing, so it is on unless the manifest stages it or the
   // BLUMI_CHAT_TYPING_ENABLED kill switch turns it off for everyone.
   const chatTypingOn = isChatTypingSwitchedOn(process.env.BLUMI_CHAT_TYPING_ENABLED)
@@ -932,6 +1011,8 @@ function createConfiguredCapabilityService(chatReceiptSchema: ChatReceiptSchemaP
     defaultRollouts: DEFAULT_CAPABILITY_ROLLOUTS,
     runtimeGates: {
       chat_read_receipts: () => chatReceiptSchema.peek(),
+      // Off unless the manifest stages it; never before migration 080.
+      chat_street: () => streetSchema.peek(),
       chat_typing: () => chatTypingOn
     }
   })
@@ -1090,4 +1171,14 @@ function isSha256Fingerprint(value: string): boolean {
 
 function isLoopbackHost(value: string): boolean {
   return value === "127.0.0.1" || value === "localhost" || value === "::1"
+}
+
+/** Counts and outcome codes only: never a user, a trip, a match or a pet name. */
+function reportCatTripEvent(event: string, fields: Record<string, number | string> = {}): void {
+  console.info(event, fields)
+}
+
+/** Counts and outcome codes only: never a user id, a room id or a pet name. */
+function reportRoomPetEvent(event: string, fields: Record<string, number | string> = {}): void {
+  console.info(event, fields)
 }

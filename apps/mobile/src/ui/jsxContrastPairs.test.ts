@@ -27,8 +27,8 @@ function listSources(directory: string): string[] {
   })
 }
 
-test("a white Text on a pink View is found and fails", () => {
-  const { pairs } = scan(`const A = () => <View style={{ backgroundColor: uiTheme.colors.primary }}><Text style={{ color: "#FFFFFF" }}>Go</Text></View>`)
+test("a white Text on a pale pink View is found and fails", () => {
+  const { pairs } = scan(`const A = () => <View style={{ backgroundColor: uiTheme.colors.primaryDisabled }}><Text style={{ color: "#FFFFFF" }}>Go</Text></View>`)
   assert.equal(pairs.length, 1)
   assert.ok(pairs[0].ratio < pairs[0].minimum)
 })
@@ -38,7 +38,7 @@ test("an icon colour prop is checked against the nearest container surface, thro
     <Pressable style={{ backgroundColor: "#FFE2EE" }}>
       <View><Ionicons name="heart" color={uiTheme.colors.primary} /></View>
     </Pressable>)`)
-  assert.deepEqual(pairs.map((pair) => [pair.foreground, pair.background, pair.minimum]), [["#F65C9D", "#FFE2EE", 3]])
+  assert.deepEqual(pairs.map((pair) => [pair.foreground, pair.background, pair.minimum]), [["#F65C9D", "#FFE2EE", 2]])
   const behindComponent = scan(`const A = () => <Pressable style={{ backgroundColor: "#FFE2EE" }}><Card><Ionicons color="#F65C9D" /></Card></Pressable>`)
   assert.deepEqual(behindComponent.pairs, [])
   assert.equal(behindComponent.skippedBackground, 1)
@@ -51,7 +51,7 @@ test("a StyleSheet entry and a conditional colour are resolved, and each branch 
       <View style={[styles.chip, active ? styles.chipActive : null]}>
         <Ionicons color={active ? uiTheme.colors.onPrimary : uiTheme.colors.textSecondary} />
       </View>)`)
-  assert.deepEqual(pairs.map((pair) => `${pair.foreground}@${pair.background}`).sort(), ["#2B202A@#F65C9D", "#675B73@#FFFFFF"])
+  assert.deepEqual(pairs.map((pair) => `${pair.foreground}@${pair.background}`).sort(), ["#675B73@#FFFFFF", "#FFFFFF@#F65C9D"])
 })
 
 test("the entry theme's own tokens are used in files that import it as uiTheme", () => {
@@ -75,15 +75,15 @@ test("colours that are props, functions or transparent are skipped and counted, 
 })
 
 test("a style with many conditional variants is judged in full, so a low-contrast last variant is found", () => {
-  // Five conditionals make 32 style variants; the white-on-pink ones come last in generation order.
+  // Five conditionals make 32 style variants; the white-on-pale-pink ones come last in generation order.
   const { pairs, truncatedStyles } = scan(`
-    const styles = StyleSheet.create({ dark: { backgroundColor: "#2B202A" }, pink: { backgroundColor: "#F65C9D" } })
+    const styles = StyleSheet.create({ dark: { backgroundColor: "#2B202A" }, pink: { backgroundColor: "#F7A8CB" } })
     const A = ({ a, b, c, d, e }) => (
       <View style={[styles.dark, a && styles.pink, b && styles.dark, c && styles.dark, d && styles.dark, e && styles.dark]}>
         <Text style={{ color: "#FFFFFF" }}>Go</Text>
       </View>)`)
   assert.equal(truncatedStyles, 0)
-  assert.ok(pairs.some((pair) => pair.background === "#F65C9D" && pair.ratio < pair.minimum))
+  assert.ok(pairs.some((pair) => pair.background === "#F7A8CB" && pair.ratio < pair.minimum))
 })
 
 test("a style with more variants than the scan's bound is reported as truncated, never silently dropped", () => {

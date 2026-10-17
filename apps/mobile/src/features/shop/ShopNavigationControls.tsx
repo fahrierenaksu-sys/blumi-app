@@ -60,7 +60,7 @@ export function ShopStatusCard(props: {
           <Ionicons
             name={props.state === "offline" ? "cloud-offline-outline" : "sparkles-outline"}
             size={22}
-            color={uiTheme.colors.primaryDeep}
+            color={uiTheme.colors.primary}
           />
         </View>
       )}
@@ -166,7 +166,7 @@ export const ShopModeDock = memo(function ShopModeDock(props: {
             <Ionicons
               name={option.icon}
               size={16}
-              color={active ? uiTheme.colors.onPrimary : "rgba(45, 31, 58, 0.62)"}
+              color={active ? "#FFFFFF" : "rgba(45, 31, 58, 0.62)"}
             />
             <Text style={[styles.modePillText, active ? styles.modePillTextActive : null]}>
               {label}
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   },
   shopStatusRetryText: {
     ...uiTheme.font.bodyBold,
-    color: uiTheme.colors.onPrimary,
+    color: "#FFFFFF",
   },
   modeDock: {
     position: "relative",
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   modePillTextActive: {
-    color: uiTheme.colors.onPrimary,
+    color: "#FFFFFF",
   },
   modeCount: {
     ...uiTheme.font.captionBold,
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.50)",
   },
   modeCountActive: {
-    color: uiTheme.colors.onPrimary,
+    color: "#FFFFFF",
     backgroundColor: "rgba(255, 255, 255, 0.22)",
   }
 })

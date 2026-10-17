@@ -83,6 +83,12 @@ import {
   getMyRoomAvatarDepthIndex
 } from "../features/roomWorld/myRoomAvatarWalkModel"
 import { useMyRoomAvatarWalk } from "../features/roomWorld/useMyRoomAvatarWalk"
+import { useMyRoomPetSlot } from "../features/roomPet/useMyRoomPetSlot"
+import { IS_BLUMI_ROOM_PET_ENABLED } from "../features/roomPet/roomPetFlag"
+import { useCatTrips } from "../features/catTrips/useCatTrips"
+import { useServerRoomPet } from "../features/roomPet/useServerRoomPet"
+import { CatTripRevealOverlay } from "../features/catTrips/CatTripRevealOverlay"
+import { CatRoomStrip } from "../features/catTrips/CatSouvenirShelf"
 import {
   INITIAL_ROOM_TAP_MARKER_STATE,
   reduceRoomTapMarker
@@ -371,6 +377,28 @@ export function MyRoomScreen({
   const readAvatarPose = useCallback((): MyRoomAvatarPose => liveWalkRef.current === null
     ? avatarPoseRef.current
     : { ...avatarPoseRef.current, x: avatarWalk.x.value, y: avatarWalk.y.value }, [avatarWalk])
+
+  // Room pet (flag EXPO_PUBLIC_BLUMI_ROOM_PET, off by default): one depth slot in the room's draw order.
+  const seatedFurnitureRenderIdRef = useRef(seatedFurnitureRenderId)
+  seatedFurnitureRenderIdRef.current = seatedFurnitureRenderId
+  const readPetOwner = useCallback(() => {
+    const pose = readAvatarPose()
+    return { point: { x: pose.x, y: pose.y }, seatFurnitureId: seatedFurnitureRenderIdRef.current ?? null }
+  }, [readAvatarPose])
+  // Traveling cat (flag EXPO_PUBLIC_BLUMI_CAT_TRIPS, off by default): while it is away the basket is empty.
+  const isRoomFocused = useIsFocused()
+  const catTrips = useCatTrips({ sessionActor, isFocused: isRoomFocused })
+  // The server decides whether this member has a cat (it grants the starter cat on the first read).
+  const hasServerRoomPet = useServerRoomPet({ sessionActor, isFocused: isRoomFocused, isEnabled: IS_BLUMI_ROOM_PET_ENABLED })
+  const petDepthSlot = useMyRoomPetSlot({
+    isEnabled: hasServerRoomPet && !catTrips.isOwnCatAway,
+    shell: baseRoomScene.shell,
+    sceneItems: baseRoomScene.renderItems,
+    renderItems,
+    isReady: persistenceState !== "loading",
+    readOwner: readPetOwner,
+    testID: "my-room-production-stage"
+  })
 
   const cancelPendingMotionWork = useCallback((): void => {
     motionLifecycle.blur()
@@ -924,6 +952,7 @@ export function MyRoomScreen({
               onItemTap={handleRoomItemTap}
               style={[styles.stageRenderer, { width: stageRendererWidth }]}
               onSceneReady={handleShellDisplay}
+              depthSlot={petDepthSlot}
             /></Animated.View>}
             <MyRoomStageVeil covered={stageCovered} />
             {roomOwnerLabel ? (
@@ -999,6 +1028,21 @@ export function MyRoomScreen({
           </View>
         </View>
       </View>
+      {catTrips.isEnabled ? (
+        <CatRoomStrip souvenirs={catTrips.souvenirs} isOwnCatAway={catTrips.isOwnCatAway} hasGuest={catTrips.hasGuest} />
+      ) : null}
+      {catTrips.reveal ? (
+        <CatTripRevealOverlay
+          key={catTrips.reveal.role === "owner" ? catTrips.reveal.trip.tripId : catTrips.reveal.guest.tripId}
+          reveal={catTrips.reveal}
+          onAcknowledge={catTrips.acknowledge}
+          onDismiss={(tripId) => {
+            catTrips.dismiss(tripId)
+            void catTrips.refresh()
+          }}
+          onOpenChat={(threadId) => navigation.navigate("ChatThread", { threadId })}
+        />
+      ) : null}
     </SafeAreaView>
   )
 }

@@ -36,6 +36,20 @@ runRepositoryContract<NotificationRepository>({
         assert.equal(await claim("message", "disabled"), "disabled")
       }
     },
+    "a push held for later uses the hourly budget only in the hour it is sent, never while it waits": async (backend) => {
+      const userId = backend.id("held")
+      await backend.ensureUsers(userId)
+      const morning = new Date("2026-10-01T09:00:00Z")
+      const service = createNotificationService({ repository: backend.repository, now: () => morning })
+      await service.updatePreferences(userId, { ...DEFAULT_NOTIFICATION_PREFERENCES, maxPushesPerHour: 1 })
+      const claim = async (key: string, now: Date) => (await backend.repository.claimPolicyDecision({ userId,
+        notificationType: "match", dedupeKey: key, now })).reason
+      assert.equal(await claim("teaser-held", new Date("2026-10-01T18:00:00Z")), "queued", "queued at 09:00 for 18:00")
+      assert.equal(await claim("like-morning", morning), "queued", "a morning push is not blocked by the waiting teaser")
+      assert.equal(await claim("like-noon", new Date("2026-10-01T12:00:00Z")), "queued")
+      assert.equal(await claim("like-evening", new Date("2026-10-01T18:30:00Z")), "frequency_cap",
+        "once sent, the teaser counts in its own hour")
+    },
     "room invites use the Messages preference, dedupe per invite and reach the device with routing ids only": async (backend) => {
       const userId = backend.id("invitee")
       await backend.ensureUsers(userId)

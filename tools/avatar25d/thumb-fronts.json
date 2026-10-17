@@ -1171,6 +1171,132 @@
           "sha256": "0625cd31cb0b10f0b09e932ce32c609a10669ae5064934ef4e50d43a9aaeb1b7"
         }
       ]
+    },
+    "hair_male_black_side_part": {
+      "sha256": "491f4b1b68527d7e8b2f2864cd3a7dfd61a0d988a0d81cc26ddafaae53b7fc86",
+      "size": [
+        256,
+        181
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "583c84456493ff3c02652c0f3f822d80896f362d8c40919cb5b1947c35766611"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "e3a796634ae6f987753bebb6cb03238d8b58e9728eab36d100aa4fd0240449ea"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_blond_fade": {
+      "sha256": "aa4c3c5985a5d179ce63e8e803cb0d33f950600a03e3d7619e5a7b1314eda494",
+      "size": [
+        256,
+        167
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "2c5c54c2ca122bfade5087704cdef58bf30a3a88accf06dd1f4cb9f80fb89b2b"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "7f9fb59fe6c68e12fbc3ccc4763d10e91015024fbef02f9cc3a7a2378c93b8c3"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_chestnut_waves": {
+      "sha256": "dd19af01718bca6bbd7fa9c57734587f49dbf4406a4bb609bbc99607dc7f71d3",
+      "size": [
+        256,
+        154
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "f06e364646002b2d6d63ba60788de7e23929b072bb779aa6984cb81a1942bcfc"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "82f6eedc8e002863b52efb69ab1a0a8a0b18ee5a37cccfff2049e8abb67616d1"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_cocoa_quiff": {
+      "sha256": "167993ba3d563500501c67d0ee82c68e4549c2e9555b80985cadbe39bf928bb0",
+      "size": [
+        256,
+        145
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "e0867ea5768e4076daa3eaa8121c47b7e35f6ec8d93137893b8796b80f55c928"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "bdfd7db0234ef56b290d1e983f6e2e7d21d68fdc0165606944d75fe99e9a8e00"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_soft_crop": {
+      "sha256": "0b84f317670f9f52938de5cb23571b59b60b64fcd5a1478b77ddb8415e96b43d",
+      "size": [
+        256,
+        175
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "15d1f52934ceb035d21f8b67f4df9733d7a54137c31d49a08aa480c650281547"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "985a551a8228a21198b658e568c559bd7f6c3fbf787814f0066204b76605727b"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
+    "hair_male_wavy_quiff": {
+      "sha256": "79c808f328763a4ff246769c35f63edc4d60d53d3268fa7c040d97824148a1d4",
+      "size": [
+        256,
+        159
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "9209b5fc256ebc298db41b5e59767f4bda660c4cc8b1247b68f19d19b4110a01"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "a10a3a6ed4099cb82dfbd02e9399cb442d38e900f563e3e239268ef3b4cf1d23"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
     }
   }
 }

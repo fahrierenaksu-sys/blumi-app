@@ -25,3 +25,4 @@ export * from "./roomWorld/miniRoomFloor";
 export * from "./roomWorld/roomFloorGrid";
 export * from "./roomWorld/roomFloorNavigation";
 export * from "./chat/chatReceiptCursor";
+export * from "./pets/roomPetCatalog";

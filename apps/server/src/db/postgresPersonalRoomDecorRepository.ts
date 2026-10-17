@@ -25,6 +25,16 @@ export function createPostgresPersonalRoomDecorRepository(
       )
       return result.rows[0] ? mapSnapshot(result.rows[0]) : null
     },
+    async getMany(userIds) {
+      if (userIds.length === 0) return []
+      const result = await pool.query(
+        `SELECT user_id, revision, decor, updated_at
+           FROM blumi_personal_room_decor
+          WHERE user_id = ANY($1::text[])`,
+        [[...userIds]]
+      )
+      return result.rows.map(mapSnapshot)
+    },
     async save(input) {
       const saved = await pool.query(
         input.expectedRevision === 0 ? `INSERT INTO blumi_personal_room_decor (

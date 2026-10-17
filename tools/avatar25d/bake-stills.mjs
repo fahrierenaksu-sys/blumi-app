@@ -546,9 +546,20 @@ function redrawnThumb(rigId, canonical) {
  *  atlas grew). Each still path of the item's receipt is served from tools/avatar25d/still-pins/<path under layers>,
  *  pinned by the receipt's own sha256, and must keep the baked size, so the manifest rects stay true. A reissued
  *  receipt with new bytes needs its entry removed here (or the pin copy replaced) in the same commit.
- *  2026-10-16 final girl base (integration/OWNER_DECISIONS.md): bob, pigtails, white sneakers changed on rims only. */
+ *  2026-10-16 final girl base (integration/OWNER_DECISIONS.md): bob, pigtails, white sneakers changed on rims only.
+ *  2026-10-17 first boy export since the body page took the ring-safe resize (73c3b636): seven published bottoms'
+ *  receipted bottom-cut stills changed on rims only (0 px changed more than 3 px inside the alpha edge). */
 const PUBLISHED_STILL_PINS = {
-  female: ["hair_girl_bob", "hair_girl_pigtails", "avatar_v2_shoes_white_clean_sneakers"]
+  female: ["hair_girl_bob", "hair_girl_pigtails", "avatar_v2_shoes_white_clean_sneakers"],
+  male: [
+    "avatar_v2_bottom_male_black_pocket_trousers",
+    "avatar_v2_bottom_male_charcoal_trousers",
+    "avatar_v2_bottom_male_cream_drawstring_trousers",
+    "avatar_v2_bottom_male_cream_pleated_trousers",
+    "avatar_v2_bottom_male_dark_straight_jeans",
+    "avatar_v2_bottom_male_ecru_wide_trousers",
+    "avatar_v2_bottom_male_grey_wide_jeans",
+  ]
 }
 const STILL_PIN_DIR = join(ROOT, "tools/avatar25d/still-pins")
 const RECEIPTED_ASSETS = new Map(JSON.parse(readFileSync(RELEASE_CATALOG, "utf8")).publishedItems

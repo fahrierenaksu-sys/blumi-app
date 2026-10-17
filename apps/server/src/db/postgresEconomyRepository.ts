@@ -31,6 +31,17 @@ export function createPostgresEconomyRepository(
       return result.rows[0] ? mapInventory(result.rows[0]) : null
     },
 
+    async getInventories(userIds) {
+      if (userIds.length === 0) return []
+      const result = await pool.query(
+        `SELECT user_id, coins, coin_debt, owned_avatar_item_ids, owned_room_item_ids, updated_at
+           FROM blumi_economy_inventories
+          WHERE user_id = ANY($1::text[])`,
+        [[...userIds]]
+      )
+      return result.rows.map(mapInventory)
+    },
+
     async ensureInventory(input) {
       const result = await pool.query(
         `INSERT INTO blumi_economy_inventories (
