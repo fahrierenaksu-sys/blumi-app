@@ -394,7 +394,7 @@
       "baseSha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648",
       "qaPass": "integration/RESUME_INTEGRATION.md STATE 2026-10-13 06:33 (boy SHOWCASE 26/26 full pass); prov_boy_2145/REPORT.md; curls_install_1030/REPORT.md",
       "ownerApproved": true,
-      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv. 2026-10-17 (branch claude/boy-hair-front-shop): the six new boy hairs are listed with their front SHOWCASE layers so the Shop try-on, Discover, profile, chat header and push show the boy facing the camera (owner report from the phone the same day: in the market the boy stands turned sideways, he should face the camera so the hair is seen). Sources: the landed front/back layers of factory boyhair_1017 (fit_A2/sc and fit_B/sc/final, the same layers the published card thumbs are cut from), cleaned by new_collection/clean_boy_hair_c1.py (pinholes inside the chestnut and cocoa hair filled from the surrounding hair colour; white generation-background matte and pale rim pixels removed, alpha only lowered) -> new_collection/<id>/front_c1.png and back_c1.png. The owner approved the look of the six hairs on 2026-10-17 10:23 (OWNER_DECISIONS: male/work/boyhair_1017/contact_sheet.png, whose third row is the front view). These cleaned front layers themselves are NOT yet shown to the owner: their look yes is asked together with the receipt reissue these new runtime files require.",
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv. 2026-10-17 (branch claude/boy-hair-front-shop): the six new boy hairs are listed with their front SHOWCASE layers so the Shop try-on, Discover, profile, chat header and push show the boy facing the camera (owner report from the phone the same day: in the market the boy stands turned sideways, he should face the camera so the hair is seen). Sources: the landed front/back layers of factory boyhair_1017 (fit_A2/sc and fit_B/sc/final, the same layers the published card thumbs are cut from), cleaned by new_collection/clean_boy_hair_c1.py (pinholes inside the chestnut and cocoa hair filled from the surrounding hair colour; white generation-background matte and pale rim pixels removed, alpha only lowered) -> new_collection/<id>/front_c1.png and back_c1.png. The owner approved the look of the six hairs on 2026-10-17 10:23 (OWNER_DECISIONS: male/work/boyhair_1017/contact_sheet.png, whose third row is the front view). These cleaned front layers themselves are NOT yet shown to the owner: their look yes is asked together with the receipt reissue these new runtime files require. 2026-10-17 (branch claude/boy-hair-retop; owner: 'Tepesi kesik 3 saçı (dalgalı, kakao, kestane) başın üstünde boşluk bırakarak yeniden çizdir'): the back layers of wavy quiff, cocoa quiff and chestnut waves were cut flat at the top of the showcase frame by the normaliser, while their ChatGPT drawings have the whole crown. They are re-extracted from the same drawings with 96 raw rows of headroom (male/work/boyhair_retop_1017), cleaned the same way plus an edge defringe -> back_rt.png. Front layers unchanged.",
       "crops": {
         "head": [
           870,
@@ -667,24 +667,24 @@
           "order": 4,
           "file": "new_collection/hair_male_wavy_quiff/front_c1.png",
           "sha256": "52c879e4266e1e8d8ca462a169ef2a27a2b2f86c37e1d9118bfc37e81e736c98",
-          "backFile": "new_collection/hair_male_wavy_quiff/back_c1.png",
-          "backSha256": "d695585ce3a55f2658da766434576b572b1f41fa3eb1dd8a3efa171fe88c4faa"
+          "backFile": "new_collection/hair_male_wavy_quiff/back_rt.png",
+          "backSha256": "8e6dda4e5464be366e1ec42679600bcf9699ad663eaa70a8c0ba8461291bcd8d"
         },
         "hair_male_cocoa_quiff": {
           "slot": "hair",
           "order": 4,
           "file": "new_collection/hair_male_cocoa_quiff/front_c1.png",
           "sha256": "29ff6d09f8aa87194ff6f4b65a37481e3e522fede641d410d08cb8bf3cdb6408",
-          "backFile": "new_collection/hair_male_cocoa_quiff/back_c1.png",
-          "backSha256": "602e023b8bec3569f984a67d7ae98c9e8c76ca7edc908e312d33111ae33543dd"
+          "backFile": "new_collection/hair_male_cocoa_quiff/back_rt.png",
+          "backSha256": "da736c0bedf60fa9a57a3a0d558f81fd021817de2b8e382315d8f81b0b731139"
         },
         "hair_male_chestnut_waves": {
           "slot": "hair",
           "order": 4,
           "file": "new_collection/hair_male_chestnut_waves/front_c1.png",
           "sha256": "edc6e7a5827bbb672db3d7461563ceb1156fad1019a256f28ea7f7e42f50456c",
-          "backFile": "new_collection/hair_male_chestnut_waves/back_c1.png",
-          "backSha256": "40add80bdf39eb34beccfa012d828bc98ec933d45b525798cca19800e723e382"
+          "backFile": "new_collection/hair_male_chestnut_waves/back_rt.png",
+          "backSha256": "d1653116cc8974cd30ccc143079a2874a957d97d130ad5b179228e8f7a82861c"
         }
       }
     }
