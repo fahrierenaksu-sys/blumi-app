@@ -37,8 +37,8 @@ export const ROOM_FURNITURE_DRAWN_OUTLINES: Readonly<Record<string, RoomFurnitur
   room_v2_chair_blush_layered_r1_back: {
     aspect: 175 / 156,
     points: [
-      { x: 0.153, y: 0.041 }, { x: 0.437, y: 0.041 }, { x: 0.787, y: 0.392 }, { x: 0.787, y: 0.746 },
-      { x: 0.575, y: 0.959 }, { x: 0.199, y: 0.959 }, { x: 0.007, y: 0.767 }, { x: 0.007, y: 0.188 }
+      { x: 0.187, y: 0.003 }, { x: 0.404, y: 0.003 }, { x: 0.787, y: 0.386 }, { x: 0.787, y: 0.75 },
+      { x: 0.579, y: 0.959 }, { x: 0.195, y: 0.959 }, { x: 0.007, y: 0.771 }, { x: 0.007, y: 0.183 }
     ]
   },
   room_v2_chair_blush_layered_r2_back: {

@@ -98,13 +98,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -141,7 +141,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_olive_overshirt.webp",
-            "sha256": "ffb7eb9331ca1961e33e3826955ceb034452005e55e6e24ce69335cffffea838"
+            "sha256": "a17ec8da26b5fcad4f0a2bd3ee8cf1485ae7d7bb93b828de5ae95e9683a8d29f"
           }
         ]
       }
@@ -151,13 +151,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -194,7 +194,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_forest_collar_sweater.webp",
-            "sha256": "08752461596b8f3395e77501f3cd623d08ddd9fe9093bd205b009b618324aed0"
+            "sha256": "04c379034890917743222cfb0a42c5c6dd2407062784dcfb2bd044d3cbdee053"
           }
         ]
       }
@@ -204,13 +204,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -247,7 +247,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_black_embroidered_sweatshirt.webp",
-            "sha256": "96a8ab19540d804eac9ce12d919d69c3defb894434dc3ec16cd5949311783d96"
+            "sha256": "341974ff3d3bf9c580ee7b5c82d22f4d9df85b036656d7a79fa4ed266a93f655"
           }
         ]
       }
@@ -363,13 +363,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -406,7 +406,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_top_male_black_basic_tee.webp",
-            "sha256": "f03a663f092c3b656f45563e19847272dd3c10c8643e27ffccd3ec943c4801e9"
+            "sha256": "bfd3d3a89e539671084ebdf85c1f01511c278d17bdaed536220c5d0562b57ca8"
           }
         ]
       }
@@ -416,13 +416,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -463,7 +463,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_cream_pleated_trousers.webp",
-            "sha256": "12f08ed0ca8b7e1b7f019265f8160c3fda2ff5e36c7468b1e9f11373bbe41f3b"
+            "sha256": "b90a60b623939f04c489059303cabf1258078619f77f166d425f6bb8a3852ab7"
           }
         ]
       }
@@ -530,13 +530,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -577,7 +577,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_charcoal_trousers.webp",
-            "sha256": "1363e070c6c7241e4ede551d924f0ccdd14e27a012fb34e415e90b9277d48714"
+            "sha256": "9e22c6911b98f1206202ea24b6e544a1b658998b497a700541feaf3bd4555e29"
           }
         ]
       }
@@ -587,13 +587,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -634,7 +634,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_cream_drawstring_trousers.webp",
-            "sha256": "1da57b201bc75684c0b29b2739af2885b7bfdde99ea070df6514c1996cfef43d"
+            "sha256": "3317f9aff75b01763f38f93b6034e2329e8b8a86010571cc301673198c916aba"
           }
         ]
       }
@@ -644,13 +644,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -691,7 +691,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_ecru_wide_trousers.webp",
-            "sha256": "040c6c05fd35b3a14b5b85d84ed716607fded7c49479dce19724c54f4dd6d809"
+            "sha256": "530ecbe5e28c509049838e730df9524f12c2ea6da63f4c430988f4702857c930"
           }
         ]
       }
@@ -701,13 +701,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -748,7 +748,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_bottom_male_grey_wide_jeans.webp",
-            "sha256": "b9a7bdf7fa7ec713e94cf17bb11318b1af79502d5a96e05beb08be32f13b757c"
+            "sha256": "edc30955e020c10e0a4b0710e1ee3ba369e9067f46cddf5d1f382a0a46019a28"
           }
         ]
       }
@@ -815,13 +815,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -842,15 +842,15 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_tan_loafers__front.webp",
-            "sha256": "356286aa0713dff45d30fd1d415812bc49972ed00f1420e36652d85ab97b072d"
+            "sha256": "31e6b879e2f68ac6266119150c488ae38fd2c616edd084c5d066dc4c84949984"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_tan_loafers__under.webp",
-            "sha256": "b813fb55f99e4eec5b984f107efab6932916311785150e391032825f463703bd"
+            "sha256": "538be6c7487d9dfb350a21e03896506a18c515cd895a422707e1b52a8af90fd6"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_tan_loafers.webp",
-            "sha256": "6dff01ee0e2d2b8d1663f7974a2b6ca0e933f3102acfd2503ba31faee69a3042"
+            "sha256": "469b335887b34ad5589bb7a29f21782a33ae263e5f4daa25852566f0976717b6"
           }
         ]
       }
@@ -860,13 +860,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -887,11 +887,11 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_sand_desert_boots__front.webp",
-            "sha256": "fe82b29f92a36d10e8774652dcf8b0ae39996c3cbc2c5c629a8da3f358a58315"
+            "sha256": "e40b7cb876f936114557f3cd09d8ab5386768b3306db502613a92487b70d8b34"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_sand_desert_boots__under.webp",
-            "sha256": "17b9b40f3553a71ee94e500429462e92741bfda384d91729b35d0667827c5db8"
+            "sha256": "c1e4443c852ca11cc54433337e583e36f81efae2e086e1f6a9f806e681337b43"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_sand_desert_boots.webp",
@@ -905,13 +905,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -932,15 +932,15 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_brown_loafers__front.webp",
-            "sha256": "406b795672be8b0ea8755c42d475d53d4ba5152686960f7508b37ec7e2badeed"
+            "sha256": "1bcdba8bd61be84c67ace44813445a917885e2bcbb1a141248ab4f4d86e9d9c4"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_brown_loafers__under.webp",
-            "sha256": "f87b68f5c3057eb523d9925ba4a3a308788e7035795aa1b4011a7fdabdd6e1d4"
+            "sha256": "c727ba074e152e273f679b28c45395962b784db0b494c0f3d25d6837042dd0f2"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_brown_loafers.webp",
-            "sha256": "fda61862fbf60d9c4cfc25e4df6da13c6cb44c185b782d0a2be6ab7a3424e25c"
+            "sha256": "6ace7920e06a8a813b68339cf50e9a161843f5a6c5d19c2330911c7804b47920"
           }
         ]
       }
@@ -950,13 +950,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -977,11 +977,11 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_cream_chunky_sneakers__front.webp",
-            "sha256": "d19d389e3707fe04dccb551b2d234c35588f34eb6a352a175c0f39bcd5660c14"
+            "sha256": "2acc151a314bd8eef6ba98e10cd0946ebee4bafc9eeda2f01817757052b98a99"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_cream_chunky_sneakers__under.webp",
-            "sha256": "042265e5e9d1ffe7d1eeb8c9dd52eba8c0821ea30674c74b2b4bb9ff1a96712d"
+            "sha256": "108952a6d3e72b93a204c14298a6876d500f312cfc8b7cbdccc2cf0b0791e5ee"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_cream_chunky_sneakers.webp",
@@ -995,13 +995,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1022,15 +1022,15 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_dark_leather_sneakers__front.webp",
-            "sha256": "9d024f24101761adbe396127b65cd1f8c7a7d1959226e85b56391e1e6fc4fadf"
+            "sha256": "52c1c0115d6e9d9ac5906286d98814c5a0223a0ec400943a4286a8e3c35fe193"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_dark_leather_sneakers__under.webp",
-            "sha256": "79df03dbe38493909806ec99495a61975d9b963a947e6651f9cb027582e48536"
+            "sha256": "6b95e55e9f39081a48ead2e24d8532d0644ef050b6013fa92ccb3596b1868e4c"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_dark_leather_sneakers.webp",
-            "sha256": "ea15033f260148cd924ee7246383ddedac77544ac29c6647fcc259d6bc7fd0f0"
+            "sha256": "f146149b666312185e80ef92b28d01f399a8ebb75e6d78098bd45399ad42ec94"
           }
         ]
       }
@@ -1040,13 +1040,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1067,15 +1067,15 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_green_skate_shoes__front.webp",
-            "sha256": "39ada18867fbd94bdd1ea022693e674bcfb8b6112ab5ebbf0af0033e47080252"
+            "sha256": "3627a4c50a3c0ae1e74a5299f41ceb9014963964b433d27177d401212fa5141a"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_green_skate_shoes__under.webp",
-            "sha256": "24214e0a9e84a0232e426889f3fd48992b8ca2253928df900375b6abf7127636"
+            "sha256": "93dd2d7c3836c081510c5c550774ed0745c8e216fc64407e319a95a72a06c2ea"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_green_skate_shoes.webp",
-            "sha256": "e6b20982ba45551631d9f1bcf57b2fdfb88fec39ef2ca022f062b42184ad2443"
+            "sha256": "04ec88d5c4108a574d3d34776c92ca8c5e933ee4c504dddf3e3a897d254ea082"
           }
         ]
       }
@@ -1085,13 +1085,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1112,11 +1112,11 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_black_everyday_sneakers__front.webp",
-            "sha256": "d7d0f1b1c72643001bfd455ba399b306b31bfa53886f313864f1a49bc21e2987"
+            "sha256": "e52d732492807cb091e8e886e39def3a313d3d989c81a66bb1a295f494a865f7"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/showcase/avatar_v2_shoes_male_black_everyday_sneakers__under.webp",
-            "sha256": "aef4ed2e5b4b603d530a345570da2b12dc4fa18675b09c55b3ce179c0b91abf6"
+            "sha256": "4fcb5286d1d167a5a8b6a7a9055641c7ee34160419bb0586f94d58862c6d50a7"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/male/thumb/avatar_v2_shoes_male_black_everyday_sneakers.webp",
@@ -1265,13 +1265,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-reissue-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17.md",
-          "manifestSha256": "03003a69b9559625a4c077634c07440222c6a426222eb0132abd59aa980ab972"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1296,7 +1296,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/avatar_v2_shoes_white_clean_sneakers__under.webp",
-            "sha256": "454fedb294d345c2ebc97ba3bd93dfa74f4e02d96e95b4c49472d425e107b97a"
+            "sha256": "ddefe3bb42449717518e4a1bd62d00cc4cbf68064b36e629a155052c3e4dd44a"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/avatar_v2_shoes_white_clean_sneakers.webp",
@@ -1310,13 +1310,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1349,7 +1349,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_butter_square_puff_mini__under.webp",
-            "sha256": "f74d6a13cc83a2ee23c686310e9cfb1ff2262d090354c55d1b2d090992392e6e"
+            "sha256": "57700f5d782a94dfe26d92c21efa27f2fdf9a56c26a336a7c3bacad780ca7850"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_butter_square_puff_mini.webp",
@@ -1363,13 +1363,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1402,7 +1402,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_denim_pinafore_mini__under.webp",
-            "sha256": "e148c6223ffe73e6207496f7f8c78a8efee480a97c83beb832bf2d974d4b81c5"
+            "sha256": "96ed21e03af3397f867a49ddf54b9677848a9a855f09f53efde40d7df82b0e92"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_denim_pinafore_mini.webp",
@@ -1416,13 +1416,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1455,7 +1455,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_sage_shirred_tiered_mini__under.webp",
-            "sha256": "e3fda1a6eda315635425e4641ad9fbc6feb124be8871d53134d61c8300810d75"
+            "sha256": "4dd9167197123b6527e805af156dde21ea1ac9d9156978db9338961a8dcaf7d4"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_sage_shirred_tiered_mini.webp",
@@ -1469,13 +1469,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1500,7 +1500,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_wine_gingham_tie__under.webp",
-            "sha256": "98ebbd9f176f06984898e48d48ce17e7f91af8e55bd7d4e82bab36d0bd74d1c1"
+            "sha256": "6ac4922d25dcc9c3249520886f632f8fefdccd371c5cd07d52bc7eadb5ad3cdf"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_wine_gingham_tie.webp",
@@ -1514,13 +1514,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1545,7 +1545,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_black_corset_flare_mini__under.webp",
-            "sha256": "c0fe0421679a411dd9a8d50f18ebc99bf4ba28dd9f75ebab88995a82bd9601c0"
+            "sha256": "8adcb94edbc24f056ea84fcc839d49015bb1513d8df9483e6dc99cf4f71fa46b"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_black_corset_flare_mini.webp",
@@ -1559,13 +1559,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1590,7 +1590,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_cream_one_shoulder_mini__under.webp",
-            "sha256": "6cb6ca6ce7ba07fc892a41ddb79a481e8f506c3f21d6199bb60aa0be250126b8"
+            "sha256": "9e832c476d55b682fee9820d5cb42907911e8c2c28b1167ca96c2d1d825d8c9b"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_cream_one_shoulder_mini.webp",
@@ -1604,13 +1604,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1635,7 +1635,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_black_corset_slit_maxi__under.webp",
-            "sha256": "1270fd740633e7145132098d68833160c901009f0c59676fd404ee356f40968b"
+            "sha256": "41fac2c463ec7175e55f55f1c9b24acfab4475480a54c73d31a865b1155ee695"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_black_corset_slit_maxi.webp",
@@ -1649,13 +1649,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1680,7 +1680,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_terracotta_patchwork_halter_bias_maxi__under.webp",
-            "sha256": "9d41274175747efd0ea5feb1d7e34994177ae3d56023ab874b42dd5e4d7d3a15"
+            "sha256": "7af2866e5abb04d397ddff2bfecae9f6939bf7b5ed1e7f571cf2af84519ca586"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_terracotta_patchwork_halter_bias_maxi.webp",
@@ -1694,13 +1694,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1733,7 +1733,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_cream_one_shoulder_tie_midi__under.webp",
-            "sha256": "cc41dda4e9343f61e8e55552ade41a5524120b576fa812c96da2896104ccd327"
+            "sha256": "56c3c6fd777ff75fd3e689760d0cc30fc98ee2d9f27c52d6aaee07aed32d1d9b"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_cream_one_shoulder_tie_midi.webp",
@@ -1747,13 +1747,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1794,7 +1794,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/dress_girl_denim_milkmaid_button_midi__under.webp",
-            "sha256": "5628cf0248c3ed2075027d1a82225fa5a239f6ae27069807989182c2bb81d773"
+            "sha256": "99fad10fdfff7d21a5eef9ccc021852496e7e3fc3e6935e58057eb60cb844d86"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/dress_girl_denim_milkmaid_button_midi.webp",
@@ -1861,13 +1861,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -1904,7 +1904,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/jacket_girl_light_denim_crop.webp",
-            "sha256": "50b8c8bcb322b3fb4b461a25eb8a8a13da6449e5111b1e0ba62c590ab82f9483"
+            "sha256": "601144c73a87c2102a996e4b1022e1d286866d467a6d20958a3c03cd9f64b64c"
           }
         ]
       }
@@ -2415,13 +2415,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -2494,7 +2494,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bottom_girl_wine_midi_skirt__under.webp",
-            "sha256": "e79d28cac29301cef73231d55eb3a9462a13975584593cba8cfea289d34f5739"
+            "sha256": "e1b207efcac71cc8da09b6e53348e99e6993f19ac6dd9f3fb10b94874946ebf9"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/bottom_girl_wine_midi_skirt.webp",
@@ -2508,13 +2508,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -2595,7 +2595,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bottom_girl_wide_jeans__under.webp",
-            "sha256": "726796e46552414482fa60695895f1b579bda92f8fe280a362509e998724c4cc"
+            "sha256": "4a4eb2f79b418a997771e5b752be7ba54f87d4a2d371f21f52e69780dacdfd68"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/bottom_girl_wide_jeans.webp",
@@ -2609,13 +2609,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -2696,7 +2696,7 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/bottom_girl_ecru_trousers__under.webp",
-            "sha256": "475e89961e4fa173efc07d27e0bde0e79b9fb900a2c8d30f2d3afdaf0aa04e6a"
+            "sha256": "87c696180af774d54fcd4d182ac490c101691294c88062bc1917c8e8f02b58c8"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/bottom_girl_ecru_trousers.webp",
@@ -2710,13 +2710,13 @@
       "itemType": "avatar",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -2737,15 +2737,15 @@
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/shoes_girl_camel_ankle_boots__front.webp",
-            "sha256": "1d4e4d3132b2612dfc6baac4c6aa38f3e8f71e9d5b4d9f4df1afe009554cbefc"
+            "sha256": "0eddfcf0310aa29c41a375fc57ddd40102a24a282bb58a418731d75959a30579"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/showcase/shoes_girl_camel_ankle_boots__under.webp",
-            "sha256": "11adb197f9bbf887ec00034a9aeaeb5bcc179600d4712fda9d5300cf324551bb"
+            "sha256": "f5ad83f651a25e7c0b2636c8496493c18d2e187bd61e84fbed6c063c143db004"
           },
           {
             "path": "apps/mobile/src/features/avatar/stills/layers/female/thumb/shoes_girl_camel_ankle_boots.webp",
-            "sha256": "2d1c64949d31ae812e54e0bfb7f07b1e0676fb96e72d5385768be963033b92eb"
+            "sha256": "52602ba04764269296c9f7ace1ab8f933efea92dbe8d2f53165c85e02078e7b7"
           }
         ]
       }
@@ -3020,13 +3020,13 @@
       "itemType": "room",
       "receipt": {
         "schemaVersion": "blumi-asset-promotion-receipt-v1",
-        "receiptId": "owner-approval-2026-10-17",
-        "sourceCommit": "c46efd85894c3530968f07ec5a5f12dfdaea2fe1",
+        "receiptId": "owner-reissue-2026-10-17-shop-cards",
+        "sourceCommit": "ccbe630fdf3627d2354369b315a2d84dd01e494e",
         "independentReviewer": "owner",
         "reviewedAt": "2026-10-17",
         "evidence": {
-          "manifestPath": "docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17.md",
-          "manifestSha256": "7b9cab8bf578904c56a665538e59a806af7a2c422eafa602e866e757edde5b39"
+          "manifestPath": "docs/quality/SHOP_CATALOG_RECEIPT_REISSUE_2026-10-17_SHOP_CARDS.md",
+          "manifestSha256": "60d9ad5b5cdcded32757567f5ecdfbd49161b10e4bad91ae592f19598bb27886"
         },
         "assets": [
           {
@@ -3043,7 +3043,7 @@
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r1_back.png",
-            "sha256": "bdcc1c7683e5c9e3c4ea6c01478f0465999d86e5c41f3181dec09630d29346a1"
+            "sha256": "93906c2ef470adcbc99d8d337316feff68355b6b76a9957128c00c88889cb770"
           },
           {
             "path": "apps/mobile/src/features/roomV2/furniture/room_v2_chair_blush/r1_front.png",
