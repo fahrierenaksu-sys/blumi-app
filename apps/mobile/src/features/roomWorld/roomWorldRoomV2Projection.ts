@@ -14,6 +14,7 @@ import {
   ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON
 } from "./roomWorldGeometry"
 import { roomAvatar25d } from "../../features/avatar/roomAvatarSeam"
+import { resolveSeatApproach } from "./seatApproach"
 
 /** 2.5D room calibration; null in every other bundle (the walk floor stays as shipped). */
 const roomCalibration = roomAvatar25d.roomCalibration
@@ -66,21 +67,24 @@ export function createRoomWorldHotspotsFromRoomV2Scene(
     .filter(isSeatFurnitureRenderItem)
     .flatMap((item) => {
       if (item.seatSpec) {
-        return (item.seatWorldPoints ?? []).map((seatPoint) => ({
-          id: `${item.renderId}:${seatPoint.id}`,
-          seatId: seatPoint.id,
-          kind: "seat" as const,
-          x: seatPoint.seat.x,
-          y: seatPoint.seat.y,
-          facing: seatPoint.facing,
-          seatHeight: seatPoint.seatHeight,
-          // sitters on one piece draw far to near (layered pieces carry `drawRank`)
-          renderDepth: item.depth + ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON +
-            (seatPoint.drawRank ?? 0) * SEATED_DRAW_RANK_DEPTH_STEP,
-          approachPoint: { ...seatPoint.approach },
-          exitPoint: { ...seatPoint.exit },
-          sourceRenderId: item.renderId
-        }))
+        return (item.seatWorldPoints ?? []).map((seatPoint) => {
+          const { approach, exit } = resolveSeatApproach(seatPoint, item.renderId, scene)
+          return {
+            id: `${item.renderId}:${seatPoint.id}`,
+            seatId: seatPoint.id,
+            kind: "seat" as const,
+            x: seatPoint.seat.x,
+            y: seatPoint.seat.y,
+            facing: seatPoint.facing,
+            seatHeight: seatPoint.seatHeight,
+            // sitters on one piece draw far to near (layered pieces carry `drawRank`)
+            renderDepth: item.depth + ROOM_WORLD_SEATED_RENDER_DEPTH_EPSILON +
+              (seatPoint.drawRank ?? 0) * SEATED_DRAW_RANK_DEPTH_STEP,
+            approachPoint: approach,
+            exitPoint: exit,
+            sourceRenderId: item.renderId
+          }
+        })
       }
 
       const seatPoints = item.seatPoints?.length

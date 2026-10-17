@@ -88,6 +88,8 @@ export interface LayeredFurnitureRotation {
 
 export interface LayeredFurnitureSpec {
   id: string
+  /** `item.json` `seat_access`: "any_side" for a seat reached from every side (a round pouf); else from its front only. */
+  seatAccess?: "any_side"
   /** Sprite px per shell px (zoom 1), `item.json` `scale`: 1.03 for the D armchair, 2.0 for the D sofa. */
   scale: number
   cell: number
@@ -192,7 +194,14 @@ export function parseLayeredFurnitureSpec(raw: unknown): LayeredFurnitureSpec {
     const ids = rotations[r].seats.map((seat) => seat.id)
     if (new Set(ids).size !== ids.length) throw new Error(`rotations.${r}.seats ids must be unique`)
   }
-  return { id, scale, cell: finite(footprint.cell, "footprint.cell"), rotations: cameraSideEdgeSeats(root, rotations) }
+  if (root.seat_access !== undefined && root.seat_access !== "any_side") throw new Error("seat_access must be any_side")
+  return {
+    id,
+    scale,
+    cell: finite(footprint.cell, "footprint.cell"),
+    rotations: cameraSideEdgeSeats(root, rotations),
+    ...(root.seat_access === "any_side" ? { seatAccess: "any_side" as const } : {})
+  }
 }
 
 /** A bed (`sit_edge`) is sat on from whichever long edge faces the camera (layeredEdgeSeats). */
@@ -339,7 +348,7 @@ export function calibrateLayeredFurnitureRenderItem(
     floorBox: placed,
     renderOffset: { x: drawPoint.x - item.x, y: drawPoint.y - item.y },
     seatWorldPoints: rotation.seats.map((s, index) => ({
-      ...layeredSeatWorldPoint(s, placed, centre, diamond, c),
+      ...layeredSeatWorldPoint(s, placed, centre, diamond, c, spec.seatAccess === "any_side"),
       drawRank: drawOrder.indexOf(index)
     })),
     layered25d: {
@@ -355,7 +364,8 @@ function layeredSeatWorldPoint(
   placed: FloorBox,
   centre: FloorPoint,
   footprint: RoomPoint2D[],
-  c: RoomCalibration
+  c: RoomCalibration,
+  anySide: boolean
 ): RoomV2SeatWorldPoint {
   // the seat point is the floor point under the hip (walking and the seat hotspot live on the floor); the hip is
   // `seatHeight` (a stage share) straight above it on screen
@@ -374,8 +384,24 @@ function layeredSeatWorldPoint(
     seatHeight: (seat.hipWorld[1] * verticalPxPerUnit(c)) / c.canvas.height,
     seat: roundStage(underHip),
     approach: cellCentre(seat.approachCell),
-    exit: cellCentre(seat.exitCell)
+    exit: cellCentre(seat.exitCell),
+    ...(anySide ? { alternativeApproaches: sideApproaches(facing, placed, footprint, c) } : {})
   }
+}
+
+/**
+ * Spots beside a seat reached from every side: left, right, then behind her facing, each just off the piece's
+ * footprint and stepped out along that side until she may stand there.
+ */
+function sideApproaches(facing: FloorPoint, placed: FloorBox, footprint: RoomPoint2D[], c: RoomCalibration): RoomPoint2D[] {
+  const centre: FloorPoint = { x: (placed.minX + placed.maxX) / 2, z: (placed.minZ + placed.maxZ) / 2 }
+  const half = { x: (placed.maxX - placed.minX) / 2, z: (placed.maxZ - placed.minZ) / 2 }
+  const sides: FloorPoint[] = [{ x: -facing.z, z: facing.x }, { x: facing.z, z: -facing.x }, { x: -facing.x, z: -facing.z }]
+  return sides.map((side) => {
+    const reach = Math.abs(side.x) * half.x + Math.abs(side.z) * half.z + c.cell / 2
+    const start = { x: centre.x + side.x * reach, z: centre.z + side.z * reach }
+    return roundStage(floorToStageFraction(c, clearOfFootprint(start, side, footprint, c, placed)))
+  })
 }
 
 function layeredSeatArt(

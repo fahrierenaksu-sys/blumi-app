@@ -5,6 +5,7 @@ import type {
 } from "../../roomV2/roomV2.types"
 import type { RoomWorldOccupant } from "../../roomWorld/roomWorldRuntime"
 import type { AvatarState, RoomPoint } from "./miniRoomSceneTypes"
+import { resolveSeatApproach } from "../../roomWorld/seatApproach"
 
 /**
  * MiniRoom on furniture drawn from room-camera layers (2.5D room calibration only; no layered piece
@@ -60,7 +61,7 @@ export function createMiniRoomLayeredSeats(scene: ResolvedRoomV2Scene | undefine
         piece: item,
         art,
         seat: { x: point.seat.x, y: point.seat.y },
-        approach: { x: point.approach.x, y: point.approach.y },
+        approach: resolveSeatApproach(point, item.renderId, scene).approach,
         seatHeight: point.seatHeight,
         drawRank: point.drawRank ?? 0
       }

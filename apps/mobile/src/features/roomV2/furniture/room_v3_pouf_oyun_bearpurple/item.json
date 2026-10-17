@@ -165,6 +165,11 @@
    25
   ]
  },
+ "colorways": [
+  "Mint",
+  "Sarı"
+ ],
+ "seat_access": "any_side",
  "rotations": {
   "0": {
    "size": [
@@ -216,7 +221,7 @@
       27.65
      ],
      "card_split": false,
-     "card_clip_below_px": 44.81,
+     "card_clip_below_px": 50.04,
      "ergo": {
       "hip_height": 0.5866,
       "hip_from_backrest": 0.113,
@@ -279,7 +284,7 @@
       27.65
      ],
      "card_split": false,
-     "card_clip_below_px": 44.81,
+     "card_clip_below_px": 50.04,
      "ergo": {
       "hip_height": 0.5866,
       "hip_from_backrest": 0.113,
@@ -409,9 +414,5 @@
    "source": "ChatGPT repaint B_r3_t2 (twin render + gated sheet), cut with the twin alpha",
    "silhouette_iou_vs_twin": 1.0
   }
- },
- "colorways": [
-  "Mint",
-  "Sarı"
- ]
+ }
 }
