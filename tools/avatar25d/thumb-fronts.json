@@ -18,7 +18,7 @@
       ]
     },
     "avatar_v2_bottom_coral_wave_pants": {
-      "sha256": "3e21ad0474bc796bed236f32add9990227e96bb4cfcf6eeaaa9611aee3ae323e",
+      "sha256": "88bd3e4b7fa5feea70f875c1458c1e6854bbbcbcdd6ff0df574c115535764429",
       "size": [
         130,
         256
@@ -103,10 +103,10 @@
       ]
     },
     "avatar_v2_top_black_cute_crop_top": {
-      "sha256": "ec33e4eb959214997d1230d423d924080a01647766312f08e57c8a51d2b6a056",
+      "sha256": "803cefeb3ab51615fd8fa968771a949ffb7916a8a68afafe7770055507aa98b9",
       "size": [
         256,
-        187
+        186
       ],
       "sources": [
         {
@@ -120,10 +120,10 @@
       ]
     },
     "avatar_v2_top_coral_wave_polo": {
-      "sha256": "ec674c5918a9d1f5d8850153c233e9b5e3ce9d15cd30b50c5378a64a06fd5243",
+      "sha256": "b0da3836278324380ecfe04ff62b72c5ce60a5345555b8da5a7f24ac11492928",
       "size": [
         256,
-        222
+        221
       ],
       "sources": [
         {
@@ -137,10 +137,10 @@
       ]
     },
     "avatar_v2_top_white_cute_crop_top": {
-      "sha256": "f6eb384cea40efb9897e2988f2c74c6b0156dc71e1199381a3156b1e6ada7adc",
+      "sha256": "08ad9d671209efb818e6f018aa87319d85809fc86236292455051e37da438b5a",
       "size": [
         256,
-        187
+        186
       ],
       "sources": [
         {
@@ -578,10 +578,10 @@
       ]
     },
     "jacket_girl_light_denim_crop": {
-      "sha256": "50b8c8bcb322b3fb4b461a25eb8a8a13da6449e5111b1e0ba62c590ab82f9483",
+      "sha256": "601144c73a87c2102a996e4b1022e1d286866d467a6d20958a3c03cd9f64b64c",
       "size": [
         256,
-        204
+        201
       ],
       "sources": [
         {
@@ -767,9 +767,9 @@
       ]
     },
     "avatar_v2_bottom_male_charcoal_trousers": {
-      "sha256": "1363e070c6c7241e4ede551d924f0ccdd14e27a012fb34e415e90b9277d48714",
+      "sha256": "9e22c6911b98f1206202ea24b6e544a1b658998b497a700541feaf3bd4555e29",
       "size": [
-        120,
+        121,
         256
       ],
       "sources": [
@@ -784,7 +784,7 @@
       ]
     },
     "avatar_v2_bottom_male_cream_drawstring_trousers": {
-      "sha256": "1da57b201bc75684c0b29b2739af2885b7bfdde99ea070df6514c1996cfef43d",
+      "sha256": "3317f9aff75b01763f38f93b6034e2329e8b8a86010571cc301673198c916aba",
       "size": [
         131,
         256
@@ -801,15 +801,19 @@
       ]
     },
     "avatar_v2_bottom_male_cream_pleated_trousers": {
-      "sha256": "12f08ed0ca8b7e1b7f019265f8160c3fda2ff5e36c7468b1e9f11373bbe41f3b",
+      "sha256": "b90a60b623939f04c489059303cabf1258078619f77f166d425f6bb8a3852ab7",
       "size": [
-        119,
+        120,
         256
       ],
       "sources": [
         {
           "file": "boy_bottom.png",
           "sha256": "14c675ce20dd2d22b4d5735e0b3f1454d0f49124fe006fd633c50e620e34f4d2"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
         }
       ]
     },
@@ -831,7 +835,7 @@
       ]
     },
     "avatar_v2_bottom_male_ecru_wide_trousers": {
-      "sha256": "040c6c05fd35b3a14b5b85d84ed716607fded7c49479dce19724c54f4dd6d809",
+      "sha256": "530ecbe5e28c509049838e730df9524f12c2ea6da63f4c430988f4702857c930",
       "size": [
         125,
         256
@@ -848,7 +852,7 @@
       ]
     },
     "avatar_v2_bottom_male_grey_wide_jeans": {
-      "sha256": "b9a7bdf7fa7ec713e94cf17bb11318b1af79502d5a96e05beb08be32f13b757c",
+      "sha256": "edc30955e020c10e0a4b0710e1ee3ba369e9067f46cddf5d1f382a0a46019a28",
       "size": [
         142,
         256
@@ -1015,10 +1019,10 @@
       ]
     },
     "avatar_v2_top_male_black_basic_tee": {
-      "sha256": "f03a663f092c3b656f45563e19847272dd3c10c8643e27ffccd3ec943c4801e9",
+      "sha256": "bfd3d3a89e539671084ebdf85c1f01511c278d17bdaed536220c5d0562b57ca8",
       "size": [
         256,
-        220
+        216
       ],
       "sources": [
         {
@@ -1032,7 +1036,7 @@
       ]
     },
     "avatar_v2_top_male_black_embroidered_sweatshirt": {
-      "sha256": "96a8ab19540d804eac9ce12d919d69c3defb894434dc3ec16cd5949311783d96",
+      "sha256": "341974ff3d3bf9c580ee7b5c82d22f4d9df85b036656d7a79fa4ed266a93f655",
       "size": [
         256,
         198
@@ -1066,10 +1070,10 @@
       ]
     },
     "avatar_v2_top_male_forest_collar_sweater": {
-      "sha256": "08752461596b8f3395e77501f3cd623d08ddd9fe9093bd205b009b618324aed0",
+      "sha256": "04c379034890917743222cfb0a42c5c6dd2407062784dcfb2bd044d3cbdee053",
       "size": [
         256,
-        232
+        229
       ],
       "sources": [
         {
@@ -1100,7 +1104,7 @@
       ]
     },
     "avatar_v2_top_male_olive_overshirt": {
-      "sha256": "ffb7eb9331ca1961e33e3826955ceb034452005e55e6e24ce69335cffffea838",
+      "sha256": "a17ec8da26b5fcad4f0a2bd3ee8cf1485ae7d7bb93b828de5ae95e9683a8d29f",
       "size": [
         256,
         254
@@ -1130,7 +1134,7 @@
       ]
     },
     "avatar_v2_top_male_white_basic_tee": {
-      "sha256": "87c1720540269b862f58bf75e57e4d4367ea38380a0e009fbdca35b24df541a8",
+      "sha256": "25c1998369371d7dbc43dcb5f968e240684c6cdf286f51663cc9171332a8f3f5",
       "size": [
         256,
         215
@@ -1143,6 +1147,10 @@
         {
           "file": "boy_a.png",
           "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        },
+        {
+          "file": "boy_bottom.png",
+          "sha256": "67c9d45a4527917f3a0fb598d06e152ea5dc58f18ea8c00e6480b2cc198b5a89"
         }
       ]
     },

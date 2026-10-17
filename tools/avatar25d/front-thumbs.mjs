@@ -13,7 +13,15 @@
  *             body), then the thumb edge cleaner (skin flecks at cuffs and hems);
  *   edge      no colour cut (art whose own colours sit inside the skin model: tan leather, honey hair, cream fabric):
  *             detached pieces under EDGE_FRAGMENT_MAX_SHARE of the largest go (hands), then the edge cleaner;
+ *   soft      the "skin" body cut, then the silhouette is smoothed at full size (softEdge: teeth, ragged cuffs and
+ *             feathered smears narrower than about one thumb pixel go, and the outline gets an even anti-aliased
+ *             rim); no fleck pass, so a garment's own drawn outline stays whole (white and cream fabric);
  *   raw       the layer as it is.
+ * A row's optional `flood` = "skin" (soft cut only) also removes the carried arms and hands the base does not match
+ * (shaded under a sleeve): light skin-coloured pixels (SKIN_FLOOD) reached from outside through such pixels. Not for
+ * items with light warm fabric of their own (camel, tan, butter), which the rule cannot tell from skin.
+ * A row's optional `trim` is another layer of the same showcase (e.g. the trousers under a top): front pixels reached
+ * from outside whose colour is that layer's own colour at the same place are a garment the cut carried, and go.
  * A row's optional `base` is the showcase base on the front layer's canvas (default: the rig's).
  * Each row's front layer (with its hair back layer under it, when `back` is not empty), less the body it carries
  * (withoutCarriedBody, against the showcase base; not for glasses and small accessories), is cropped to its alpha rect,
@@ -43,7 +51,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 export const FRONT_THUMBS_DIR = join(ROOT, "tools/avatar25d/thumb-fronts")
 export const FRONT_THUMBS_PINS = join(ROOT, "tools/avatar25d/thumb-fronts.json")
 const RIGS = new Set(["female", "male"])
-const CUTS = new Set(["full", "skin", "edge", "raw"])
+const CUTS = new Set(["full", "skin", "edge", "soft", "raw"])
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex")
 
@@ -225,8 +233,88 @@ export function withoutCarriedBody(item, base, { paper = true, skinOnly = false 
   return { data: out, width, height, removed }
 }
 
+/** softEdge: alpha at or above this is the item's core; a longer, fainter alpha ramp is a feathered smear. */
+const SOFT_CORE_ALPHA = 192
+/** softEdge blur radii, in thumb pixels: the silhouette smoothing (features thinner than about this go) and the rim. */
+const SOFT_SMOOTH_THUMB_PX = 0.6
+const SOFT_RIM_THUMB_PX = 0.35
+/** CIELAB distance under which a front pixel is the trim layer's own colour at that place. */
+const TRIM_DELTA_E = 14
+
+async function blurredMask(mask, width, height, sigma) {
+  if (sigma < 0.3) return mask
+  return sharp(mask, { raw: { width, height, channels: 1 } }).blur(sigma).extractChannel(0).raw().toBuffer()
+}
+
+/**
+ * Smooths an item's silhouette at full size before the downscale. The core (alpha >= SOFT_CORE_ALPHA) is blurred by
+ * SOFT_SMOOTH_THUMB_PX thumb pixels and cut at half, so teeth, ragged cuffs and the tail of a feathered smear go;
+ * then blurred by SOFT_RIM_THUMB_PX for an even rim. Each pixel keeps at most its own alpha: nothing is added.
+ */
+export async function softEdge(rgba, width, height, fullPxPerThumbPx) {
+  const n = width * height, core = Buffer.alloc(n)
+  for (let p = 0; p < n; p++) core[p] = rgba[p * 4 + 3] >= SOFT_CORE_ALPHA ? 255 : 0
+  const smooth = await blurredMask(core, width, height, SOFT_SMOOTH_THUMB_PX * fullPxPerThumbPx)
+  for (let p = 0; p < n; p++) smooth[p] = smooth[p] >= 128 ? 255 : 0
+  const rim = await blurredMask(smooth, width, height, SOFT_RIM_THUMB_PX * fullPxPerThumbPx)
+  const out = Buffer.from(rgba)
+  for (let p = 0; p < n; p++) {
+    const a = Math.min(out[p * 4 + 3], rim[p])
+    if (a === 0) out.fill(0, p * 4, p * 4 + 4)
+    else out[p * 4 + 3] = a
+  }
+  return out
+}
+
+/** Light skin (CIELAB lightness, chroma and hue ranges): an arm or hand, never a drawn outline (darker). */
+const SKIN_FLOOD = { lightness: [55, 97], chroma: [12, 60], hue: [20, 80] }
+
+/** Pixels matching `test` (r, g, b) reached from outside the item through such pixels are removed. */
+function floodFromOutside(rgba, width, height, test) {
+  const n = width * height, matched = new Uint8Array(n)
+  for (let p = 0; p < n; p++) if (rgba[p * 4 + 3] > 0 && test(p)) matched[p] = 1
+  const out = Buffer.from(rgba), removed = new Uint8Array(n), stack = []
+  const outside = (x, y) => x < 0 || y < 0 || x >= width || y >= height || rgba[(y * width + x) * 4 + 3] === 0
+  for (let p = 0; p < n; p++) {
+    const x = p % width, y = (p - x) / width
+    if (matched[p] && (outside(x - 1, y) || outside(x + 1, y) || outside(x, y - 1) || outside(x, y + 1))) { removed[p] = 1; stack.push(p) }
+  }
+  while (stack.length) {
+    const p = stack.pop(), x = p % width, y = (p - x) / width
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const nx = x + dx, ny = y + dy, q = ny * width + nx
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height || removed[q] || !matched[q]) continue
+      removed[q] = 1; stack.push(q)
+    }
+  }
+  for (let p = 0; p < n; p++) if (removed[p]) out.fill(0, p * 4, p * 4 + 4)
+  return out
+}
+
+/** Carried arms and hands: light skin-coloured pixels reached from outside (see SKIN_FLOOD). */
+export function withoutCarriedSkin(rgba, width, height) {
+  const within = (v, [lo, hi]) => v >= lo && v <= hi
+  return floodFromOutside(rgba, width, height, (p) => {
+    const [L, A, B] = labOf(rgba[p * 4], rgba[p * 4 + 1], rgba[p * 4 + 2])
+    return within(L, SKIN_FLOOD.lightness) && within(Math.hypot(A, B), SKIN_FLOOD.chroma) && within(Math.atan2(B, A) * 180 / Math.PI, SKIN_FLOOD.hue)
+  })
+}
+
+/** Front pixels reached from outside through pixels of the trim layer's own colour at the same place (a garment the
+ *  cut carried, e.g. trousers under a top's hem) are removed. */
+export function withoutCarriedGarment(rgba, trim, width, height) {
+  if (trim.width !== width || trim.height !== height) throw new Error("the trim layer canvas differs from the front layer")
+  const limit = TRIM_DELTA_E ** 2
+  return floodFromOutside(rgba, width, height, (p) => {
+    if (trim.data[p * 4 + 3] < 128) return false
+    const [L, A, B] = labOf(rgba[p * 4], rgba[p * 4 + 1], rgba[p * 4 + 2])
+    const [l, a, b] = labOf(trim.data[p * 4], trim.data[p * 4 + 1], trim.data[p * 4 + 2])
+    return (L - l) ** 2 + (A - a) ** 2 + (B - b) ** 2 < limit
+  })
+}
+
 /** The card thumb of a front layer (and its hair back layer under it): { webp, width, height }. */
-export async function cutFrontThumb(frontPath, backPath, basePath, { match = {}, edgeClean = false } = {}) {
+export async function cutFrontThumb(frontPath, backPath, basePath, { match = {}, edgeClean = false, soft = false, trimPath, skinFlood = false } = {}) {
   const front = await rawOf(frontPath)
   let pixels = front.data
   if (backPath) {
@@ -241,6 +329,14 @@ export async function cutFrontThumb(frontPath, backPath, basePath, { match = {},
     pixels = cut.data
     removed = cut.removed
   }
+  if (skinFlood) pixels = withoutCarriedSkin(pixels, front.width, front.height)
+  if (trimPath) pixels = withoutCarriedGarment(pixels, await rawOf(trimPath), front.width, front.height)
+  if (soft) {
+    const cutRect = alphaRect(pixels, front.width, front.height)
+    if (!cutRect) throw new Error(`${frontPath}: the front layer is empty`)
+    const [cw, ch] = cutRect.slice(2)
+    pixels = await softEdge(pixels, front.width, front.height, Math.max(1, Math.max(cw, ch) / THUMB_MAX_PX))
+  }
   const rect = alphaRect(pixels, front.width, front.height)
   if (!rect) throw new Error(`${frontPath}: the front layer is empty`)
   const [x0, y0, w, h] = rect
@@ -248,7 +344,7 @@ export async function cutFrontThumb(frontPath, backPath, basePath, { match = {},
   for (let y = 0; y < h; y++) pixels.copy(cropped, y * w * 4, ((y0 + y) * front.width + x0) * 4, ((y0 + y) * front.width + x0 + w) * 4)
   const [toW, toH] = thumbSize(w, h)
   const resized = toW === w && toH === h ? cropped : await premultipliedResize(cropped, w, h, toW, toH)
-  const scaled = edgeClean ? Buffer.from(cleanThumb(resized, toW, toH).rgba) : resized
+  const scaled = edgeClean || soft ? Buffer.from(cleanThumb(resized, toW, toH, { flecks: !soft }).rgba) : resized
   const webp = await sharp(scaled, { raw: { width: toW, height: toH, channels: 4 } }).webp({ lossless: true, effort: 6 }).toBuffer()
   return { webp, width: toW, height: toH, rect, removed, full: { data: pixels, width: front.width, height: front.height } }
 }
@@ -354,14 +450,15 @@ async function main() {
     const back = row.back && row.back !== "none" ? row.back : undefined
     const cut = row.cut || "full"
     if (!CUTS.has(cut)) throw new Error(`${row.item_id}: cut must be one of ${[...CUTS].join(", ")}, got ${cut}`)
-    const cutsBody = carriesBody(row.item_id) && (cut === "full" || cut === "skin")
+    const cutsBody = carriesBody(row.item_id) && (cut === "full" || cut === "skin" || cut === "soft")
     const basePath = cutsBody ? (row.base || bases[row.rig]) : undefined
     const { webp, width, height, rect, removed, full } = await cutFrontThumb(row.front, back, basePath,
-      { match: cut === "skin" ? SKIN_CUT : {}, edgeClean: cut === "skin" || cut === "edge" })
+      { match: cut === "skin" || cut === "soft" ? SKIN_CUT : {}, edgeClean: cut === "skin" || cut === "edge", soft: cut === "soft", trimPath: row.trim || undefined,
+        skinFlood: cut === "soft" && row.flood === "skin" })
     if (evidence) await writeEvidence(evidence, row.item_id, row.front, back, rect, removed, full)
     mkdirSync(join(FRONT_THUMBS_DIR, row.rig), { recursive: true })
     writeFileSync(join(FRONT_THUMBS_DIR, row.rig, `${row.item_id}.webp`), webp)
-    const sources = [row.front, ...(back ? [back] : []), ...(basePath ? [basePath] : [])].map((p) => ({ file: basename(p), sha256: sha256(readFileSync(p)) }))
+    const sources = [row.front, ...(back ? [back] : []), ...(basePath ? [basePath] : []), ...(row.trim ? [row.trim] : [])].map((p) => ({ file: basename(p), sha256: sha256(readFileSync(p)) }))
     next[row.rig] = { ...next[row.rig], [row.item_id]: { sha256: sha256(webp), size: [width, height], sources } }
     console.log(`${row.rig}/${row.item_id}: ${width}x${height}`)
   }
