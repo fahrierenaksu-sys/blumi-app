@@ -254,7 +254,8 @@ test("country allowlist, price freshness, country count and cost limits cannot b
       ('US', false, 10000, clock_timestamp() + interval '1 day', 1, 5000)`)
     assert.equal((await f.reserve[0]!(input())).reason, "country_unavailable")
     await f.pools[0]!.query("UPDATE blumi_sms_country_policy SET enabled = true, price_valid_until = clock_timestamp() - interval '1 second'")
-    assert.equal((await f.reserve[0]!(input())).reason, "country_unavailable")
+    // An expired price has its own reason so operators can tell it from other refusals.
+    assert.equal((await f.reserve[0]!(input())).reason, "country_price_expired")
     await f.pools[0]!.query("UPDATE blumi_sms_country_policy SET price_valid_until = clock_timestamp() + interval '1 day'")
     assert.equal((await f.reserve[0]!(input())).reason, "country_cost_limit")
     await f.pools[0]!.query("UPDATE blumi_sms_country_policy SET cost_limit_24_hours_microusd = 20000")

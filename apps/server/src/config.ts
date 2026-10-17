@@ -1,4 +1,9 @@
 import { isIP } from "node:net"
+import {
+  createPostgresSmsPriceValidityReader,
+  createSmsPriceValidityMonitor,
+  type SmsPriceValidityMonitor
+} from "./auth/smsPriceValidity"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
 import {
   createDatabasePools,
@@ -263,6 +268,8 @@ export interface ConfiguredServerServices {
   adminAnalyticsService?: AdminAnalyticsService
   personalRoomDecorService: PersonalRoomDecorService
   roomSnapshotService: RoomSnapshotService
+  /** Warns before SMS prices expire and sign-in closes; only with a database. */
+  smsPriceValidity?: SmsPriceValidityMonitor
   checkReadiness(): Promise<void>
   close(): Promise<void>
 }
@@ -818,6 +825,10 @@ export function createConfiguredServerServices(
       adminAnalyticsService: createAdminAnalyticsService({ pool, environment: config.deployEnvironment }),
       personalRoomDecorService,
       roomSnapshotService,
+      smsPriceValidity: createSmsPriceValidityMonitor({
+        read: createPostgresSmsPriceValidityReader(pool),
+        log: (level, line) => console[level](line)
+      }),
       async checkReadiness() {
         await checkSchemaReadiness()
       },

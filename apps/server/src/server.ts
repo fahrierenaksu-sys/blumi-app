@@ -113,6 +113,7 @@ import {
   type NotificationPortraitService
 } from "./notifications/notificationPortraitService"
 import { readDeployedCommit } from "./operations/deployedCommit"
+import type { SmsPriceValidity } from "./auth/smsPriceValidity"
 import {
   createOpenApiDocument,
   OPENAPI_DOCUMENT_PATH,
@@ -128,6 +129,8 @@ interface CreateServerOptions {
   avatarArtPackHash?: () => string | null
   /** Overrides the build commit /health reports (tests); default reads it from the deploy environment. */
   deployedCommit?: string | null
+  /** The latest SMS price-validity check; absent means nothing monitors it (no database). */
+  smsPriceValidity?: () => SmsPriceValidity
   authService?: AuthService
   firebaseAuthVerifier?: FirebaseAuthVerifier
   /**
@@ -387,7 +390,9 @@ export function createServer(options: CreateServerOptions = {}): FastifyInstance
       // the push portrait art self-check (start-up); "failed" means pushes go out without a sender picture
       pushPortraitArt: getAvatarPortraitSelfCheckState(),
       // the short git SHA this server was built from, or null when the deploy does not say
-      commit: deployedCommit
+      commit: deployedCommit,
+      // "expiring" (under 7 days), "expired" or "no_enabled_country" means SMS sign-in is closing or closed
+      smsPriceValidity: options.smsPriceValidity?.() ?? { state: "not_monitored", daysLeft: null }
     }))
     app.get("/live", async () => ({ ok: true, service: "blumi-server" }))
     const probe = createReadinessProbe({

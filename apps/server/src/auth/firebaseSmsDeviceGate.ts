@@ -4,6 +4,7 @@ import { canonicalSmsIp, SMS_ADMISSION_MIGRATION_ID, SMS_PHONE_COOLDOWN_MS,
   SMS_PHONE_REQUESTS_PER_DAY, smsDestinationCountry } from "./firebaseSmsAdmission"
 
 export type SmsPlatform = "ios" | "android"
+export const SMS_COUNTRY_PRICE_EXPIRED = "SMS country price expired"
 export type SmsDeviceProofVerifier = (input: {
   platform: SmsPlatform; installationId: string; payload: string; proof: string;
   publicKey: string | null; signCount: number; now: number
@@ -72,9 +73,9 @@ export function createSmsDeviceGate(options: {
     identity: { installationKey: string; phoneKey: string; country: string }): Promise<void> {
     const { installationKey, phoneKey, country } = identity
     const market = (await db.query("SELECT enabled, price_valid_until FROM blumi_sms_country_policy WHERE country = $1", [country])).rows[0]
-    if (market?.enabled !== true || !(market.price_valid_until instanceof Date) || market.price_valid_until <= now) {
-      throw new Error("SMS gate unavailable")
-    }
+    if (market?.enabled !== true || !(market.price_valid_until instanceof Date)) throw new Error("SMS gate unavailable")
+    // Distinct from App Check or proof failures: only an operator renewing the price reopens it.
+    if (market.price_valid_until <= now) throw new Error(SMS_COUNTRY_PRICE_EXPIRED)
     // Count issued permits even if the client abandons the send. Clearing app
     // state, changing IPs or requesting a new challenge never refunds a slot.
     const recent = (await db.query(`SELECT

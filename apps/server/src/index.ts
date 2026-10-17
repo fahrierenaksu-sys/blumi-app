@@ -23,6 +23,7 @@ import { startChatDeliveryWorker } from "./chat/chatDeliveryWorker"
 import { createFirebaseAuthVerifier } from "./auth/firebaseAuth"
 import { createFirebaseUserDeletionDispatch } from "./auth/firebaseUserDeletionWorker"
 import { safeOperationalErrorKind } from "./operations/safeErrorLog"
+import { SMS_PRICE_CHECK_INTERVAL_MS } from "./auth/smsPriceValidity"
 import { checkRoomSnapshotRenderer } from "./rooms/roomSnapshotRenderer"
 import { checkAvatarPortraitRenderer } from "./avatar/avatarPortrait"
 
@@ -122,6 +123,15 @@ const discoveryWatchWorker = startDiscoveryWatchWorker({
     console.error("Discovery Watch worker failed", safeOperationalErrorKind(error))
   }
 })
+// Expired SMS prices refuse every sign-in (2026-10-17); warn in the logs and /health a week ahead.
+const smsPriceValidity = services.smsPriceValidity
+const smsPriceValidityWorker = smsPriceValidity
+  ? startPeriodicWorker({
+      run: () => smsPriceValidity.check(),
+      intervalMs: SMS_PRICE_CHECK_INTERVAL_MS,
+      firstRunDelayMs: startupJitterMs(SMS_PRICE_CHECK_INTERVAL_MS)
+    })
+  : undefined
 const adminTokenService = config.adminSigningKeys.length > 0
   ? createAdminTokenService({ keys: config.adminSigningKeys })
   : undefined
@@ -144,6 +154,7 @@ const app = createServer({
   streetSchema: services.streetSchema,
   streetDigestsInSaveTransaction: services.streetDigestsInSaveTransaction,
   firebaseAuthVerifier,
+  smsPriceValidity: smsPriceValidity?.current,
   // Only a loopback, in-memory development API can carry QA auth (config.ts).
   localQaOtpEnabled: isLocalQaOtpEnabled(config),
   chatService: services.chatService,
@@ -236,7 +247,8 @@ const shutdown = createGracefulShutdown({
     () => rateBudgetCleanupWorker.stop(),
     () => discoverySnapshotCleanupWorker.stop(),
     () => retentionWorker.stop(),
-    () => catTripRetentionWorker.stop()
+    () => catTripRetentionWorker.stop(),
+    () => smsPriceValidityWorker?.stop() ?? Promise.resolve()
   ],
   drainOutgoing: () => connectionManager.closeFanout(),
   closeData: () => services.close()

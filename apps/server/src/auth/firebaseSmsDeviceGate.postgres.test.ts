@@ -7,6 +7,7 @@ import { Pool } from "pg"
 import { assertDisposablePostgresDatabase, disposablePostgresSkip } from "../db/disposablePostgres"
 import { createSmsDeviceGate, type SmsDeviceProofVerifier } from "./firebaseSmsDeviceGate"
 import { createPostgresSmsAdmission, SMS_ADMISSION_MIGRATION_ID } from "./firebaseSmsAdmission"
+import { classifySmsPriceValidity, createPostgresSmsPriceValidityReader } from "./smsPriceValidity"
 
 const checksum = createHash("sha256").update(readFileSync(resolve(__dirname, "../../db/migrations", SMS_ADMISSION_MIGRATION_ID))).digest("hex")
 const phone = (index = 1) => `+1202555${String(100 + index).padStart(4, "0")}`
@@ -210,5 +211,22 @@ test("a market disabled during external verification cannot receive a new permit
     const challenge = await f.gates[0]!.challenge(base)
     await assert.rejects(f.gates[1]!.permit({ ...base, ...challenge, proof: "fixture-proof" }), /unavailable/)
     assert.equal((await f.pool.query("SELECT count(*)::int AS total FROM blumi_sms_device_permits")).rows[0].total, 0)
+  } finally { await f.close() }
+})
+
+test("an expired price refuses with its own reason, and the expiry check reads the earliest enabled market", disposablePostgresSkip(), async () => {
+  const f = await fixture()
+  try {
+    const read = createPostgresSmsPriceValidityReader(f.pool)
+    await f.pool.query(`INSERT INTO blumi_sms_country_policy VALUES ('CA', true, 10000, clock_timestamp() + interval '3 days', 1500, 2000000),
+      ('GB', false, 10000, clock_timestamp() - interval '1 day', 1500, 2000000)`)
+    assert.equal(classifySmsPriceValidity(await read()).state, "expiring")
+    await f.pool.query("UPDATE blumi_sms_country_policy SET price_valid_until = clock_timestamp() - interval '1 second' WHERE country = 'US'")
+    assert.equal(classifySmsPriceValidity(await read()).state, "expired")
+    for (const gate of f.gates) await assert.rejects(gate.challenge(base), /price expired/)
+    await f.pool.query("UPDATE blumi_sms_country_policy SET enabled = false WHERE country = 'US'")
+    await assert.rejects(f.gates[0]!.challenge(base), /gate unavailable/)
+    await f.pool.query("UPDATE blumi_sms_country_policy SET enabled = false")
+    assert.equal(classifySmsPriceValidity(await read()).state, "no_enabled_country")
   } finally { await f.close() }
 })

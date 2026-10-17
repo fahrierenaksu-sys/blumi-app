@@ -7,6 +7,7 @@ import { createSmsDeviceProofVerifier } from "./lib/device-proof.mjs"
 import schemaLock from "./schema-lock.json" with { type: "json" }
 import { smsHmacKey as hmacKey } from "./secrets.mjs"
 import { createCallableBudget } from "./callBudget.mjs"
+import { APP_CHECK_REJECTED, CALL_BUDGET_REJECTED, logSmsRefusal, smsGateRefusalReason } from "./refusalLog.mjs"
 import { randomBytes } from "node:crypto"
 const withinCallBudget = createCallableBudget({ secret: randomBytes(32), report: counts => console.info(counts) })
 
@@ -47,13 +48,16 @@ export const blumiSmsDeviceGate = onCall({
 }, async request => {
   const data = request.data
   try {
-    if (!request.app || request.app.alreadyConsumed || !data || typeof data !== "object" || Array.isArray(data) ||
+    if (!data || typeof data !== "object" || Array.isArray(data) ||
       !["ios", "android"].includes(data.platform) || typeof data.phoneNumber !== "string" ||
-      data.phoneNumber.length > 16 ||
-      request.app.appId !== (data.platform === "ios" ? appleAppId.value() : androidAppId.value())) {
+      data.phoneNumber.length > 16) {
       throw new Error("Rejected")
     }
-    if (!withinCallBudget(request.rawRequest.ip)) throw new Error("Rejected")
+    if (!request.app || request.app.alreadyConsumed ||
+      request.app.appId !== (data.platform === "ios" ? appleAppId.value() : androidAppId.value())) {
+      throw new Error(APP_CHECK_REJECTED)
+    }
+    if (!withinCallBudget(request.rawRequest.ip)) throw new Error(CALL_BUDGET_REJECTED)
     if (data.action === "challenge") {
       if (data.installationId !== undefined && (typeof data.installationId !== "string" || data.installationId.length > 64)) throw new Error("Rejected")
       return await getGate().challenge({ platform: data.platform, installationId: data.installationId,
@@ -66,8 +70,10 @@ export const blumiSmsDeviceGate = onCall({
         challenge: data.challenge, phoneNumber: data.phoneNumber, proof: data.proof })
     }
     throw new Error("Rejected")
-  } catch {
-    // No raw request, proof, key, phone, IP or provider error in logs/errors.
+  } catch (error) {
+    // No raw request, proof, key, phone, IP or provider error in logs/errors:
+    // only a fixed reason code, so an expired price is not mistaken for App Check.
+    logSmsRefusal("blumi_sms_gate_refused", smsGateRefusalReason(error))
     throw new HttpsError("permission-denied", "SMS verification is unavailable. Try again later.")
   }
 })

@@ -6,16 +6,25 @@ test("a granted budget never overrides the provider fraud verdict with ALLOW", a
   const handler = createBeforeSmsHandler(async () => ({ allowed: true }))
   assert.deepEqual(await handler({}), {})
 })
+const quiet = () => {}
 test("every refused or unavailable budget blocks instead of falling back", async () => {
   for (const result of [{ allowed: false }, {}, { allowed: "true" }, null]) {
-    assert.deepEqual(await createBeforeSmsHandler(async () => result)({}), { recaptchaActionOverride: "BLOCK" })
+    assert.deepEqual(await createBeforeSmsHandler(async () => result, quiet)({}), { recaptchaActionOverride: "BLOCK" })
   }
-  assert.deepEqual(await createBeforeSmsHandler(async () => { throw new Error("provider failure") })({}),
+  assert.deepEqual(await createBeforeSmsHandler(async () => { throw new Error("provider failure") }, quiet)({}),
     { recaptchaActionOverride: "BLOCK" })
+})
+test("a refused send logs its reason, so an expired price is not a silent block", async () => {
+  const logged = []
+  const log = (event, reason) => logged.push([event, reason])
+  await createBeforeSmsHandler(async () => ({ allowed: false, reason: "country_price_expired" }), log)({})
+  await createBeforeSmsHandler(async () => { throw new Error("provider failure") }, log)({})
+  await createBeforeSmsHandler(async () => ({ allowed: true }), log)({})
+  assert.deepEqual(logged, [["blumi_sms_send_refused", "country_price_expired"], ["blumi_sms_send_refused", "unavailable"]])
 })
 test("the adapter uses the provider phone and address, not user agent or arbitrary client fields", async () => {
   let received
-  const handler = createBeforeSmsHandler(async event => { received = event; return { allowed: false } })
+  const handler = createBeforeSmsHandler(async event => { received = event; return { allowed: false } }, quiet)
   await handler({ eventId: "fixture", resource: { service: "identitytoolkit.googleapis.com", name: "projects/fixture-project" }, timestamp: "fixture-time",
     smsType: "SIGN_IN_OR_SIGN_UP", ipAddress: "203.0.113.7",
     additionalUserInfo: { phoneNumber: "+15550000001", recaptchaScore: 0.3 }, userAgent: "ignored",
