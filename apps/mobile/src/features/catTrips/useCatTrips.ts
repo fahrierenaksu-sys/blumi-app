@@ -50,12 +50,14 @@ export function useCatTrips(input: { sessionActor: SessionActor; isFocused: bool
   const token = sessionActor.session.sessionToken
   const [state, setState] = useState<CatState | null>(null)
   const [guests, setGuests] = useState<CatGuests | null>(null)
-  const [dismissVersion, setDismissVersion] = useState(0)
+  // A copy of today's "Sonra" set, so a dismissal re-renders and a new focus picks up a new day.
+  const [dismissedTripIds, setDismissedTripIds] = useState<ReadonlySet<string>>(() => new Set(dismissedToday()))
   const generation = useRef(0)
 
   const refresh = useCallback(async () => {
     if (!isEnabled || !token) return
     const current = (generation.current += 1)
+    setDismissedTripIds(new Set(dismissedToday()))
     const [nextState, nextGuests] = await Promise.allSettled([
       fetchCatState(MOBILE_HTTP_BASE_URL, token),
       fetchCatGuests(MOBILE_HTTP_BASE_URL, token)
@@ -78,15 +80,13 @@ export function useCatTrips(input: { sessionActor: SessionActor; isFocused: bool
   }, [isEnabled])
 
   const reveal: CatReveal | null = useMemo(
-    () => pickCatReveal({ isEnabled, state, guests, dismissedTripIds: dismissedToday() }),
-    // dismissVersion re-reads the day's dismissed set after "Sonra".
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isEnabled, state, guests, dismissVersion]
+    () => pickCatReveal({ isEnabled, state, guests, dismissedTripIds }),
+    [isEnabled, state, guests, dismissedTripIds]
   )
 
   const dismiss = useCallback((tripId: string) => {
     dismissedToday().add(tripId)
-    setDismissVersion((version) => version + 1)
+    setDismissedTripIds(new Set(dismissedToday()))
   }, [])
 
   const acknowledge = useCallback(async (tripId: string): Promise<CatCounterpart | null> => {
