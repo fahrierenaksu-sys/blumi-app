@@ -19,8 +19,8 @@ export type Avatar25PageCache<T> = Map<string, Avatar25PageCacheEntry<T>>
 
 /** How long an unused page set stays on the GPU before it is freed. */
 export const AVATAR25_PAGE_IDLE_MS = 5 * 60_000
-/** Unused page sets kept at most (the user's body plus a partner's, or an outfit just taken off). */
-export const AVATAR25_PAGE_MAX_IDLE = 3
+/** Unused page sets kept at most (both avatars of a room about to open, plus My Room's, or an outfit just taken off). */
+export const AVATAR25_PAGE_MAX_IDLE = 4
 
 export interface Avatar25PageCacheTimers {
   setTimeout: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>

@@ -6,7 +6,8 @@ import { AVATAR_V2_CATALOG } from "../avatarV2/avatarV2Catalog"
 import { getAvatarV2ShopItemsCompatibleWithBody } from "../avatarV2/avatarBodyCompatibility"
 import { avatarStillWarmupSources } from "../avatar/model/avatarStillWarmup"
 import { AVATAR_STILL_ASSETS } from "../avatar/stills/stillAssets"
-import { normalizeCompleteAvatarSelection } from "../avatarV2/avatarSelectionModel"
+import { loadoutToUserAvatar, normalizeCompleteAvatarSelection } from "../avatarV2/avatarSelectionModel"
+import { prewarmRoomAvatars } from "../avatar/components/prewarmRoomAvatars"
 import { useAvatarV2 } from "../avatarV2/state/AvatarV2Provider"
 import {
   DEFAULT_ROOM_V2_SHELL_ID,
@@ -305,6 +306,7 @@ export function CurrentSceneAssetWarmup({
     const unsubscribe = subscribeToRoomEntryWarmup((request) => {
       generation = request.generation
       const sources: ImageSourcePropType[] = []
+      const roomLoadouts: unknown[] = []
       const shellSource = resolveRoomV2Shell(ROOM_V2_SHELL_CATALOG, DEFAULT_ROOM_V2_SHELL_ID, DEFAULT_ROOM_V2_SHELL_ID)?.asset.source
       if (shellSource !== undefined) sources.push(shellSource)
       for (const value of request.avatars) {
@@ -313,7 +315,10 @@ export function CurrentSceneAssetWarmup({
         // The shared room draws both avatars live from the rigs (read lazily, bundled with the app); what the image
         // cache can warm are the small bust stills of their chips. An avatar that cannot be resolved is not warmed.
         sources.push(...avatarStillWarmupSources(selection.loadout, "bust", AVATAR_STILL_ASSETS, { presetId: selection.presetId }))
+        // the room draws them from this loadout (miniRoom snapshots): their GPU pages load now, not as it opens
+        roomLoadouts.push(loadoutToUserAvatar(selection.loadout))
       }
+      prewarmRoomAvatars(roomLoadouts)
       void warmSources(
         sources,
         ROOM_ENTRY_BUDGET,

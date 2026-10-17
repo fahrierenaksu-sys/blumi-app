@@ -128,7 +128,7 @@ test("the default full card keeps its room scene and compact drops it", () => {
   f.runtime.unmount()
 })
 
-test("an open room door starts warming the room once; history rows and closed doors do not", () => {
+test("an open door or an invitation to accept warms the room once; history rows and closed doors do not", () => {
   const f = mount(true)
   const you = { name: "You", userId: "synthetic-recipient", avatar: { presetId: "synthetic-you" } as never }
   const partner = { name: "Partner", userId: "synthetic-sender", avatar: { presetId: "synthetic-partner" } as never }
@@ -141,8 +141,19 @@ test("an open room door starts warming the room once; history rows and closed do
   history.render({ compact: true })
   assert.deepEqual(history.roomWarmups, [])
   history.runtime.unmount()
-  const pending = mount(true)
-  pending.render({ invite: { ...invite, status: "pending", roomSessionId: undefined } })
-  assert.deepEqual(pending.roomWarmups, [])
-  pending.runtime.unmount()
+  const pendingInvite = { ...invite, status: "pending" as const, roomSessionId: undefined }
+  const toAccept = mount(true)
+  toAccept.render({ invite: pendingInvite, you, partner })
+  assert.equal(toAccept.roomWarmups.length, 1, "the recipient is one tap from the room")
+  toAccept.runtime.unmount()
+  const sent = mount(true)
+  sent.render({ invite: pendingInvite, currentUserId: "synthetic-sender" })
+  assert.deepEqual(sent.roomWarmups, [], "the sender's door is still closed")
+  sent.runtime.unmount()
+  for (const status of ["declined", "expired", "cancelled"] as const) {
+    const closed = mount(true)
+    closed.render({ invite: { ...invite, status, roomSessionId: undefined } })
+    assert.deepEqual(closed.roomWarmups, [], `a ${status} invitation does not warm the room`)
+    closed.runtime.unmount()
+  }
 })

@@ -48,7 +48,8 @@ test("only the GPU files import react-native-webgpu, and only components draw wi
 })
 
 test("every canvas comes out of the live budget: each component that mounts it takes a slot, nothing else mounts it", () => {
-  const drawers = files.filter(({ text }) => /["'][./]+(?:renderer\/)?Avatar25Canvas["']/.test(text))
+  // a drawer renders the canvas; a component file may also import it only to load pages ahead (prewarmRoomAvatars)
+  const drawers = files.filter(({ text }) => /<Avatar25Canvas\b/.test(text))
   assert.ok(drawers.some(({ path }) => path === "components/AvatarLive.tsx"), "AvatarLive draws with the canvas")
   for (const { path, text } of drawers) {
     assert.match(text, /["']\.\/useAvatarLiveSlot["']/, `${path} mounts the canvas without the live budget`)

@@ -145,6 +145,44 @@ async function getShared(): Promise<Avatar25GpuShared> {
   return sharedPromise
 }
 
+type InstanceViews = { views: Avatar25GpuView[]; mirrorViews: (Avatar25GpuView | undefined)[]; instance: Avatar25Instance }
+
+/** One avatar's GPU drawings: both facings, plus the mirrored ones where a worn item has mirror cards. */
+async function createInstanceViews(shared: Avatar25GpuShared, instance: Avatar25Instance): Promise<InstanceViews> {
+  const rig = getAvatar25Rig(instance.rig)
+  const hasCards = (view: Avatar25ViewName) => avatar25HasMirrorCards(rig.rig, view, instance.itemIds, instance.mirrorCards !== false)
+  const create = (view: Avatar25ViewName, mirrored: boolean) =>
+    createAvatar25GpuView(shared, rig.rig, view, instance.itemIds, rig.readTextureBytes, rig.id, rig.astc, mirrored, hasCards(view))
+  return {
+    instance,
+    // the plain view of a carded avatar holds the cards' overflow page too: one page set, one texture array
+    views: await Promise.all(VIEWS.map((view) => create(view, false))),
+    // a second drawing only for the directions whose worn items carry mirror cards
+    mirrorViews: await Promise.all(VIEWS.map((view) => hasCards(view) ? create(view, true) : undefined))
+  }
+}
+
+function allInstanceViews(avatar: InstanceViews): Avatar25GpuView[] {
+  return [...avatar.views, ...avatar.mirrorViews.filter((view): view is Avatar25GpuView => view !== undefined)]
+}
+
+/**
+ * Uploads these avatars' texture pages ahead of time and leaves them in the idle page cache (avatar25PageCache),
+ * so a room about to open (an invitation on screen) builds its avatars without a load. Best effort: a failure only
+ * means the room loads them itself, as before.
+ */
+export async function prewarmAvatar25Pages(avatars: readonly { rig: AvatarRigId; itemIds: string[] }[]): Promise<void> {
+  try {
+    const shared = await getShared()
+    const built = await Promise.all(avatars.map((avatar) => createInstanceViews(shared, {
+      key: "prewarm", rig: avatar.rig, view: "front", mirror: false, itemIds: avatar.itemIds, anchorX: 0.5, anchorY: 1, heightPx: 1
+    })))
+    for (const view of built.flatMap(allInstanceViews)) destroyAvatar25GpuView(shared, view)
+  } catch (error) {
+    if (__DEV__) console.warn(`[avatar25] prewarm skipped (${error instanceof Error ? error.message.slice(0, 80) : "error"})`)
+  }
+}
+
 /** Only GPU handles and plain data: this whole object is copied into the UI runtime. */
 interface GpuState {
   device: GPUDevice
@@ -160,7 +198,7 @@ interface GpuState {
    * same two drawn for the mirrored directions, only where a worn item has mirror cards (else undefined: the plain
    * view is flipped).
    */
-  avatars: { views: Avatar25GpuView[]; mirrorViews: (Avatar25GpuView | undefined)[]; instance: Avatar25Instance }[]
+  avatars: InstanceViews[]
 }
 
 /**
@@ -225,20 +263,8 @@ export function Avatar25Canvas(props: {
         sampleCount: AVATAR25_SAMPLE_COUNT,
         usage: GPUTextureUsage.RENDER_ATTACHMENT
       })
-      const avatars = await Promise.all(instances.map(async (instance) => {
-        const rig = getAvatar25Rig(instance.rig)
-        const hasCards = (view: Avatar25ViewName) => avatar25HasMirrorCards(rig.rig, view, instance.itemIds, instance.mirrorCards !== false)
-        const create = (view: Avatar25ViewName, mirrored: boolean) =>
-          createAvatar25GpuView(shared, rig.rig, view, instance.itemIds, rig.readTextureBytes, rig.id, rig.astc, mirrored, hasCards(view))
-        return {
-          instance,
-          // the plain view of a carded avatar holds the cards' overflow page too: one page set, one texture array
-          views: await Promise.all(VIEWS.map((view) => create(view, false))),
-          // a second drawing only for the directions whose worn items carry mirror cards
-          mirrorViews: await Promise.all(VIEWS.map((view) => hasCards(view) ? create(view, true) : undefined))
-        }
-      }))
-      built = { shared, views: avatars.flatMap((a) => [...a.views, ...a.mirrorViews.filter((v): v is Avatar25GpuView => v !== undefined)]), msaa }
+      const avatars = await Promise.all(instances.map((instance) => createInstanceViews(shared, instance)))
+      built = { shared, views: avatars.flatMap(allInstanceViews), msaa }
       if (cancelled) return
       const textureMB = (await getAvatar25TextureBytes(shared)) / 1e6
       if (cancelled) return
