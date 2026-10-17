@@ -157,13 +157,13 @@ const styles = StyleSheet.create({
   card: { alignItems: "center", gap: 8 },
   title: { fontSize: 20, fontWeight: "700", color: uiTheme.colors.textPrimary, textAlign: "center" },
   body: { fontSize: 15, color: uiTheme.colors.textSecondary, textAlign: "center" },
-  question: { fontSize: 16, fontWeight: "600", color: uiTheme.colors.brandPink, textAlign: "center", marginTop: 4 },
+  question: { fontSize: 16, fontWeight: "600", color: uiTheme.colors.primaryDeep, textAlign: "center", marginTop: 4 },
   hint: { fontSize: 13, color: uiTheme.colors.textSecondary, textAlign: "center" },
   clue: { alignItems: "center", gap: 4, paddingVertical: 8, paddingHorizontal: 16, borderRadius: uiTheme.radius.lg,
     backgroundColor: uiTheme.colors.surfaceSoft },
   clueGlyph: { fontSize: 34 },
   tag: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: uiTheme.radius.full, backgroundColor: uiTheme.colors.surfaceSoft },
-  tagLabel: { fontSize: 15, fontWeight: "700", color: uiTheme.colors.brandPink },
+  tagLabel: { fontSize: 15, fontWeight: "700", color: uiTheme.colors.primaryDeep },
   chip: { fontSize: 12, color: uiTheme.colors.textSecondary },
   actions: { gap: 8 },
   button: { minHeight: 48, borderRadius: uiTheme.radius.full, alignItems: "center", justifyContent: "center", paddingHorizontal: 18 },
@@ -171,5 +171,5 @@ const styles = StyleSheet.create({
   buttonQuiet: { backgroundColor: uiTheme.colors.surfaceMuted },
   pressed: { opacity: 0.85 },
   buttonLabel: { fontSize: 16, fontWeight: "600", color: uiTheme.colors.textPrimary },
-  buttonLabelPrimary: { color: "#FFFFFF" }
+  buttonLabelPrimary: { color: uiTheme.colors.onPrimary }
 })
