@@ -71,10 +71,11 @@ import { AVATAR_STILL_MANIFEST, type AvatarStillRigId } from "./avatarStills";
  * new collection: hair_male_soft_crop landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  * new collection: hair_male_black_side_part landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  * new collection: hair_male_chestnut_waves landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
+ * new collection: hair_male_cocoa_quiff landed without an owner-approved front look; it keeps the 3/4 fallback until the owner says yes and the import adds its allowlist entry.
  */
 const SHOWCASE_PENDING: Readonly<Record<AvatarStillRigId, readonly string[]>> = {
   female: [],
-  male: ["hair_male_blond_fade", "hair_male_soft_crop", "hair_male_black_side_part", "hair_male_chestnut_waves"],
+  male: ["hair_male_blond_fade", "hair_male_soft_crop", "hair_male_black_side_part", "hair_male_chestnut_waves", "hair_male_cocoa_quiff"],
 };
 
 const rigs = Object.keys(AVATAR_STILL_MANIFEST.bodies) as AvatarStillRigId[];

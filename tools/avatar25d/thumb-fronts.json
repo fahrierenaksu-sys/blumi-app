@@ -1235,6 +1235,27 @@
         }
       ]
     },
+    "hair_male_cocoa_quiff": {
+      "sha256": "167993ba3d563500501c67d0ee82c68e4549c2e9555b80985cadbe39bf928bb0",
+      "size": [
+        256,
+        145
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "e0867ea5768e4076daa3eaa8121c47b7e35f6ec8d93137893b8796b80f55c928"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "bdfd7db0234ef56b290d1e983f6e2e7d21d68fdc0165606944d75fe99e9a8e00"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
     "hair_male_soft_crop": {
       "sha256": "0b84f317670f9f52938de5cb23571b59b60b64fcd5a1478b77ddb8415e96b43d",
       "size": [
