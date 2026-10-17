@@ -12,8 +12,8 @@ export const SCAN_BEAM_START_Y = -142
 export const SCAN_BEAM_END_Y = 150
 
 const BEAM_WIDTH = 268
-const BEAM_HEIGHT = 34
-const CURTAIN_HEIGHT = 56
+const BEAM_HEIGHT = 24
+const CURTAIN_HEIGHT = 36
 
 const LASER_TEXTURES = {
   beam: require("./assets/onboarding-scan-laser-v4/scan_laser_beam.png"),
