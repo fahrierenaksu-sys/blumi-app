@@ -204,6 +204,8 @@ test("release builds show which step failed as a short code, never native detail
       assert.match(message, /^We could not send a verification code right now\./)
       assert.ok(message.endsWith(` ${code}`), message)
       assert.doesNotMatch(message, /5550101|secret|socket|refused|Attest/)
+      // A refused device check or permit never sends the user to recheck a valid number.
+      assert.equal(/Check the number/.test(message), code.startsWith("(E-FIREBASE"), message)
       return true
     })
   }

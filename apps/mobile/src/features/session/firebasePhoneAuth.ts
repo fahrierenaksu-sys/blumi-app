@@ -112,8 +112,11 @@ export async function requestFirebasePhoneCode(
     // The short code names the failed step in release builds too, so a phone
     // screenshot is enough to tell App Check, the device permit and Firebase
     // apart. It never includes tokens, numbers or native error text.
+    // Only the provider step can be about the number itself; a refused device
+    // check or permit (for example a closed SMS budget) is not the user's to fix.
+    const advice = stage === "FIREBASE" ? "Check the number and try again." : "Please try again later."
     throw new Error(
-      "We could not send a verification code right now. Check the number and try again. " +
+      `We could not send a verification code right now. ${advice} ` +
         `(${describePhoneCodeFailure(stage, error)})`
     )
   } finally { smsRequestInFlight = false }
