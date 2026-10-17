@@ -89,6 +89,11 @@ const ROOM_CHAT_BUBBLE_LIFETIME_MS = 4_000
  * assembles piece by piece; entry is never held longer than this.
  */
 const MINI_ROOM_STAGE_READY_CAP_MS = 320
+/**
+ * The room also waits for the local 2.5D avatar to load, so she arrives with it instead of popping in after the
+ * fade; a slow load never holds entry longer than this.
+ */
+const MINI_ROOM_AVATAR_READY_CAP_MS = 1_500
 const NO_HISTORY: readonly RoomChatHistoryItem[] = [], NO_NOTICES: readonly string[] = []
 const NO_FAILED_MESSAGES: readonly FailedRoomMessage[] = []
 const StableMiniRoomRoomDecorLayer = memo(MiniRoomRoomDecorLayer)
@@ -159,7 +164,17 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   // when the reveal finishes, so the avatar arrives with the room instead of after it.
   const [stageRevealed, setStageRevealed] = useState(false)
   const markStageRevealed = useCallback(() => setStageRevealed(true), [])
-  const stageRevealStyle = useStageRevealStyle(stageCovered, markStageRevealed)
+  const [localAvatarReady, setLocalAvatarReady] = useState(false)
+  const markLocalAvatarReady = useCallback(() => setLocalAvatarReady(true), [])
+  const [avatarWaitElapsed, setAvatarWaitElapsed] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setAvatarWaitElapsed(true), MINI_ROOM_AVATAR_READY_CAP_MS)
+    return () => clearTimeout(timer)
+  }, [])
+  const stageRevealStyle = useStageRevealStyle(
+    stageCovered || (!localAvatarReady && !avatarWaitElapsed),
+    markStageRevealed
+  )
   // VIS-04: upright furniture is drawn among the avatars by floor depth.
   const depthScene = useMemo(() => createMiniRoomDepthScene(roomDecorScene), [roomDecorScene])
   // Everything the pose depends on except the keyboard (that is a progress).
@@ -341,6 +356,7 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
       motionPolicy={motionPolicy}
       depthScene={depthScene}
       holdGpuSurfaces={!stageRevealed}
+      onLocalAvatarReady={markLocalAvatarReady}
     />
   )
 

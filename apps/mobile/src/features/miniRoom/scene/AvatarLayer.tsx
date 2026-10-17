@@ -63,6 +63,8 @@ interface AvatarLayerProps {
   depthScene?: MiniRoomDepthScene
   /** 2.5D avatars: their GPU surface loads but draws nothing while the stage is still fading in. */
   holdGpuSurfaces?: boolean
+  /** The local 2.5D avatar is loaded and ready to draw (stable callback: the scene reveals the room with her). */
+  onLocalAvatarReady?: () => void
 }
 
 type BubblePlacement = RoomSpeechBubblePlacement
@@ -127,6 +129,7 @@ export const AvatarLayer = memo(function AvatarLayer(props: AvatarLayerProps) {
         partnerJustJoined={partnerJustJoined}
         motionPolicy={motionPolicy}
         holdGpuSurfaces={props.holdGpuSurfaces}
+        onLocalAvatarReady={props.onLocalAvatarReady}
       />
       {sortedAvatars.map((avatar) => {
         const position = avatarPositions[avatar.userId]
@@ -181,6 +184,7 @@ const AvatarBodyLayer = memo(function AvatarBodyLayer(props: {
   partnerJustJoined: boolean
   motionPolicy: MiniRoomMotionPolicy
   holdGpuSurfaces?: boolean
+  onLocalAvatarReady?: () => void
 }) {
   const { avatars, avatarPositions, stageWidth, stageHeight, depthScene, localUserId, partnerJustJoined, motionPolicy } = props
   // A seated (or sitting-down / standing-up) avatar sorts at its seat's depth.
@@ -270,6 +274,7 @@ const AvatarBodyLayer = memo(function AvatarBodyLayer(props: {
             showJoinPulse={!isLocal && partnerJustJoined && !avatar.enteringFromDoor && !avatar.arrivedByWalk}
             motionPolicy={motionPolicy}
             holdGpuSurface={props.holdGpuSurfaces}
+            onReady={isLocal ? props.onLocalAvatarReady : undefined}
           />
         )
       })}
@@ -345,6 +350,8 @@ interface AvatarFigureProps {
   showJoinPulse: boolean
   motionPolicy: MiniRoomMotionPolicy
   holdGpuSurface?: boolean
+  /** Her GPU surface is loaded (fires once per build). */
+  onReady?: () => void
 }
 
 /** The chibi body and its floor ring: sorted among the furniture by depth. */
@@ -458,6 +465,7 @@ const AvatarFigure = memo(function AvatarFigure(props: AvatarFigureProps) {
               calibratedFigureHeightPx={calibratedFigureHeightPx}
               seatPlacement={seatPlacement}
               holdCanvas={props.holdGpuSurface}
+              onDrawn={props.onReady}
             />
           ) : null}
         </Reanimated.View>

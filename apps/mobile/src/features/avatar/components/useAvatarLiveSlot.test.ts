@@ -150,3 +150,30 @@ test("a deep link or account switch that remounts the tabs leaves no stale holde
   next.discover.unmount()
   assert.equal(budget.grantedCount(), 0)
 })
+
+test("a room avatar kept while blurred stays mounted across tab changes and never takes the shown page's canvas", () => {
+  const budget = budgetModule.createAvatarLiveBudget()
+  const runtime = createFakeReactRuntime()
+  const state = { focused: true }
+  const { useAvatarLiveSlot } = loadSourceWithFakeReact<typeof SlotModule>(
+    "features/avatar/components/useAvatarLiveSlot.ts",
+    runtime,
+    { modules: { "../model/avatarLiveBudget": budgetModule, "./useIsSurfaceFocused": { useIsSurfaceFocused: () => state.focused } } }
+  )
+  runtime.render(() => useAvatarLiveSlot("screen", true, budget, true))
+  assert.equal(runtime.output, true)
+  // switch to Discover: the room blurs, Discover's deck asks for the canvas
+  state.focused = false
+  runtime.rerender()
+  const discover = mountCaller(budget, "screen", true)
+  assert.equal(discover.canvasMounted, true, "the shown page owns the canvas")
+  assert.equal(runtime.output, true, "the room keeps its paused canvas in the background")
+  // back to the room: still mounted, nothing to rebuild
+  discover.focus(false)
+  state.focused = true
+  runtime.rerender()
+  assert.equal(runtime.output, true)
+  discover.unmount()
+  runtime.unmount()
+  assert.equal(budget.grantedCount(), 0)
+})

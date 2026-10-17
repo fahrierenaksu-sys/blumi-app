@@ -10,6 +10,7 @@ import { compileMotionStance, motionCyclesForTravel, SIT_CARD_FROM, sitDownWeigh
 import { getAvatar25BoxPlacement } from "../renderer/avatar25Placement"
 import { seatedHipToSoleShare, seatedLegExtensionPx } from "../renderer/avatar25SeatedLegs"
 import { useAvatarLiveSlot } from "./useAvatarLiveSlot"
+import { useIsSurfaceFocused } from "./useIsSurfaceFocused"
 
 const POSE_STAND = AVATAR25_POSES.indexOf("stand")
 const POSE_SIT = AVATAR25_POSES.indexOf("sit")
@@ -117,9 +118,12 @@ export function AvatarLive(props: AvatarLiveProps) {
   const bendsToSit = view.motion !== undefined
   const hasSeatPlacement = props.seatPlacement !== undefined
   const previousPose = useRef(spec.pose)
-  // every canvas comes out of the live budget (over budget: no GPU surface). Held (MiniRoom fade-in), the surface
-  // still mounts and loads but presents nothing, so she is drawn on the very frame the hold ends.
-  const canvasMounted = useAvatarLiveSlot(props.liveScope, true)
+  // every canvas comes out of the live budget (over budget: no GPU surface). Held (MiniRoom fade-in) or on a
+  // screen not shown (a tab in the background), the surface stays mounted and loaded but presents nothing, so she
+  // is drawn on the very frame she shows again instead of being rebuilt.
+  const isSurfaceFocused = useIsSurfaceFocused()
+  const canvasMounted = useAvatarLiveSlot(props.liveScope, true, undefined, true)
+  const canvasPaused = Boolean(props.holdCanvas) || !isSurfaceFocused
   // facing is live: both drawings stay resident, so a turn shows on the very next frame (no rebuild)
   const mirrored = spec.mirror !== Boolean(props.outerMirrored)
   const viewIndex = useSharedValue(spec.view === "back" ? 1 : 0)
@@ -284,7 +288,7 @@ export function AvatarLive(props: AvatarLiveProps) {
             instances={instances}
             driver={{ pose, walkCycles, walkWeight, waveStartMs, sitWeight, sitLegDropPx, breathWeight, view: viewIndex, mirror, outerMirror }}
             reduceMotion={reduceMotion}
-            paused={props.holdCanvas}
+            paused={canvasPaused}
             onReady={props.onDrawn}
           /> : null}
         </Reanimated.View>

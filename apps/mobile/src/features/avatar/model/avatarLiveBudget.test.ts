@@ -42,3 +42,27 @@ test("an unfocused page never asks, so nothing is live without a request; releas
   budget.request("screen")
   assert.equal(calls, 2)
 })
+
+test("a room kept in the background holds a paused canvas but never takes the shown screen's", () => {
+  const budget = createAvatarLiveBudget()
+  const discover = budget.request("screen")
+  const myRoom = budget.request("screen", true)
+  assert.equal(budget.isGranted(discover), true, "the shown screen keeps its canvas")
+  assert.equal(budget.isGranted(myRoom), true, "the room behind keeps its paused canvas")
+  const second = budget.request("screen", true)
+  assert.equal(budget.isGranted(myRoom), false, "only one background canvas is kept; the newest")
+  assert.equal(budget.isGranted(second), true)
+  budget.release(second)
+  assert.equal(budget.isGranted(myRoom), true)
+})
+
+test("a MiniRoom on top takes every canvas, the background room's too, and gives it back on leaving", () => {
+  const budget = createAvatarLiveBudget()
+  const myRoom = budget.request("screen", true)
+  const me = budget.request("miniRoom")
+  const partner = budget.request("miniRoom")
+  assert.deepEqual([budget.isGranted(me), budget.isGranted(partner), budget.isGranted(myRoom)], [true, true, false])
+  budget.release(me)
+  budget.release(partner)
+  assert.equal(budget.isGranted(myRoom), true)
+})
