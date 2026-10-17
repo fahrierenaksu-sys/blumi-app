@@ -88,10 +88,13 @@ const TALL = ["room_v3_bookshelf_oyun_cream", "room_v3_dresser_oyun_honey", "roo
 /** Seats she can really sit on (drawn pose `sit_chair`). */
 const SEATING: Record<string, string[]> = {
   room_v3_bed_oyun_gingham: ["s0", "s1"],
-  room_v3_teaset_oyun_flower: ["s0", "s1"]
+  room_v3_teaset_oyun_flower: ["s0", "s1"],
+  // chair height since 2026-10-17, so the drawn sitting pose fits them
+  room_v3_pouf_oyun_bunnypink: ["s0"],
+  room_v3_pouf_oyun_bearpurple: ["s0"]
 }
 /** Pieces whose only seats are `sit_low`: pose-pending, so they stand as decor. */
-const POSE_PENDING = ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple", "room_v3_teaset_japon_zaisu"]
+const POSE_PENDING = ["room_v3_teaset_japon_zaisu"]
 const ROTATIONS: RoomFurnitureRotation[] = ["front", "right", "back", "left"]
 const SHELL = calibrateRoomShell({
   id: "room_v2_shell_blumi_world_v1",
@@ -201,7 +204,7 @@ test("each floor piece stands on its item.json cells (w x d, turned for odd rota
   }
 })
 
-test("the bed and the flower tea set seat two in every rotation and she can walk to every seat; every other piece is decor", () => {
+test("the bed and the flower tea set seat two and each pouf one in every rotation; she can walk to every seat; every other piece is decor", () => {
   for (const [id, seatIds] of Object.entries(SEATING)) {
     assert.equal(item(id).interactionType, "seat")
     assert.equal(item(id).seatSpec?.capacity, seatIds.length)
@@ -291,7 +294,7 @@ test("she draws behind a tall piece from behind and in front of it from the fron
   }
 })
 
-test("a tap anywhere on the Oyun bed's or the flower tea set's drawn back layer, in every rotation, is a tap on it", () => {
+test("a tap anywhere on an Oyun seat's drawn back layer (bed, flower tea set, poufs), in every rotation, is a tap on it", () => {
   for (const id of Object.keys(SEATING)) {
     for (const r of [0, 1, 2, 3] as const) {
       const key = `${id}_layered_r${r}_back`
@@ -355,7 +358,8 @@ const OYUN_ROOM: { id: string; i: number; j: number; rotation: RoomFurnitureRota
   { id: "room_v3_bed_oyun_gingham", i: 2, j: 6, rotation: "front" },
   { id: "room_v3_nightstand_oyun_honey", i: 2, j: 11, rotation: "front" },
   { id: "room_v3_snacktable_oyun_round", i: 8, j: 8, rotation: "front" },
-  { id: "room_v3_pouf_oyun_bunnypink", i: 11, j: 8, rotation: "front" }
+  // the pouf faces the snack table; she walks in through the free cells between them
+  { id: "room_v3_pouf_oyun_bunnypink", i: 12, j: 8, rotation: "front" }
 ]
 
 test("a furnished Oyun room holds together: every piece valid beside the others, every seat reachable", () => {
@@ -369,5 +373,21 @@ test("a furnished Oyun room holds together: every piece valid beside the others,
   }
   for (const hotspot of createRoomWorldHotspotsFromRoomV2Scene({ shell: SHELL, renderItems: pieces })) {
     assert.ok(canWalk(pieces, hotspot.approachPoint!), `${hotspot.id}: unreachable`)
+  }
+})
+
+test("two poufs facing each other two cells apart: she can walk to both seats, one sitter faces us, the other rests on her cushion", () => {
+  for (const id of ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple"]) {
+    // "front" faces -X and "back" faces +X: the one at the larger i looks toward the other
+    const pieces = [onCell(id, 6, 8, "back"), onCell(id, 10, 8, "front")]
+    assert.ok(validateRoomV2FurniturePlacement({ scene: { shell: SHELL, renderItems: [pieces[0]!] }, candidate: pieces[1]! }).isValid, id)
+    const hotspots = createRoomWorldHotspotsFromRoomV2Scene({ shell: SHELL, renderItems: pieces })
+    assert.equal(hotspots.length, 2, id)
+    for (const hotspot of hotspots) assert.ok(canWalk(pieces, hotspot.approachPoint!), `${id} ${hotspot.id}: unreachable`)
+    const views = pieces.map((piece) => piece.layered25d!.seats[0]!)
+    assert.deepEqual(views.map((seat) => seat.view).sort(), ["back", "front"], id)
+    // seen from behind she is cut just under her hip, so she sits on the cushion instead of hanging over it
+    const behind = views.find((seat) => seat.view === "back")!
+    assert.ok(behind.avatarClipBelowHip !== undefined && behind.avatarClipBelowHip > 0 && behind.avatarClipBelowHip < 0.003, `${id}: ${behind.avatarClipBelowHip}`)
   }
 })
