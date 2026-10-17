@@ -141,15 +141,13 @@ test("the 10 QA-only room ids are reserved: legacy and never sold", () => {
   }
 })
 
-test("the 27 approved 2.5D pieces and the blush chair are held as pricing-pending; the starter bed never is", () => {
+test("the 27 approved 2.5D pieces and the blush chair are sellable with a receipt or held without one; the starter bed never is", () => {
   assert.equal(ROOM_V3_IDS.length, 27)
   assert.equal(new Set(ROOM_V3_IDS).size, 27)
-  const pricingPending = BLUMI_R1_RELEASE_CATALOG.heldScopes.find((scope) => scope.scope === "pricing-pending")
-  assert.ok(pricingPending)
-  const inScope = (id: string) => pricingPending.itemIdPatterns.some((pattern) => new RegExp(pattern).test(id))
+  const receiptedIds = new Set(BLUMI_R1_RELEASE_CATALOG.publishedItems.map((item) => item.itemId))
   for (const id of [...ROOM_V3_IDS, "room_v2_chair_blush"]) {
-    assert.ok(inScope(id), `${id} is not pricing-pending`)
-    assert.ok(isReleaseCatalogItemHeld(id), id)
+    // a piece is either receipted (sellable, held by no scope) or held (never sold): never both, never neither
+    assert.notEqual(isReleaseCatalogItemHeld(id), receiptedIds.has(id), `${id} must be receipted xor held`)
     assert.ok(ECONOMY_CATALOG.some((item) => item.itemId === id && item.type === "room"), `${id} has no economy entry`)
   }
   for (const id of RESERVED_ROOM_ITEM_IDS) {
@@ -173,10 +171,11 @@ test("every sellable room piece has a real price, so lifting its hold never sell
   assert.equal(starterBed.ownedByDefault, true)
 })
 
-test("held items are neither sold nor listed in production or development projections", () => {
+test("held items are neither sold nor listed in production or development projections; receipted ones are", () => {
+  const receiptedIds = new Set(BLUMI_R1_RELEASE_CATALOG.publishedItems.map((item) => item.itemId))
   for (const projection of [resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG), resolveUnheldEconomyCatalog(ECONOMY_CATALOG)]) {
     for (const id of [...ROOM_V3_IDS, "room_v2_chair_blush"]) {
-      assert.equal(projection.some((item) => item.itemId === id), false, id)
+      assert.equal(projection.some((item) => item.itemId === id), receiptedIds.has(id) && !isReleaseCatalogItemHeld(id), id)
     }
   }
   // ownedByDefault starters stay in both

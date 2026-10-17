@@ -248,7 +248,7 @@ test("saving refuses an item outside the active room catalog even when it is own
 // are still refused, and no item outside the active catalog is ever placed, owned or not.
 test("the default room catalog leaves out a retired id and refuses a held or unknown one", async () => {
   const service = createPersonalRoomDecorService({
-    getOwnedRoomItemIds: async () => ["room_v2_cozy_bed", "room_v3_sofa_japon_cream", "room_v9_unknown"]
+    getOwnedRoomItemIds: async () => ["room_v2_cozy_bed", "room_v3_sofa_japon_cream", "room_v9_unknown", "room_v2_candidate_stand_in"]
   })
   const saved = await service.save("user_1", {
     expectedRevision: 0,
@@ -259,7 +259,8 @@ test("the default room catalog leaves out a retired id and refuses a held or unk
   assert.deepEqual(saved.snapshot.decor.placedItems, [])
   assert.equal(saved.strippedItemCount, 1)
   assert.deepEqual((await service.repository.get("user_1"))?.decor.placedItems, [])
-  for (const itemId of ["room_v3_sofa_japon_cream", "room_v9_unknown"]) {
+  // a candidate id is held by the development scope and an unknown id has no catalog row: both are refused
+  for (const itemId of ["room_v2_candidate_stand_in", "room_v9_unknown"]) {
     await assert.rejects(
       service.save("user_1", {
         expectedRevision: saved.snapshot.revision,

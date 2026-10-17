@@ -3,7 +3,8 @@ import {
   ECONOMY_CATALOG as DOMAIN_ECONOMY_CATALOG,
   isAvatarItemRetired,
   isLegacyItemId,
-  isReleaseCatalogItemHeld
+  isReleaseCatalogItemHeld,
+  type ReleaseCatalog
 } from "@blumi/domain"
 import type { AuthRepository } from "../auth/authRepository"
 
@@ -11,11 +12,11 @@ import type { AuthRepository } from "../auth/authRepository"
 export type QaClothingGrant = (userId: string) => Promise<readonly string[]>
 
 /** Held (receipt pending), non-legacy, non-retired avatar pieces: what the local QA accounts may wear. */
-function heldClothingItemIds(): readonly string[] {
+function heldClothingItemIds(releaseCatalog: ReleaseCatalog | undefined): readonly string[] {
   return Object.freeze(DOMAIN_ECONOMY_CATALOG
     .filter((item) =>
       item.type === "avatar" &&
-      isReleaseCatalogItemHeld(item.itemId) &&
+      isReleaseCatalogItemHeld(item.itemId, releaseCatalog) &&
       !isLegacyItemId(item.itemId) &&
       !isAvatarItemRetired(AVATAR_ITEM_RULES, item.itemId))
     .map((item) => item.itemId))
@@ -34,6 +35,8 @@ export function resolveQaClothingGrant(input: {
   nodeEnv: string
   authRepositoryMode: string
   authRepository: Pick<AuthRepository, "findAccountByUserId">
+  /** Which items are held. Defaults to the R1 release catalog; only tests pass another, to hold a fixture piece. */
+  releaseCatalog?: ReleaseCatalog
 }): QaClothingGrant | undefined {
   if (!input.qaAuth) return undefined
   // belt and braces: resolveServerConfig already refuses QA auth outside a local development memory server
@@ -41,7 +44,7 @@ export function resolveQaClothingGrant(input: {
     throw new Error("The QA clothing grant is only allowed on a local development memory server.")
   }
   const qaPhoneNumbers = new Set(input.qaAuth.phoneNumbers)
-  const grantedItemIds = heldClothingItemIds()
+  const grantedItemIds = heldClothingItemIds(input.releaseCatalog)
   return async (userId) => {
     const account = await input.authRepository.findAccountByUserId(userId)
     return account && qaPhoneNumbers.has(account.phoneNumber) ? grantedItemIds : []

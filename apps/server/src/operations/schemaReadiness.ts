@@ -8,6 +8,7 @@ import { BETA_RESET_RUNS_MIGRATION_ID } from "./betaResetRuns"
 import { CAT_TRIPS_MIGRATION_ID } from "../catTrips/catTripSchema"
 import { ROOM_PETS_MIGRATION_ID } from "../roomPets/roomPetSchema"
 import { CAT_TRIP_PREFS_MIGRATION_ID } from "../catTrips/catTripPrefs"
+import { STREET_MIGRATION_ID } from "../street/streetSchema"
 
 interface MigrationIdentity { id: string; checksum: string }
 interface SchemaQueryExecutor {
@@ -37,7 +38,9 @@ export const OPTIONAL_READINESS_MIGRATIONS: readonly string[] = Object.freeze([
   // The room pet service probes the ledger and its routes answer 409 until it is applied.
   ROOM_PETS_MIGRATION_ID,
   // The cat trip service reads the default switches (teasers off) until it is applied.
-  CAT_TRIP_PREFS_MIGRATION_ID
+  CAT_TRIP_PREFS_MIGRATION_ID,
+  // Sokağım probes its ledger row; the `chat_street` capability stays off until then.
+  STREET_MIGRATION_ID
 ])
 
 /** Read the packaged schema manifest once at service construction, not on each probe. */

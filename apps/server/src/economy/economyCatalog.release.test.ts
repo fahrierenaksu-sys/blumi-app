@@ -45,11 +45,14 @@ test("the production economy projection keeps the 2.5D starters and excludes old
     // the old flat room pieces were retired in X8 (legacy registry), the free cozy bed included
     "room_v2_cozy_bed",
     "room_v2_cute_bookshelf",
-    // pricing-pending (plan F8/R1): the blush chair is held; its receipt was removed in X8
-    "room_v2_chair_blush",
-    "room_v3_sofa_japon_cream"
+    "universal_bench_a"
   ]) {
     assert.equal(ids.has(excludedId), false, excludedId)
+  }
+  // the owner-approved home pieces are sold once receipted, and only then
+  for (const homeId of ["room_v2_chair_blush", "room_v3_sofa_japon_cream"]) {
+    assert.equal(ids.has(homeId), receipted.has(homeId), `${homeId} is sold exactly when it has a receipt`)
+    assert.equal(receipted.has(homeId), true, `${homeId} was approved by the owner and receipted`)
   }
 })
 

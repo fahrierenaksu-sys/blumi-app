@@ -37,6 +37,9 @@ const { ROOM_V2_FURNITURE_CATALOG } =
 const { hasAvatarItemRigArt } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("../avatar/model/avatarItemArt") as typeof import("../avatar/model/avatarItemArt")
+const { LAYERED_FURNITURE_ASSETS, LAYERED_WALL_ASSETS } =
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
+  require("../roomV2/furniture/layeredFurnitureAssets") as typeof import("../roomV2/furniture/layeredFurnitureAssets")
 const { AVATAR_STILL_ASSETS } =
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro asset and CommonJS fixture loading requires static require.
   require("../avatar/stills/stillAssets") as typeof import("../avatar/stills/stillAssets")
@@ -109,6 +112,9 @@ function resolveRuntimeAssetPaths(item: (typeof ECONOMY_CATALOG)[number]): strin
     }
   } else {
     collectAssetFiles(ROOM_V2_FURNITURE_CATALOG.find((furniture) => furniture.id === item.itemId), files)
+    // Plain Node has no room seam, so the catalog above is empty there; the pieces' bundled sprites are these maps.
+    collectAssetFiles(LAYERED_FURNITURE_ASSETS[item.itemId], files)
+    collectAssetFiles(LAYERED_WALL_ASSETS[item.itemId], files)
   }
   return [...files].map((file) => relative(repositoryRoot, file)).sort()
 }
@@ -172,8 +178,10 @@ test("published items are visible in the Shop and render in the Room", () => {
       )
     } else {
       assert.ok(
-        ROOM_V2_FURNITURE_CATALOG.some((furniture) => furniture.id === published.itemId),
-        `${published.itemId} has no Room V2 furniture entry`
+        ROOM_V2_FURNITURE_CATALOG.some((furniture) => furniture.id === published.itemId) ||
+          LAYERED_FURNITURE_ASSETS[published.itemId] !== undefined ||
+          LAYERED_WALL_ASSETS[published.itemId] !== undefined,
+        `${published.itemId} has no Room V2 furniture entry or bundled furniture sprites`
       )
     }
   }
@@ -269,14 +277,25 @@ test("each receipt's source commit holds the same asset bytes", (context) => {
 test("the room Shop never lists a held piece, in any build, even one the room catalog can draw", () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded after the image hooks above.
   const { buildRoomShopItems } = require("./shopCatalog") as typeof import("./shopCatalog")
-  // stand-in drawings (plain Node has no seam catalog); one unheld stand-in proves the Shop still lists pieces
+  // stand-in drawings (plain Node has no seam catalog). A candidate id is held by the development scope, an
+  // unheld stand-in proves the Shop still lists pieces, and the receipted sofa and chair prove published pieces sell.
   const standIn = (id: string, name: string): FurnitureItem => ({
     id, name, asset: { key: id, source: 1 }, category: "seating", layer: "furniture", width: 0.1, height: 0.1,
     interactionType: "seat"
   })
+  const heldId = "room_v2_candidate_stand_in"
   const unheldId = "stand_in_room_piece"
-  const economyCatalog = [...ECONOMY_CATALOG, { itemId: unheldId, type: "room" as const, title: "Stand-in", priceCoins: 10 }]
-  for (const publishedItemIds of [undefined, [...resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG).map((item) => item.itemId), unheldId]]) {
+  const publishedRoomIds = ["room_v2_chair_blush", "room_v3_sofa_japon_cream"].filter((id) =>
+    publishedItems.some((published) => published.itemId === id)
+  )
+  assert.equal(heldScopeFor(heldId) !== undefined, true, "the stand-in must be a held id")
+  assert.equal(heldScopeFor(unheldId), undefined)
+  const economyCatalog = [
+    ...ECONOMY_CATALOG,
+    { itemId: unheldId, type: "room" as const, title: "Stand-in", priceCoins: 10 },
+    { itemId: heldId, type: "room" as const, title: "Held stand-in", priceCoins: 10 }
+  ]
+  for (const publishedItemIds of [undefined, [...resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG).map((item) => item.itemId), unheldId, heldId]]) {
     const listed = buildRoomShopItems({
       roomDecor: { roomShellId: "room_v2_shell_blumi_world_v1", placedItems: [] },
       economyCatalog,
@@ -284,12 +303,13 @@ test("the room Shop never lists a held piece, in any build, even one the room ca
       roomFurnitureCatalog: [
         standIn("room_v2_chair_blush", "Blush Lounge Chair"),
         standIn("room_v3_sofa_japon_cream", "Japon Cream Sofa"),
+        standIn(heldId, "Held stand-in"),
         standIn(unheldId, "Stand-in")
       ],
       inventory: { ownedRoomItemIds: [] }
     }).map((item) => item.sourceItemId)
-    assert.equal(listed.includes("room_v3_sofa_japon_cream"), false)
-    assert.equal(listed.includes("room_v2_chair_blush"), false)
+    assert.equal(listed.includes(heldId), false, "a held piece is never listed")
+    for (const id of publishedRoomIds) assert.equal(listed.includes(id), true, `${id} is receipted and must be listed`)
     assert.ok(listed.length > 0, "unheld pieces are still listed")
   }
 })

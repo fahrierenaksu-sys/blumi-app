@@ -200,14 +200,16 @@ test("every published room_v2 item and the starter bed keep resolving to one can
 test("the editor tray never offers a held piece, even to an owner", () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- CommonJS fixture loading as above
   const { filterRoomEditorTrayCatalog } = require("./editor/roomEditorTrayCatalog") as typeof import("./editor/roomEditorTrayCatalog")
+  // The sofa, armchair and blush chair are receipted since 2026-10-17, so the tray offers them; the
+  // development scope (qa_ / room_v2_candidate_) is still held and never reaches the tray.
   const offered = filterRoomEditorTrayCatalog([
     { id: "room_v2_chair_blush" },
     { id: "room_v3_sofa_japon_cream" },
-    { id: "room_v3_armchair_japon_cream" },
+    { id: "room_v2_candidate_probe" },
     { id: "qa_room_probe" },
     { id: "standin_room_piece" }
   ]).map((item) => item.id)
-  assert.deepEqual(offered, ["standin_room_piece"])
+  assert.deepEqual(offered, ["room_v2_chair_blush", "room_v3_sofa_japon_cream", "standin_room_piece"])
 })
 
 test("the held-piece tray override is the local QA guard's decision and changes nothing else", () => {
@@ -215,14 +217,15 @@ test("the held-piece tray override is the local QA guard's decision and changes 
   const { resolveRoomEditorTrayCatalog, ROOM_EDITOR_TRAY_CATALOG } = require("./editor/roomEditorTrayCatalog") as typeof import("./editor/roomEditorTrayCatalog")
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- CommonJS fixture loading as above
   const { isReleaseCatalogItemHeld } = require("@blumi/domain") as typeof import("@blumi/domain")
-  const catalog = [{ id: "room_v3_sofa_japon_cream" }, { id: "standin_room_piece" }]
+  const catalog = [{ id: "room_v2_candidate_probe" }, { id: "standin_room_piece" }]
+  assert.equal(isReleaseCatalogItemHeld("room_v2_candidate_probe"), true, "the probe is still held")
   assert.deepEqual(
     resolveRoomEditorTrayCatalog(catalog, { showHeldPieces: false }).map((item) => item.id),
     ["standin_room_piece"]
   )
   assert.deepEqual(
     resolveRoomEditorTrayCatalog(catalog, { showHeldPieces: true }).map((item) => item.id),
-    ["room_v3_sofa_japon_cream", "standin_room_piece"]
+    ["room_v2_candidate_probe", "standin_room_piece"]
   )
   // Node tests, like release bundles, run without a dev build: the shipped tray stays filtered.
   assert.equal(ROOM_EDITOR_TRAY_CATALOG.some((item) => isReleaseCatalogItemHeld(item.id)), false)

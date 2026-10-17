@@ -9,7 +9,7 @@ const BOY = "avatar_v2_body_male_light"
 
 /**
  * The economy v1 lead price sheet (Workbench economy_2025/LEAD/PRICES.tsv, set under the owner's economy delegation
- * on 2026-10-16) for the 62 items that have no receipt yet: [item id, type, body that wears it, lead price in coins].
+ * on 2026-10-16) for the 62 items the owner approved on 2026-10-16: [item id, type, body that wears it, lead price in coins].
  * The server charges what the shared domain catalog says, so any second price table that drifts fails here.
  */
 const LEAD_PRICES: ReadonlyArray<readonly [string, EconomyItemType, string | null, number]> = [
@@ -84,14 +84,19 @@ test("the lead price sheet names 62 distinct items", () => {
   assert.equal(new Set(LEAD_PRICES.map(([itemId]) => itemId)).size, 62)
 })
 
-test("every unreceipted economy v1 item stays held in the real release catalog, so none is sold yet", async () => {
+test("every economy v1 item is sold at its lead price once receipted, and one without a receipt stays held", async () => {
+  const receipted = new Set(BLUMI_R1_RELEASE_CATALOG.publishedItems.map((item) => item.itemId))
   const service = createEconomyService({ catalog: DOMAIN_ECONOMY_CATALOG })
-  for (const [itemId, type, bodyId] of LEAD_PRICES) {
-    await assert.rejects(
-      service.purchaseItem(`user_held_${itemId}`, { itemId, type, avatarBodyId: bodyId ?? GIRL }),
-      /not available/,
-      itemId
-    )
+  assert.ok(LEAD_PRICES.length > 0, "the guard scanned the lead price sheet")
+  for (const [itemId, type, bodyId, priceCoins] of LEAD_PRICES) {
+    const userId = `user_buy_${itemId}`
+    const request = { itemId, type, avatarBodyId: bodyId ?? GIRL }
+    if (!receipted.has(itemId)) {
+      await assert.rejects(service.purchaseItem(userId, request), /not available/, itemId)
+      continue
+    }
+    await service.purchaseItem(userId, request)
+    assert.equal((await service.getInventory(userId)).coins, STARTER_COIN_BALANCE - priceCoins, `${itemId} is charged its lead price`)
   }
 })
 

@@ -37,6 +37,7 @@ import { useMyReports } from "../features/settings/useMyReports"
 import { useNotificationSettings } from "../features/settings/useNotificationSettings"
 import { usePhoneChange } from "../features/settings/usePhoneChange"
 import { useReadReceiptsSetting } from "../features/settings/useReadReceiptsSetting"
+import { useStreetWindowSetting } from "../features/street/useStreetWindowSetting"
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0"
 const BUILD_NUMBER = Platform.select({
@@ -62,6 +63,8 @@ type SettingsScreenProps = NativeStackScreenProps<
   onRequestPushPermission: () => Promise<void>
   /** `chat_read_receipts` resolved for this session. */
   readReceiptsCapability?: boolean
+  /** `chat_street` resolved for this session (Sokağım window switch). */
+  streetCapability?: boolean
 }
 
 /* ── Main Screen ───────────────────────────────────────────── */
@@ -112,6 +115,11 @@ export function SettingsScreen(props: SettingsScreenProps) {
     capabilityEnabled: props.readReceiptsCapability === true,
     copy,
     whenSettled: whenPushSettled
+  })
+  const streetWindow = useStreetWindowSetting({
+    sessionActor,
+    capabilityEnabled: props.streetCapability === true,
+    locale: locale === "en" ? "en" : "tr"
   })
   const handleGoBack = useCallback(() => {
     goBackOrFallback(navigation, () => navigation.replace("You"))
@@ -197,7 +205,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
             myReports={myReports}
           />
 
-          <SettingsPrivacySection copy={copy} analyticsConsent={analyticsConsent} readReceipts={readReceipts} />
+          <SettingsPrivacySection copy={copy} analyticsConsent={analyticsConsent} readReceipts={readReceipts} streetWindow={streetWindow} />
 
           <SettingsAboutSection copy={copy} versionLabel={VERSION_LABEL} />
 

@@ -50,7 +50,9 @@ test("only independently guarded additive features are optional for readiness", 
     // The room pet service probes this ledger row; its routes answer 409 until it is applied.
     "078_room_pets.sql",
     // Cat trip switches: defaults (teaser pushes off) until applied.
-    "079_cat_trip_prefs.sql"
+    "079_cat_trip_prefs.sql",
+    // Sokağım probes its own ledger row; the chat_street capability stays off until it is applied.
+    "080_street.sql"
   ])
 })
 

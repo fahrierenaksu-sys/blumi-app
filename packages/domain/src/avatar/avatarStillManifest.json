@@ -3,7 +3,7 @@
   "supersample": 2,
   "bodies": {
     "female": {
-      "rigSha256": "b6a21368d101add7c5265d568c1827aacac10d5c1481845d5c141fec4bb21e4a",
+      "rigSha256": "d50bb35bb9147a1cf75b1c2d6de2da54854fe6f74febd3da2e4b5efebe21b995",
       "sheetHeight": 967,
       "canvas": {
         "width": 640,
@@ -49,7 +49,7 @@
             "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__front",
             "rect": [
               146,
-              1384,
+              1411,
               317,
               178
             ],
@@ -58,7 +58,7 @@
               "key": "avatar_v2_shoes_mint_ribbon_court_sneakers__under",
               "rect": [
                 146,
-                1381,
+                1408,
                 317,
                 181
               ]
@@ -73,7 +73,7 @@
             "key": "avatar_v2_shoes_white_clean_sneakers__front",
             "rect": [
               145,
-              1390,
+              1417,
               319,
               170
             ],
@@ -82,7 +82,7 @@
               "key": "avatar_v2_shoes_white_clean_sneakers__under",
               "rect": [
                 136,
-                1381,
+                1408,
                 330,
                 179
               ]
@@ -92,7 +92,26 @@
         "shoes_girl_camel_ankle_boots": {
           "slot": "shoes",
           "rigItemId": "shoes_girl_camel_ankle_boots",
-          "thumb": "shoes_girl_camel_ankle_boots"
+          "thumb": "shoes_girl_camel_ankle_boots",
+          "showcase": {
+            "key": "shoes_girl_camel_ankle_boots__front",
+            "rect": [
+              131,
+              1343,
+              346,
+              246
+            ],
+            "order": 1,
+            "under": {
+              "key": "shoes_girl_camel_ankle_boots__under",
+              "rect": [
+                134,
+                1408,
+                334,
+                179
+              ]
+            }
+          }
         },
         "avatar_v2_bottom_coral_wave_pants": {
           "slot": "bottom",
@@ -102,7 +121,7 @@
             "key": "avatar_v2_bottom_coral_wave_pants__front",
             "rect": [
               18,
-              708,
+              735,
               576,
               682
             ],
@@ -111,9 +130,9 @@
               "key": "avatar_v2_bottom_coral_wave_pants__under",
               "rect": [
                 11,
-                642,
+                669,
                 583,
-                754
+                757
               ]
             }
           }
@@ -205,7 +224,7 @@
             "key": "avatar_v2_bottom_black_highwaist_trousers__front",
             "rect": [
               13,
-              663,
+              690,
               581,
               747
             ],
@@ -214,9 +233,9 @@
               "key": "avatar_v2_bottom_black_highwaist_trousers__under",
               "rect": [
                 11,
-                642,
+                669,
                 583,
-                754
+                757
               ]
             }
           }
@@ -285,7 +304,26 @@
             {
               "part": "sit"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "bottom_girl_wine_midi_skirt__front",
+            "rect": [
+              60,
+              684,
+              501,
+              510
+            ],
+            "order": 2,
+            "under": {
+              "key": "bottom_girl_wine_midi_skirt__under",
+              "rect": [
+                11,
+                669,
+                583,
+                757
+              ]
+            }
+          }
         },
         "bottom_girl_wide_jeans": {
           "slot": "bottom",
@@ -351,7 +389,26 @@
             {
               "part": "sit"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "bottom_girl_wide_jeans__front",
+            "rect": [
+              40,
+              705,
+              543,
+              720
+            ],
+            "order": 2,
+            "under": {
+              "key": "bottom_girl_wide_jeans__under",
+              "rect": [
+                11,
+                669,
+                583,
+                757
+              ]
+            }
+          }
         },
         "bottom_girl_ecru_trousers": {
           "slot": "bottom",
@@ -417,7 +474,26 @@
             {
               "part": "sit"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "bottom_girl_ecru_trousers__front",
+            "rect": [
+              40,
+              702,
+              544,
+              715
+            ],
+            "order": 2,
+            "under": {
+              "key": "bottom_girl_ecru_trousers__under",
+              "rect": [
+                11,
+                669,
+                583,
+                757
+              ]
+            }
+          }
         },
         "avatar_v2_top_coral_wave_polo": {
           "slot": "top",
@@ -427,7 +503,7 @@
             "key": "avatar_v2_top_coral_wave_polo__front",
             "rect": [
               113,
-              395,
+              422,
               378,
               342
             ],
@@ -435,10 +511,10 @@
             "under": {
               "key": "avatar_v2_top_coral_wave_polo__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                413,
+                486,
+                401
               ]
             }
           }
@@ -484,7 +560,7 @@
             "key": "avatar_v2_top_white_cute_crop_top__front",
             "rect": [
               124,
-              435,
+              462,
               359,
               265
             ],
@@ -492,10 +568,10 @@
             "under": {
               "key": "avatar_v2_top_white_cute_crop_top__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                413,
+                486,
+                401
               ]
             }
           }
@@ -541,7 +617,7 @@
             "key": "avatar_v2_top_black_cute_crop_top__front",
             "rect": [
               124,
-              435,
+              462,
               359,
               265
             ],
@@ -549,10 +625,10 @@
             "under": {
               "key": "avatar_v2_top_black_cute_crop_top__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                413,
+                486,
+                401
               ]
             }
           }
@@ -565,7 +641,7 @@
             "key": "top_sage_ribbon_knit_jacket__front",
             "rect": [
               106,
-              416,
+              443,
               393,
               311
             ],
@@ -573,10 +649,10 @@
             "under": {
               "key": "top_sage_ribbon_knit_jacket__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                413,
+                486,
+                401
               ]
             }
           }
@@ -609,7 +685,7 @@
             "key": "top_powder_blue_ribbon_corset_top__front",
             "rect": [
               172,
-              422,
+              449,
               263,
               320
             ],
@@ -617,10 +693,10 @@
             "under": {
               "key": "top_powder_blue_ribbon_corset_top__under",
               "rect": [
-                113,
-                404,
-                380,
-                325
+                60,
+                413,
+                486,
+                401
               ]
             }
           }
@@ -628,37 +704,170 @@
         "jacket_girl_light_denim_crop": {
           "slot": "top",
           "rigItemId": "jacket_girl_light_denim_crop",
-          "thumb": "jacket_girl_light_denim_crop"
+          "thumb": "jacket_girl_light_denim_crop",
+          "showcase": {
+            "key": "jacket_girl_light_denim_crop__front",
+            "rect": [
+              55,
+              419,
+              496,
+              404
+            ],
+            "order": 3,
+            "under": {
+              "key": "jacket_girl_light_denim_crop__under",
+              "rect": [
+                60,
+                413,
+                486,
+                401
+              ]
+            }
+          }
         },
         "jacket_girl_black_crop_blazer": {
           "slot": "top",
           "rigItemId": "jacket_girl_black_crop_blazer",
-          "thumb": "jacket_girl_black_crop_blazer"
+          "thumb": "jacket_girl_black_crop_blazer",
+          "showcase": {
+            "key": "jacket_girl_black_crop_blazer__front",
+            "rect": [
+              49,
+              422,
+              508,
+              419
+            ],
+            "order": 3,
+            "under": {
+              "key": "jacket_girl_black_crop_blazer__under",
+              "rect": [
+                60,
+                413,
+                486,
+                401
+              ]
+            }
+          }
         },
         "top_girl_camel_vest_tee": {
           "slot": "top",
           "rigItemId": "top_girl_camel_vest_tee",
-          "thumb": "top_girl_camel_vest_tee"
+          "thumb": "top_girl_camel_vest_tee",
+          "showcase": {
+            "key": "top_girl_camel_vest_tee__front",
+            "rect": [
+              103,
+              422,
+              403,
+              380
+            ],
+            "order": 3,
+            "under": {
+              "key": "top_girl_camel_vest_tee__under",
+              "rect": [
+                60,
+                413,
+                486,
+                401
+              ]
+            }
+          }
         },
         "top_girl_white_poplin_shirt": {
           "slot": "top",
           "rigItemId": "top_girl_white_poplin_shirt",
-          "thumb": "top_girl_white_poplin_shirt"
+          "thumb": "top_girl_white_poplin_shirt",
+          "showcase": {
+            "key": "top_girl_white_poplin_shirt__front",
+            "rect": [
+              97,
+              422,
+              405,
+              379
+            ],
+            "order": 3,
+            "under": {
+              "key": "top_girl_white_poplin_shirt__under",
+              "rect": [
+                60,
+                413,
+                486,
+                401
+              ]
+            }
+          }
         },
         "top_girl_rose_pearl_cardigan": {
           "slot": "top",
           "rigItemId": "top_girl_rose_pearl_cardigan",
-          "thumb": "top_girl_rose_pearl_cardigan"
+          "thumb": "top_girl_rose_pearl_cardigan",
+          "showcase": {
+            "key": "top_girl_rose_pearl_cardigan__front",
+            "rect": [
+              119,
+              422,
+              366,
+              351
+            ],
+            "order": 3,
+            "under": {
+              "key": "top_girl_rose_pearl_cardigan__under",
+              "rect": [
+                60,
+                413,
+                486,
+                401
+              ]
+            }
+          }
         },
         "top_girl_breton_stripe": {
           "slot": "top",
           "rigItemId": "top_girl_breton_stripe",
-          "thumb": "top_girl_breton_stripe"
+          "thumb": "top_girl_breton_stripe",
+          "showcase": {
+            "key": "top_girl_breton_stripe__front",
+            "rect": [
+              87,
+              464,
+              430,
+              324
+            ],
+            "order": 3,
+            "under": {
+              "key": "top_girl_breton_stripe__under",
+              "rect": [
+                60,
+                413,
+                486,
+                401
+              ]
+            }
+          }
         },
         "top_girl_sage_knit_polo": {
           "slot": "top",
           "rigItemId": "top_girl_sage_knit_polo",
-          "thumb": "top_girl_sage_knit_polo"
+          "thumb": "top_girl_sage_knit_polo",
+          "showcase": {
+            "key": "top_girl_sage_knit_polo__front",
+            "rect": [
+              114,
+              422,
+              376,
+              358
+            ],
+            "order": 3,
+            "under": {
+              "key": "top_girl_sage_knit_polo__under",
+              "rect": [
+                60,
+                413,
+                486,
+                401
+              ]
+            }
+          }
         },
         "avatar_v2_hair_ink_pageboy_star": {
           "slot": "hair",
@@ -668,7 +877,7 @@
             "key": "avatar_v2_hair_ink_pageboy_star__front",
             "rect": [
               140,
-              66,
+              93,
               326,
               372
             ],
@@ -677,7 +886,7 @@
               "key": "avatar_v2_hair_ink_pageboy_star__back",
               "rect": [
                 116,
-                52,
+                79,
                 384,
                 386
               ]
@@ -692,7 +901,7 @@
             "key": "avatar_v2_hair_mocha_ribbon_waves__front",
             "rect": [
               88,
-              67,
+              94,
               431,
               659
             ],
@@ -701,7 +910,7 @@
               "key": "avatar_v2_hair_mocha_ribbon_waves__back",
               "rect": [
                 46,
-                15,
+                42,
                 517,
                 731
               ]
@@ -716,7 +925,7 @@
             "key": "hair_girl_bob__front",
             "rect": [
               133,
-              67,
+              94,
               354,
               349
             ],
@@ -725,7 +934,7 @@
               "key": "hair_girl_bob__back",
               "rect": [
                 97,
-                54,
+                81,
                 415,
                 363
               ]
@@ -740,7 +949,7 @@
             "key": "hair_girl_pigtails__front",
             "rect": [
               121,
-              67,
+              94,
               364,
               492
             ],
@@ -749,7 +958,7 @@
               "key": "hair_girl_pigtails__back",
               "rect": [
                 125,
-                58,
+                85,
                 355,
                 501
               ]
@@ -759,37 +968,170 @@
         "hair_girl_bun_wine_bow": {
           "slot": "hair",
           "rigItemId": "hair_girl_bun_wine_bow",
-          "thumb": "hair_girl_bun_wine_bow"
+          "thumb": "hair_girl_bun_wine_bow",
+          "showcase": {
+            "key": "hair_girl_bun_wine_bow__front",
+            "rect": [
+              141,
+              94,
+              317,
+              342
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_girl_bun_wine_bow__back",
+              "rect": [
+                135,
+                10,
+                334,
+                426
+              ]
+            }
+          }
         },
         "hair_girl_chestnut_butterfly": {
           "slot": "hair",
           "rigItemId": "hair_girl_chestnut_butterfly",
-          "thumb": "hair_girl_chestnut_butterfly"
+          "thumb": "hair_girl_chestnut_butterfly",
+          "showcase": {
+            "key": "hair_girl_chestnut_butterfly__front",
+            "rect": [
+              145,
+              94,
+              318,
+              401
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_girl_chestnut_butterfly__back",
+              "rect": [
+                60,
+                76,
+                490,
+                419
+              ]
+            }
+          }
         },
         "hair_girl_ink_french_bob": {
           "slot": "hair",
           "rigItemId": "hair_girl_ink_french_bob",
-          "thumb": "hair_girl_ink_french_bob"
+          "thumb": "hair_girl_ink_french_bob",
+          "showcase": {
+            "key": "hair_girl_ink_french_bob__front",
+            "rect": [
+              143,
+              94,
+              313,
+              333
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_girl_ink_french_bob__back",
+              "rect": [
+                100,
+                85,
+                388,
+                347
+              ]
+            }
+          }
         },
         "hair_girl_caramel_braid_crown": {
           "slot": "hair",
           "rigItemId": "hair_girl_caramel_braid_crown",
-          "thumb": "hair_girl_caramel_braid_crown"
+          "thumb": "hair_girl_caramel_braid_crown",
+          "showcase": {
+            "key": "hair_girl_caramel_braid_crown__front",
+            "rect": [
+              128,
+              94,
+              349,
+              473
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_girl_caramel_braid_crown__back",
+              "rect": [
+                78,
+                89,
+                454,
+                478
+              ]
+            }
+          }
         },
         "hair_girl_copper_soft_waves": {
           "slot": "hair",
           "rigItemId": "hair_girl_copper_soft_waves",
-          "thumb": "hair_girl_copper_soft_waves"
+          "thumb": "hair_girl_copper_soft_waves",
+          "showcase": {
+            "key": "hair_girl_copper_soft_waves__front",
+            "rect": [
+              122,
+              94,
+              360,
+              521
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_girl_copper_soft_waves__back",
+              "rect": [
+                68,
+                92,
+                472,
+                523
+              ]
+            }
+          }
         },
         "hair_girl_ink_twin_braids": {
           "slot": "hair",
           "rigItemId": "hair_girl_ink_twin_braids",
-          "thumb": "hair_girl_ink_twin_braids"
+          "thumb": "hair_girl_ink_twin_braids",
+          "showcase": {
+            "key": "hair_girl_ink_twin_braids__front",
+            "rect": [
+              140,
+              94,
+              326,
+              515
+            ],
+            "order": 4,
+            "back": {
+              "key": "hair_girl_ink_twin_braids__back",
+              "rect": [
+                129,
+                83,
+                347,
+                526
+              ]
+            }
+          }
         },
         "dress_girl_wine_gingham_tie": {
           "slot": "dress",
           "rigItemId": "dress_girl_wine_gingham_tie",
-          "thumb": "dress_girl_wine_gingham_tie"
+          "thumb": "dress_girl_wine_gingham_tie",
+          "showcase": {
+            "key": "dress_girl_wine_gingham_tie__front",
+            "rect": [
+              18,
+              460,
+              576,
+              915
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_wine_gingham_tie__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "dress_girl_black_corset_slit_maxi": {
           "slot": "dress",
@@ -817,7 +1159,26 @@
             {
               "part": "sit"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "dress_girl_black_corset_slit_maxi__front",
+            "rect": [
+              18,
+              442,
+              545,
+              941
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_black_corset_slit_maxi__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "dress_girl_terracotta_patchwork_halter_bias_maxi": {
           "slot": "dress",
@@ -845,7 +1206,26 @@
             {
               "part": "sit"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "dress_girl_terracotta_patchwork_halter_bias_maxi__front",
+            "rect": [
+              17,
+              422,
+              580,
+              995
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_terracotta_patchwork_halter_bias_maxi__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "dress_girl_denim_milkmaid_button_midi": {
           "slot": "dress",
@@ -873,7 +1253,26 @@
             {
               "part": "sit"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "dress_girl_denim_milkmaid_button_midi__front",
+            "rect": [
+              36,
+              462,
+              558,
+              914
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_denim_milkmaid_button_midi__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "dress_girl_cream_one_shoulder_tie_midi": {
           "slot": "dress",
@@ -901,57 +1300,221 @@
             {
               "part": "sit"
             }
-          ]
+          ],
+          "showcase": {
+            "key": "dress_girl_cream_one_shoulder_tie_midi__front",
+            "rect": [
+              18,
+              459,
+              576,
+              956
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_cream_one_shoulder_tie_midi__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "dress_girl_denim_pinafore_mini": {
           "slot": "dress",
           "rigItemId": "dress_girl_denim_pinafore_mini",
-          "thumb": "dress_girl_denim_pinafore_mini"
+          "thumb": "dress_girl_denim_pinafore_mini",
+          "showcase": {
+            "key": "dress_girl_denim_pinafore_mini__front",
+            "rect": [
+              39,
+              460,
+              524,
+              547
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_denim_pinafore_mini__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "dress_girl_sage_shirred_tiered_mini": {
           "slot": "dress",
           "rigItemId": "dress_girl_sage_shirred_tiered_mini",
-          "thumb": "dress_girl_sage_shirred_tiered_mini"
+          "thumb": "dress_girl_sage_shirred_tiered_mini",
+          "showcase": {
+            "key": "dress_girl_sage_shirred_tiered_mini__front",
+            "rect": [
+              19,
+              457,
+              567,
+              568
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_sage_shirred_tiered_mini__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "dress_girl_black_corset_flare_mini": {
           "slot": "dress",
           "rigItemId": "dress_girl_black_corset_flare_mini",
-          "thumb": "dress_girl_black_corset_flare_mini"
+          "thumb": "dress_girl_black_corset_flare_mini",
+          "showcase": {
+            "key": "dress_girl_black_corset_flare_mini__front",
+            "rect": [
+              19,
+              442,
+              576,
+              973
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_black_corset_flare_mini__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "dress_girl_butter_square_puff_mini": {
           "slot": "dress",
           "rigItemId": "dress_girl_butter_square_puff_mini",
-          "thumb": "dress_girl_butter_square_puff_mini"
+          "thumb": "dress_girl_butter_square_puff_mini",
+          "showcase": {
+            "key": "dress_girl_butter_square_puff_mini__front",
+            "rect": [
+              20,
+              462,
+              575,
+              953
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_butter_square_puff_mini__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "dress_girl_cream_one_shoulder_mini": {
           "slot": "dress",
           "rigItemId": "dress_girl_cream_one_shoulder_mini",
-          "thumb": "dress_girl_cream_one_shoulder_mini"
+          "thumb": "dress_girl_cream_one_shoulder_mini",
+          "showcase": {
+            "key": "dress_girl_cream_one_shoulder_mini__front",
+            "rect": [
+              83,
+              463,
+              438,
+              537
+            ],
+            "order": 3,
+            "under": {
+              "key": "dress_girl_cream_one_shoulder_mini__under",
+              "rect": [
+                11,
+                413,
+                583,
+                1013
+              ]
+            }
+          }
         },
         "glasses_girl_gold_round": {
           "slot": "glasses",
           "rigItemId": "glasses_girl_gold_round",
-          "thumb": "glasses_girl_gold_round"
+          "thumb": "glasses_girl_gold_round",
+          "showcase": {
+            "key": "glasses_girl_gold_round__front",
+            "rect": [
+              159,
+              269,
+              282,
+              104
+            ],
+            "order": 5
+          }
         },
         "glasses_girl_rose_soft_cateye": {
           "slot": "glasses",
           "rigItemId": "glasses_girl_rose_soft_cateye",
-          "thumb": "glasses_girl_rose_soft_cateye"
+          "thumb": "glasses_girl_rose_soft_cateye",
+          "showcase": {
+            "key": "glasses_girl_rose_soft_cateye__front",
+            "rect": [
+              156,
+              272,
+              294,
+              92
+            ],
+            "order": 5
+          }
         },
         "clip_girl_pearl_bar_pair": {
           "slot": "accessory",
           "rigItemId": "clip_girl_pearl_bar_pair",
-          "thumb": "clip_girl_pearl_bar_pair"
+          "thumb": "clip_girl_pearl_bar_pair",
+          "showcase": {
+            "key": "clip_girl_pearl_bar_pair__front",
+            "rect": [
+              387,
+              177,
+              46,
+              42
+            ],
+            "order": 6
+          }
         },
         "necklace_girl_pearl_drop": {
           "slot": "accessory",
           "rigItemId": "necklace_girl_pearl_drop",
-          "thumb": "necklace_girl_pearl_drop"
+          "thumb": "necklace_girl_pearl_drop",
+          "showcase": {
+            "key": "necklace_girl_pearl_drop__front",
+            "rect": [
+              259,
+              448,
+              91,
+              60
+            ],
+            "order": 6
+          }
         },
         "bag_girl_camel_mini": {
           "slot": "accessory",
           "rigItemId": "bag_girl_camel_mini",
-          "thumb": "bag_girl_camel_mini"
+          "thumb": "bag_girl_camel_mini",
+          "showcase": {
+            "key": "bag_girl_camel_mini__front",
+            "rect": [
+              388,
+              465,
+              106,
+              383
+            ],
+            "order": 6
+          }
         }
       },
       "layers": {
@@ -1586,6 +2149,35 @@
             "legVariant": "bottom"
           },
           {
+            "key": "avatar_v2_bottom_coral_wave_pants__o1__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 1,
+            "seq": 2003,
+            "rect": [
+              243,
+              887,
+              50,
+              29
+            ],
+            "leg": "farLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "avatar_v2_bottom_coral_wave_pants__o1__bottom-cut",
+              "rect": [
+                0,
+                0,
+                50,
+                29
+              ],
+              "sheet": [
+                50,
+                29
+              ]
+            }
+          },
+          {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o1__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
             "owner": "avatar_v2_bottom_black_highwaist_trousers",
             "slot": "bottom",
@@ -2179,6 +2771,35 @@
             ],
             "leg": "nearLeg",
             "legVariant": "bottom"
+          },
+          {
+            "key": "avatar_v2_bottom_coral_wave_pants__o2__bottom__cut-by__shoes_girl_camel_ankle_boots",
+            "owner": "avatar_v2_bottom_coral_wave_pants",
+            "slot": "bottom",
+            "order": 2,
+            "seq": 2004,
+            "rect": [
+              349,
+              911,
+              50,
+              20
+            ],
+            "leg": "nearLeg",
+            "legVariant": "bottom",
+            "gatedBy": "shoes_girl_camel_ankle_boots",
+            "source": {
+              "key": "avatar_v2_bottom_coral_wave_pants__o2__bottom-cut",
+              "rect": [
+                0,
+                0,
+                50,
+                20
+              ],
+              "sheet": [
+                50,
+                20
+              ]
+            }
           },
           {
             "key": "avatar_v2_bottom_black_highwaist_trousers__o2__bottom__cut-by__avatar_v2_shoes_mint_ribbon_court_sneakers",
@@ -5275,29 +5896,29 @@
       "showcaseBase": {
         "key": "base__front",
         "canvas": {
-          "width": 604,
-          "height": 1572
+          "width": 607,
+          "height": 1599
         },
         "ground": [
           302,
-          1560
+          1587
         ],
         "windows": {
           "card": [
             0,
             0,
-            604,
-            1572
+            607,
+            1599
           ],
           "head": [
             103,
-            13,
+            40,
             400,
             400
           ],
           "push": [
             23,
-            13,
+            40,
             560,
             560
           ]
@@ -5975,12 +6596,32 @@
         "glasses_boy_black_soft_rect": {
           "slot": "glasses",
           "rigItemId": "glasses_boy_black_soft_rect",
-          "thumb": "glasses_boy_black_soft_rect"
+          "thumb": "glasses_boy_black_soft_rect",
+          "showcase": {
+            "key": "glasses_boy_black_soft_rect__front",
+            "rect": [
+              177,
+              237,
+              251,
+              72
+            ],
+            "order": 5
+          }
         },
         "glasses_boy_gunmetal_round": {
           "slot": "glasses",
           "rigItemId": "glasses_boy_gunmetal_round",
-          "thumb": "glasses_boy_gunmetal_round"
+          "thumb": "glasses_boy_gunmetal_round",
+          "showcase": {
+            "key": "glasses_boy_gunmetal_round__front",
+            "rect": [
+              178,
+              229,
+              248,
+              89
+            ],
+            "order": 5
+          }
         }
       },
       "layers": {

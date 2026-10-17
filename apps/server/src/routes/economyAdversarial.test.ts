@@ -136,7 +136,9 @@ test("A4 unknown, cross-category, default-owned, retired and wrong-body items ar
     { itemId: TEST_AVATAR_ITEM.retiredTop, type: "avatar", error: /not available/i },
     { itemId: TEST_ROOM_STARTER_ITEM_ID, type: "room", error: /already own/i },
     { itemId: "room_v2_cozy_bed", type: "room", error: /not available/i },
-    { itemId: "room_v3_sofa_japon_cream", type: "room", error: /not available/i },
+    { itemId: "avatar_v2_top_cherry_heart_milkmaid_blouse", type: "avatar", error: /not available/i },
+    // held by the development scope (no receipt can exist for a candidate id)
+    { itemId: "room_v2_candidate_stand_in", type: "room", error: /not available/i },
     { itemId: "avatar_v2_top_locked_luxe", type: "avatar", error: /not available/i },
     { itemId: MALE_TOP, type: "avatar", error: /does not fit/i },
     { itemId: "", type: "avatar", error: /choose a shop item/i },

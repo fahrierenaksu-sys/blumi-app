@@ -173,10 +173,13 @@ test("the baked manifest's front art is complete: a base with windows inside its
 const SLOT_FIELD = { top: "topId", bottom: "bottomId", shoes: "shoesId", hair: "hairId" } as const;
 const DEFAULT_LOOK = { female: DEFAULT_FEMALE_AVATAR_LOADOUT, male: DEFAULT_MALE_AVATAR_LOADOUT } as const;
 
-/** The body's default look wearing one item in its slot. */
+/** The body's default look wearing one item in its slot: a dress replaces top and bottom, glasses and accessories are worn. */
 function wearing(rig: keyof typeof DEFAULT_LOOK, itemId: string) {
-  const slot = AVATAR_STILL_MANIFEST.bodies[rig].items[itemId]!.slot as keyof typeof SLOT_FIELD;
-  return { ...DEFAULT_LOOK[rig], [SLOT_FIELD[slot]]: itemId };
+  const slot = AVATAR_STILL_MANIFEST.bodies[rig].items[itemId]!.slot;
+  const look = { ...DEFAULT_LOOK[rig], schemaVersion: 2, dressId: null, outerwearId: null };
+  if (slot === "dress") return { ...look, dressId: itemId };
+  if (slot === "glasses" || slot === "accessory") return { ...look, accessoryIds: [itemId] };
+  return { ...look, [SLOT_FIELD[slot as keyof typeof SLOT_FIELD]]: itemId };
 }
 
 /** What each drawn layer is: hair back, the base, the body under a piece, or a piece's front. */

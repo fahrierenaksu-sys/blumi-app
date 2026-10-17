@@ -140,6 +140,8 @@ const app = createServer({
   },
   authService: services.authService,
   capabilityService: services.capabilityService,
+  streetRepository: services.streetRepository,
+  streetSchema: services.streetSchema,
   firebaseAuthVerifier,
   // Only a loopback, in-memory development API can carry QA auth (config.ts).
   localQaOtpEnabled: isLocalQaOtpEnabled(config),
@@ -203,6 +205,7 @@ async function start() {
   // Learn whether migration 070 is applied before serving, so the first
   // capability answers already include receipts (the probe never throws).
   await services.chatReceiptSchema.isReady()
+  await services.streetSchema.isReady()
   await app.listen({ port: config.port, host: config.host })
   await realtimeServer.listen({
     port: config.realtimePort,

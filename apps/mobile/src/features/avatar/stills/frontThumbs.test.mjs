@@ -1,5 +1,6 @@
-// Card thumbs cut from the showcase front (tools/avatar25d/front-thumbs.mjs): an unpublished item's Shop and
-// Wardrobe thumb is its front cut, a published item keeps its receipt-locked rig thumb, and the cut only removes
+// Card thumbs cut from the showcase front (tools/avatar25d/front-thumbs.mjs): every item's Shop and Wardrobe thumb
+// shows it from the front (owner, 2026-10-16), a published item only when PUBLISHED_FRONT_THUMBS lists it (its
+// receipt is reissued for the new bytes), and the cut only removes
 // the body a front layer carries, never fabric inside the item's outline. A hand redraw (thumb-redraws/) wins over the
 // front cut; a seeded cleanup redraw (seed-clean-thumbs.mjs) is reproducible from its seeds and only removes pixels.
 import assert from "node:assert/strict"
@@ -10,7 +11,7 @@ import { join, resolve } from "node:path"
 import test from "node:test"
 import sharp from "sharp"
 import { seedClean } from "../../../../../../tools/avatar25d/seed-clean-thumbs.mjs"
-import { premultipliedResize, readFrontThumbPins, thumbSource, withoutCarriedBody } from "../../../../../../tools/avatar25d/front-thumbs.mjs"
+import { PUBLISHED_FRONT_THUMBS, premultipliedResize, readFrontThumbPins, thumbSource, withoutCarriedBody } from "../../../../../../tools/avatar25d/front-thumbs.mjs"
 
 const ROOT = resolve(import.meta.dirname, "../../../../../..")
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex")
@@ -18,12 +19,12 @@ const MANIFEST = JSON.parse(readFileSync(join(ROOT, "packages/domain/src/avatar/
 const REDRAWS = join(ROOT, "tools/avatar25d/thumb-redraws")
 const PUBLISHED = new Set(JSON.parse(readFileSync(join(ROOT, "packages/domain/src/release/blumiR1ReleaseCatalog.json"), "utf8")).publishedItems.map((i) => i.itemId))
 
-test("an unpublished item with a front pin ships exactly its front cut as the card thumb", () => {
+test("an item with a front pin ships exactly its front cut as the card thumb", () => {
   const pins = readFrontThumbPins()
   let checked = 0
   for (const [rig, items] of Object.entries(pins)) {
     for (const [itemId, pin] of Object.entries(items)) {
-      assert.ok(!PUBLISHED.has(itemId), `${itemId} is published: its thumb is receipt-locked and must not have a front pin`)
+      assert.ok(!PUBLISHED.has(itemId) || PUBLISHED_FRONT_THUMBS.has(itemId), `${itemId} is published: its thumb is receipt-locked, a front pin needs PUBLISHED_FRONT_THUMBS`)
       const item = MANIFEST.bodies[rig]?.items[itemId]
       if (!item) continue // pinned ahead of its rig art: baked once the item lands
       const thumb = readFileSync(join(ROOT, "apps/mobile/src/features/avatar/stills/layers", rig, "thumb", `${item.thumb}.webp`))
@@ -39,12 +40,28 @@ test("an unpublished item with a front pin ships exactly its front cut as the ca
   assert.ok(checked > 0, "no front-cut thumb was checked")
 })
 
-test("a published item keeps its rig thumb, and a front pin for one is refused", () => {
-  assert.equal(thumbSource({ itemId: "p", isPublished: true, hasRedraw: false, hasFront: false }), "rig")
+test("the app bake takes every thumb from the front; a published front pin needs the owner's allow list", () => {
+  const listed = [...PUBLISHED_FRONT_THUMBS][0]
+  assert.equal(thumbSource({ itemId: listed, isPublished: true, hasRedraw: false, hasFront: true, requireFront: true }), "front")
   assert.throws(() => thumbSource({ itemId: "p", isPublished: true, hasRedraw: false, hasFront: true }), /receipt-locked/)
-  assert.equal(thumbSource({ itemId: "n", isPublished: false, hasRedraw: false, hasFront: true }), "front")
+  assert.equal(thumbSource({ itemId: "n", isPublished: false, hasRedraw: false, hasFront: true, requireFront: true }), "front")
+  assert.throws(() => thumbSource({ itemId: "n", isPublished: false, hasRedraw: false, hasFront: false, requireFront: true }), /no front thumb/)
   assert.equal(thumbSource({ itemId: "n", isPublished: false, hasRedraw: false, hasFront: false }), "rig")
-  assert.equal(thumbSource({ itemId: "n", isPublished: false, hasRedraw: true, hasFront: true }), "redraw")
+  assert.equal(thumbSource({ itemId: "n", isPublished: false, hasRedraw: true, hasFront: true, requireFront: true }), "redraw")
+  for (const itemId of PUBLISHED_FRONT_THUMBS) assert.ok(PUBLISHED.has(itemId), `${itemId} is not published: drop it from PUBLISHED_FRONT_THUMBS`)
+})
+
+test("every Shop and Wardrobe card thumb is a front cut or a hand redraw, never the room's rig bake", () => {
+  const pins = readFrontThumbPins()
+  let checked = 0
+  for (const [rig, body] of Object.entries(MANIFEST.bodies)) {
+    for (const itemId of Object.keys(body.items)) {
+      const front = Boolean(pins[rig]?.[itemId]), redraw = existsSync(join(REDRAWS, rig, `${itemId}.webp`))
+      assert.ok(front || redraw, `${rig}/${itemId}: its card thumb has no front cut (run front-thumbs.mjs)`)
+      checked++
+    }
+  }
+  assert.ok(checked > 0, "no card thumb was checked")
 })
 
 const SKIN = [240, 200, 175], FABRIC = [40, 60, 160]

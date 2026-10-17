@@ -33,17 +33,23 @@ export interface LegPlan {
 /**
  * The leg drawing for what is worn. Items own their drawings ('bottom' on a bottom, 'shoes' on shoes; export_rig.py
  * leg_variant_owners). A legacy pair drawing ('bottom+shoes', the girl's QA'd one, one item per slot) wins when worn
- * with both; otherwise a bottom worn with shoes draws its own 'bottom' drawing only where the shoes' 'shoes' drawing
+ * with both and the shoes are the ones it was fitted with (LEGACY_PAIR_SHOES); otherwise a bottom worn with shoes draws its own 'bottom' drawing only where the shoes' 'shoes' drawing
  * is drawn too (the AND of the two coverages, which equals the factory's fitted pair up to a hidden heel rim:
  * WB integration/combo_proof_0750/PROOF.md). One alone draws its own drawing; neither leaves the bare legs.
  */
+/**
+ * The shoes a legacy pair drawing was fitted and QA'd with (the girl's starter sneakers). Its bare feet are cut to
+ * their silhouette, so with any other shoes (an ankle boot) they show past the shoe: those shoes compose instead.
+ */
+export const LEGACY_PAIR_SHOES: ReadonlySet<string> = new Set(["shoes_mint_ribbon_court_sneakers", "shoes_white_sneakers"])
+
 export function legPlan(v: Rig25View, worn: string[]): LegPlan | null {
   const owns = (k: number, key: string) => k >= 0 && v.items[worn[k]].mesh.ranges.some((r) => r.legVariant === key && r.layer)
   // a one-piece dress is the bottom for the legs (the bare legs under its skirt)
   const bottom = worn.findIndex((id) => v.items[id].slot === "bottom" || v.items[id].slot === "dress")
   const shoes = worn.findIndex((id) => v.items[id].slot === "shoes")
   if (bottom >= 0 && shoes >= 0) {
-    const pair = worn.findIndex((_, k) => owns(k, "bottom+shoes"))
+    const pair = LEGACY_PAIR_SHOES.has(worn[shoes]) ? worn.findIndex((_, k) => owns(k, "bottom+shoes")) : -1
     if (pair >= 0) return { set: pair + 1, key: "bottom+shoes" }
     if (owns(bottom, "bottom") && owns(shoes, "shoes")) return { set: bottom + 1, key: "bottom", mask: shoes + 1 }
   }

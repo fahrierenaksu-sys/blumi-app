@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 
 export interface RateBudgetResult { allowed: boolean; retryAfterSeconds: number }
 export type UserRateBudgetScope = "general" | "chatSend" | "roomLeave" | "deviceRegistration" | "deviceRemoval" |
-  "authVerification" | "accountRecovery" | "accountSecurity"
+  "authVerification" | "accountRecovery" | "accountSecurity" | "streetRead"
 export interface SharedRateBudget {
   consumeUser(userId: string, scope?: UserRateBudgetScope): Promise<RateBudgetResult>
   purgeExpired(): Promise<void>
@@ -26,7 +26,10 @@ export const USER_RATE_BUDGET_LIMITS: Readonly<Record<UserRateBudgetScope, numbe
   deviceRemoval: 30,
   authVerification: 10,
   accountRecovery: 3,
-  accountSecurity: 6
+  accountSecurity: 6,
+  // The street read joins every match's room and loadout (up to 50 windows):
+  // the client refetches it with the thread list, never per frame.
+  streetRead: 20
 }
 const WINDOW_MS = 60_000
 

@@ -24,17 +24,24 @@ const wrapName = (name: string): string[] => name.split(" ").reduce<string[]>((l
     : [...lines, word]
 }, [])
 
-test("a new collection piece without its receipt is never sold, listed or granted in any build", () => {
+test("a new collection piece is sold only with its receipt, and never granted to every account", () => {
   const defaultOwned = new Set(getDefaultOwnedItemIds("avatar"))
   const unheld = new Set(resolveUnheldEconomyCatalog(ECONOMY_CATALOG).map((item) => item.itemId))
   const published = new Set(resolveR1PublishedEconomyCatalog(ECONOMY_CATALOG).map((item) => item.itemId))
-  const unreceipted = NEW_COLLECTION_ITEM_IDS.filter((itemId) => !isReleaseCatalogItemPublished(itemId))
-  assert.ok(unreceipted.length > 0, "the guard scanned the pending pieces")
-  for (const itemId of unreceipted) {
+  assert.ok(NEW_COLLECTION_ITEM_IDS.length > 0, "the guard scanned the collection")
+  for (const itemId of NEW_COLLECTION_ITEM_IDS) {
+    assert.equal(defaultOwned.has(itemId), false, `${itemId} is not granted to every account`)
+    if (isReleaseCatalogItemPublished(itemId)) {
+      // a receipted piece is sellable and no scope holds it
+      assert.equal(isReleaseCatalogItemHeld(itemId), false, `${itemId} has a receipt, so no scope may hold it`)
+      assert.equal(unheld.has(itemId), true, `${itemId} is sellable in development builds`)
+      assert.equal(published.has(itemId), true, `${itemId} is in the production projection`)
+      continue
+    }
+    // an unreceipted piece stays hidden until its receipt lands
     assert.equal(isReleaseCatalogItemHeld(itemId), true, `${itemId} is held until its receipt lands`)
     assert.equal(unheld.has(itemId), false, `${itemId} is not sellable in development builds`)
     assert.equal(published.has(itemId), false, `${itemId} is not in the production projection`)
-    assert.equal(defaultOwned.has(itemId), false, `${itemId} is not granted to every account`)
   }
 })
 
