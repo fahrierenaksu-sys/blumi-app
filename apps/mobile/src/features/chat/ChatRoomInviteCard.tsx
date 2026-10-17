@@ -24,13 +24,13 @@ export function ChatRoomInviteCard({ invite, currentUserId, locale, you, partner
   const card = getRoomInviteCardState(invite, currentUserId, locale)
   const disabled = isBusy || !card.primaryAction || !onAction
   const primaryIcon = card.primaryAction?.type === "accept" ? "checkmark" : card.doorOpen ? "arrow-forward" : "lock-closed-outline"
-  const isDoorOpen = !compact && card.doorOpen && Boolean(invite.roomSessionId)
-  // An open door is the likely next step: start drawing the room and both
-  // avatars into the image cache now, so the room opens whole.
+  // An invitation to accept, or an open door, is the likely next step: start loading the room and both avatars
+  // now (images and GPU pages), so the room opens whole.
+  const isRoomLikelyNext = !compact && (card.primaryAction?.type === "accept" || (card.doorOpen && Boolean(invite.roomSessionId)))
   const warmRoomEntry = useEffectEvent(() => publishRoomEntryWarmup([you.avatar, partner.avatar]))
   useEffect(() => {
-    if (isDoorOpen) warmRoomEntry()
-  }, [isDoorOpen])
+    if (isRoomLikelyNext) warmRoomEntry()
+  }, [isRoomLikelyNext])
   if (compact) {
     const sender = card.isSender ? you : partner
     return (
