@@ -32,7 +32,7 @@ import {
   resolveRoomV2Scene
 } from "../features/roomV2/roomV2Selectors"
 import { resolveRoomV2MyRoomCamera } from "../features/roomV2/roomV2Camera"
-import { resolveMyRoomLayoutMetrics } from "../features/roomV2/myRoomLayoutMetrics"
+import { getMyRoomVisibleStageXRange, resolveMyRoomLayoutMetrics } from "../features/roomV2/myRoomLayoutMetrics"
 import { useRoomV2 } from "../features/roomV2/state/RoomV2Provider"
 import { getMyRoomCopy, getMyRoomEditorCopy } from "../features/roomV2/myRoomCopy"
 import { getMyRoomStageAccessibilityValue } from "../features/roomV2/myRoomStageModel"
@@ -390,12 +390,17 @@ export function MyRoomScreen({
   const catTrips = useCatTrips({ sessionActor, isFocused: isRoomFocused })
   // The server decides whether this member has a cat (it grants the starter cat on the first read).
   const hasServerRoomPet = useServerRoomPet({ sessionActor, isFocused: isRoomFocused, isEnabled: IS_BLUMI_ROOM_PET_ENABLED })
+  const myRoomVisibleXRange = useMemo(
+    () => getMyRoomVisibleStageXRange(layoutMetrics.rendererScalePercent),
+    [layoutMetrics.rendererScalePercent]
+  )
   const petDepthSlot = useMyRoomPetSlot({
     isEnabled: hasServerRoomPet && !catTrips.isOwnCatAway,
     shell: baseRoomScene.shell,
     sceneItems: baseRoomScene.renderItems,
     renderItems,
     isReady: persistenceState !== "loading",
+    visibleXRange: myRoomVisibleXRange,
     readOwner: readPetOwner,
     testID: "my-room-production-stage"
   })

@@ -8,8 +8,15 @@ import {
   isRoomV2FloorGridPointOnFloor,
   ROOM_V2_BLUMI_WORLD_FLOOR_GRID
 } from "../roomV2/roomV2FloorGrid"
+import { getMyRoomVisibleStageXRange, resolveMyRoomLayoutMetrics } from "../roomV2/myRoomLayoutMetrics"
+import { resolveRoomV2MyRoomCamera } from "../roomV2/roomV2Camera"
+import type { RoomPetCell, RoomPetEvent, RoomPetMap, RoomPetState } from "./roomPet.types"
 import { roomPetCellKey } from "./roomPetGrid"
-import { createRoomPetMapFromRoom, getRoomPetCellAtStagePoint } from "./roomPetRoomAdapter"
+import { drawRoomPetInteger } from "./roomPetRng"
+import { createRoomPetMapFromRoom, getRoomPetCellAtStagePoint, type RoomPetVisibleStage } from "./roomPetRoomAdapter"
+import { getRoomPetDrawnHalfWidth } from "./roomPetSprite"
+import { runTestRoomPet } from "./roomPetTestMap"
+import { ROOM_PET_CAT_WHITE_SHEET_LAYOUT } from "./sheet/roomPetCatWhiteSheet"
 
 const PROJECTION = createRoomV2FloorGridProjection(ROOM_V2_BLUMI_WORLD_FLOOR_GRID)
 const MIDDLE_COLUMN = Math.round((PROJECTION.minColumn + PROJECTION.maxColumn) / 2)
@@ -104,4 +111,92 @@ test("a seat piece that is not a bed is a sofa perch", () => {
   })
   const map = createRoomPetMapFromRoom({ projection: PROJECTION, furniture: [sofa] })
   assert.equal(map.spots[0]?.kind, "sofa")
+})
+
+const SHELL_CANVAS_WIDTH = 1254
+const PET_HALF_WIDTH = getRoomPetDrawnHalfWidth(ROOM_PET_CAT_WHITE_SHEET_LAYOUT, SHELL_CANVAS_WIDTH)
+
+function visibleStageFor(viewportWidth: number): RoomPetVisibleStage {
+  const metrics = resolveMyRoomLayoutMetrics({
+    viewportWidth,
+    contentWidth: viewportWidth,
+    availableContentHeight: 760,
+    bottomContentInset: 90,
+    camera: resolveRoomV2MyRoomCamera(undefined)
+  })
+  return { ...getMyRoomVisibleStageXRange(metrics.rendererScalePercent), petHalfWidth: PET_HALF_WIDTH }
+}
+
+function isPetOnScreen(visible: RoomPetVisibleStage, x: number): boolean {
+  return x - visible.petHalfWidth >= visible.minX - 1e-9 && x + visible.petHalfWidth <= visible.maxX + 1e-9
+}
+
+function cellX(cell: RoomPetCell): number {
+  return getRoomV2FloorGridCellPoint(PROJECTION, cell.column, cell.row).x
+}
+
+/** A bed in the far right floor corner, which the phone card cuts off. */
+function cornerBed(): RoomV2FurnitureRenderItem {
+  const corner = PROJECTION.outline.reduce((best, point) => (point.x > best.x ? point : best))
+  const approach = { x: corner.x - 0.06, y: corner.y }
+  return item({
+    renderId: "bed_corner", itemId: "room_v3_bed_blumi_starter", category: "seating", interactionType: "seat",
+    seatWorldPoints: [{ id: "lie", facing: "front", seatHeight: 0, seat: { x: corner.x - 0.03, y: corner.y - 0.04 }, approach, exit: approach }]
+  })
+}
+
+test("the phone card cuts off the floor's side corners, so the pet's floor stops where the card does", () => {
+  const visible = visibleStageFor(393)
+  assert.ok(visible.minX > 0 && visible.maxX < 1, "the portrait card shows only the middle of the shell")
+  const wholeFloor = createRoomPetMapFromRoom({ projection: PROJECTION, furniture: FURNITURE })
+  assert.ok(wholeFloor.cells.some((cell) => !isPetOnScreen(visible, cellX(cell))), "the drawn floor reaches past the card")
+  const map = createRoomPetMapFromRoom({ projection: PROJECTION, furniture: [...FURNITURE, cornerBed()], visibleStage: visible })
+  assert.ok(map.cells.length > 30)
+  for (const cell of map.cells) {
+    const center = getRoomV2FloorGridCellPoint(PROJECTION, cell.column, cell.row)
+    assert.ok(isRoomV2FloorGridPointOnFloor(PROJECTION, center.x, center.y))
+    assert.ok(isPetOnScreen(visible, center.x), `cell ${roomPetCellKey(cell)} is off screen`)
+  }
+  assert.ok(!map.spots.some((spot) => spot.id === "bed_corner"), "a bed in a cut-off corner is no perch")
+  for (const spot of map.spots) {
+    assert.ok(map.walkableKeys.has(roomPetCellKey(spot.cell)))
+    if (spot.perchAnchor) assert.ok(isPetOnScreen(visible, spot.perchAnchor.x))
+  }
+  const wide = visibleStageFor(800)
+  assert.deepEqual([wide.minX, wide.maxX], [0, 1], "a wide stage shows the whole shell")
+})
+
+test("over a long random room life on a phone every place the pet stands, aims for or walks through is on screen", () => {
+  for (const viewportWidth of [320, 393, 430]) {
+    const visible = visibleStageFor(viewportWidth)
+    const map: RoomPetMap = createRoomPetMapFromRoom({ projection: PROJECTION, furniture: [...FURNITURE, cornerBed()], visibleStage: visible })
+    // the owner walks the whole drawn floor, cut-off corners included
+    const ownerCells = createRoomPetMapFromRoom({ projection: PROJECTION, furniture: [] }).cells
+    let driver = viewportWidth
+    const draw = (min: number, max: number): number => {
+      const next = drawRoomPetInteger(driver, min, max)
+      driver = next.rngState
+      return next.value
+    }
+    const eventsAt = (_tick: number, state: RoomPetState): RoomPetEvent[] => {
+      const roll = draw(0, 199)
+      const cell = ownerCells[draw(0, ownerCells.length - 1)]
+      if (roll === 0) return state.owner ? [{ type: "ownerLeft" }] : [{ type: "ownerArrived", cell }]
+      if (roll < 4 && state.owner) return [{ type: "ownerMoved", cell }]
+      if (roll === 4 && state.owner) return [{ type: "ownerSat", cell, seatFurnitureId: "bed_1" }]
+      if (roll === 5 && state.owner) return [{ type: "ownerStood", cell }]
+      if (roll === 6) return [{ type: "tap" }]
+      return []
+    }
+    const run = runTestRoomPet({ map, seed: viewportWidth, ticks: 20000, eventsAt, keepStates: true })
+    run.states.forEach((state, index) => {
+      const output = run.outputs[index]
+      const where = `width ${viewportWidth}, tick ${index}`
+      assert.ok(isPetOnScreen(visible, cellX(output.cell)), `${where}: stands off screen`)
+      assert.ok(isPetOnScreen(visible, cellX(output.targetCell)), `${where}: aims off screen`)
+      assert.ok(state.path.every((cell) => isPetOnScreen(visible, cellX(cell))), `${where}: walks off screen`)
+      const perch = output.perchSpotId ? map.spots.find((spot) => spot.id === output.perchSpotId) : undefined
+      if (perch?.perchAnchor) assert.ok(isPetOnScreen(visible, perch.perchAnchor.x), `${where}: perched off screen`)
+    })
+  }
 })

@@ -7,6 +7,7 @@ import type { RoomRendererDepthSlot } from "../roomV2/components/roomRendererDep
 import { ROOM_PET_CAT_WHITE_SHEET } from "./sheet/roomPetCatWhiteSheetSource"
 import { IS_BLUMI_ROOM_PET_ENABLED } from "./roomPetFlag"
 import { ROOM_PET_RENDER_ID } from "./roomPetRoomScene"
+import { getRoomPetDrawnHalfWidth } from "./roomPetSprite"
 import { RoomPetFlipbook } from "./RoomPetFlipbook"
 import { useRoomPet, type RoomPetOwnerSnapshot } from "./useRoomPet"
 
@@ -20,6 +21,8 @@ export function useMyRoomPetSlot(input: {
   readonly sceneItems: readonly RoomV2RenderItem[]
   readonly renderItems: readonly RoomV2RenderItem[]
   readonly isReady: boolean
+  /** The horizontal part of the shell the card shows (stage x); the pet stays fully inside it. */
+  readonly visibleXRange?: { readonly minX: number; readonly maxX: number }
   readonly readOwner: () => RoomPetOwnerSnapshot | null
   readonly isEnabled?: boolean
   readonly testID?: string
@@ -36,7 +39,16 @@ export function useMyRoomPetSlot(input: {
     () => sceneItems.filter((item): item is RoomV2FurnitureRenderItem => item.kind === "furniture"),
     [sceneItems]
   )
-  const pet = useRoomPet({ isEnabled, isActive: isFocused && isReady, projection, furniture, renderItems, readOwner })
+  const canvasWidth = shell?.canvasSize.width
+  const visibleMinX = input.visibleXRange?.minX
+  const visibleMaxX = input.visibleXRange?.maxX
+  const visibleStage = useMemo(
+    () => visibleMinX !== undefined && visibleMaxX !== undefined && canvasWidth
+      ? { minX: visibleMinX, maxX: visibleMaxX, petHalfWidth: getRoomPetDrawnHalfWidth(ROOM_PET_CAT_WHITE_SHEET.layout, canvasWidth) }
+      : undefined,
+    [canvasWidth, visibleMaxX, visibleMinX]
+  )
+  const pet = useRoomPet({ isEnabled, isActive: isFocused && isReady, projection, furniture, renderItems, visibleStage, readOwner })
   const { draw, tap } = pet
   const handleTap = useCallback(() => tap(), [tap])
   const canvasSize = shell?.canvasSize
