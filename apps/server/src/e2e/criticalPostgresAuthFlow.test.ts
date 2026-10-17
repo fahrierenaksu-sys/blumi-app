@@ -97,7 +97,7 @@ test(
       const exportPayload = JSON.parse(exportText)
       assert.equal(exportPayload.account.userId, persisted.userId)
       assert.deepEqual(exportPayload.account.acceptedTerms, persisted.acceptedTerms)
-      assert.equal(Object.keys(exportPayload.data).length, 11)
+      assert.equal(Object.keys(exportPayload.data).length, 17, "release 3 adds pet, cat and street sections")
       const replay = await fetch(`${baseUrl}/v1/account/export`, {
         method: "POST", headers: { authorization: `Bearer ${verifiedBody.session.sessionToken}`, "content-type": "application/json" },
         body: JSON.stringify({ confirmationToken: confirmation.confirmationToken })
