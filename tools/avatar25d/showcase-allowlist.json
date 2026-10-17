@@ -394,7 +394,7 @@
       "baseSha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648",
       "qaPass": "integration/RESUME_INTEGRATION.md STATE 2026-10-13 06:33 (boy SHOWCASE 26/26 full pass); prov_boy_2145/REPORT.md; curls_install_1030/REPORT.md",
       "ownerApproved": true,
-      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv. 2026-10-17 (branch claude/boy-hair-front-shop): the six new boy hairs are listed with their front SHOWCASE layers so the Shop try-on, Discover, profile, chat header and push show the boy facing the camera (owner report from the phone the same day: in the market the boy stands turned sideways, he should face the camera so the hair is seen). Sources: the landed front/back layers of factory boyhair_1017 (fit_A2/sc and fit_B/sc/final, the same layers the published card thumbs are cut from), cleaned by new_collection/clean_boy_hair_c1.py (pinholes inside the chestnut and cocoa hair filled from the surrounding hair colour; white generation-background matte and pale rim pixels removed, alpha only lowered) -> new_collection/<id>/front_c1.png and back_c1.png. The owner approved the look of the six hairs on 2026-10-17 10:23 (OWNER_DECISIONS: male/work/boyhair_1017/contact_sheet.png, whose third row is the front view). These cleaned front layers themselves are NOT yet shown to the owner: their look yes is asked together with the receipt reissue these new runtime files require. 2026-10-17 22:24 +0300 (lead report in chat; card-quality lane): the owner approved the straight-front card and showcase layers of tan loafers, brown loafers, dark leather sneakers and green skate shoes (Workbench shop/work/card-quality-20261017/shoes/REPORT.md, files integration/card_design/showcase/shoes_front_20261017/<id>/front.png + erase.png). Their published receipts must be reissued with the new bytes.",
+      "ownerApprovalNote": "Owner approved this front look ('evet') on 2026-10-13 21:22 +0300 for exactly the listed pieces as baked on wip/showcase-layers (Workbench integration/OWNER_DECISIONS.md, FRONT SHOWCASE line; sheets integration/showcase_approval_2120/). A piece added to this body later needs its own owner yes before it is listed. 2026-10-16 ~22:5x +0300: front-look sheet integration/release_finish/sheet/index.html approved by the owner (lead report: 'güzel hepsi'; OWNER_DECISIONS.md 22:59 line: all prices and publishing approved after the front-look sheet); fresh QA release2/showcase/SHOWCASE.tsv. 2026-10-17 (branch claude/boy-hair-front-shop): the six new boy hairs are listed with their front SHOWCASE layers so the Shop try-on, Discover, profile, chat header and push show the boy facing the camera (owner report from the phone the same day: in the market the boy stands turned sideways, he should face the camera so the hair is seen). Sources: the landed front/back layers of factory boyhair_1017 (fit_A2/sc and fit_B/sc/final, the same layers the published card thumbs are cut from), cleaned by new_collection/clean_boy_hair_c1.py (pinholes inside the chestnut and cocoa hair filled from the surrounding hair colour; white generation-background matte and pale rim pixels removed, alpha only lowered) -> new_collection/<id>/front_c1.png and back_c1.png. The owner approved the look of the six hairs on 2026-10-17 10:23 (OWNER_DECISIONS: male/work/boyhair_1017/contact_sheet.png, whose third row is the front view). These cleaned front layers themselves are NOT yet shown to the owner: their look yes is asked together with the receipt reissue these new runtime files require. 2026-10-17 22:24 +0300 (lead report in chat; card-quality lane): the owner approved the straight-front card and showcase layers of tan loafers, brown loafers, dark leather sneakers and green skate shoes (Workbench shop/work/card-quality-20261017/shoes/REPORT.md, files integration/card_design/showcase/shoes_front_20261017/<id>/front.png + erase.png). Their published receipts must be reissued with the new bytes. 2026-10-17 (lead task, card-quality lane land2): the owner-approved straight-front showcase layers of cream chunky sneakers, black clean sneakers, black everyday sneakers and sand desert boots (Workbench shop/work/card-quality-20261017/shoes2/REPORT.md, files integration/card_design/showcase/shoes_front_20261017/<id>/front.png + erase.png); their published receipts must be reissued with the new bytes.",
       "crops": {
         "head": [
           870,
@@ -505,10 +505,10 @@
         "avatar_v2_shoes_male_black_clean_sneakers": {
           "slot": "shoes",
           "order": 1,
-          "file": "boy_c12_c13_1915/qa_fix/q_basic_a/layers/boy_shoes.png",
-          "eraseFile": "boy_c12_c13_1915/qa_fix/q_basic_a/layers/boy_shoes_erase.png",
-          "sha256": "79320675c82e62caca16d85378825355e0e0c9a33e4c615f68db4eedb5210ba3",
-          "eraseSha256": "7ba7c02139164bbe91d8c7369f2016f233b76e2e8c76277dfa38bf59f1dde2cb"
+          "file": "shoes_front_20261017/avatar_v2_shoes_male_black_clean_sneakers/front.png",
+          "eraseFile": "shoes_front_20261017/avatar_v2_shoes_male_black_clean_sneakers/erase.png",
+          "sha256": "2fd533337a47315bc7b3bc25bb472fe623d7e69a006705e2529475e3ae4bf6c1",
+          "eraseSha256": "765219b6d803405fd49c56f9f9e9d7abfd98e75ce941625ce06f7db4582a32b8"
         },
         "avatar_v2_top_male_black_basic_tee": {
           "slot": "top",
@@ -530,10 +530,10 @@
         "avatar_v2_shoes_male_black_everyday_sneakers": {
           "slot": "shoes",
           "order": 1,
-          "file": "boy_c12_c13_1915/qa_fix/q_basic_b/layers/boy_shoes.png",
-          "eraseFile": "boy_c12_c13_1915/qa_fix/q_basic_b/layers/boy_shoes_erase.png",
-          "sha256": "fa3225588e527979232bdf5e100eb322f4bb6fa133edf50ca8d1bb853a962b31",
-          "eraseSha256": "b7293b1dfe24b5f3675d3c361b37bdd608df3e2be604fc362fa1c5811ef4742b"
+          "file": "shoes_front_20261017/avatar_v2_shoes_male_black_everyday_sneakers/front.png",
+          "eraseFile": "shoes_front_20261017/avatar_v2_shoes_male_black_everyday_sneakers/erase.png",
+          "sha256": "4525dd7b8c43bdf196ea0131e9f23d25638df3205f93061d33ade1d8a7986e76",
+          "eraseSha256": "e0c486f231ca3e35f3611b38f6586cfc2a272387d8e01b22174abcadd58e2675"
         },
         "avatar_v2_top_male_black_embroidered_sweatshirt": {
           "slot": "top",
@@ -555,10 +555,10 @@
         "avatar_v2_shoes_male_cream_chunky_sneakers": {
           "slot": "shoes",
           "order": 1,
-          "file": "boy_c12_c13_1915/r8/o_c12/layers/boy_shoes.png",
-          "eraseFile": "boy_c12_c13_1915/r8/o_c12/layers/boy_shoes_erase.png",
-          "sha256": "e9492b8035029d04d77400a7205919ea1d6d313b5b4ba0a59fc2fe4af5fd8f1f",
-          "eraseSha256": "6234aa85cc3c012a3e4e244b22e93f8e50505d74701ca1f5275a6be3fb5605b8"
+          "file": "shoes_front_20261017/avatar_v2_shoes_male_cream_chunky_sneakers/front.png",
+          "eraseFile": "shoes_front_20261017/avatar_v2_shoes_male_cream_chunky_sneakers/erase.png",
+          "sha256": "f96c49185d70fdb5aa826719f9c2d418877a28c45fc2c4758cda17ca5addba43",
+          "eraseSha256": "bd4021f21fc6ba5243e092634225f33f034840ee1a361fa6a90ede06cd009745"
         },
         "avatar_v2_top_male_taupe_waffle_blouson": {
           "slot": "top",
@@ -605,10 +605,10 @@
         "avatar_v2_shoes_male_sand_desert_boots": {
           "slot": "shoes",
           "order": 1,
-          "file": "boy_line_r3/o_c3/layers/boy_shoes.png",
-          "eraseFile": "boy_line_r3/o_c3/layers/boy_shoes_erase.png",
-          "sha256": "3b6ee49cdf96e2eb177c17fe32ed80d9f5209b034d2e462281e87c4e74020cf5",
-          "eraseSha256": "3e13e23248938f2575451b394f63ff969592a42f0f4ebb1da0123ff64440a8a4"
+          "file": "shoes_front_20261017/avatar_v2_shoes_male_sand_desert_boots/front.png",
+          "eraseFile": "shoes_front_20261017/avatar_v2_shoes_male_sand_desert_boots/erase.png",
+          "sha256": "6c7a6503f434626c27c7ab11c07531e15385c8aad361b0615ee172173592d5ba",
+          "eraseSha256": "97e59effde4dac891608f0da4eda9998bd458a94099983f27d32b31df6054b4d"
         },
         "avatar_v2_hair_male_blue_black_curls": {
           "slot": "hair",

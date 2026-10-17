@@ -5986,9 +5986,9 @@
               "key": "avatar_v2_shoes_male_tan_loafers__under",
               "rect": [
                 154,
-                1353,
+                1352,
                 303,
-                51
+                52
               ]
             }
           }
@@ -6000,19 +6000,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_sand_desert_boots__front",
             "rect": [
-              80,
-              1365,
-              454,
-              169
+              120,
+              1360,
+              374,
+              191
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_sand_desert_boots__under",
               "rect": [
-                84,
-                1353,
-                438,
-                185
+                162,
+                1352,
+                287,
+                16
               ]
             }
           }
@@ -6034,9 +6034,9 @@
               "key": "avatar_v2_shoes_male_brown_loafers__under",
               "rect": [
                 154,
-                1353,
+                1352,
                 303,
-                44
+                45
               ]
             }
           }
@@ -6048,19 +6048,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_cream_chunky_sneakers__front",
             "rect": [
-              72,
-              1344,
-              461,
-              201
+              117,
+              1367,
+              377,
+              204
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_cream_chunky_sneakers__under",
               "rect": [
-                84,
-                1353,
-                437,
-                187
+                160,
+                1352,
+                292,
+                26
               ]
             }
           }
@@ -6082,9 +6082,9 @@
               "key": "avatar_v2_shoes_male_dark_leather_sneakers__under",
               "rect": [
                 158,
-                1353,
+                1352,
                 295,
-                28
+                29
               ]
             }
           }
@@ -6106,9 +6106,9 @@
               "key": "avatar_v2_shoes_male_green_skate_shoes__under",
               "rect": [
                 163,
-                1353,
+                1352,
                 286,
-                9
+                10
               ]
             }
           }
@@ -6120,19 +6120,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_black_clean_sneakers__front",
             "rect": [
-              79,
-              1360,
-              455,
-              179
+              120,
+              1359,
+              371,
+              185
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_black_clean_sneakers__under",
               "rect": [
-                84,
-                1353,
-                438,
-                185
+                162,
+                1352,
+                287,
+                14
               ]
             }
           }
@@ -6144,19 +6144,19 @@
           "showcase": {
             "key": "avatar_v2_shoes_male_black_everyday_sneakers__front",
             "rect": [
-              75,
-              1360,
-              459,
-              178
+              107,
+              1351,
+              395,
+              199
             ],
             "order": 1,
             "under": {
               "key": "avatar_v2_shoes_male_black_everyday_sneakers__under",
               "rect": [
-                84,
-                1353,
-                438,
-                185
+                163,
+                1352,
+                286,
+                8
               ]
             }
           }
@@ -12538,7 +12538,7 @@
         "key": "base__front",
         "canvas": {
           "width": 600,
-          "height": 1564
+          "height": 1580
         },
         "ground": [
           300,
@@ -12549,7 +12549,7 @@
             0,
             0,
             600,
-            1564
+            1580
           ],
           "head": [
             105,
