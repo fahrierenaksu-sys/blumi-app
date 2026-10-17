@@ -25,7 +25,7 @@ export type SmsAdmissionResult = {
   allowed: boolean
   reason: "admitted" | "invalid_event" | "disabled" | "replay" | "phone_cooldown" |
     "phone_limit" | "ip_limit" | "project_limit" | "project_burst_limit" |
-    "country_unavailable" | "country_limit" | "country_cost_limit" | "daily_cost_limit" | "monthly_cost_limit" |
+    "country_unavailable" | "country_price_expired" | "country_limit" | "country_cost_limit" | "daily_cost_limit" | "monthly_cost_limit" |
     "risk_verification_required" | "adaptive_rate_limit" |
     "device_permit_required"
 }
@@ -112,10 +112,14 @@ export function createPostgresSmsAdmission(options: {
         "SELECT * FROM blumi_sms_country_policy WHERE country = $1", [country]
       )).rows[0]
       // A price listing is not permission. Unknown/expired markets fail closed.
-      if (!market || market.enabled !== true || !(market.price_valid_until instanceof Date) ||
-        market.price_valid_until.getTime() <= time) {
+      if (!market || market.enabled !== true || !(market.price_valid_until instanceof Date)) {
         await client.query("ROLLBACK")
         return refuse("country_unavailable")
+      }
+      // Its own reason: an operator renews the price, nothing on the device helps.
+      if (market.price_valid_until.getTime() <= time) {
+        await client.query("ROLLBACK")
+        return refuse("country_price_expired")
       }
       const dailyCostLimit = readMicroUsd(config.cost_limit_24_hours_microusd)
       const monthlyCostLimit = readMicroUsd(config.cost_limit_month_microusd)
