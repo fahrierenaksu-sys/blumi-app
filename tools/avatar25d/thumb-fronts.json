@@ -1276,6 +1276,27 @@
           "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
         }
       ]
+    },
+    "hair_male_wavy_quiff": {
+      "sha256": "79c808f328763a4ff246769c35f63edc4d60d53d3268fa7c040d97824148a1d4",
+      "size": [
+        256,
+        159
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "9209b5fc256ebc298db41b5e59767f4bda660c4cc8b1247b68f19d19b4110a01"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "a10a3a6ed4099cb82dfbd02e9399cb442d38e900f563e3e239268ef3b4cf1d23"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
     }
   }
 }

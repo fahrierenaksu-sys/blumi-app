@@ -5931,7 +5931,7 @@
       }
     },
     "male": {
-      "rigSha256": "17b104e26e398e2943a07cccf9402ecad96220fc74469b5b972fc8bb9b8ecb2b",
+      "rigSha256": "875c9099bd6773df477b4576637a710c97048aa362a73ccd07954c2fa8955950",
       "sheetHeight": 982,
       "canvas": {
         "width": 649,
@@ -6617,6 +6617,11 @@
           "slot": "hair",
           "rigItemId": "hair_male_cocoa_quiff",
           "thumb": "hair_male_cocoa_quiff"
+        },
+        "hair_male_wavy_quiff": {
+          "slot": "hair",
+          "rigItemId": "hair_male_wavy_quiff",
+          "thumb": "hair_male_wavy_quiff"
         },
         "glasses_boy_black_soft_rect": {
           "slot": "glasses",
@@ -11788,6 +11793,19 @@
             ]
           },
           {
+            "key": "hair_male_wavy_quiff__o4p6",
+            "owner": "hair_male_wavy_quiff",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              178,
+              19,
+              257,
+              179
+            ]
+          },
+          {
             "key": "body__o5",
             "owner": "body",
             "slot": "body",
@@ -12268,6 +12286,19 @@
               8,
               162,
               115
+            ]
+          },
+          {
+            "key": "hair_male_wavy_quiff__o4p6",
+            "owner": "hair_male_wavy_quiff",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              50,
+              8,
+              160,
+              113
             ]
           },
           {
