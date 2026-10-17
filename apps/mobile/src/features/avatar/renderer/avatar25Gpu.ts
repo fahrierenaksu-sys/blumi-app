@@ -23,6 +23,7 @@ import {
   type Avatar25AstcSource,
   type Avatar25PageSource
 } from "./avatar25Astc"
+import { releaseAvatar25PagesToCache, retainAvatar25Pages, type Avatar25PageCache } from "./avatar25PageCache"
 
 export const AVATAR25_SAMPLE_COUNT = 4
 const MAX_SLOTS = 32
@@ -146,8 +147,11 @@ export interface Avatar25GpuShared {
   sampler: GPUSampler
   /** The device was created with `texture-compression-astc` (only requested when the adapter has it). */
   astcAvailable: boolean
-  /** Texture arrays by page set, shared by every avatar on the device and freed when the last one leaves. */
-  textureCache: Map<string, { promise: Promise<{ bindGroup: GPUBindGroup; texture: GPUTexture; bytes: number }>; refs: number }>
+  /**
+   * Texture arrays by page set, shared by every avatar on the device and freed a short while after the last one
+   * leaves (avatar25PageCache: a returning avatar draws on its first frame).
+   */
+  textureCache: Avatar25PageCache<{ bindGroup: GPUBindGroup; texture: GPUTexture; bytes: number }>
 }
 
 /** One avatar's GPU state for one view. Plain object of GPU handles: passes into worklets (registered serializable). */
@@ -332,7 +336,7 @@ export function acquireAvatar25Pages(
   const key = avatar25PagesKey(pages, avatar25PageSourceNamespace(namespace, source))
   const cached = shared.textureCache.get(key)
   if (cached) {
-    cached.refs += 1
+    retainAvatar25Pages(cached)
     return cached.promise.then((entry) => entry.bindGroup)
   }
   const promise = (async () => {
@@ -356,17 +360,12 @@ export function acquireAvatar25Pages(
   return promise.then((entry) => entry.bindGroup)
 }
 
-/** One avatar view stops using its pages; the texture is destroyed when no avatar uses it any more. */
+/** One avatar view stops using its pages; the texture is destroyed once no avatar has used it for a while. */
 export function releaseAvatar25Pages(shared: Avatar25GpuShared, key: string): void {
-  const cached = shared.textureCache.get(key)
-  if (!cached) return
-  cached.refs -= 1
-  if (cached.refs > 0) return
-  shared.textureCache.delete(key)
-  cached.promise.then((entry) => entry.texture.destroy(), () => undefined)
+  releaseAvatar25PagesToCache(shared.textureCache, key, (entry) => entry.texture.destroy())
 }
 
-/** Bytes of all live avatar textures on this device (mip chains included). */
+/** Bytes of all avatar textures on this device, idle ones included (mip chains included). */
 export async function getAvatar25TextureBytes(shared: Avatar25GpuShared): Promise<number> {
   const entries = await Promise.all([...shared.textureCache.values()].map((entry) => entry.promise))
   return entries.reduce((sum, entry) => sum + entry.bytes, 0)

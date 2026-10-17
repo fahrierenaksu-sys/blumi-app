@@ -117,8 +117,9 @@ export function AvatarLive(props: AvatarLiveProps) {
   const bendsToSit = view.motion !== undefined
   const hasSeatPlacement = props.seatPlacement !== undefined
   const previousPose = useRef(spec.pose)
-  // every canvas comes out of the live budget: held (MiniRoom fade-in) or over budget, no GPU surface is mounted
-  const canvasMounted = useAvatarLiveSlot(props.liveScope, !props.holdCanvas)
+  // every canvas comes out of the live budget (over budget: no GPU surface). Held (MiniRoom fade-in), the surface
+  // still mounts and loads but presents nothing, so she is drawn on the very frame the hold ends.
+  const canvasMounted = useAvatarLiveSlot(props.liveScope, true)
   // facing is live: both drawings stay resident, so a turn shows on the very next frame (no rebuild)
   const mirrored = spec.mirror !== Boolean(props.outerMirrored)
   const viewIndex = useSharedValue(spec.view === "back" ? 1 : 0)
@@ -283,6 +284,7 @@ export function AvatarLive(props: AvatarLiveProps) {
             instances={instances}
             driver={{ pose, walkCycles, walkWeight, waveStartMs, sitWeight, sitLegDropPx, breathWeight, view: viewIndex, mirror, outerMirror }}
             reduceMotion={reduceMotion}
+            paused={props.holdCanvas}
             onReady={props.onDrawn}
           /> : null}
         </Reanimated.View>

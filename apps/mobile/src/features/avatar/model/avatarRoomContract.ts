@@ -81,7 +81,7 @@ export interface AvatarLiveProps {
    * the box's floor point. Unset: the figure is sized from the box (rig `motion.charScale`) on the avatarV2 foot line.
    */
   calibratedFigureHeightPx?: number
-  /** Keep the GPU surface unmounted for now (MiniRoom: until its stage has faded in). */
+  /** Load the GPU surface but draw nothing yet (MiniRoom: until its stage has faded in). */
   holdCanvas?: boolean
   onDrawn?: () => void
 }

@@ -155,8 +155,8 @@ export function MiniRoomScene(props: MiniRoomSceneProps) {
   const { covered: stageCovered, markPainted: handleStageSceneReady } =
     useMyRoomStageCover(!roomShell, MINI_ROOM_STAGE_READY_CAP_MS)
   // 2.5D avatars draw into a GPU surface, which must not appear while the stage fades in from
-  // transparent (the whole stage stayed invisible): they wait for the reveal to finish. The stub (every
-  // release bundle) never asks, so the reveal is exactly as before.
+  // transparent (the whole stage stayed invisible): it loads during the fade and draws its first frame
+  // when the reveal finishes, so the avatar arrives with the room instead of after it.
   const [stageRevealed, setStageRevealed] = useState(false)
   const markStageRevealed = useCallback(() => setStageRevealed(true), [])
   const stageRevealStyle = useStageRevealStyle(stageCovered, markStageRevealed)
