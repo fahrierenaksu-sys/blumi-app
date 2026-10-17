@@ -5931,7 +5931,7 @@
       }
     },
     "male": {
-      "rigSha256": "519047ea9b79a8082303bfb03d33f89a0a4e250fc4bfeec312539dfe2a1acb4f",
+      "rigSha256": "054c12db5f3fe57a75a1a3dd583abdca6563eeb5e4ea9300b7950aafd1fbd7ae",
       "sheetHeight": 982,
       "canvas": {
         "width": 649,
@@ -6607,6 +6607,11 @@
           "slot": "hair",
           "rigItemId": "hair_male_black_side_part",
           "thumb": "hair_male_black_side_part"
+        },
+        "hair_male_chestnut_waves": {
+          "slot": "hair",
+          "rigItemId": "hair_male_chestnut_waves",
+          "thumb": "hair_male_chestnut_waves"
         },
         "glasses_boy_black_soft_rect": {
           "slot": "glasses",
@@ -11752,6 +11757,19 @@
             ]
           },
           {
+            "key": "hair_male_chestnut_waves__o4p6",
+            "owner": "hair_male_chestnut_waves",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              187,
+              29,
+              248,
+              167
+            ]
+          },
+          {
             "key": "body__o5",
             "owner": "body",
             "slot": "body",
@@ -12206,6 +12224,19 @@
               11,
               160,
               132
+            ]
+          },
+          {
+            "key": "hair_male_chestnut_waves__o4p6",
+            "owner": "hair_male_chestnut_waves",
+            "slot": "hair",
+            "order": 4.6,
+            "seq": 4000,
+            "rect": [
+              55,
+              14,
+              155,
+              105
             ]
           },
           {

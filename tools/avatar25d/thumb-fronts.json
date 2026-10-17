@@ -1214,6 +1214,27 @@
         }
       ]
     },
+    "hair_male_chestnut_waves": {
+      "sha256": "dd19af01718bca6bbd7fa9c57734587f49dbf4406a4bb609bbc99607dc7f71d3",
+      "size": [
+        256,
+        154
+      ],
+      "sources": [
+        {
+          "file": "boy_hair_front.png",
+          "sha256": "f06e364646002b2d6d63ba60788de7e23929b072bb779aa6984cb81a1942bcfc"
+        },
+        {
+          "file": "boy_hair_back.png",
+          "sha256": "82f6eedc8e002863b52efb69ab1a0a8a0b18ee5a37cccfff2049e8abb67616d1"
+        },
+        {
+          "file": "boy_a.png",
+          "sha256": "5c01793498a23aedf82c0fa6afa25c1b5f14515f03a7cc79ec8e60132b68e648"
+        }
+      ]
+    },
     "hair_male_soft_crop": {
       "sha256": "0b84f317670f9f52938de5cb23571b59b60b64fcd5a1478b77ddb8415e96b43d",
       "size": [

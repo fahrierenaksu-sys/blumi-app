@@ -99,7 +99,8 @@ export const AVATAR_ITEM_ART: Readonly<Record<AvatarRigId, Readonly<Record<strin
     glasses_boy_gunmetal_round: "glasses_boy_gunmetal_round",
     hair_male_blond_fade: "hair_male_blond_fade",
     hair_male_soft_crop: "hair_male_soft_crop",
-    hair_male_black_side_part: "hair_male_black_side_part"
+    hair_male_black_side_part: "hair_male_black_side_part",
+    hair_male_chestnut_waves: "hair_male_chestnut_waves"
   }
 }
 
