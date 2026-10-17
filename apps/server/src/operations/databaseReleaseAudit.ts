@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto"
 import { readdirSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { AVATAR_LOADOUT_CATALOG, ECONOMY_CATALOG } from "@blumi/domain"
+import {
+  AVATAR_LOADOUT_CATALOG,
+  ECONOMY_CATALOG,
+  LEGACY_AVATAR_ITEM_IDS,
+  LEGACY_ROOM_ITEM_IDS,
+  RETIRED_AVATAR_ITEM_IDS
+} from "@blumi/domain"
 
 interface Queryable {
   query(sql: string, values?: readonly unknown[]): Promise<{ rows: Record<string, unknown>[] }>
@@ -24,9 +30,17 @@ export interface DatabaseReleaseAudit {
   malformedAvatarInventoryRows: number
   malformedRoomInventoryRows: number
   invalidBalanceRows: number
+  /** Ids no catalog and no retired list knows: a finding. */
   unknownOwnedAvatarIds: number
   unknownOwnedRoomIds: number
   unknownEquippedAvatarIds: number
+  /**
+   * Retired ids (`LEGACY_*_ITEM_IDS`, `RETIRED_AVATAR_ITEM_IDS`) that users still own or wear. They are kept on
+   * purpose (user data is never deleted), so they are informational, not findings.
+   */
+  retiredOwnedAvatarIds: number
+  retiredOwnedRoomIds: number
+  retiredEquippedAvatarIds: number
   unownedEquippedAvatarIds: number
   accountsWithoutInventory: number
   exposedTables: number
@@ -56,6 +70,8 @@ export async function auditDatabaseRelease(
     ...AVATAR_LOADOUT_CATALOG.map(item => item.itemId)
   ])]
   const roomIds = ECONOMY_CATALOG.filter(item => item.type === "room").map(item => item.itemId)
+  const retiredAvatarIds = retiredOutside(avatarIds, [...LEGACY_AVATAR_ITEM_IDS, ...RETIRED_AVATAR_ITEM_IDS])
+  const retiredRoomIds = retiredOutside(roomIds, LEGACY_ROOM_ITEM_IDS)
   const defaults = ECONOMY_CATALOG
     .filter(item => item.type === "avatar" && item.ownedByDefault)
     .map(item => item.itemId)
@@ -96,11 +112,17 @@ export async function auditDatabaseRelease(
     SELECT
       (SELECT count(*) FROM blumi_economy_inventories i,
          LATERAL unnest(i.owned_avatar_item_ids) AS id
-        WHERE id IS NOT NULL AND NOT (id = ANY($1::text[]))) AS unknown_owned_avatar_ids,
+        WHERE id IS NOT NULL AND NOT (id = ANY($1::text[])) AND NOT (id = ANY($3::text[]))) AS unknown_owned_avatar_ids,
       (SELECT count(*) FROM blumi_economy_inventories i,
          LATERAL unnest(i.owned_room_item_ids) AS id
-        WHERE id IS NOT NULL AND NOT (id = ANY($2::text[]))) AS unknown_owned_room_ids
-  `, [avatarIds, roomIds])).rows[0]
+        WHERE id IS NOT NULL AND NOT (id = ANY($2::text[])) AND NOT (id = ANY($4::text[]))) AS unknown_owned_room_ids,
+      (SELECT count(*) FROM blumi_economy_inventories i,
+         LATERAL unnest(i.owned_avatar_item_ids) AS id
+        WHERE id = ANY($3::text[])) AS retired_owned_avatar_ids,
+      (SELECT count(*) FROM blumi_economy_inventories i,
+         LATERAL unnest(i.owned_room_item_ids) AS id
+        WHERE id = ANY($4::text[])) AS retired_owned_room_ids
+  `, [avatarIds, roomIds, retiredAvatarIds, retiredRoomIds])).rows[0]
 
   const equipped = (await db.query(`
     WITH equipped AS (
@@ -120,13 +142,14 @@ export async function auditDatabaseRelease(
        WHERE a.avatar_selection IS NOT NULL
     )
     SELECT
-      count(*) FILTER (WHERE item_id <> 'null' AND NOT (item_id = ANY($1::text[])))
-        AS unknown_equipped_avatar_ids,
+      count(*) FILTER (WHERE item_id <> 'null' AND NOT (item_id = ANY($1::text[]))
+        AND NOT (item_id = ANY($3::text[]))) AS unknown_equipped_avatar_ids,
+      count(*) FILTER (WHERE item_id = ANY($3::text[])) AS retired_equipped_avatar_ids,
       count(*) FILTER (WHERE item_id <> 'null'
         AND NOT (item_id = ANY(COALESCE(owned_avatar_item_ids, '{}'::text[])))
         AND NOT (item_id = ANY($2::text[]))) AS unowned_equipped_avatar_ids
     FROM equipped
-  `, [avatarIds, defaults])).rows[0]
+  `, [avatarIds, defaults, retiredAvatarIds])).rows[0]
 
   const grants = (await db.query(`
     SELECT
@@ -171,9 +194,18 @@ export async function auditDatabaseRelease(
     unknownOwnedRoomIds: count(owned.unknown_owned_room_ids),
     unknownEquippedAvatarIds: count(equipped.unknown_equipped_avatar_ids),
     unownedEquippedAvatarIds: count(equipped.unowned_equipped_avatar_ids),
+    retiredOwnedAvatarIds: count(owned.retired_owned_avatar_ids),
+    retiredOwnedRoomIds: count(owned.retired_owned_room_ids),
+    retiredEquippedAvatarIds: count(equipped.retired_equipped_avatar_ids),
     accountsWithoutInventory: count(counts.accounts_without_inventory),
     exposedTables: count(grants.exposed_tables),
     exposedSequences: count(grants.exposed_sequences),
     exposedFunctions: count(grants.exposed_functions)
   }
+}
+
+/** Retired ids that no active catalog still lists (an id in both stays an ordinary catalog id). */
+function retiredOutside(activeIds: readonly string[], retiredIds: Iterable<string>): string[] {
+  const active = new Set(activeIds)
+  return [...new Set(retiredIds)].filter(id => !active.has(id))
 }

@@ -100,7 +100,9 @@ try {
       console.log(JSON.stringify({beforeMigrations:before.rows[0].count, applied:first.applied.length,
         appliedFiles:first.applied, stillPending,
         rerunApplied:second.applied.length, accounts:audit.accounts, inventories:audit.inventories,
-        remainingFindings:audit.unknownOwnedAvatarIds+audit.unknownOwnedRoomIds+audit.unownedEquippedAvatarIds}));
+        remainingFindings:audit.unknownOwnedAvatarIds+audit.unknownOwnedRoomIds+audit.unownedEquippedAvatarIds,
+        retiredOwnedAvatarIds:audit.retiredOwnedAvatarIds, retiredOwnedRoomIds:audit.retiredOwnedRoomIds,
+        retiredEquippedAvatarIds:audit.retiredEquippedAvatarIds}));
     } finally {await pool.end()}
   `])
   const hash = createHash("sha256")
