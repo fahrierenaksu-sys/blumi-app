@@ -181,6 +181,11 @@ export function Avatar25Canvas(props: {
   /** Caps the surface's pixel ratio (plan 2.2: 2x above 250 pt) to bound its memory. */
   maxPixelRatio?: number
   style?: StyleProp<ViewStyle>
+  /**
+   * Build everything (textures, buffers) but present nothing yet: the surface stays empty and transparent, and the
+   * first frame after it turns false is fully drawn (MiniRoom: loads during the stage fade-in, shows at its end).
+   */
+  paused?: boolean
   onStats?: (stats: Avatar25FrameStats) => void
   onReady?: () => void
   onError?: (error: Error) => void
@@ -262,10 +267,11 @@ export function Avatar25Canvas(props: {
   const hasStats = Boolean(onStats)
   const clockFromMount = props.clockStartsAtMount ?? false
   const clockStartMs = useSharedValue(-1)
+  const paused = props.paused ?? false
 
   useFrameCallback((info) => {
     "worklet"
-    if (!gpu) return
+    if (!gpu || paused) return
     const t0 = performance.now()
     const { device, pipeline } = gpu
     const texture = gpu.context.getCurrentTexture()

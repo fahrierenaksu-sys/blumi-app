@@ -61,7 +61,7 @@ interface AvatarLayerProps {
   typingUserId?: string
   /** Furniture drawn among the avatars by floor depth (VIS-04). */
   depthScene?: MiniRoomDepthScene
-  /** 2.5D avatars: keep their GPU surface unmounted while the stage is still fading in. */
+  /** 2.5D avatars: their GPU surface loads but draws nothing while the stage is still fading in. */
   holdGpuSurfaces?: boolean
 }
 
