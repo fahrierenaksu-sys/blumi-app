@@ -21,6 +21,7 @@ import {
   type RoomV2AvatarRenderLayer,
   type RoomV2FurnitureRenderItem,
   type RoomV2RenderItem,
+  type RoomV2WallCover,
   type UserRoomDecor,
   type RoomPoint2D
 } from "./roomV2.types"
@@ -33,6 +34,7 @@ import {
 import { validateRoomV2FurnitureSurfacePlacement } from "./roomV2PlacementSurface"
 import { getRoomV2FurnitureMobileRenderScale } from "./roomV2RenderSurface"
 import { getRoomV2ShellFloorPlacementPolygon } from "./roomV2FloorGrid"
+import { applyRoomV2FloorDrawOrder } from "./roomV2FloorDrawOrder"
 import { roomAvatar25d } from "../../features/avatar/roomAvatarSeam"
 
 /** 2.5D room calibration; null in every other bundle (shapes stay as shipped). */
@@ -136,11 +138,11 @@ export function resolveRoomV2Scene(
       const renderItem = resolvePlacedFurnitureRenderItem(resolvedPlaced, item)
       return renderItem ? [renderItem] : []
     })
-    .sort(compareRoomV2RenderItems)
+  const sortedRenderItems = sortRoomV2RenderItems(renderItems)
 
   return {
     shell,
-    renderItems
+    renderItems: sortedRenderItems
   }
 }
 
@@ -449,22 +451,19 @@ export function compareRoomV2RenderItems(
   return a.renderId.localeCompare(b.renderId)
 }
 
+/**
+ * The room's draw order: by layer and depth, then pieces on floor cells by their floor boxes, so the nearer of two
+ * neighbours is drawn over the other whatever their sizes (`applyRoomV2FloorDrawOrder`).
+ */
+export function sortRoomV2RenderItems<T extends RoomV2RenderItem>(items: readonly T[]): T[] {
+  return applyRoomV2FloorDrawOrder([...items].sort(compareRoomV2RenderItems))
+}
+
 export function insertRoomV2RenderItemSorted(
   items: RoomV2RenderItem[],
   item: RoomV2RenderItem
 ): RoomV2RenderItem[] {
-  const nextItems = [...items]
-  let insertAt = nextItems.length
-
-  for (let index = 0; index < nextItems.length; index += 1) {
-    if (compareRoomV2RenderItems(item, nextItems[index]) < 0) {
-      insertAt = index
-      break
-    }
-  }
-
-  nextItems.splice(insertAt, 0, item)
-  return nextItems
+  return sortRoomV2RenderItems([...items, item])
 }
 
 export function upsertRoomV2RenderItemSorted(
@@ -528,7 +527,7 @@ export function validateRoomV2FurniturePlacement(input: {
     }
   }
 
-  const blockingRenderIds = input.scene.renderItems
+  const floorBlockingRenderIds = input.scene.renderItems
     .filter((item): item is RoomV2FurnitureRenderItem =>
       item.kind === "furniture" &&
       item.renderId !== input.candidate.renderId &&
@@ -543,6 +542,10 @@ export function validateRoomV2FurniturePlacement(input: {
       )
     )
     .map((item) => item.renderId)
+  const blockingRenderIds = [
+    ...floorBlockingRenderIds,
+    ...getRoomV2WallPieceBlockerIds(input.scene.renderItems, input.candidate)
+  ]
 
   if (blockingRenderIds.length > 0) {
     issueIds.push("overlaps_blocking_furniture")
@@ -554,6 +557,30 @@ export function validateRoomV2FurniturePlacement(input: {
     blockingRenderIds,
     supportingRenderIds: surfaceValidation.supportingRenderIds
   }
+}
+
+/** Wall covers may touch; sharing more wall than this (world units) is hanging one over the other. */
+const WALL_COVER_TOUCH = 1e-3
+
+/** Wall pieces whose drawings cover the candidate's wall (room calibration: both on the same measured wall). */
+function getRoomV2WallPieceBlockerIds(
+  renderItems: readonly RoomV2RenderItem[],
+  candidate: RoomV2FurnitureRenderItem
+): string[] {
+  const own = candidate.wallPlacement
+  if (!own) return []
+  return renderItems
+    .filter((item): item is RoomV2FurnitureRenderItem =>
+      item.kind === "furniture" &&
+      item.renderId !== candidate.renderId &&
+      item.wallPlacement?.wall === own.wall &&
+      doRoomV2WallCoversOverlap(own.cover, item.wallPlacement.cover))
+    .map((item) => item.renderId)
+}
+
+function doRoomV2WallCoversOverlap(a: RoomV2WallCover, b: RoomV2WallCover): boolean {
+  return a.alongMin < b.alongMax - WALL_COVER_TOUCH && b.alongMin < a.alongMax - WALL_COVER_TOUCH &&
+    a.heightMin < b.heightMax - WALL_COVER_TOUCH && b.heightMin < a.heightMax - WALL_COVER_TOUCH
 }
 
 /**
@@ -611,6 +638,8 @@ export function validateRoomV2DraftPlacements(input: {
       isSameRoomV2Placement(untouchedItems.get(placedItem.instanceId), placedItem) &&
       validation.issueIds.every((issueId) =>
         issueId === "outside_placeable_area" ||
+        // a wall piece saved over another before wall pieces were kept apart keeps its spot
+        (issueId === "overlaps_blocking_furniture" && renderItem.wallPlacement !== undefined) ||
         // room calibration: a wall piece saved under the shell's old wall band keeps its spot
         (issueId === "invalid_placement_surface" && renderItem.wallPlacement !== undefined))
     ) {

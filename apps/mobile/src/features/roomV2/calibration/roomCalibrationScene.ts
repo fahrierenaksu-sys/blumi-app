@@ -145,6 +145,7 @@ export function calibrateFurnitureRenderItem(
     collisionPolygon: diamond,
     placementPolygon: diamond.map((point) => ({ ...point })),
     footprintCells: getFloorBoxCellQuads(placed, c),
+    floorBox: placed,
     depth: item.depth + delta.y,
     ...(item.seatWorldPoints
       ? {
@@ -175,7 +176,7 @@ export function calibrateWallRenderItem(
   c: RoomCalibration = ROOM_CALIBRATION
 ): RoomV2FurnitureRenderItem {
   const fit = checkWallPiece({ ...wallPieceOf(item), x: item.x, y: item.y }, item.surfacePlacementPolicy, c)
-  return { ...item, wallPlacement: { wall: fit.wall, isValid: fit.isValid, strip: fit.strip } }
+  return { ...item, wallPlacement: { wall: fit.wall, isValid: fit.isValid, strip: fit.strip, cover: fit.cover } }
 }
 
 /** The wall magnet (`snapWallPiece`) for a wall piece held at a stage point: its anchor's stage point. */

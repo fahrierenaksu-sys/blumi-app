@@ -454,6 +454,11 @@ export interface RoomV2FurnitureRenderItem extends RoomV2RenderItemBase {
    */
   footprintCells?: RoomPoint2D[][]
   /**
+   * Room calibration: the floor box (world units) those cells make, wall-flush moves included. The room's
+   * painter's order reads it (`applyRoomV2FloorDrawOrder`). Never persisted.
+   */
+  floorBox?: RoomV2FloorBox
+  /**
    * Room calibration: a wall piece on the measured back-wall plane under its anchor. Whether it
    * fits there (wall span, skirting to cap, clear of door, window and niche) and the soft strip of wall the editor
    * highlights behind it. Never persisted.
@@ -480,6 +485,24 @@ export interface RoomV2WallPlacement {
   isValid: boolean
   /** Stage quad: base start, base end, top end, top start (fractions). */
   strip: RoomPoint2D[]
+  /** The wall the drawing covers (world units along and up its wall): two pieces' covers may not share wall. */
+  cover: RoomV2WallCover
+}
+
+/** A wall rectangle in world units: along the wall (Z on the left wall, X on the right) and up it. */
+export interface RoomV2WallCover {
+  alongMin: number
+  alongMax: number
+  heightMin: number
+  heightMax: number
+}
+
+/** An axis-aligned floor box in world units (X along the right wall, Z along the left wall). */
+export interface RoomV2FloorBox {
+  minX: number
+  maxX: number
+  minZ: number
+  maxZ: number
 }
 
 /** A layered piece's extra art and its seat rules (Workbench `item.json`), for one rotation. */

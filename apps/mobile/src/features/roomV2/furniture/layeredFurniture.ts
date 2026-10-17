@@ -320,6 +320,7 @@ export function calibrateLayeredFurnitureRenderItem(
     collisionPolygon: diamond,
     placementPolygon: diamond.map((point) => ({ ...point })),
     footprintCells: getFloorBoxCellQuads(placed, c),
+    floorBox: placed,
     renderOffset: { x: drawPoint.x - item.x, y: drawPoint.y - item.y },
     seatWorldPoints: rotation.seats.map((s, index) => ({
       ...layeredSeatWorldPoint(s, placed, centre, diamond, c, spec.scale),
