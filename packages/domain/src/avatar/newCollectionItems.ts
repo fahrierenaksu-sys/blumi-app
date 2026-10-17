@@ -123,8 +123,8 @@ export const NEW_COLLECTION_ITEMS: readonly NewCollectionItem[] = Object.freeze(
   piece("top_girl_rose_pearl_cardigan", "top", "Gül Hırka", 240),
   piece("top_girl_breton_stripe", "top", "Bretan Bluz", 220),
   piece("top_girl_sage_knit_polo", "top", "Triko Polo", 220),
-  // the boy's six 2.5D hairs (boyhair_1017): lead proposal prices on the hair tiers (short cut 260, quiff 300, waves 320),
-  // waiting for the owner's figures; held by `new-collection-art-pending` until their receipts land
+  // the boy's six 2.5D hairs (boyhair_1017): owner-approved prices on the hair tiers (short cut 260, quiff 300, waves 320),
+  // published with their receipts on 2026-10-17 (docs/quality/SHOP_CATALOG_PUBLICATION_2026-10-17_BOY_HAIRS.md)
   piece("hair_male_blond_fade", "hair", "Sarı Fade", 260, { bodyId: BOY }),
   piece("hair_male_soft_crop", "hair", "Yumuşak Kısa Kesim", 260, { bodyId: BOY }),
   piece("hair_male_black_side_part", "hair", "Siyah Yan Ayrık", 260, { bodyId: BOY }),
