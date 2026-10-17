@@ -126,6 +126,24 @@ export function isRoomFootPointInFrontOfFootprint(footprint: readonly number[], 
 }
 
 /**
+ * A pinned depth (a seat's) goes right after the last item it is deeper than. The floor-box order can put a
+ * deeper piece before a shallower one (a long shelf behind a bed), so the first deeper item is not where the
+ * shallower ones end: stopping there would draw a sitter under the bed she sits on.
+ */
+function getPinnedAvatarDepthIndex(neighbours: readonly MyRoomAvatarDepthNeighbour[], depth: number): number {
+  "worklet"
+  let after = 0
+  for (let index = 0; index < neighbours.length; index += 1) {
+    const neighbour = neighbours[index]!
+    if (neighbour.layerSign < 0) break
+    if (neighbour.layerSign > 0 || depth > neighbour.depth || (depth === neighbour.depth && !neighbour.avatarFirstOnTie)) {
+      after = index + 1
+    }
+  }
+  return after
+}
+
+/**
  * The index the avatar takes among items already in render order. Feet on
  * the floor (`footX`/`footY`) are compared with each footprint's front edge;
  * an item without a footprint compares by depth; a pinned depth (the avatar
@@ -155,20 +173,3 @@ export function getMyRoomAvatarDepthIndex(
   return neighbours.length
 }
 
-/**
- * A pinned depth (a seat's) goes right after the last item it is deeper than. The floor-box order can put a
- * deeper piece before a shallower one (a long shelf behind a bed), so the first deeper item is not where the
- * shallower ones end: stopping there would draw a sitter under the bed she sits on.
- */
-function getPinnedAvatarDepthIndex(neighbours: readonly MyRoomAvatarDepthNeighbour[], depth: number): number {
-  "worklet"
-  let after = 0
-  for (let index = 0; index < neighbours.length; index += 1) {
-    const neighbour = neighbours[index]!
-    if (neighbour.layerSign < 0) break
-    if (neighbour.layerSign > 0 || depth > neighbour.depth || (depth === neighbour.depth && !neighbour.avatarFirstOnTie)) {
-      after = index + 1
-    }
-  }
-  return after
-}
