@@ -30,7 +30,6 @@ const invite: ChatRoomInviteTimelineItem = {
 
 function mount(allowHeavyContent = false) {
   const runtime = createFakeReactRuntime()
-  const attachedSources = new Set<string>()
   const actions: ChatRoomInviteAction[] = []
   const roomWarmups: unknown[][] = []
   const heavy = (type: string) => (props: Record<string, unknown>) => {
@@ -44,14 +43,6 @@ function mount(allowHeavyContent = false) {
       "@expo/vector-icons/Ionicons": "Icon",
       "../../ui/linearGradient": { LinearGradient: heavy("Gradient") },
       "./ChatRoomInviteScene": { ChatRoomInviteScene: heavy("RoomScene") },
-      "./roomDoorFlight": {
-        getRoomDoorKey: (key: string) => key,
-        roomDoorSources: { attach: (key: string) => {
-          attachedSources.add(key)
-          return () => { attachedSources.delete(key) }
-        } }
-      },
-      "../../ui/flight/flightSources": { measureViewInWindow: () => undefined },
       "../performance/sceneAssetWarmupModel": {
         publishRoomEntryWarmup: (avatars: unknown[]) => { roomWarmups.push(avatars) }
       }
@@ -67,7 +58,7 @@ function mount(allowHeavyContent = false) {
     input = { ...input, ...patch }
     return renderedElements(runtime.render(() => card.ChatRoomInviteCard(input)))
   }
-  return { runtime, render, actions, attachedSources, roomWarmups }
+  return { runtime, render, actions, roomWarmups }
 }
 
 test("compact historical invitations show sender and status without mounting the room scene", () => {
@@ -84,7 +75,6 @@ test("compact historical invitations show sender and status without mounting the
       assert.ok(label.includes(state.label))
       assert.ok(label.includes(state.statusLabel))
       assert.ok(elements.some((element) => element.type === "Text" && element.props.children === state.statusLabel))
-      assert.deepEqual([...f.attachedSources], [], "an unmounted historical door cannot become a flight source")
       f.runtime.unmount()
     }
   }
@@ -128,15 +118,13 @@ test("compact mode preserves participant actions, busy state and access restrict
   }
 })
 
-test("the default full card keeps its room scene and switching to compact detaches its door", () => {
+test("the default full card keeps its room scene and compact drops it", () => {
   const f = mount(true)
   const full = f.render()
   assert.ok(full.some((element) => element.type === "RoomScene"))
   assert.ok(full.some((element) => element.type === "Gradient"))
-  assert.ok(f.attachedSources.has(invite.threadId))
   const compact = f.render({ compact: true })
   assert.ok(compact.every((element) => element.type !== "RoomScene" && element.type !== "Gradient"))
-  assert.deepEqual([...f.attachedSources], [])
   f.runtime.unmount()
 })
 
