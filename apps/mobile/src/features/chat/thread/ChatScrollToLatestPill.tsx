@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiTheme.colors.primary
   },
   badgeText: {
-    color: uiTheme.colors.onPrimary,
+    color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "800"
   }

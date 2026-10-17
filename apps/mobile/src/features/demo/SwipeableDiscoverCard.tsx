@@ -889,7 +889,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     textAlign: "center",
     lineHeight: 24,
-    color: uiTheme.colors.goldInk,
+    color: "#A46A12",
     backgroundColor: "#FFF2C8",
     fontSize: 13,
   },

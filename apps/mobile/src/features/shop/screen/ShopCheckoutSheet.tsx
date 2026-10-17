@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   buttonTextPrimary: {
-    color: uiTheme.colors.onPrimary
+    color: "#FFFFFF"
   },
   disabled: {
     opacity: uiTheme.opacity.disabled
