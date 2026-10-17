@@ -359,3 +359,35 @@ test("switches answer disabled with the flag off and cannot be saved before migr
   await noTable.service.getState(OWNER)
   assert.deepEqual(noTable.world.teasers, [], "defaults keep teasers off")
 })
+
+test("planning a day asks about each member and pair once, and a finished trip writes its souvenir once", async () => {
+  // Arrange: forty chat partners, so the old planner asked about the owner for every partner and window
+  const partners = Object.fromEntries(Array.from({ length: 40 }, (_, index) => [`host-${index}`, 3]))
+  const h = harness({}, partners)
+  const calls = { hasCat: 0, active: 0, block: 0 }
+  const world = h.world
+  const original = { hasCat: world.hasCat, isUserActive: world.isUserActive, hasBlockBetween: world.hasBlockBetween }
+  world.hasCat = async (userId) => { calls.hasCat += 1; return original.hasCat(userId) }
+  world.isUserActive = async (userId, at) => { calls.active += 1; return original.isUserActive(userId, at) }
+  world.hasBlockBetween = async (a, b) => { calls.block += 1; return original.hasBlockBetween(a, b) }
+  let souvenirWrites = 0
+  const grant = h.repository.grantSouvenir.bind(h.repository)
+  h.repository.grantSouvenir = async (input) => { souvenirWrites += 1; return grant(input) }
+  // Act
+  await h.service.getState(OWNER)
+  // Assert: one check per member (owner + 40 hosts) and one per pair, whatever the number of windows
+  assert.ok(calls.hasCat <= 41, `hasCat ${calls.hasCat}`)
+  assert.ok(calls.active <= 41, `isUserActive ${calls.active}`)
+  assert.ok(calls.block <= 40, `hasBlockBetween ${calls.block}`)
+  // Act: read again after every trip of the day has finished
+  h.setNow(Date.parse("2026-10-16T23:55:00.000Z"))
+  const trips = (await h.trips()).length
+  await h.service.getState(OWNER)
+  const firstWrites = souvenirWrites
+  await h.service.getState(OWNER)
+  await h.service.getState(OWNER)
+  // Assert
+  assert.ok(trips > 0)
+  assert.ok(firstWrites > 0, "the first read after the return grants the souvenir")
+  assert.equal(souvenirWrites, firstWrites, "later reads reuse the granted souvenir")
+})

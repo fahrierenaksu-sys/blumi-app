@@ -148,6 +148,9 @@ export interface CatTripService {
   deleteUserData(userId: string): Promise<number>
 }
 
+/** Bounds the per-process memo of granted souvenirs. */
+const SOUVENIR_MEMO_MAX = 10_000
+
 export function createCatTripService(options: CatTripServiceOptions): CatTripService {
   const { repository, world } = options
   const now = options.now ?? (() => new Date())
@@ -173,15 +176,38 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
     return { clock, settings }
   }
 
+  /**
+   * One request's answers, keyed by its `at` instant: every check of a member or a pair runs once per
+   * request, not once per window and trip (the planner asks about the same owner for every partner).
+   */
+  const requestMemos = new WeakMap<Date, Map<string, Promise<unknown>>>()
+  function once<T>(at: Date, key: string, read: () => Promise<T>): Promise<T> {
+    let memo = requestMemos.get(at)
+    if (!memo) {
+      memo = new Map()
+      requestMemos.set(at, memo)
+    }
+    const found = memo.get(key)
+    if (found) return found as Promise<T>
+    const created = read()
+    memo.set(key, created)
+    return created
+  }
+  const isActive = (userId: string, at: Date) => once(at, `active|${userId}`, () => world.isUserActive(userId, at))
+  const hasCat = (userId: string, at: Date) => once(at, `cat|${userId}`, () => world.hasCat(userId))
+  const prefsOf = (userId: string, at: Date) => once(at, `prefs|${userId}`, () => prefs.read(userId))
+
   /** Why the pair may not travel together now, or null when it may. */
   async function pairProblem(ownerUserId: string, hostUserId: string, at: Date): Promise<CatTripEndReason | null> {
-    if (await world.hasBlockBetween(ownerUserId, hostUserId)) return "block"
-    if (!(await world.isUserActive(ownerUserId, at)) || !(await world.isUserActive(hostUserId, at))) return "account"
-    if (!(await world.isMutualMatch(ownerUserId, hostUserId))) return "unmatch"
-    if (!(await world.hasCat(ownerUserId)) || !(await world.hasCat(hostUserId))) return "ineligible"
-    // The owner turned travel off, or the host turned guests off: silently not eligible.
-    if (!(await prefs.read(ownerUserId)).travelEnabled || !(await prefs.read(hostUserId)).hostEnabled) return "ineligible"
-    return null
+    return once(at, `pair|${ownerUserId}|${hostUserId}`, async () => {
+      if (await world.hasBlockBetween(ownerUserId, hostUserId)) return "block"
+      if (!(await isActive(ownerUserId, at)) || !(await isActive(hostUserId, at))) return "account"
+      if (!(await world.isMutualMatch(ownerUserId, hostUserId))) return "unmatch"
+      if (!(await hasCat(ownerUserId, at)) || !(await hasCat(hostUserId, at))) return "ineligible"
+      // The owner turned travel off, or the host turned guests off: silently not eligible.
+      if (!(await prefsOf(ownerUserId, at)).travelEnabled || !(await prefsOf(hostUserId, at)).hostEnabled) return "ineligible"
+      return null
+    })
   }
 
   async function candidatesFor(ownerUserId: string, since: Date, until: Date, at: Date): Promise<CatTripCandidate[]> {
@@ -204,9 +230,9 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
       plannedDays.add(memoKey)
       return
     }
-    if (!(await world.isUserActive(ownerUserId, at)) || !(await world.hasCat(ownerUserId))) return
+    if (!(await isActive(ownerUserId, at)) || !(await hasCat(ownerUserId, at))) return
     // Travel off: nothing is planned, so turning it back on later today still plans the day.
-    if (!(await prefs.read(ownerUserId)).travelEnabled) return
+    if (!(await prefsOf(ownerUserId, at)).travelEnabled) return
 
     const seed = createCatTripSeed(options.seedSecret, ownerUserId, dayKey)
     const dayStartMs = clock.dayStartMs(dayKey)
@@ -309,7 +335,21 @@ export function createCatTripService(options: CatTripServiceOptions): CatTripSer
     return ended ?? trip
   }
 
+  /** A souvenir never changes once granted, so each finished trip writes it once per process, not on every read. */
+  const grantedSouvenirs = new Map<string, CatSouvenirView>()
   async function souvenirFor(trip: CatTripRecord): Promise<CatSouvenirView> {
+    const known = grantedSouvenirs.get(trip.tripId)
+    if (known) return known
+    const view = await grantSouvenirOnce(trip)
+    if (grantedSouvenirs.size >= SOUVENIR_MEMO_MAX) {
+      const oldest = grantedSouvenirs.keys().next().value
+      if (oldest !== undefined) grantedSouvenirs.delete(oldest)
+    }
+    grantedSouvenirs.set(trip.tripId, view)
+    return view
+  }
+
+  async function grantSouvenirOnce(trip: CatTripRecord): Promise<CatSouvenirView> {
     const seed = createCatTripSeed(options.seedSecret, trip.ownerUserId, trip.dayKey)
     const drawn = pickSouvenir(seed, trip.slot)
     const stored = await repository.grantSouvenir({
