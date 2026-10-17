@@ -76,6 +76,8 @@ const OYUN_FLOOR = [
   "room_v3_tvunit_oyun_game",
   "room_v3_pouf_oyun_bunnypink",
   "room_v3_pouf_oyun_bearpurple",
+  "room_v3_pouf_oyun_bunnymint",
+  "room_v3_pouf_oyun_bunnyyellow",
   "room_v3_rug_oyun_checker",
   "room_v3_rug_oyun_cloud",
   "room_v3_rug_oyun_tea"
@@ -91,8 +93,11 @@ const SEATING: Record<string, string[]> = {
   room_v3_teaset_oyun_flower: ["s0", "s1"],
   // chair height since 2026-10-17, so the drawn sitting pose fits them
   room_v3_pouf_oyun_bunnypink: ["s0"],
-  room_v3_pouf_oyun_bearpurple: ["s0"]
+  room_v3_pouf_oyun_bearpurple: ["s0"],
+  room_v3_pouf_oyun_bunnymint: ["s0"],
+  room_v3_pouf_oyun_bunnyyellow: ["s0"]
 }
+const POUFS = ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple", "room_v3_pouf_oyun_bunnymint", "room_v3_pouf_oyun_bunnyyellow"]
 /** Pieces whose only seats are `sit_low`: pose-pending, so they stand as decor. */
 const POSE_PENDING = ["room_v3_teaset_japon_zaisu"]
 const ROTATIONS: RoomFurnitureRotation[] = ["front", "right", "back", "left"]
@@ -246,7 +251,7 @@ test("a pouf's authored seat opens toward its approach cell at every rotation", 
   // yaw 0 faces +Z (toward the camera at rotation 0), 90 +X, 180 -Z, 270 -X; the approach cell lies on that side.
   const side = (yaw: number, [i, j]: number[], [w, d]: number[]) =>
     yaw === 0 ? j >= d : yaw === 90 ? i >= w : yaw === 180 ? j < 0 : i < 0
-  for (const id of ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple"]) {
+  for (const id of POUFS) {
     const raw = JSON.parse(readFileSync(join(__dirname, id, "item.json"), "utf8")) as {
       rotations: Record<string, { footprint_cells: number[]; seats: { facing_yaw_deg: number; approach_cell: number[] }[] }>
     }
@@ -377,7 +382,7 @@ test("a furnished Oyun room holds together: every piece valid beside the others,
 })
 
 test("two poufs facing each other, side by side or one cell apart: she walks to both seats from their sides and faces the other", () => {
-  for (const id of ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple"]) {
+  for (const id of POUFS) {
     // "front" faces -X and "back" faces +X: the one at the larger i looks toward the other
     for (const gap of [0, 1, 2]) {
       const pieces = [onCell(id, 6, 8, "back"), onCell(id, 8 + gap, 8, "front")]
@@ -396,7 +401,7 @@ test("seen from behind, a pouf sitter rests on the cushion: its near rim covers 
   const raw = (id: string) => JSON.parse(readFileSync(join(__dirname, id, "item.json"), "utf8")) as {
     rotations: Record<string, { seats: { avatar_view: string; hip_px: number[]; card_clip_below_px?: number }[] }>
   }
-  for (const id of ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple"]) {
+  for (const id of POUFS) {
     for (const r of ["0", "1"]) {
       const seat = raw(id).rotations[r]!.seats[0]!
       assert.ok(seat.avatar_view.startsWith("back"), `${id} r${r}`)
@@ -414,7 +419,7 @@ test("seen from behind, a pouf sitter rests on the cushion: its near rim covers 
 test("a chair keeps its front approach even when another piece stands there: only a pouf is reached from its side", () => {
   const chair = onCell("room_v3_teaset_oyun_flower", 8, 8, "front")
   assert.equal(chair.seatWorldPoints!.some((seat) => seat.alternativeApproaches), false)
-  for (const id of ["room_v3_pouf_oyun_bunnypink", "room_v3_pouf_oyun_bearpurple"]) {
+  for (const id of POUFS) {
     for (const rotation of ROTATIONS) {
       assert.equal(onCell(id, 8, 8, rotation).seatWorldPoints![0]!.alternativeApproaches?.length, 3, `${id} ${rotation}`)
     }

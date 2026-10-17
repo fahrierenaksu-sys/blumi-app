@@ -163,6 +163,46 @@ export const OYUN_LAYERED_FURNITURE_ASSETS: LayeredFurnitureAssets = {
       shadow: art("room_v3_pouf_oyun_bunnypink", "r3_shadow", require("./room_v3_pouf_oyun_bunnypink/r3_shadow.png"))
     }
   },
+  room_v3_pouf_oyun_bunnymint: {
+    0: {
+      back: art("room_v3_pouf_oyun_bunnymint", "r0_back", require("./room_v3_pouf_oyun_bunnymint/r0_back.png")),
+      front: art("room_v3_pouf_oyun_bunnymint", "r0_front", require("./room_v3_pouf_oyun_bunnymint/r0_front.png")),
+      shadow: art("room_v3_pouf_oyun_bunnymint", "r0_shadow", require("./room_v3_pouf_oyun_bunnymint/r0_shadow.png"))
+    },
+    1: {
+      back: art("room_v3_pouf_oyun_bunnymint", "r1_back", require("./room_v3_pouf_oyun_bunnymint/r1_back.png")),
+      front: art("room_v3_pouf_oyun_bunnymint", "r1_front", require("./room_v3_pouf_oyun_bunnymint/r1_front.png")),
+      shadow: art("room_v3_pouf_oyun_bunnymint", "r1_shadow", require("./room_v3_pouf_oyun_bunnymint/r1_shadow.png"))
+    },
+    2: {
+      back: art("room_v3_pouf_oyun_bunnymint", "r2_back", require("./room_v3_pouf_oyun_bunnymint/r2_back.png")),
+      shadow: art("room_v3_pouf_oyun_bunnymint", "r2_shadow", require("./room_v3_pouf_oyun_bunnymint/r2_shadow.png"))
+    },
+    3: {
+      back: art("room_v3_pouf_oyun_bunnymint", "r3_back", require("./room_v3_pouf_oyun_bunnymint/r3_back.png")),
+      shadow: art("room_v3_pouf_oyun_bunnymint", "r3_shadow", require("./room_v3_pouf_oyun_bunnymint/r3_shadow.png"))
+    }
+  },
+  room_v3_pouf_oyun_bunnyyellow: {
+    0: {
+      back: art("room_v3_pouf_oyun_bunnyyellow", "r0_back", require("./room_v3_pouf_oyun_bunnyyellow/r0_back.png")),
+      front: art("room_v3_pouf_oyun_bunnyyellow", "r0_front", require("./room_v3_pouf_oyun_bunnyyellow/r0_front.png")),
+      shadow: art("room_v3_pouf_oyun_bunnyyellow", "r0_shadow", require("./room_v3_pouf_oyun_bunnyyellow/r0_shadow.png"))
+    },
+    1: {
+      back: art("room_v3_pouf_oyun_bunnyyellow", "r1_back", require("./room_v3_pouf_oyun_bunnyyellow/r1_back.png")),
+      front: art("room_v3_pouf_oyun_bunnyyellow", "r1_front", require("./room_v3_pouf_oyun_bunnyyellow/r1_front.png")),
+      shadow: art("room_v3_pouf_oyun_bunnyyellow", "r1_shadow", require("./room_v3_pouf_oyun_bunnyyellow/r1_shadow.png"))
+    },
+    2: {
+      back: art("room_v3_pouf_oyun_bunnyyellow", "r2_back", require("./room_v3_pouf_oyun_bunnyyellow/r2_back.png")),
+      shadow: art("room_v3_pouf_oyun_bunnyyellow", "r2_shadow", require("./room_v3_pouf_oyun_bunnyyellow/r2_shadow.png"))
+    },
+    3: {
+      back: art("room_v3_pouf_oyun_bunnyyellow", "r3_back", require("./room_v3_pouf_oyun_bunnyyellow/r3_back.png")),
+      shadow: art("room_v3_pouf_oyun_bunnyyellow", "r3_shadow", require("./room_v3_pouf_oyun_bunnyyellow/r3_shadow.png"))
+    }
+  },
   room_v3_pouf_oyun_bearpurple: {
     0: {
       back: art("room_v3_pouf_oyun_bearpurple", "r0_back", require("./room_v3_pouf_oyun_bearpurple/r0_back.png")),

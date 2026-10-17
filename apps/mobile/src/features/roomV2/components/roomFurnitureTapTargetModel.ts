@@ -307,6 +307,64 @@ export const ROOM_FURNITURE_DRAWN_OUTLINES: Readonly<Record<string, RoomFurnitur
       { x: 0.208, y: 0.027 }, { x: 0.485, y: 0.027 }, { x: 0.842, y: 0.425 }, { x: 0.842, y: 0.678 },
       { x: 0.644, y: 0.898 }, { x: 0.213, y: 0.898 }, { x: 0.024, y: 0.688 }, { x: 0.024, y: 0.233 }
     ]
+  },
+  // The Oyun mint bunny pouf (chair height, 2026-10-17): room-camera back layers.
+  room_v3_pouf_oyun_bunnymint_layered_r0_back: {
+    aspect: 238 / 230,
+    points: [
+      { x: 0.116, y: 0.025 }, { x: 0.426, y: 0.025 }, { x: 0.817, y: 0.429 }, { x: 0.817, y: 0.714 },
+      { x: 0.632, y: 0.906 }, { x: 0.213, y: 0.906 }, { x: 0.024, y: 0.71 }, { x: 0.024, y: 0.12 }
+    ]
+  },
+  room_v3_pouf_oyun_bunnymint_layered_r1_back: {
+    aspect: 286 / 230,
+    points: [
+      { x: 0.364, y: 0.025 }, { x: 0.625, y: 0.025 }, { x: 0.702, y: 0.12 }, { x: 0.702, y: 0.714 },
+      { x: 0.548, y: 0.906 }, { x: 0.084, y: 0.906 }, { x: 0.018, y: 0.823 }, { x: 0.018, y: 0.455 }
+    ]
+  },
+  room_v3_pouf_oyun_bunnymint_layered_r2_back: {
+    aspect: 280 / 261,
+    points: [
+      { x: 0.351, y: 0.021 }, { x: 0.531, y: 0.021 }, { x: 0.696, y: 0.197 }, { x: 0.696, y: 0.772 },
+      { x: 0.549, y: 0.93 }, { x: 0.208, y: 0.93 }, { x: 0.019, y: 0.726 }, { x: 0.019, y: 0.377 }
+    ]
+  },
+  room_v3_pouf_oyun_bunnymint_layered_r3_back: {
+    aspect: 238 / 256,
+    points: [
+      { x: 0.217, y: 0.021 }, { x: 0.426, y: 0.021 }, { x: 0.842, y: 0.408 }, { x: 0.842, y: 0.733 },
+      { x: 0.644, y: 0.916 }, { x: 0.213, y: 0.916 }, { x: 0.024, y: 0.74 }, { x: 0.024, y: 0.201 }
+    ]
+  },
+  // The Oyun yellow bunny pouf (chair height, 2026-10-17): room-camera back layers.
+  room_v3_pouf_oyun_bunnyyellow_layered_r0_back: {
+    aspect: 238 / 230,
+    points: [
+      { x: 0.116, y: 0.025 }, { x: 0.426, y: 0.025 }, { x: 0.817, y: 0.429 }, { x: 0.817, y: 0.714 },
+      { x: 0.632, y: 0.906 }, { x: 0.213, y: 0.906 }, { x: 0.024, y: 0.71 }, { x: 0.024, y: 0.12 }
+    ]
+  },
+  room_v3_pouf_oyun_bunnyyellow_layered_r1_back: {
+    aspect: 286 / 230,
+    points: [
+      { x: 0.364, y: 0.025 }, { x: 0.625, y: 0.025 }, { x: 0.702, y: 0.12 }, { x: 0.702, y: 0.714 },
+      { x: 0.548, y: 0.906 }, { x: 0.084, y: 0.906 }, { x: 0.018, y: 0.823 }, { x: 0.018, y: 0.455 }
+    ]
+  },
+  room_v3_pouf_oyun_bunnyyellow_layered_r2_back: {
+    aspect: 280 / 261,
+    points: [
+      { x: 0.351, y: 0.021 }, { x: 0.531, y: 0.021 }, { x: 0.696, y: 0.197 }, { x: 0.696, y: 0.772 },
+      { x: 0.549, y: 0.93 }, { x: 0.208, y: 0.93 }, { x: 0.019, y: 0.726 }, { x: 0.019, y: 0.377 }
+    ]
+  },
+  room_v3_pouf_oyun_bunnyyellow_layered_r3_back: {
+    aspect: 238 / 256,
+    points: [
+      { x: 0.217, y: 0.021 }, { x: 0.426, y: 0.021 }, { x: 0.842, y: 0.408 }, { x: 0.842, y: 0.733 },
+      { x: 0.644, y: 0.916 }, { x: 0.213, y: 0.916 }, { x: 0.024, y: 0.74 }, { x: 0.024, y: 0.201 }
+    ]
   }
 })
 

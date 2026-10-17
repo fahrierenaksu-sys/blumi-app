@@ -42,6 +42,8 @@ import rawTeasetOyunFlower from "./room_v3_teaset_oyun_flower/item.json"
 import rawTvunitOyunGame from "./room_v3_tvunit_oyun_game/item.json"
 import rawPoufOyunBunnypink from "./room_v3_pouf_oyun_bunnypink/item.json"
 import rawPoufOyunBearpurple from "./room_v3_pouf_oyun_bearpurple/item.json"
+import rawPoufOyunBunnymint from "./room_v3_pouf_oyun_bunnymint/item.json"
+import rawPoufOyunBunnyyellow from "./room_v3_pouf_oyun_bunnyyellow/item.json"
 import rawRugOyunChecker from "./room_v3_rug_oyun_checker/item.json"
 import rawRugOyunCloud from "./room_v3_rug_oyun_cloud/item.json"
 import rawRugOyunTea from "./room_v3_rug_oyun_tea/item.json"
@@ -163,6 +165,9 @@ export const LAYERED_FURNITURE_SPECS: Readonly<Record<string, LayeredFurnitureSp
   room_v3_tvunit_oyun_game: parseLayeredFurnitureSpec(rawTvunitOyunGame),
   room_v3_pouf_oyun_bunnypink: parseLayeredFurnitureSpec(rawPoufOyunBunnypink),
   room_v3_pouf_oyun_bearpurple: parseLayeredFurnitureSpec(rawPoufOyunBearpurple),
+  // the bunny pouf's colourways (owner, 2026-10-17)
+  room_v3_pouf_oyun_bunnymint: parseLayeredFurnitureSpec(rawPoufOyunBunnymint),
+  room_v3_pouf_oyun_bunnyyellow: parseLayeredFurnitureSpec(rawPoufOyunBunnyyellow),
   room_v3_rug_oyun_checker: parseLayeredFurnitureSpec(rawRugOyunChecker),
   room_v3_rug_oyun_cloud: parseLayeredFurnitureSpec(rawRugOyunCloud),
   room_v3_rug_oyun_tea: parseLayeredFurnitureSpec(rawRugOyunTea)

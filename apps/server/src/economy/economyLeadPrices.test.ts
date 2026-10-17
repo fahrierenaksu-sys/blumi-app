@@ -9,7 +9,8 @@ const BOY = "avatar_v2_body_male_light"
 
 /**
  * The economy v1 lead price sheet (Workbench economy_2025/LEAD/PRICES.tsv, set under the owner's economy delegation
- * on 2026-10-16) for the 62 items the owner approved on 2026-10-16: [item id, type, body that wears it, lead price in coins].
+ * on 2026-10-16) for the 62 items the owner approved on 2026-10-16, plus the bunny pouf's two colourways the owner asked
+ * for on 2026-10-17 (same price as the pouf): [item id, type, body that wears it, lead price in coins].
  * The server charges what the shared domain catalog says, so any second price table that drifts fails here.
  */
 const LEAD_PRICES: ReadonlyArray<readonly [string, EconomyItemType, string | null, number]> = [
@@ -51,6 +52,8 @@ const LEAD_PRICES: ReadonlyArray<readonly [string, EconomyItemType, string | nul
   ["room_v3_bed_oyun_gingham", "room", null, 480],
   ["room_v3_pouf_oyun_bearpurple", "room", null, 120],
   ["room_v3_pouf_oyun_bunnypink", "room", null, 120],
+  ["room_v3_pouf_oyun_bunnymint", "room", null, 120],
+  ["room_v3_pouf_oyun_bunnyyellow", "room", null, 120],
   ["room_v3_rug_oyun_tea", "room", null, 120],
   ["room_v3_rug_japon_tea", "room", null, 150],
   ["room_v3_rug_japon_botanic", "room", null, 180],
@@ -80,8 +83,8 @@ const LEAD_PRICES: ReadonlyArray<readonly [string, EconomyItemType, string | nul
 // Every one of these items is still held; lift only the holds, so the purchase runs the real server path.
 const HOLDS_LIFTED: ReleaseCatalog = { ...BLUMI_R1_RELEASE_CATALOG, heldScopes: [] }
 
-test("the lead price sheet names 62 distinct items", () => {
-  assert.equal(new Set(LEAD_PRICES.map(([itemId]) => itemId)).size, 62)
+test("the lead price sheet names 64 distinct items", () => {
+  assert.equal(new Set(LEAD_PRICES.map(([itemId]) => itemId)).size, 64)
 })
 
 test("every economy v1 item is sold at its lead price once receipted, and one without a receipt stays held", async () => {

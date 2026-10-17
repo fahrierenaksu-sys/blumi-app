@@ -4311,6 +4311,13 @@
         "^(?:qa_|dev_|test_)",
         "^room_v2_(?:qa_|candidate_)"
       ]
+    },
+    {
+      "scope": "room-colourway-owner-receipt-pending",
+      "productionPublication": false,
+      "itemIdPatterns": [
+        "^room_v3_pouf_oyun_bunny(?:mint|yellow)$"
+      ]
     }
   ],
   "productionPolicy": {
