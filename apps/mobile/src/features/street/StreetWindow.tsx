@@ -14,8 +14,8 @@ import { StreetRoomScene } from "./StreetRoomScene"
 export const STREET_WINDOW = { width: 78, wideWidth: 92, glass: 68, bubble: 20, gap: 10 } as const
 /** From AX1 up the window grows and the name may wrap (spec §3). */
 const LARGE_TEXT_SCALE = 1.35
-/** A round window frames the chibi's head and shoulders, like a profile photo; the room stays behind as colour. */
-const BUST_FRAMING = { chibiScale: 1.9, feetRatio: 1.98, roomScale: 13.4 } as const
+/** A window shows the whole chibi standing in a fifth of their room, so a new rug or bed shows too (spec §1). */
+const ROOM_FRAMING = { chibiScale: 0.74, roomScale: 5.2 } as const
 const NIGHT_GLASS_OPACITY = 0.88
 const WAKE_STAGGER_MS = 110
 const WAKE_MAX_WINDOWS = 7
@@ -92,9 +92,8 @@ export const StreetWindowView = memo(function StreetWindowView(props: {
             avatar={isSelf ? item.avatar : window!.avatar}
             width={glassSize}
             height={glassSize}
-            roomWidth={glassSize * BUST_FRAMING.roomScale}
-            chibiHeight={glassSize * BUST_FRAMING.chibiScale}
-            feetRatio={BUST_FRAMING.feetRatio}
+            roomWidth={glassSize * ROOM_FRAMING.roomScale}
+            chibiHeight={glassSize * ROOM_FRAMING.chibiScale}
           />
         )}
         <Reanimated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.night, nightStyle]} />

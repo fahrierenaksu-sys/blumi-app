@@ -12,7 +12,8 @@ const SHELL_ASPECT = 714 / 1254
 const PORTRAIT_SPOT = { x: 0.5, y: 0.66 }
 /** The chibi still is 2:3 (width:height). */
 const STILL_ASPECT = 2 / 3
-const DEFAULT_FEET_RATIO = 0.92
+/** The chibi's feet sit near the bottom of the window. */
+const FEET_RATIO = 0.92
 
 /**
  * One match's room cropped around the portrait spot, with their chibi standing on it. The room is drawn from its saved
@@ -26,10 +27,8 @@ export const StreetRoomScene = memo(function StreetRoomScene(props: {
   height: number
   roomWidth: number
   chibiHeight: number
-  /** Where the chibi's feet sit, as a fraction of the height; above 1 crops to the head and shoulders. */
-  feetRatio?: number
 }) {
-  const { room, avatar, width, height, roomWidth, chibiHeight, feetRatio = DEFAULT_FEET_RATIO } = props
+  const { room, avatar, width, height, roomWidth, chibiHeight } = props
   const scene = useMemo(() => room ? resolveRoomV2Scene({
     roomShellCatalog: ROOM_V2_SHELL_CATALOG,
     furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
@@ -42,7 +41,7 @@ export const StreetRoomScene = memo(function StreetRoomScene(props: {
   const roomHeight = roomWidth * SHELL_ASPECT
   const spotX = roomWidth * PORTRAIT_SPOT.x
   const spotY = roomHeight * PORTRAIT_SPOT.y
-  const feetY = height * feetRatio
+  const feetY = height * FEET_RATIO
   const chibiWidth = chibiHeight * STILL_ASPECT
   return (
     <View style={[styles.clip, { width, height }]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
