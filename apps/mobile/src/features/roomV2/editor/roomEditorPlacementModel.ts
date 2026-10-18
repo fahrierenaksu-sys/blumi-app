@@ -110,10 +110,13 @@ export function createValidDraftPlacement(input: {
   itemId: string
   scene: ReturnType<typeof resolveRoomV2Scene>
   rotationOverride?: PlacedRoomItem["rotation"]
+  /** Reorders the default spots (the Shop preview tries the most visible ones first). */
+  orderCandidates?: (candidates: { x: number; y: number }[]) => { x: number; y: number }[]
 }): PlacedRoomItem | null {
   const instanceId = `${input.itemId}_${Date.now()}`
   const rotation = input.rotationOverride ?? getDefaultRoomV2FurnitureRotation(input.item)
-  const candidates = getRoomV2DraftPlacementCandidates(input.item, input.scene)
+  const defaultCandidates = getRoomV2DraftPlacementCandidates(input.item, input.scene)
+  const candidates = input.orderCandidates ? input.orderCandidates(defaultCandidates) : defaultCandidates
 
   const usesFloorGrid = isFloorGridPlacement(input.item, input.scene.shell)
   for (const candidate of candidates) {

@@ -258,7 +258,8 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
     combinationSummary,
     canRemoveAvatarPreview,
     combinationItems,
-    roomPreviewScene
+    roomPreviewScene,
+    roomPreviewDimmedIds
   } = useShopPreviewModel({
     shopMode,
     showShopContent,
@@ -487,6 +488,7 @@ export function CosmeticShopScreen(props: CosmeticShopScreenProps) {
                   previewAvatar={previewAvatar}
                   purchaseLandingFlightIds={purchaseFlight.landingFlightIds}
                   roomPreviewScene={roomPreviewScene}
+                  roomPreviewDimmedIds={roomPreviewDimmedIds}
                   layoutMetrics={shopLayoutMetrics}
                   isPurchasing={
                     isPurchasing || isRemoving || combinationState.phase !== "editing"

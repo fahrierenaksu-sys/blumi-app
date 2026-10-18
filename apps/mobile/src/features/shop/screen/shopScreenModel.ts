@@ -1,4 +1,5 @@
 import type Ionicons from "@expo/vector-icons/Ionicons"
+import type MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { MAIN_TAB_ROUTE_NAMES } from "../../../navigation/mainTabPager/mainTabPagerConfig"
 import { getAppLocale, type AppLocale } from "../../session/appLocale"
 import type {
@@ -35,7 +36,22 @@ export type ShopCategoryOption = {
   id: string
   label: string
   count: number
-  icon: keyof typeof Ionicons.glyphMap
+  /** One outline icon family for every rail entry, so the rail reads as one set. */
+  icon: ShopCategoryGlyph
+}
+
+export type ShopCategoryGlyph = keyof typeof MaterialCommunityIcons.glyphMap
+
+const AVATAR_CATEGORY_GLYPHS: Record<(typeof SHOP_AVATAR_CATEGORY_ORDER)[number], ShopCategoryGlyph> = {
+  top: "tshirt-crew-outline",
+  // The rail draws its own trousers outline for bottoms; this glyph is only the fallback.
+  bottom: "hanger",
+  dress: "hanger",
+  outerwear: "coat-rack",
+  shoes: "shoe-sneaker",
+  glasses: "glasses",
+  accessory: "necklace",
+  hair: "hair-dryer-outline"
 }
 
 export function getShopSurfacePolicy(input: {
@@ -87,6 +103,8 @@ export function getCompactCategoryLabel(category: ShopCategoryOption, locale: Ap
   if (locale === "tr" && category.id === "accessory") return "Aksesuar"
   if (locale === "tr" && category.id === "glasses") return "Gözlük"
   if (locale === "tr" && category.id === "dress") return "Elbise"
+  if (locale === "tr" && category.id === "owned") return "Eşyaların"
+  if (locale === "tr" && category.id === "misc") return "Dekor"
   return category.label
 }
 
@@ -116,20 +134,23 @@ export function getAvatarPurchaseFailureTitle(
  * `defaultRoomShellId` is injected (the screen passes
  * `DEFAULT_ROOM_V2_SHELL_ID`) so this model stays free of Room asset imports.
  */
+/** The previewed piece's instance (and render) id in the Shop's room preview. */
+export const SHOP_PREVIEW_INSTANCE_ID = "shop-preview-item"
+
 export function createRoomPreviewDecor(
   item: FurnitureItem,
   baseDecor: UserRoomDecor,
   defaultRoomShellId: string
 ): UserRoomDecor {
   const placedItems = baseDecor.placedItems.filter(
-    (placedItem) => placedItem.instanceId !== "shop-preview-item"
+    (placedItem) => placedItem.instanceId !== SHOP_PREVIEW_INSTANCE_ID
   )
   return {
     roomShellId: baseDecor.roomShellId || defaultRoomShellId,
     placedItems: [
       ...placedItems,
       {
-        instanceId: "shop-preview-item",
+        instanceId: SHOP_PREVIEW_INSTANCE_ID,
         itemId: item.id,
         x: item.category === "wallDecor" ? 0.28 : 0.54,
         y: item.category === "wallDecor" ? 0.5 : 0.76,
@@ -158,33 +179,23 @@ export function buildShopCategoryOptions(
   locale = getAppLocale()
 ): ShopCategoryOption[] {
   const categoryCopy = getShopCopy(locale).categories
-  const avatarCategoryIcons: Record<(typeof SHOP_AVATAR_CATEGORY_ORDER)[number], keyof typeof Ionicons.glyphMap> = {
-    top: "shirt",
-    bottom: "layers",
-    dress: "sparkles",
-    outerwear: "snow",
-    shoes: "walk",
-    glasses: "glasses",
-    accessory: "bag-handle",
-    hair: "color-wand"
-  }
   const candidates: Omit<ShopCategoryOption, "count">[] =
     mode === "avatar"
       ? SHOP_AVATAR_CATEGORY_ORDER.map((id) => ({
           id,
           label: categoryCopy[id],
-          icon: avatarCategoryIcons[id]
+          icon: AVATAR_CATEGORY_GLYPHS[id]
         }))
       : [
-          { id: "all", label: categoryCopy.all, icon: "grid" },
-          { id: "owned", label: categoryCopy.owned, icon: "checkmark-circle" },
-          { id: "seating", label: categoryCopy.seating, icon: "bed" },
-          { id: "table", label: categoryCopy.table, icon: "ellipse" },
-          { id: "lighting", label: categoryCopy.lighting, icon: "bulb" },
-          { id: "rug", label: categoryCopy.rug, icon: "layers" },
-          { id: "wallDecor", label: categoryCopy.wallDecor, icon: "image" },
-          { id: "plant", label: categoryCopy.plant, icon: "leaf" },
-          { id: "misc", label: categoryCopy.misc, icon: "sparkles" }
+          { id: "all", label: categoryCopy.all, icon: "view-grid-outline" },
+          { id: "owned", label: categoryCopy.owned, icon: "check-circle-outline" },
+          { id: "seating", label: categoryCopy.seating, icon: "sofa-outline" },
+          { id: "table", label: categoryCopy.table, icon: "table-furniture" },
+          { id: "lighting", label: categoryCopy.lighting, icon: "floor-lamp-outline" },
+          { id: "rug", label: categoryCopy.rug, icon: "rug" },
+          { id: "wallDecor", label: categoryCopy.wallDecor, icon: "image-frame" },
+          { id: "plant", label: categoryCopy.plant, icon: "flower-tulip-outline" },
+          { id: "misc", label: categoryCopy.misc, icon: "bookshelf" }
         ]
 
   return candidates

@@ -76,11 +76,9 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
     : metaLabel
       ?? (selectedCompact && product.priceCoins !== null && !product.owned
         ? formatCoins(product.priceCoins, locale)
-        : selectedCompact && product.previewType === "room" && product.owned
-          ? copy.readyToPlace
-          : selectedCompact && product.owned && product.previewType === "avatar"
-            ? copy.ownedCompact
-            : presentation.stateLabel)
+        : selectedCompact && product.owned
+          ? copy.ownedCompact
+          : presentation.stateLabel)
   const avatarPreviewSource = product.avatarItem
     ? getShopProductThumbnailSource(product.sourceItemId)
       ?? getAvatarItemPreviewSource(product.avatarItem)
@@ -122,8 +120,7 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
       style={[
         styles.productCard,
         selectedCompact ? styles.productCardCompact : null,
-        compactCardSizeStyle,
-        selected ? styles.productCardSelected : null
+        compactCardSizeStyle
       ]}
     >
       <View ref={thumbnailRef} collapsable={false} style={[styles.productThumb, { height: thumbHeight }]}>

@@ -256,10 +256,8 @@ export const shopScreenStyles = StyleSheet.create({
     minHeight: 122,
     padding: 5,
   },
-  // The rose border is drawn by productSelectionRing so it can fade (SHOP-3).
-  productCardSelected: {
-    backgroundColor: "rgba(255, 242, 249, 0.94)",
-  },
+  // The rose border is drawn by productSelectionRing so it can fade (SHOP-3). A selected card keeps
+  // the white face, so its pink picture tile still reads like every other card's.
   productSelectionRing: {
     position: "absolute",
     top: -1,

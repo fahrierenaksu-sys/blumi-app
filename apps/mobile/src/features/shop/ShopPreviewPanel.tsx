@@ -38,6 +38,8 @@ export function ShopPreviewPanel(props: {
   /** Purchase flights landing on the avatar (useShopPurchaseFlight). */
   purchaseLandingFlightIds?: readonly string[]
   roomPreviewScene: ReturnType<typeof resolveRoomV2Scene> | null
+  /** Pieces drawn over the previewed one; faded so it stays in sight. */
+  roomPreviewDimmedIds?: ReadonlySet<string>
   layoutMetrics: ShopLayoutMetrics
   isPurchasing: boolean
   locale: AppLocale
@@ -75,6 +77,7 @@ export function ShopPreviewPanel(props: {
     previewAvatar,
     purchaseLandingFlightIds,
     roomPreviewScene,
+    roomPreviewDimmedIds,
     onPrimaryAction
   } = props
   const copy = getShopCopy(locale)
@@ -98,8 +101,9 @@ export function ShopPreviewPanel(props: {
   }), [previewAvatar, layoutMetrics.preview.avatarWidth])
   const roomDrawingInput = useMemo(() => roomPreviewScene ? ({
     scene: roomPreviewScene,
+    dimmedIds: roomPreviewDimmedIds,
     item: product?.roomItem
-  }) : null, [roomPreviewScene, product?.roomItem])
+  }) : null, [roomPreviewScene, roomPreviewDimmedIds, product?.roomItem])
   const avatarDrawing = useRetainedShopPreviewDrawing(avatarPreview, avatarDrawingInput)
   const roomDrawing = useRetainedShopPreviewDrawing(roomPreview, roomDrawingInput)
 
@@ -121,12 +125,6 @@ export function ShopPreviewPanel(props: {
     : actionPrice !== null
       ? `${actionLabel}, ${formatCoins(actionPrice, locale)} ${copy.coins}`
       : actionLabel
-  const previewGuide =
-    product?.previewType === "avatar"
-      ? copy.avatarPreviewGuide
-      : product?.previewType === "room"
-        ? copy.roomPreviewGuide
-        : copy.genericPreviewGuide
   const stageHeight = avatarPreview
     ? layoutMetrics.preview.avatarStageHeight
     : layoutMetrics.preview.roomStageHeight
@@ -213,10 +211,10 @@ export function ShopPreviewPanel(props: {
               </>
             ) : <View style={[
               styles.roomHeroTitleGlass,
-              avatarPreview ? styles.avatarHeroTopPanel : null
+              avatarPreview ? styles.avatarHeroTopPanel : styles.roomHeroNameChip
             ]}>
               <View style={avatarPreview ? styles.avatarProductHeading : undefined}>
-                <Text style={[styles.roomHeroEyebrow, avatarPreview ? styles.avatarProductEyebrow : null]} numberOfLines={2}>
+                <Text style={[styles.roomHeroEyebrow, avatarPreview ? styles.avatarProductEyebrow : null]} numberOfLines={avatarPreview ? 2 : 1} maxFontSizeMultiplier={avatarPreview ? undefined : ROOM_OVERLAY_TEXT_SCALE_CAP}>
                   {presentation.eyebrow}
                 </Text>
                 {avatarPreview && canRemovePreview && onRemovePreview ? (
@@ -236,8 +234,9 @@ export function ShopPreviewPanel(props: {
                   styles.roomHeroTitle,
                   avatarPreview ? styles.avatarProductTitle : null
                 ]}
-                numberOfLines={2}
+                numberOfLines={avatarPreview ? 2 : 1}
                 adjustsFontSizeToFit
+                maxFontSizeMultiplier={avatarPreview ? undefined : ROOM_OVERLAY_TEXT_SCALE_CAP}
               >
                 {product.title}
               </Text>
@@ -276,23 +275,7 @@ export function ShopPreviewPanel(props: {
                   ) : null}
                 </View>
               </Pressable>
-            ) : <View style={[
-              styles.roomHeroStatusPill,
-              avatarPreview ? styles.avatarHeroTopPanel : null
-            ]}>
-              <Ionicons
-                name={product.owned ? "checkmark-circle" : "sparkles"}
-                size={14}
-                color={product.owned ? uiTheme.colors.success : uiTheme.colors.primary}
-              />
-              <Text style={styles.roomHeroStatusText} numberOfLines={1}>
-                {product.owned
-                  ? presentation.stateLabel
-                  : product.priceCoins !== null
-                    ? `${formatCoins(product.priceCoins, locale)} ${copy.coins}`
-                    : previewGuide}
-              </Text>
-            </View>}
+            ) : null}
           </View> : avatarPreview ? (
             <View key="avatar-showcase-overlay" style={[styles.roomHeroTopOverlay, styles.avatarInfoOverlay, {
               right: layoutMetrics.preview.overlayInset,
@@ -314,6 +297,7 @@ export function ShopPreviewPanel(props: {
               accessibilityState={{ disabled }}
               disabled={disabled}
               onPress={onPrimaryAction}
+              hitSlop={ROOM_ACTION_HIT_SLOP}
               style={({ pressed }) => [
                 styles.roomHeroAction,
                 {
@@ -324,7 +308,7 @@ export function ShopPreviewPanel(props: {
                 pressed && !disabled ? styles.primaryActionPressed : null
               ]}
             >
-              <Text style={styles.roomHeroActionText} numberOfLines={1} adjustsFontSizeToFit>
+              <Text style={styles.roomHeroActionText} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={ROOM_OVERLAY_TEXT_SCALE_CAP}>
                 {isPurchasing ? copy.saving : actionLabel}
               </Text>
             </Pressable>
@@ -381,6 +365,11 @@ function productOverlayEdges(inset: number, avatarPreview: boolean, showCombinat
   return avatarPreview ? { right: inset, top, bottom: 10 } : { left: inset, right: inset, top }
 }
 
+/** The room preview's labels sit on the drawing, so large text must not bury the room under them. */
+const ROOM_OVERLAY_TEXT_SCALE_CAP = 1.2
+/** The compact room button keeps a 44 pt touch target. */
+const ROOM_ACTION_HIT_SLOP = { top: 5, bottom: 5, left: 4, right: 4 } as const
+
 // Match the stage's child alignment; the extra slot owns no drawing geometry.
 const drawingSlotStyle = {
   ...StyleSheet.absoluteFill,
@@ -402,6 +391,7 @@ const ShopRoomItemPreview = memo(function ShopRoomItemPreview(props: {
   active: boolean
   item: FurnitureItem | undefined
   scene: ReturnType<typeof resolveRoomV2Scene> | null
+  dimmedIds: ReadonlySet<string> | undefined
   locale: AppLocale
 }) {
   const scene = props.scene
@@ -418,6 +408,7 @@ const ShopRoomItemPreview = memo(function ShopRoomItemPreview(props: {
       <ShopRoomRenderer2D
         shell={scene.shell}
         renderItems={scene.renderItems}
+        dimmedItemRenderIds={props.dimmedIds}
         style={styles.shopRoomSceneRenderer}
       />
     </View>

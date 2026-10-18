@@ -30,8 +30,6 @@ export interface ShopCopy {
   owned: string
   previewing: string
   avatarPreviewGuide: string
-  roomPreviewGuide: string
-  genericPreviewGuide: string
   avatarOwnedFootnote: string
   avatarUnlockFootnote: string
   roomOwnedFootnote: string
@@ -47,7 +45,6 @@ export interface ShopCopy {
   ownedCompact: string
   itemCount: (count: number) => string
   categories: Record<string, string>
-  readyToPlace: string
   product: {
     wearing: string
     wearingOutfit: string
@@ -158,8 +155,6 @@ const COPY: Record<AppLocale, ShopCopy> = {
     owned: "Owned",
     previewing: "Previewing",
     avatarPreviewGuide: "Live on your avatar",
-    roomPreviewGuide: "See it in your room",
-    genericPreviewGuide: "See the vibe before you unlock it",
     avatarOwnedFootnote: "Applies to your saved avatar.",
     avatarUnlockFootnote: "Unlock it here, then wear it from Avatar Studio.",
     roomOwnedFootnote: "Opens Edit Room so you can place it.",
@@ -180,7 +175,6 @@ const COPY: Record<AppLocale, ShopCopy> = {
       glasses: "Glasses", accessory: "Accessories", all: "All", seating: "Seating", table: "Tables",
       lighting: "Lighting", rug: "Rugs", wallDecor: "Wall", plant: "Plants", misc: "Storage & decor"
     },
-    readyToPlace: "Ready to place",
     product: {
       wearing: "Wearing", wearingOutfit: "Wearing outfit", ownedOutfit: "Owned outfit",
       placed: (count) => `${count} placed`, wearNow: "Wear now", wearOutfit: "Wear outfit",
@@ -287,8 +281,6 @@ const COPY: Record<AppLocale, ShopCopy> = {
     owned: "Dolabında",
     previewing: "Önizleniyor",
     avatarPreviewGuide: "Avatarında canlı gör",
-    roomPreviewGuide: "Odanda gör",
-    genericPreviewGuide: "Açmadan önce havayı gör",
     avatarOwnedFootnote: "Kayıtlı avatarına uygulanır.",
     avatarUnlockFootnote: "Buradan aç, sonra Avatar Stüdyosu’nda giy.",
     roomOwnedFootnote: "Yerleştirmek için Odayı Düzenle’yi açar.",
@@ -309,7 +301,6 @@ const COPY: Record<AppLocale, ShopCopy> = {
       glasses: "Gözlükler", accessory: "Aksesuarlar", all: "Tümü", seating: "Oturma", table: "Masalar",
       lighting: "Aydınlatma", rug: "Halılar", wallDecor: "Duvar", plant: "Bitkiler", misc: "Depolama ve dekor"
     },
-    readyToPlace: "Yerleştirmeye hazır",
     product: {
       wearing: "Giyili", wearingOutfit: "Kombin giyili", ownedOutfit: "Kombin sende",
       placed: (count) => `${count} yerleştirildi`, wearNow: "Giy", wearOutfit: "Kombini giy",

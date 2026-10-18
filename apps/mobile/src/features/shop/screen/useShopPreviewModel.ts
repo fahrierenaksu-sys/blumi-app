@@ -18,16 +18,14 @@ import { getShopCombinationItems, getShopCombinationSummary } from "../shopCombi
 import type { ShopCombinationState } from "../shopCombinationState"
 import type { ShopMode } from "../ShopNavigationControls"
 import { resolveShopSelectedProduct } from "../shopSelectionModel"
-import {
-  createRoomPreviewDecor,
-  maskUnverifiedProductOwnership
-} from "./shopScreenModel"
+import { maskUnverifiedProductOwnership } from "./shopScreenModel"
+import { resolveShopRoomPreviewScene, type ShopRoomPreviewScene } from "./shopRoomPreviewScene"
 
 interface RoomPreviewResolution {
   roomDecor: UserRoomDecor
   furnitureCatalog: FurnitureItem[]
   selectedRoomItem: FurnitureItem | undefined
-  scene: ReturnType<typeof resolveRoomV2Scene>
+  preview: ShopRoomPreviewScene
 }
 
 /**
@@ -150,13 +148,13 @@ export function useShopPreviewModel(input: {
       roomDecor,
       furnitureCatalog,
       selectedRoomItem,
-      scene: resolveRoomV2Scene({
-        roomShellCatalog: ROOM_V2_SHELL_CATALOG,
+      preview: resolveShopRoomPreviewScene({
+        item: selectedRoomItem,
+        decor: roomDecor,
         furnitureCatalog,
-        decor: selectedRoomItem
-          ? createRoomPreviewDecor(selectedRoomItem, roomDecor, DEFAULT_ROOM_V2_SHELL_ID)
-          : roomDecor,
-        defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
+        roomShellCatalog: ROOM_V2_SHELL_CATALOG,
+        defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID,
+        resolveScene: resolveRoomV2Scene
       })
     }
   }, [showRoomPreview, furnitureCatalog, roomDecor, selectedRoomItem, lastRoomResolution])
@@ -166,7 +164,8 @@ export function useShopPreviewModel(input: {
   if (roomResolution && roomResolution !== lastRoomResolution) {
     setLastRoomResolution(roomResolution)
   }
-  const roomPreviewScene = roomResolution?.scene ?? null
+  const roomPreviewScene = roomResolution?.preview.scene ?? null
+  const roomPreviewDimmedIds = roomResolution?.preview.dimmedRenderIds
 
   return {
     selectedProduct,
@@ -177,6 +176,7 @@ export function useShopPreviewModel(input: {
     combinationSummary,
     canRemoveAvatarPreview,
     combinationItems,
-    roomPreviewScene
+    roomPreviewScene,
+    roomPreviewDimmedIds
   }
 }

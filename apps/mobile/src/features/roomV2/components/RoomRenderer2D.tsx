@@ -135,6 +135,8 @@ interface RoomRenderer2DProps {
    * Their contact shadows stay here, on the floor under everything.
    */
   hiddenItemRenderIds?: ReadonlySet<string>
+  /** Furniture drawn see-through, so a piece behind it stays in sight (the Shop's preview). */
+  dimmedItemRenderIds?: ReadonlySet<string>
   /**
    * One extra drawing (the room pet) placed in the upright items' draw order, just before
    * `beforeRenderId` (null: after every item). Layered floor pieces always stay behind it.
@@ -170,6 +172,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
     onSceneReady,
     onItemDrawn,
     hiddenItemRenderIds,
+    dimmedItemRenderIds,
     depthSlot
   } = props
   const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 })
@@ -222,6 +225,7 @@ export function RoomRenderer2D(props: RoomRenderer2DProps) {
           item={item}
           layeredSeat={layeredSeat?.seat}
           isSelected={selectedInstanceId === item.renderId}
+          isDimmed={dimmedItemRenderIds?.has(item.renderId) ?? false}
           placementState={placementStateByRenderId?.[item.renderId]}
           onItemTap={shouldRoomV2ItemReceiveTap({
             kind: item.kind,
@@ -526,6 +530,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   /** A seated 2.5D avatar's layered seat (room calibration): her hip goes on the seat point. */
   layeredSeat?: RoomV2LayeredSeatArt
   isSelected?: boolean
+  isDimmed?: boolean
   placementState?: RoomRendererPlacementState
   onItemTap?: (item: RoomV2RenderItem) => void
   onItemLongPress?: (item: RoomV2RenderItem) => void
@@ -552,6 +557,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
   const {
     item,
     isSelected,
+    isDimmed,
     placementState,
     onItemTap,
     onItemLongPress,
@@ -736,7 +742,8 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
             styles.itemContent,
             isSelected ? styles.itemSelected : null,
             placementState === "valid" ? styles.itemPlacementValid : null,
-            placementState === "invalid" ? styles.itemPlacementInvalid : null
+            placementState === "invalid" ? styles.itemPlacementInvalid : null,
+            isDimmed ? styles.itemDimmed : null
           ]}
         >
           {isSelected && item.kind === "furniture" && !showsFloorCells ? (
@@ -885,6 +892,7 @@ const RoomRendererItem = memo(function RoomRendererItem(props: {
 }, (previous, next) =>
   previous.item === next.item &&
   previous.isSelected === next.isSelected &&
+  previous.isDimmed === next.isDimmed &&
   previous.placementState === next.placementState &&
   previous.onItemTap === next.onItemTap &&
   previous.onItemLongPress === next.onItemLongPress &&
@@ -1051,6 +1059,9 @@ const styles = StyleSheet.create({
   },
   itemPlacementInvalid: {
     opacity: 0.64
+  },
+  itemDimmed: {
+    opacity: 0.32
   },
   itemImage: {
     width: "100%",

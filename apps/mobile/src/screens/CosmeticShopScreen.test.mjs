@@ -31,7 +31,7 @@ test("unverified catalog cards show neutral pending status, not ownership or pri
     },
     useCallback: (callback) => callback,
     useScrollSafePress: (callback) => callback,
-    getShopCopy: () => ({ owned: "Owned", readyToPlace: "Ready" }),
+    getShopCopy: () => ({ owned: "Owned", ownedCompact: "Sende" }),
     getShopProductPresentation: () => ({ stateLabel: "Owned" }),
     getAvatarAutomationSlug: () => "top",
     styles: { productCard: "card", productCardCompact: "compact", productMetaPill: "meta", productMetaPillOwned: { ownership: "owned" } },

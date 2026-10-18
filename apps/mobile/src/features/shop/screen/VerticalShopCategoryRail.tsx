@@ -1,4 +1,3 @@
-import Ionicons from "@expo/vector-icons/Ionicons"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { memo } from "react"
 import { Pressable, ScrollView, Text, View } from "react-native"
@@ -9,13 +8,7 @@ import { getShopCopy } from "../shopCopy"
 import { getCompactCategoryLabel, type ShopCategoryOption } from "./shopScreenModel"
 import { shopScreenStyles as styles } from "./shopScreenStyles"
 
-const AVATAR_CATEGORY_GLYPHS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
-  top: "tshirt-crew-outline",
-  dress: "hanger",
-  shoes: "shoe-sneaker",
-  accessory: "sunglasses",
-  hair: "hair-dryer-outline"
-}
+const INACTIVE_ICON_COLOR = "rgba(45, 31, 58, 0.56)"
 
 export const VerticalShopCategoryRail = memo(function VerticalShopCategoryRail(props: {
   categories: ShopCategoryOption[]
@@ -48,18 +41,14 @@ export const VerticalShopCategoryRail = memo(function VerticalShopCategoryRail(p
             <View style={styles.verticalCategoryHeading}>
               {category.id === "bottom" ? (
                 <View style={styles.trousersIcon}>
-                  <View style={[styles.trousersWaist, { borderColor: active ? uiTheme.colors.primary : "#8E8194" }]} />
-                  <View style={[styles.trousersLeg, { left: 1, borderColor: active ? uiTheme.colors.primary : "#8E8194" }]} />
-                  <View style={[styles.trousersLeg, { right: 1, borderColor: active ? uiTheme.colors.primary : "#8E8194" }]} />
+                  <View style={[styles.trousersWaist, { borderColor: active ? uiTheme.colors.primary : INACTIVE_ICON_COLOR }]} />
+                  <View style={[styles.trousersLeg, { left: 1, borderColor: active ? uiTheme.colors.primary : INACTIVE_ICON_COLOR }]} />
+                  <View style={[styles.trousersLeg, { right: 1, borderColor: active ? uiTheme.colors.primary : INACTIVE_ICON_COLOR }]} />
                 </View>
-              ) : AVATAR_CATEGORY_GLYPHS[category.id] ? <MaterialCommunityIcons
-                name={AVATAR_CATEGORY_GLYPHS[category.id]}
-                size={17}
-                color={active ? uiTheme.colors.primary : "rgba(45, 31, 58, 0.56)"}
-              /> : <Ionicons
+              ) : <MaterialCommunityIcons
                 name={category.icon}
-                size={17}
-                color={active ? uiTheme.colors.primary : "rgba(45, 31, 58, 0.56)"}
+                size={18}
+                color={active ? uiTheme.colors.primary : INACTIVE_ICON_COLOR}
               />}
               <Text
                 style={[

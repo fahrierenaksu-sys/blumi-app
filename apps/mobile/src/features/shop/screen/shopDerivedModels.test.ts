@@ -17,7 +17,7 @@ import type * as MotionModule from "../../../ui/motion"
 import { getShopLayoutMetrics } from "../shopLayoutMetrics"
 import { avatarToShopCombinationDraft } from "../shopAvatarDraft"
 import { buildPurchaseQueue, createShopCombinationState } from "../shopCombinationState"
-import { createRoomPreviewDecor } from "./shopScreenModel"
+import { SHOP_PREVIEW_INSTANCE_ID } from "./shopScreenModel"
 
 require.extensions[".png"] = (module, filename) => { module.exports = filename }
 require.extensions[".webp"] = require.extensions[".png"]
@@ -62,6 +62,8 @@ const { DEFAULT_ROOM_V2_SHELL_ID, ROOM_V2_SHELL_CATALOG, ROOM_V2_FURNITURE_CATAL
 const avatarProductOrder = require("./shopAvatarProductOrder") as typeof import("./shopAvatarProductOrder")
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
 const roomSelectors = require("../../roomV2/roomV2Selectors") as typeof import("../../roomV2/roomV2Selectors")
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro assets use the test loaders above.
+const { resolveShopRoomPreviewScene, getShopPreviewOccluderIds } = require("./shopRoomPreviewScene") as typeof import("./shopRoomPreviewScene")
 
 // Plan X15 retired every old paid avatar item, so the live Shop sells no avatar piece either. The same tests run on
 // three paid avatar stand-ins (two hairs, one top) copied from old items under their own ids; each has a published
@@ -384,7 +386,7 @@ function mountPreview(
         "../../../ui/animations": { useSelectionTransition: () => ({}) },
         "../../roomV2/roomV2Selectors": { resolveRoomV2Scene: resolveScene }
       },
-      real: ["../../roomV2/roomV2Catalog", "../shopAvatarDraft", "../shopCombinationSummary", "../shopSelectionModel", "./shopScreenModel"]
+      real: ["../../roomV2/roomV2Catalog", "../shopAvatarDraft", "../shopCombinationSummary", "../shopSelectionModel", "./shopScreenModel", "./shopRoomPreviewScene"]
     }
   ).useShopPreviewModel
   const equipped = avatarToShopCombinationDraft(DEFAULT_AVATAR_V2)
@@ -499,11 +501,11 @@ test("home mode resumes the latest saved room and selected preview without chang
     decor, defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
   }))
   const selected = shop.update({ selectedId: product.id })
-  assert.deepEqual(selected.roomPreviewScene, roomSelectors.resolveRoomV2Scene({
-    roomShellCatalog: ROOM_V2_SHELL_CATALOG, furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
-    decor: createRoomPreviewDecor(product.roomItem, decor, DEFAULT_ROOM_V2_SHELL_ID),
-    defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
-  }))
+  assert.deepEqual(selected.roomPreviewScene, resolveShopRoomPreviewScene({
+    item: product.roomItem, decor, furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
+    roomShellCatalog: ROOM_V2_SHELL_CATALOG, defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID,
+    resolveScene: roomSelectors.resolveRoomV2Scene
+  }).scene)
   assert.deepEqual(decor, original)
   assert.equal(shop.update({ shopMode: "avatar", activeProducts: shop.catalog.avatarProducts }).roomPreviewScene, null)
   const moved: UserRoomDecor = { ...decor, placedItems: decor.placedItems.map((item) => ({ ...item, x: 0.62 })) }
@@ -1005,11 +1007,46 @@ test("visible room changes refresh immediately using exact decor, catalog and se
     ? { ...entry, roomItem: nextItem } : entry)
   const itemUpdated = shop.update({ activeProducts: products })
   assert.notEqual(itemUpdated.roomPreviewScene, selected.roomPreviewScene)
-  assert.deepEqual(itemUpdated.roomPreviewScene, roomSelectors.resolveRoomV2Scene({
-    roomShellCatalog: ROOM_V2_SHELL_CATALOG, furnitureCatalog: catalog,
-    decor: createRoomPreviewDecor(nextItem, decor, DEFAULT_ROOM_V2_SHELL_ID),
-    defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
-  }))
+  assert.deepEqual(itemUpdated.roomPreviewScene, resolveShopRoomPreviewScene({
+    item: nextItem, decor, furnitureCatalog: catalog,
+    roomShellCatalog: ROOM_V2_SHELL_CATALOG, defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID,
+    resolveScene: roomSelectors.resolveRoomV2Scene
+  }).scene)
+})
+
+test("a previewed room piece takes a free spot and is never hidden behind the shopper's furniture", () => {
+  const [pieceA, pieceB] = standInPieces
+  const catalog = [...ROOM_V2_FURNITURE_CATALOG.filter((item) => item.id !== pieceA!.id && item.id !== pieceB!.id), pieceA!, pieceB!]
+  // The shopper already has a piece standing where the preview used to drop every new one.
+  const decor: UserRoomDecor = {
+    roomShellId: DEFAULT_ROOM_V2_SHELL_ID,
+    placedItems: [{ instanceId: "owned-piece", itemId: pieceB!.id, x: 0.54, y: 0.76, rotation: "front" }]
+  }
+  const preview = resolveShopRoomPreviewScene({
+    item: pieceA, decor, furnitureCatalog: catalog,
+    roomShellCatalog: ROOM_V2_SHELL_CATALOG, defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID,
+    resolveScene: roomSelectors.resolveRoomV2Scene
+  })
+  const previewItem = preview.scene.renderItems.find((item) => item.renderId === SHOP_PREVIEW_INSTANCE_ID)
+  assert.ok(previewItem, "the previewed piece is in the room")
+  const roomWithoutPreview = { ...preview.scene, renderItems: preview.scene.renderItems.filter((item) => item !== previewItem) }
+  assert.deepEqual(roomSelectors.validateRoomV2FurniturePlacement({ scene: roomWithoutPreview, candidate: previewItem }).blockingRenderIds, [])
+  assert.deepEqual([...preview.dimmedRenderIds], [...getShopPreviewOccluderIds(preview.scene.renderItems, SHOP_PREVIEW_INSTANCE_ID)])
+  assert.deepEqual(decor.placedItems.map((item) => item.instanceId), ["owned-piece"])
+})
+
+test("pieces drawn over the previewed piece are faded; pieces behind it or beside it are not", () => {
+  const box = (renderId: string, x: number, y: number) => ({
+    kind: "furniture", renderId, x, y, width: 0.2, height: 0.2, anchor: { x: 0.5, y: 1 }, sceneProjection: "upright"
+  }) as unknown as Parameters<typeof getShopPreviewOccluderIds>[0][number]
+  const items = [
+    box("behind", 0.5, 0.6),
+    box(SHOP_PREVIEW_INSTANCE_ID, 0.5, 0.7),
+    box("in-front", 0.52, 0.78),
+    box("far-side", 0.9, 0.8)
+  ]
+  assert.deepEqual([...getShopPreviewOccluderIds(items, SHOP_PREVIEW_INSTANCE_ID)], ["in-front"])
+  assert.equal(getShopPreviewOccluderIds(items, "missing").size, 0)
 })
 
 test("hidden room changes do no scene work and activation resolves the latest inputs", () => {
@@ -1029,11 +1066,11 @@ test("hidden room changes do no scene work and activation resolves the latest in
   assert.equal(resolvedInputs.length, 1, "hidden changes must leave the drawing resolver untouched")
   const latest = shop.update({ showShopContent: true })
   assert.notEqual(latest.roomPreviewScene, shop.first.roomPreviewScene)
-  assert.deepEqual(latest.roomPreviewScene, roomSelectors.resolveRoomV2Scene({
-    roomShellCatalog: ROOM_V2_SHELL_CATALOG, furnitureCatalog: catalog,
-    decor: createRoomPreviewDecor(product.roomItem, decor, DEFAULT_ROOM_V2_SHELL_ID),
-    defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID
-  }))
+  assert.deepEqual(latest.roomPreviewScene, resolveShopRoomPreviewScene({
+    item: product.roomItem, decor, furnitureCatalog: catalog,
+    roomShellCatalog: ROOM_V2_SHELL_CATALOG, defaultRoomShellId: DEFAULT_ROOM_V2_SHELL_ID,
+    resolveScene: roomSelectors.resolveRoomV2Scene
+  }).scene)
   assert.equal(resolvedInputs.at(-1)?.furnitureCatalog, catalog)
 })
 

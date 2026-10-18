@@ -216,6 +216,17 @@ export const shopPreviewStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.76)"
   },
+  // Room mode: a small name tag in the corner, not a banner across the room.
+  roomHeroNameChip: {
+    flex: 0,
+    flexShrink: 1,
+    maxWidth: "62%",
+    minHeight: 0,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 250, 253, 0.84)"
+  },
   roomHeroEyebrow: {
     ...uiTheme.font.micro,
     color: uiTheme.colors.primary,
@@ -246,23 +257,6 @@ export const shopPreviewStyles = StyleSheet.create({
   avatarPreviewRemoveButtonPressed: {
     backgroundColor: "rgba(255, 219, 236, 0.98)",
     transform: [{ scale: 0.96 }]
-  },
-  roomHeroStatusPill: {
-    minHeight: 29,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
-    borderRadius: uiTheme.radius.full,
-    backgroundColor: "rgba(255, 255, 250, 0.86)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.80)"
-  },
-  roomHeroStatusText: {
-    ...uiTheme.font.captionBold,
-    color: uiTheme.colors.successInk,
-    fontSize: 13,
-    lineHeight: 15
   },
   avatarHeroTopPanel: {
     minHeight: 64,
@@ -307,8 +301,7 @@ export const shopPreviewStyles = StyleSheet.create({
     right: 10,
     bottom: 9,
     zIndex: 5,
-    minWidth: 124,
-    minHeight: 44,
+    minHeight: 34,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
@@ -321,8 +314,8 @@ export const shopPreviewStyles = StyleSheet.create({
   roomHeroActionText: {
     ...uiTheme.font.bodyBold,
     color: "#FFFFFF",
-    fontSize: 16,
-    lineHeight: 19,
+    fontSize: 13,
+    lineHeight: 16,
     textAlign: "center"
   },
   avatarHeroAction: {
