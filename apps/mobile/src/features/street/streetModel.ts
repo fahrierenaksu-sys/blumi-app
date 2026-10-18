@@ -58,10 +58,6 @@ export function streetWindowAccessibilityLabel(window: StreetWindow, copy: Stree
   return `${parts.join(". ")}.`
 }
 
-export function streetStarters(change: StreetChangeKind | null, copy: StreetCopy): readonly [string, string] {
-  return copy.starters[change ?? "none"]
-}
-
 /** Hysteresis: collapse past the offset, open only back at the top. */
 export function nextStreetCollapsed(collapsed: boolean, scrollOffset: number): boolean {
   "worklet"

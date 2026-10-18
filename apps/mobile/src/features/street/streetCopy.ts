@@ -20,7 +20,6 @@ export interface StreetCopy {
   today: string
   close: string
   changes: Readonly<Record<StreetChangeKind, string>>
-  starters: Readonly<Record<StreetChangeKind | "none", readonly [string, string]>>
   infoTitle: string
   infoBody: string
   infoOk: string
@@ -35,6 +34,7 @@ export interface StreetCopy {
   cancel: string
   noteLabel: (name: string, note: string) => string
   replyPlaceholder: string
+  messagePlaceholder: string
   send: string
   demoReplyTitle: string
   demoReplyBody: string
@@ -74,22 +74,6 @@ const TR: StreetCopy = {
     item: "yeni eşya",
     layout: "yeni düzen"
   },
-  starters: {
-    guest: ["Misafirin çok tatlı!", "Kedi senin odanı seçmiş 🐾"],
-    dress: ["Yeni elbisen çok yakışmış", "Bu elbise nereden?"],
-    outfit: ["Yeni kombinin çok güzel", "Bu kombin tam sen olmuş"],
-    hair: ["Yeni saçın çok yakışmış", "Saçını çok sevdim"],
-    shoes: ["Ayakkabıların çok tatlı", "Yeni ayakkabılar mı?"],
-    accessory: ["Aksesuarın çok tatlı", "Bu aksesuar sana çok yakışmış"],
-    rug: ["Yeni halın odayı değiştirmiş", "Halın çok tatlı"],
-    bed: ["Yeni yatağın çok rahat görünüyor", "Odan çok güzel olmuş"],
-    seat: ["Yeni koltuğun çok rahat görünüyor", "Odan çok güzel olmuş"],
-    wall: ["Duvarın çok güzel olmuş", "Bu tablo çok tatlı"],
-    shelf: ["Yeni rafın çok güzel", "Odan çok derli toplu"],
-    item: ["Odana yeni bir şey gelmiş", "Odan çok güzel olmuş"],
-    layout: ["Odanı yeniden düzenlemişsin", "Yeni düzen çok güzel"],
-    none: ["Odan çok güzel", "Günün nasıl geçiyor?"]
-  },
   infoTitle: "Evin sokakta",
   infoBody: "Karşılıklı eşleştiğin kişiler odanı ve görünüşünü Sohbetler'deki sokakta görür. Pencereni istediğin zaman Ayarlar'dan kapatabilirsin.",
   infoOk: "Anladım",
@@ -103,6 +87,7 @@ const TR: StreetCopy = {
   cancel: "Vazgeç",
   noteLabel: (name, note) => `${name} not bıraktı: ${note}`,
   replyPlaceholder: "Notuna yanıt yaz…",
+  messagePlaceholder: "Mesaj yaz…",
   send: "Gönder",
   demoReplyTitle: "Deneme",
   demoReplyBody: "Gerçekte yanıtın, notu alıntılayarak sohbetinize mesaj olarak düşer.",
@@ -141,6 +126,7 @@ const EN: StreetCopy = {
   cancel: "Cancel",
   noteLabel: (name, note) => `${name} left a note: ${note}`,
   replyPlaceholder: "Reply to their note…",
+  messagePlaceholder: "Write a message…",
   send: "Send",
   demoReplyTitle: "Demo",
   demoReplyBody: "For real, your reply lands in your chat as a message quoting the note.",

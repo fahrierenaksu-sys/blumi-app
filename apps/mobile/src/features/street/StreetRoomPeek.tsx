@@ -9,14 +9,14 @@ import { PressableScale } from "../../ui/PressableScale"
 import { useSheetPresentation } from "../../ui/sheetPresentation"
 import { uiTheme } from "../../ui/theme"
 import type { StreetCopy } from "./streetCopy"
-import { streetChangeLabel, streetStarters, type StreetWindowSnapshot } from "./streetModel"
+import { streetChangeLabel, type StreetWindowSnapshot } from "./streetModel"
 import { normalizeStreetNote } from "./streetNoteModel"
 import { StreetRoomScene } from "./StreetRoomScene"
 
 /** Side inset of the sheet's content. */
 const SIDE = 16
-/** The room card: about half the room across, a little wider than tall. */
-const PEEK = { roomScale: 2.3, heightRatio: 0.74, radius: 26 } as const
+/** The room card: about half the room across, a little wider than tall, in a white frame. */
+const PEEK = { roomScale: 2.3, heightRatio: 0.8, radius: 30, frame: 4 } as const
 const TEXT_SCALE_CAP = 1.6
 
 export interface StreetRoomPeekContentProps {
@@ -24,10 +24,10 @@ export interface StreetRoomPeekContentProps {
   previous: StreetWindowSnapshot | null
   copy: StreetCopy
   fallbackName: string
-  onStarter: (threadId: string, draft: string | null) => void
-  /** Notes prototype: their note, answered from here into the chat. */
+  /** Notes prototype: their note, said by the chibi over its head. */
   note: string | null
-  onReply?: (threadId: string, note: string, reply: string) => void
+  /** Opens the chat with this message as a draft (quoting the note when there is one). */
+  onReply: (threadId: string, note: string | null, reply: string) => void
 }
 
 /**
@@ -55,151 +55,199 @@ export function StreetRoomPeek(props: Omit<StreetRoomPeekContentProps, "window" 
   )
 }
 
-/** The room card (Dün / Bugün when this device kept yesterday's), their note with a reply, and two starters. */
+/** Their room with the note over the chibi's head, their name, and one message field into the chat. */
 export function StreetRoomPeekContent(props: StreetRoomPeekContentProps) {
   const { window, previous, copy, note } = props
   const { width } = useWindowDimensions()
   const { close } = useSheetPresentation()
   const [showYesterday, setShowYesterday] = useState(false)
-  const [reply, setReply] = useState("")
-  const replyText = normalizeStreetNote(reply)
-  const sendReply = () => {
-    if (!note || !replyText) return
-    setReply("")
-    close(() => props.onReply?.(window.threadId, note, replyText))
+  const [message, setMessage] = useState("")
+  const text = normalizeStreetNote(message)
+  const send = () => {
+    if (!text) return
+    setMessage("")
+    close(() => props.onReply(window.threadId, note, text))
   }
-  const startWith = (starter: string) => close(() => props.onStarter(window.threadId, starter))
+  const name = window.displayName ?? props.fallbackName
   const shown = showYesterday && previous ? previous : window
   const label = streetChangeLabel(window.change, copy)
-  const sceneWidth = width - SIDE * 2
+  const sceneWidth = width - SIDE * 2 - PEEK.frame * 2
   const sceneHeight = Math.round(sceneWidth * PEEK.heightRatio)
+  const placeholder = note ? copy.replyPlaceholder : copy.messagePlaceholder
   return (
     <View style={styles.content}>
-      <View style={[styles.scene, { height: sceneHeight }]}>
-        <Reanimated.View key={showYesterday ? "yesterday" : "today"} entering={FadeIn.duration(220)}>
-          <StreetRoomScene
-            room={shown.room}
-            avatar={shown.avatar}
-            width={sceneWidth}
-            height={sceneHeight}
-            roomWidth={sceneWidth * PEEK.roomScale}
-          />
-        </Reanimated.View>
+      <View style={styles.frame}>
+        <View style={[styles.scene, { height: sceneHeight }]}>
+          <Reanimated.View
+            key={showYesterday ? "yesterday" : "today"}
+            entering={FadeIn.duration(220)}
+            accessible={note !== null}
+            accessibilityLabel={note ? copy.noteLabel(name, note) : undefined}
+          >
+            <StreetRoomScene
+              room={shown.room}
+              avatar={shown.avatar}
+              width={sceneWidth}
+              height={sceneHeight}
+              roomWidth={sceneWidth * PEEK.roomScale}
+              greet={note !== null}
+              overHead={note ? <NoteBubble note={note} /> : undefined}
+            />
+          </Reanimated.View>
+          {previous ? (
+            <View style={styles.segment} accessibilityRole="tablist">
+              {[false, true].map((yesterday) => (
+                <Pressable
+                  key={String(yesterday)}
+                  accessibilityRole="tab"
+                  accessibilityLabel={yesterday ? copy.yesterday : copy.today}
+                  accessibilityState={{ selected: showYesterday === yesterday }}
+                  onPress={() => setShowYesterday(yesterday)}
+                  style={[styles.segmentItem, showYesterday === yesterday && styles.segmentOn]}
+                >
+                  <Text style={styles.segmentText}>{yesterday ? copy.yesterday : copy.today}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      </View>
+      <View style={styles.heading}>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={1} style={styles.name}>
+          {name}
+        </Text>
         {label ? (
-          <View style={[styles.floating, styles.labelPill]}>
-            <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.labelText}>{`${copy.thisMorning} ${label}`}</Text>
-          </View>
-        ) : null}
-        {previous ? (
-          <View style={[styles.floating, styles.segment]} accessibilityRole="tablist">
-            {[false, true].map((yesterday) => (
-              <Pressable
-                key={String(yesterday)}
-                accessibilityRole="tab"
-                accessibilityLabel={yesterday ? copy.yesterday : copy.today}
-                accessibilityState={{ selected: showYesterday === yesterday }}
-                onPress={() => setShowYesterday(yesterday)}
-                style={[styles.segmentItem, showYesterday === yesterday && styles.segmentOn]}
-              >
-                <Text style={styles.segmentText}>{yesterday ? copy.yesterday : copy.today}</Text>
-              </Pressable>
-            ))}
+          <View style={styles.labelPill}>
+            <Ionicons name="sparkles" size={12} color={uiTheme.colors.chipText} />
+            <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={1} style={styles.labelText}>
+              {`${copy.thisMorning} ${label}`}
+            </Text>
           </View>
         ) : null}
       </View>
-      <Text accessibilityRole="header" maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={1} style={styles.name}>
-        {window.displayName ?? props.fallbackName}
-      </Text>
-      {note ? (
-        <View style={styles.noteBubble}>
-          <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.noteText}>{note}</Text>
-        </View>
-      ) : null}
-      {note && props.onReply ? (
-        <View style={styles.replyRow}>
-          <TextInput
-            value={reply}
-            onChangeText={setReply}
-            placeholder={copy.replyPlaceholder}
-            accessibilityLabel={copy.replyPlaceholder}
-            placeholderTextColor={uiTheme.colors.textMuted}
-            returnKeyType="send"
-            onSubmitEditing={sendReply}
-            maxFontSizeMultiplier={TEXT_SCALE_CAP}
-            style={styles.replyInput}
-          />
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={copy.send}
-            accessibilityState={{ disabled: replyText === null }}
-            disabled={replyText === null}
-            onPress={sendReply}
-            style={[styles.send, replyText === null && styles.sendDisabled]}
-          >
-            <Ionicons name="arrow-up" size={20} color={uiTheme.colors.onPrimary} />
-          </PressableScale>
-        </View>
-      ) : null}
-      <View style={styles.chips}>
-        {streetStarters(window.change, copy).map((starter) => (
-          <PressableScale
-            key={starter}
-            accessibilityRole="button"
-            accessibilityLabel={starter}
-            onPress={() => startWith(starter)}
-            style={styles.chip}
-          >
-            <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} style={styles.chipText}>{starter}</Text>
-          </PressableScale>
-        ))}
+      <View style={styles.composer}>
+        <TextInput
+          value={message}
+          onChangeText={setMessage}
+          placeholder={placeholder}
+          accessibilityLabel={placeholder}
+          placeholderTextColor={uiTheme.colors.textMuted}
+          returnKeyType="send"
+          onSubmitEditing={send}
+          maxFontSizeMultiplier={TEXT_SCALE_CAP}
+          style={styles.input}
+        />
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={copy.send}
+          accessibilityState={{ disabled: text === null }}
+          disabled={text === null}
+          onPress={send}
+          style={[styles.send, text === null && styles.sendDisabled]}
+        >
+          <Ionicons name="arrow-up" size={19} color={uiTheme.colors.onPrimary} />
+        </PressableScale>
       </View>
     </View>
   )
 }
 
+/** The note as a speech bubble with its tail pointing down at the chibi. */
+function NoteBubble({ note }: { note: string }) {
+  return (
+    <View style={styles.bubbleWrap}>
+      <View style={styles.bubble}>
+        <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={3} style={styles.bubbleText}>{note}</Text>
+      </View>
+      <View style={styles.bubbleTail} />
+    </View>
+  )
+}
+
 /** Light enough for the sheet's glass to read through, solid enough for text. */
-const FROST = "rgba(255, 255, 255, 0.62)"
-const FROST_STRONG = "rgba(255, 255, 255, 0.86)"
+const FROST = "rgba(255, 255, 255, 0.66)"
+const BUBBLE = "rgba(255, 255, 255, 0.96)"
 
 const styles = StyleSheet.create({
   backdrop: { backgroundColor: uiTheme.colors.overlaySoft },
   fallbackSheet: { backgroundColor: uiTheme.colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 8, paddingBottom: 28 },
-  content: { paddingHorizontal: SIDE, paddingTop: 8, gap: 12 },
-  scene: { borderRadius: PEEK.radius, borderCurve: "continuous", overflow: "hidden", backgroundColor: uiTheme.colors.surfaceMuted },
-  floating: { position: "absolute", top: 12, borderRadius: 16, borderCurve: "continuous", backgroundColor: FROST_STRONG },
-  labelPill: { left: 12, paddingHorizontal: 12, paddingVertical: 6 },
-  labelText: { color: uiTheme.colors.chipText, fontSize: 13, fontWeight: "700" },
-  segment: { right: 12, flexDirection: "row", padding: 3 },
+  content: { paddingHorizontal: SIDE, paddingTop: 10, gap: 14 },
+  frame: {
+    padding: PEEK.frame,
+    borderRadius: PEEK.radius,
+    borderCurve: "continuous",
+    backgroundColor: BUBBLE,
+    shadowColor: uiTheme.colors.primaryDeep,
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 }
+  },
+  scene: {
+    borderRadius: PEEK.radius - PEEK.frame,
+    borderCurve: "continuous",
+    overflow: "hidden",
+    backgroundColor: uiTheme.colors.surfaceMuted
+  },
+  bubbleWrap: { alignItems: "center", maxWidth: "88%" },
+  bubble: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 18,
+    borderCurve: "continuous",
+    backgroundColor: BUBBLE,
+    shadowColor: uiTheme.colors.textPrimary,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 }
+  },
+  bubbleText: { color: uiTheme.colors.textPrimary, fontSize: 15, lineHeight: 20, fontWeight: "600", textAlign: "center" },
+  bubbleTail: {
+    width: 12,
+    height: 12,
+    marginTop: -7,
+    borderBottomRightRadius: 3,
+    backgroundColor: BUBBLE,
+    transform: [{ rotate: "45deg" }]
+  },
+  segment: {
+    position: "absolute",
+    left: 10,
+    bottom: 10,
+    flexDirection: "row",
+    padding: 3,
+    borderRadius: 16,
+    borderCurve: "continuous",
+    backgroundColor: BUBBLE
+  },
   segmentItem: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 13 },
   segmentOn: { backgroundColor: uiTheme.colors.primarySoft },
   segmentText: { color: uiTheme.colors.textPrimary, fontSize: 13, fontWeight: "600" },
-  name: { color: uiTheme.colors.textPrimary, fontSize: 24, fontWeight: "800", letterSpacing: -0.3, marginTop: 2, paddingHorizontal: 4 },
-  noteBubble: {
-    alignSelf: "flex-start",
-    maxWidth: "100%",
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderRadius: 20,
-    borderTopLeftRadius: 6,
+  heading: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, paddingHorizontal: 4 },
+  name: { flexShrink: 1, color: uiTheme.colors.textPrimary, fontSize: 26, fontWeight: "800", letterSpacing: -0.4 },
+  labelPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
     borderCurve: "continuous",
-    backgroundColor: FROST_STRONG
+    backgroundColor: uiTheme.colors.primarySoft
   },
-  noteText: { color: uiTheme.colors.textPrimary, fontSize: 17, lineHeight: 23, fontWeight: "600" },
-  replyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  replyInput: {
-    flex: 1,
-    minHeight: 44,
-    color: uiTheme.colors.textPrimary,
-    fontSize: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 22,
+  labelText: { color: uiTheme.colors.chipText, fontSize: 13, fontWeight: "700" },
+  composer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 50,
+    paddingLeft: 18,
+    paddingRight: 6,
+    marginBottom: 4,
+    borderRadius: 25,
     borderCurve: "continuous",
     backgroundColor: FROST
   },
-  send: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: uiTheme.colors.primary },
-  sendDisabled: { opacity: 0.4 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 4 },
-  chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderCurve: "continuous", backgroundColor: FROST },
-  chipText: { color: uiTheme.colors.chipText, fontSize: 15, fontWeight: "700" }
+  input: { flex: 1, color: uiTheme.colors.textPrimary, fontSize: 16, paddingVertical: 12 },
+  send: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: uiTheme.colors.primary },
+  sendDisabled: { opacity: 0.4 }
 })

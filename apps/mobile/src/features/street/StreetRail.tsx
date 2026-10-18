@@ -65,13 +65,13 @@ export function StreetRail(props: {
     onOpenChat(threadId)
   }, [onOpenChat, sessionActor.profile.userId])
 
-  const replyToNote = useCallback((threadId: string, note: string, reply: string) => {
+  const replyToNote = useCallback((threadId: string, note: string | null, reply: string) => {
     if (isStreetDemoThread(threadId)) {
       setPeek(null)
       Alert.alert(copy.demoReplyTitle, copy.demoReplyBody)
       return
     }
-    openChatWithDraft(threadId, `“${note}” ${reply}`)
+    openChatWithDraft(threadId, note ? `“${note}” ${reply}` : reply)
   }, [copy, openChatWithDraft])
 
   const renderSlot = useCallback(({ item, index }: { item: StreetSlot; index: number }) => {
@@ -139,7 +139,6 @@ export function StreetRail(props: {
         copy={copy}
         fallbackName={props.fallbackName}
         onClose={() => setPeek(null)}
-        onStarter={openChatWithDraft}
         note={peek ? notes[peek.threadId] ?? null : null}
         onReply={replyToNote}
       />

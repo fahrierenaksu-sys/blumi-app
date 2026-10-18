@@ -1,5 +1,5 @@
 import type { StreetRoom } from "@blumi/contracts"
-import { memo, useEffect, useMemo } from "react"
+import { memo, useEffect, useMemo, type ReactNode } from "react"
 import { StyleSheet, View } from "react-native"
 import Reanimated, { useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from "react-native-reanimated"
 import { useReducedMotion } from "../../ui/motion"
@@ -32,8 +32,10 @@ export const StreetRoomScene = memo(function StreetRoomScene(props: {
   roomWidth: number
   /** Notes prototype: the chibi gives one small hop when the window opens, as if saying its note. */
   greet?: boolean
+  /** Drawn just above the chibi's head (the peek's note bubble), centred on it as far as the scene allows. */
+  overHead?: ReactNode
 }) {
-  const { room, avatar, width, height, roomWidth, greet = false } = props
+  const { room, avatar, width, height, roomWidth, greet = false, overHead } = props
   const roomHeight = roomWidth * SHELL_ASPECT
   const chibiHeight = roomHeight * STREET_CHIBI_ROOM_SHARE
   const chibiWidth = chibiHeight * STILL_ASPECT
@@ -77,9 +79,23 @@ export const StreetRoomScene = memo(function StreetRoomScene(props: {
           />
         </View>
       ) : drawChibi((width - chibiWidth) / 2, height * FEET_RATIO - chibiHeight)}
+      {overHead && scene?.shell ? (
+        <View
+          style={[styles.overHead, {
+            height: Math.max(0, roomTop + footY - chibiHeight - OVER_HEAD_GAP),
+            transform: [{ translateX: clamp(roomLeft + footX - width / 2, -width * OVER_HEAD_SHIFT, width * OVER_HEAD_SHIFT) }]
+          }]}
+        >
+          {overHead}
+        </View>
+      ) : null}
     </View>
   )
 })
+
+/** Space between the head and what is drawn over it, and how far off-centre it may follow the chibi. */
+const OVER_HEAD_GAP = 2
+const OVER_HEAD_SHIFT = 0.2
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
@@ -102,5 +118,6 @@ function useGreetHop(greet: boolean, chibiHeight: number) {
 }
 
 const styles = StyleSheet.create({
-  clip: { overflow: "hidden", backgroundColor: "#F5ECFA" }
+  clip: { overflow: "hidden", backgroundColor: "#F5ECFA" },
+  overHead: { position: "absolute", top: 0, left: 0, right: 0, paddingHorizontal: 14, alignItems: "center", justifyContent: "flex-end" }
 })
