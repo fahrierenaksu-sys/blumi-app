@@ -126,8 +126,8 @@ function RailGap() {
 }
 
 const styles = StyleSheet.create({
-  root: { marginHorizontal: -SIDE_PADDING, paddingBottom: 8 },
-  rail: { paddingHorizontal: SIDE_PADDING, paddingTop: 2, paddingBottom: 4 },
+  root: { marginHorizontal: -SIDE_PADDING, paddingBottom: 2 },
+  rail: { paddingHorizontal: SIDE_PADDING, paddingTop: 0, paddingBottom: 2 },
   info: { marginHorizontal: SIDE_PADDING, marginBottom: 8, padding: 12, borderRadius: 16, backgroundColor: uiTheme.colors.surfaceSoft, gap: 4 },
   infoTitle: { color: uiTheme.colors.textPrimary, fontWeight: "700" },
   infoBody: { color: uiTheme.colors.textSecondary, fontSize: 13 },

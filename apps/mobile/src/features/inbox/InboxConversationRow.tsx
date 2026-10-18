@@ -13,7 +13,7 @@ import { uiTheme } from "../../ui/theme"
 import type { InboxConversationActionsCopy } from "./inboxConversationActionsCopy"
 
 /** Height of a row with a one-line preview; the skeleton uses it. Rows are measured, not assumed. */
-export const INBOX_ROW_ESTIMATED_HEIGHT = 74
+export const INBOX_ROW_ESTIMATED_HEIGHT = 72
 
 export interface ConversationCardProps {
   threadId: string
@@ -176,7 +176,8 @@ const cardStyles = StyleSheet.create({
   name: {
     flexShrink: 1,
     color: uiTheme.colors.textPrimary,
-    ...uiTheme.font.subheading,
+    fontSize: 16,
+    lineHeight: 21,
     fontFamily: "Inter_600SemiBold",
     fontWeight: "600"
   },
@@ -188,9 +189,12 @@ const cardStyles = StyleSheet.create({
     marginLeft: -2
   },
   // textSecondary keeps the small time label above 4.5:1 on the white card.
+  // The time reads as quietly as the preview; only an unread chat lights it up.
   time: {
     color: uiTheme.colors.textSecondary,
-    ...uiTheme.font.caption
+    ...uiTheme.font.bodySmall,
+    fontFamily: "Inter_400Regular",
+    fontWeight: "400"
   },
   timeUnread: {
     color: uiTheme.colors.primaryDeep,

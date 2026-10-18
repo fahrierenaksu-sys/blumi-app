@@ -9,6 +9,8 @@ import {
   View
 } from "react-native"
 import { PageSafeArea as SafeAreaView } from "../ui/layout/PageContainer"
+import { resolvePageScrollBottomPadding } from "../ui/layout/pageContainerLayout"
+import { useAppViewportMetrics } from "../ui/layout/useAppViewportMetrics"
 import { useChatInboxStore, type ThreadListState } from "../features/chat/chatStore"
 import { resolveAccountRecoveryLocale } from "../features/session/accountRecoveryCopy"
 import { getNativeAppLocale } from "../features/session/authLocale"
@@ -121,6 +123,13 @@ export function InboxScreen(props: InboxScreenProps) {
     [locale]
   )
   const now = useInboxClock(navigation)
+  // The last row scrolls clear of the floating tab bar.
+  const viewport = useAppViewportMetrics({ bottomNavVisible: true })
+  const listBottomPadding = resolvePageScrollBottomPadding({
+    bottomContentInset: viewport.bottomContentInset,
+    safeAreaBottom: viewport.safeAreaInsets.bottom,
+    safeAreaBottomIncluded: true
+  }) + uiTheme.spacing.lg
 
   const headerAnim = useEntranceAnimation({ delay: 0, translateY: 16 })
   // One UI-thread pulse shared by every unread row's glow.
@@ -277,10 +286,7 @@ export function InboxScreen(props: InboxScreenProps) {
         onOpenDiscover={handleGoDiscover}
       />
       {threads.length > 0 ? (
-        <View style={styles.sectionRow}>
-          <Text accessibilityRole="header" style={styles.sectionTitle}>{copy.messagesHeading}</Text>
-          <Text numberOfLines={1} style={styles.sectionCount}>{copy.conversationCount(threads.length)}</Text>
-        </View>
+        <Text accessibilityRole="header" style={styles.sectionTitle}>{copy.messagesHeading}</Text>
       ) : null}
     </Reanimated.View>
   ), [copy, handleGoDiscover, headerAnim, locale, openOwnRoom, openSettings, openThread, sessionActor, threadKeySignature, threads.length])
@@ -333,7 +339,7 @@ export function InboxScreen(props: InboxScreenProps) {
             initialNumToRender={8}
             maxToRenderPerBatch={8}
             windowSize={5}
-            contentContainerStyle={styles.scroll}
+            contentContainerStyle={{ paddingBottom: listBottomPadding }}
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={listHeader}
             refreshControl={
@@ -489,7 +495,7 @@ const styles = StyleSheet.create({
     paddingTop: uiTheme.spacing.sm
   },
   titleBar: {
-    minHeight: 48,
+    minHeight: 40,
     justifyContent: "center",
     paddingHorizontal: 2
   },
@@ -497,29 +503,18 @@ const styles = StyleSheet.create({
     ...uiTheme.font.heading,
     color: uiTheme.colors.textPrimary
   },
-  sectionRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: uiTheme.spacing.sm,
-    paddingHorizontal: 2,
-    paddingTop: uiTheme.spacing.md,
-    paddingBottom: uiTheme.spacing.xs
-  },
   sectionTitle: {
-    ...uiTheme.font.subheading,
+    fontSize: 16,
+    lineHeight: 20,
+    fontFamily: "Inter_800ExtraBold",
     fontWeight: "800",
-    color: uiTheme.colors.textPrimary
-  },
-  sectionCount: {
-    ...uiTheme.font.caption,
-    color: uiTheme.colors.textMuted
+    color: uiTheme.colors.textPrimary,
+    paddingHorizontal: 2,
+    paddingTop: uiTheme.spacing.xs,
+    paddingBottom: 2
   },
   listArea: {
     flex: 1
-  },
-  scroll: {
-    paddingBottom: uiTheme.spacing.xxl
   },
   itemSpacer: {
     height: CONVERSATION_ROW_GAP

@@ -11,9 +11,11 @@ import { streetChangeLabel, streetWindowAccessibilityLabel } from "./streetModel
 import { StreetRoomScene } from "./StreetRoomScene"
 
 /** A round window (68 pt glass in a 78 pt slot) with room above it for the change bubble, like a notes row. */
-export const STREET_WINDOW = { width: 78, wideWidth: 92, glass: 68, bubble: 24, gap: 10 } as const
+export const STREET_WINDOW = { width: 78, wideWidth: 92, glass: 68, bubble: 20, gap: 10 } as const
 /** From AX1 up the window grows and the name may wrap (spec §3). */
 const LARGE_TEXT_SCALE = 1.35
+/** A round window frames the chibi's head and shoulders, like a profile photo; the room stays behind as colour. */
+const BUST_FRAMING = { chibiScale: 1.9, feetRatio: 1.98, roomScale: 13.4 } as const
 const NIGHT_GLASS_OPACITY = 0.88
 const WAKE_STAGGER_MS = 110
 const WAKE_MAX_WINDOWS = 7
@@ -90,8 +92,9 @@ export const StreetWindowView = memo(function StreetWindowView(props: {
             avatar={isSelf ? item.avatar : window!.avatar}
             width={glassSize}
             height={glassSize}
-            roomWidth={glassSize * 5.2}
-            chibiHeight={glassSize * 0.74}
+            roomWidth={glassSize * BUST_FRAMING.roomScale}
+            chibiHeight={glassSize * BUST_FRAMING.chibiScale}
+            feetRatio={BUST_FRAMING.feetRatio}
           />
         )}
         <Reanimated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.night, nightStyle]} />

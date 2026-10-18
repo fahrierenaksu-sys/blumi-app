@@ -16,7 +16,6 @@ export interface InboxCopy {
   goToDiscover: string
   back: string
   unknownPartner: string
-  conversationCount: (count: number) => string
   /** Prefix of my own last message in a row preview ("You: …"). */
   youPrefix: string
   unreadMessages: (count: number) => string
@@ -46,7 +45,6 @@ const COPY: Record<AccountRecoveryLocale, InboxCopy> = {
     goToDiscover: "Go to Discover",
     back: "Go back",
     unknownPartner: "Someone",
-    conversationCount: (count) => `${count} conversation${count === 1 ? "" : "s"}`,
     youPrefix: "You",
     unreadMessages: (count) => `${count} unread message${count === 1 ? "" : "s"}`,
     openChatHint: "Opens the conversation.",
@@ -73,7 +71,6 @@ const COPY: Record<AccountRecoveryLocale, InboxCopy> = {
     goToDiscover: "Keşfet'e git",
     back: "Geri dön",
     unknownPartner: "Biri",
-    conversationCount: (count) => `${count} konuşma`,
     youPrefix: "Sen",
     unreadMessages: (count) => `${count} okunmamış mesaj`,
     openChatHint: "Sohbeti açar.",
