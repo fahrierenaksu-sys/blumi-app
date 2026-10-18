@@ -24,12 +24,15 @@ const WAKE_STAGGER_MS = 110
 const WAKE_MAX_WINDOWS = 7
 /** The guest cat sits on the window's floor, left of the chibi. */
 const GUEST_CAT = { size: 34, left: 2, bottom: 2 } as const
-/** One sky for the whole street: a faint tint over every window's glass, never an effect. */
+/**
+ * One sky for the whole street: a barely-there warm tint in the morning and evening, never an effect. Night has none:
+ * a dark wash over a pink room only read as a faded window (owner, 2026-10-18).
+ */
 const LIGHT_TINT: Readonly<Record<StreetLight, string | null>> = {
-  morning: "rgba(255, 240, 214, 0.16)",
+  morning: "rgba(255, 240, 214, 0.1)",
   day: null,
-  evening: "rgba(255, 168, 92, 0.2)",
-  night: "rgba(36, 30, 84, 0.42)"
+  evening: "rgba(255, 168, 92, 0.1)",
+  night: null
 }
 
 export type StreetWindowKind =

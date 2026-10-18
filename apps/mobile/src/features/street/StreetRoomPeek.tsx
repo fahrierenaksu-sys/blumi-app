@@ -9,7 +9,7 @@ import { PressableScale } from "../../ui/PressableScale"
 import { useSheetPresentation } from "../../ui/sheetPresentation"
 import { uiTheme } from "../../ui/theme"
 import type { StreetCopy } from "./streetCopy"
-import { streetChangeLabel, type StreetWindowSnapshot } from "./streetModel"
+import type { StreetWindowSnapshot } from "./streetModel"
 import { normalizeStreetNote } from "./streetNoteModel"
 import { StreetRoomScene } from "./StreetRoomScene"
 
@@ -70,7 +70,6 @@ export function StreetRoomPeekContent(props: StreetRoomPeekContentProps) {
   }
   const name = window.displayName ?? props.fallbackName
   const shown = showYesterday && previous ? previous : window
-  const label = streetChangeLabel(window.change, copy)
   const sceneWidth = width - SIDE * 2 - PEEK.frame * 2
   const sceneHeight = Math.round(sceneWidth * PEEK.heightRatio)
   const placeholder = note ? copy.replyPlaceholder : copy.messagePlaceholder
@@ -112,19 +111,9 @@ export function StreetRoomPeekContent(props: StreetRoomPeekContentProps) {
           ) : null}
         </View>
       </View>
-      <View style={styles.heading}>
-        <Text accessibilityRole="header" maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={1} style={styles.name}>
-          {name}
-        </Text>
-        {label ? (
-          <View style={styles.labelPill}>
-            <Ionicons name="sparkles" size={12} color={uiTheme.colors.chipText} />
-            <Text maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={1} style={styles.labelText}>
-              {`${copy.thisMorning} ${label}`}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      <Text accessibilityRole="header" maxFontSizeMultiplier={TEXT_SCALE_CAP} numberOfLines={1} style={styles.name}>
+        {name}
+      </Text>
       <View style={styles.composer}>
         <TextInput
           value={message}
@@ -164,8 +153,6 @@ function NoteBubble({ note }: { note: string }) {
   )
 }
 
-/** Light enough for the sheet's glass to read through, solid enough for text. */
-const FROST = "rgba(255, 255, 255, 0.66)"
 const BUBBLE = "rgba(255, 255, 255, 0.96)"
 
 const styles = StyleSheet.create({
@@ -222,19 +209,7 @@ const styles = StyleSheet.create({
   segmentItem: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 13 },
   segmentOn: { backgroundColor: uiTheme.colors.primarySoft },
   segmentText: { color: uiTheme.colors.textPrimary, fontSize: 13, fontWeight: "600" },
-  heading: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, paddingHorizontal: 4 },
-  name: { flexShrink: 1, color: uiTheme.colors.textPrimary, fontSize: 26, fontWeight: "800", letterSpacing: -0.4 },
-  labelPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderCurve: "continuous",
-    backgroundColor: uiTheme.colors.primarySoft
-  },
-  labelText: { color: uiTheme.colors.chipText, fontSize: 13, fontWeight: "700" },
+  name: { paddingHorizontal: 4, color: uiTheme.colors.textPrimary, fontSize: 26, fontWeight: "800", letterSpacing: -0.4 },
   composer: {
     flexDirection: "row",
     alignItems: "center",
@@ -245,7 +220,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     borderRadius: 25,
     borderCurve: "continuous",
-    backgroundColor: FROST
+    backgroundColor: uiTheme.colors.surfaceSoft
   },
   input: { flex: 1, color: uiTheme.colors.textPrimary, fontSize: 16, paddingVertical: 12 },
   send: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: uiTheme.colors.primary },

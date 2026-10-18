@@ -120,8 +120,9 @@ const styles = StyleSheet.create({
     paddingTop: uiTheme.spacing.md,
     backgroundColor: uiTheme.colors.background
   },
+  // a milky white over the system glass: the glass edge and depth stay, the grey cast of whatever is behind does not
   glass: {
-    backgroundColor: "transparent"
+    backgroundColor: "rgba(255, 252, 254, 0.86)"
   },
   fill: {
     flex: 1
