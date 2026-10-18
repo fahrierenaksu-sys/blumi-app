@@ -1,17 +1,21 @@
 import type { StreetWindow } from "@blumi/contracts"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native"
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native"
 import { useAvatarV2 } from "../avatarV2/state/AvatarV2Provider"
 import { writeChatComposerDraft } from "../chat/chatComposerDraftStore"
+import { useChatInboxStore } from "../chat/chatStore"
 import type { SessionActor } from "../session/sessionModel"
 import { hapticLight } from "../../ui/haptics"
 import { useReducedMotion } from "../../ui/motion"
 import { uiTheme } from "../../ui/theme"
 import { getStreetCopy } from "./streetCopy"
 import { buildStreetView, previousStreetSnapshot, shouldPlayStreetWakeUp, type StreetSlot } from "./streetModel"
+import { StreetNoteComposer } from "./StreetNoteComposer"
+import { IS_STREET_NOTES_DEMO_ENABLED, buildStreetNotesDemo, isStreetDemoThread } from "./streetNotesDemo"
 import { StreetRoomPeek } from "./StreetRoomPeek"
 import { STREET_WINDOW, StreetWindowView, type StreetWindowKind } from "./StreetWindow"
 import { useStreet } from "./useStreet"
+import { useStreetLight } from "./useStreetLight"
 
 const SIDE_PADDING = 20
 
@@ -34,11 +38,19 @@ export function StreetRail(props: {
   const { resolvedCapabilities } = useAvatarV2()
   const copy = useMemo(() => getStreetCopy(props.locale), [props.locale])
   const reduceMotion = useReducedMotion()
-  const { street, device, markOpened, markInfoSeen, markWoke } = useStreet({
+  const { street: serverStreet, device, markOpened, markInfoSeen, markWoke } = useStreet({
     sessionActor,
     enabled: resolvedCapabilities.chat_street === true,
     refreshKey: props.refreshKey
   })
+  const demo = useStreetNotesDemo(sessionActor.profile.userId, serverStreet)
+  const street = demo?.street ?? serverStreet
+  const notes = demo?.notes ?? NO_NOTES
+  const light = useStreetLight()
+  // Notes prototype: your own note lives on this device only until the server keeps notes.
+  const [myNote, setMyNote] = useState<string | null>(null)
+  const [composerOpen, setComposerOpen] = useState(false)
+  const notesOn = IS_STREET_NOTES_DEMO_ENABLED
   const [peek, setPeek] = useState<StreetWindow | null>(null)
   const seen = useMemo(() => new Set(device.seenThreadIds), [device.seenThreadIds])
   const view = useMemo(() => street ? buildStreetView(street, copy, seen) : null, [copy, seen, street])
@@ -52,6 +64,15 @@ export function StreetRail(props: {
     setPeek(null)
     onOpenChat(threadId)
   }, [onOpenChat, sessionActor.profile.userId])
+
+  const replyToNote = useCallback((threadId: string, note: string, reply: string) => {
+    if (isStreetDemoThread(threadId)) {
+      setPeek(null)
+      Alert.alert(copy.demoReplyTitle, copy.demoReplyBody)
+      return
+    }
+    openChatWithDraft(threadId, `“${note}” ${reply}`)
+  }, [copy, openChatWithDraft])
 
   const renderSlot = useCallback(({ item, index }: { item: StreetSlot; index: number }) => {
     const kind: StreetWindowKind = item.kind === "self"
@@ -74,9 +95,12 @@ export function StreetRail(props: {
         wakeUp={wakeUp}
         onPress={onPress}
         onOpenChat={item.kind === "window" ? () => onOpenChat(item.window.threadId) : undefined}
+        note={item.kind === "self" ? myNote : item.kind === "window" ? notes[item.window.threadId] ?? null : null}
+        light={notesOn ? light : undefined}
+        onEditNote={item.kind === "self" && notesOn ? () => setComposerOpen(true) : undefined}
       />
     )
-  }, [copy, markOpened, onOpenChat, props, sessionActor.profile.avatar, street, wakeUp])
+  }, [copy, light, markOpened, myNote, notes, notesOn, onOpenChat, props, sessionActor.profile.avatar, street, wakeUp])
 
   if (!view || !street) return null
   return (
@@ -116,9 +140,35 @@ export function StreetRail(props: {
         fallbackName={props.fallbackName}
         onClose={() => setPeek(null)}
         onStarter={openChatWithDraft}
+        note={peek ? notes[peek.threadId] ?? null : null}
+        onReply={replyToNote}
+      />
+      <StreetNoteComposer
+        visible={composerOpen}
+        current={myNote}
+        copy={copy}
+        onSave={(note) => { setMyNote(note); setComposerOpen(false) }}
+        onClose={() => setComposerOpen(false)}
       />
     </View>
   )
+}
+
+const NO_NOTES: Readonly<Record<string, string>> = Object.freeze({})
+
+/** Dev builds with EXPO_PUBLIC_BLUMI_STREET_NOTES_DEMO=1 only: made-up neighbours wearing your chat partners' looks. */
+function useStreetNotesDemo(userId: string, serverStreet: ReturnType<typeof useStreet>["street"]) {
+  const { threads } = useChatInboxStore()
+  const partnerAvatars = useMemo(() => threads
+    .map((thread) => thread.participants.find((participant) => participant.userId !== userId)?.avatar ?? null)
+    .filter((avatar) => avatar !== null), [threads, userId])
+  return useMemo(() => IS_STREET_NOTES_DEMO_ENABLED
+    ? buildStreetNotesDemo({
+      edition: serverStreet?.edition ?? new Date().toISOString().slice(0, 10),
+      self: serverStreet?.self ?? null,
+      partnerAvatars
+    })
+    : null, [partnerAvatars, serverStreet])
 }
 
 function RailGap() {

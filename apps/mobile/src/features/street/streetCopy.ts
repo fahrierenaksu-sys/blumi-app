@@ -27,6 +27,18 @@ export interface StreetCopy {
   infoSettings: string
   settingLabel: string
   settingNote: string
+  /** Notes prototype. */
+  leaveNote: string
+  notePlaceholder: string
+  shareNote: string
+  removeNote: string
+  cancel: string
+  noteLabel: (name: string, note: string) => string
+  replyPlaceholder: string
+  send: string
+  demoReplyTitle: string
+  demoReplyBody: string
+  guestCat: string
 }
 
 const TR: StreetCopy = {
@@ -83,7 +95,18 @@ const TR: StreetCopy = {
   infoOk: "Anladım",
   infoSettings: "Ayarlar",
   settingLabel: "Penceremi sokakta göster",
-  settingNote: "Kapalıyken eşleşmelerin yalnızca perdeleri kapalı pencereni ve adını görür."
+  settingNote: "Kapalıyken eşleşmelerin yalnızca perdeleri kapalı pencereni ve adını görür.",
+  leaveNote: "Not bırak",
+  notePlaceholder: "Aklından ne geçiyor?",
+  shareNote: "Paylaş",
+  removeNote: "Notu kaldır",
+  cancel: "Vazgeç",
+  noteLabel: (name, note) => `${name} not bıraktı: ${note}`,
+  replyPlaceholder: "Notuna yanıt yaz…",
+  send: "Gönder",
+  demoReplyTitle: "Deneme",
+  demoReplyBody: "Gerçekte yanıtın, notu alıntılayarak sohbetinize mesaj olarak düşer.",
+  guestCat: "Penceresinde misafir kedi var"
 }
 
 const EN: StreetCopy = {
@@ -110,7 +133,18 @@ const EN: StreetCopy = {
   infoOk: "Got it",
   infoSettings: "Settings",
   settingLabel: "Show my window on the street",
-  settingNote: "When off, matches see only your closed curtains and your name."
+  settingNote: "When off, matches see only your closed curtains and your name.",
+  leaveNote: "Leave a note",
+  notePlaceholder: "What's on your mind?",
+  shareNote: "Share",
+  removeNote: "Remove note",
+  cancel: "Cancel",
+  noteLabel: (name, note) => `${name} left a note: ${note}`,
+  replyPlaceholder: "Reply to their note…",
+  send: "Send",
+  demoReplyTitle: "Demo",
+  demoReplyBody: "For real, your reply lands in your chat as a message quoting the note.",
+  guestCat: "A guest cat is in their window"
 }
 
 export function getStreetCopy(locale: AccountRecoveryLocale): StreetCopy {

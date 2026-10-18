@@ -8,10 +8,13 @@ import { PressableScale } from "../../ui/PressableScale"
 import { uiTheme } from "../../ui/theme"
 import type { StreetCopy } from "./streetCopy"
 import { streetChangeLabel, streetWindowAccessibilityLabel } from "./streetModel"
+import { CatSprite } from "../catTrips/CatSprite"
+import { StreetNoteBubble } from "./StreetNoteBubble"
+import type { StreetLight } from "./streetNoteModel"
 import { StreetRoomScene } from "./StreetRoomScene"
 
-/** A round window (68 pt glass in a 78 pt slot) with room above it for the change bubble, like a notes row. */
-export const STREET_WINDOW = { width: 78, wideWidth: 92, glass: 68, bubble: 20, gap: 10 } as const
+/** A round window (68 pt glass in an 84 pt slot) with room above it for a two-line note bubble, like a notes row. */
+export const STREET_WINDOW = { width: 84, wideWidth: 96, glass: 68, bubble: 40, gap: 6 } as const
 /** From AX1 up the window grows and the name may wrap (spec §3). */
 const LARGE_TEXT_SCALE = 1.35
 /** A window shows the whole chibi standing in a fifth of their room, so a new rug or bed shows too (spec §1). */
@@ -19,6 +22,15 @@ const ROOM_FRAMING = { chibiScale: 0.74, roomScale: 5.2 } as const
 const NIGHT_GLASS_OPACITY = 0.88
 const WAKE_STAGGER_MS = 110
 const WAKE_MAX_WINDOWS = 7
+/** The guest cat sits on the window's floor, left of the chibi. */
+const GUEST_CAT = { size: 34, left: 2, bottom: 2 } as const
+/** One sky for the whole street: a faint tint over every window's glass, never an effect. */
+const LIGHT_TINT: Readonly<Record<StreetLight, string | null>> = {
+  morning: "rgba(255, 240, 214, 0.16)",
+  day: null,
+  evening: "rgba(255, 168, 92, 0.2)",
+  night: "rgba(36, 30, 84, 0.42)"
+}
 
 export type StreetWindowKind =
   | { kind: "window"; window: StreetWindowData; isNew: boolean }
@@ -34,6 +46,10 @@ export const StreetWindowView = memo(function StreetWindowView(props: {
   wakeUp: boolean
   onPress: () => void
   onOpenChat?: () => void
+  /** Notes prototype: this window's note, the light of the hour and, on your own window, the note editor. */
+  note?: string | null
+  light?: StreetLight
+  onEditNote?: () => void
 }) {
   const { item, index, copy, wakeUp } = props
   const motion = useMotion()
@@ -69,7 +85,8 @@ export const StreetWindowView = memo(function StreetWindowView(props: {
   const closed = isSelf ? item.closed : window!.closed
   const name = isSelf ? copy.self : window!.displayName ?? props.fallbackName
   const label = window ? streetChangeLabel(window.change, copy) : null
-  const accessibilityLabel = window ? streetWindowAccessibilityLabel(window, copy, props.fallbackName) : copy.self
+  const baseLabel = window ? streetWindowAccessibilityLabel(window, copy, props.fallbackName) : copy.self
+  const accessibilityLabel = props.note && !closed ? `${baseLabel}. ${copy.noteLabel(name, props.note)}` : baseLabel
   return (
     <PressableScale
       accessibilityRole="button"
@@ -81,7 +98,13 @@ export const StreetWindowView = memo(function StreetWindowView(props: {
       style={[styles.slot, { width }]}
     >
       <View style={styles.bubbleSpace}>
-        {label ? <View style={styles.pill}><Text style={styles.pillText} numberOfLines={1}>{label}</Text></View> : null}
+        {props.note && !closed ? (
+          <StreetNoteBubble text={props.note} onPress={isSelf ? props.onEditNote : undefined} />
+        ) : isSelf && props.onEditNote ? (
+          <StreetNoteBubble text={copy.leaveNote} placeholder onPress={props.onEditNote} />
+        ) : label && window?.change !== "guest" ? (
+          <View style={styles.pill}><Text style={styles.pillText} numberOfLines={1}>{label}</Text></View>
+        ) : null}
       </View>
       <View style={styles.glass}>
         {closed ? (
@@ -94,8 +117,17 @@ export const StreetWindowView = memo(function StreetWindowView(props: {
             height={glassSize}
             roomWidth={glassSize * ROOM_FRAMING.roomScale}
             chibiHeight={glassSize * ROOM_FRAMING.chibiScale}
+            greet={Boolean(props.note) && !isSelf}
           />
         )}
+        {window?.change === "guest" && !closed ? (
+          <View style={styles.guestCat} accessible accessibilityLabel={copy.guestCat}>
+            <CatSprite clip="sit" size={GUEST_CAT.size} />
+          </View>
+        ) : null}
+        {props.light && LIGHT_TINT[props.light] ? (
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: LIGHT_TINT[props.light] ?? undefined }]} />
+        ) : null}
         <Reanimated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.night, nightStyle]} />
       </View>
       {window && window.unread > 0 ? (
@@ -110,7 +142,8 @@ export const StreetWindowView = memo(function StreetWindowView(props: {
 
 const styles = StyleSheet.create({
   slot: { alignItems: "center", gap: 4 },
-  bubbleSpace: { height: STREET_WINDOW.bubble, justifyContent: "flex-end", alignItems: "center", marginBottom: -10, zIndex: 1 },
+  bubbleSpace: { height: STREET_WINDOW.bubble, justifyContent: "flex-end", alignItems: "center", marginBottom: -8, zIndex: 1 },
+  guestCat: { position: "absolute", left: GUEST_CAT.left, bottom: GUEST_CAT.bottom },
   glass: {
     width: STREET_WINDOW.glass,
     height: STREET_WINDOW.glass,

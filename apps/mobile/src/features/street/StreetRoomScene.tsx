@@ -1,6 +1,8 @@
 import type { StreetRoom } from "@blumi/contracts"
-import { memo, useMemo } from "react"
+import { memo, useEffect, useMemo } from "react"
 import { StyleSheet, View } from "react-native"
+import Reanimated, { useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from "react-native-reanimated"
+import { useReducedMotion } from "../../ui/motion"
 import { AvatarStill } from "../avatar/components/AvatarStill"
 import { RoomRenderer2D } from "../roomV2/components/RoomRenderer2D"
 import { DEFAULT_ROOM_V2_SHELL_ID, ROOM_V2_FURNITURE_CATALOG, ROOM_V2_SHELL_CATALOG } from "../roomV2/roomV2Catalog"
@@ -27,8 +29,11 @@ export const StreetRoomScene = memo(function StreetRoomScene(props: {
   height: number
   roomWidth: number
   chibiHeight: number
+  /** Notes prototype: the chibi gives one small hop when the window opens, as if saying its note. */
+  greet?: boolean
 }) {
-  const { room, avatar, width, height, roomWidth, chibiHeight } = props
+  const { room, avatar, width, height, roomWidth, chibiHeight, greet = false } = props
+  const hop = useGreetHop(greet, chibiHeight)
   const scene = useMemo(() => room ? resolveRoomV2Scene({
     roomShellCatalog: ROOM_V2_SHELL_CATALOG,
     furnitureCatalog: ROOM_V2_FURNITURE_CATALOG,
@@ -51,16 +56,29 @@ export const StreetRoomScene = memo(function StreetRoomScene(props: {
         </View>
       ) : null}
       {avatar ? (
-        <AvatarStill
-          loadout={avatar.loadout}
-          width={chibiWidth}
-          height={chibiHeight}
-          style={{ position: "absolute", left: (width - chibiWidth) / 2, top: feetY - chibiHeight }}
-        />
+        <Reanimated.View style={[{ position: "absolute", left: (width - chibiWidth) / 2, top: feetY - chibiHeight }, hop]}>
+          <AvatarStill loadout={avatar.loadout} width={chibiWidth} height={chibiHeight} />
+        </Reanimated.View>
       ) : null}
     </View>
   )
 })
+
+const GREET_HOP = { heightShare: 0.06, delayMs: 450, upMs: 160, downMs: 220 } as const
+
+/** One small hop, a beat after the window appears; none under Reduce Motion. */
+function useGreetHop(greet: boolean, chibiHeight: number) {
+  const reduceMotion = useReducedMotion()
+  const lift = useSharedValue(0)
+  useEffect(() => {
+    if (!greet || reduceMotion) return
+    lift.value = withDelay(GREET_HOP.delayMs, withSequence(
+      withTiming(-chibiHeight * GREET_HOP.heightShare, { duration: GREET_HOP.upMs }),
+      withTiming(0, { duration: GREET_HOP.downMs })
+    ))
+  }, [chibiHeight, greet, lift, reduceMotion])
+  return useAnimatedStyle(() => ({ transform: [{ translateY: lift.value }] }))
+}
 
 const styles = StyleSheet.create({
   clip: { overflow: "hidden", backgroundColor: "#F5ECFA" }
