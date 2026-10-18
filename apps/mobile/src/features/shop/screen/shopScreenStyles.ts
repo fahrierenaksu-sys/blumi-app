@@ -174,11 +174,12 @@ export const shopScreenStyles = StyleSheet.create({
     lineHeight: 12,
     fontWeight: "900",
   },
+  // Icon and count sit together, centred over the label, so every rail entry lines up on one axis.
   verticalCategoryHeading: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 4,
+    justifyContent: "center",
+    gap: 3,
   },
   trousersIcon: { width: 17, height: 18 },
   trousersWaist: { position: "absolute", top: 1, left: 1, right: 1, height: 6, borderWidth: 1.5, borderBottomWidth: 0 },
@@ -188,7 +189,6 @@ export const shopScreenStyles = StyleSheet.create({
   },
   verticalCategoryCount: {
     ...uiTheme.font.micro,
-    minWidth: 19,
     textAlign: "center",
     color: "rgba(45, 31, 58, 0.54)",
     paddingHorizontal: 3,
@@ -305,6 +305,9 @@ export const shopScreenStyles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  productRoomImage: {
+    position: "absolute",
+  },
   productWearableImage: {
     alignSelf: "center",
     width: "100%",
@@ -351,9 +354,14 @@ export const shopScreenStyles = StyleSheet.create({
     backgroundColor: "rgba(255, 79, 152, 0.92)",
     borderColor: "rgba(255, 255, 255, 0.76)",
   },
+  // The name sits centred between the picture and the price, whatever its line count.
+  productTitleSlot: {
+    flex: 1,
+    minHeight: 26,
+    justifyContent: "center",
+  },
   productTitle: {
     ...uiTheme.font.caption,
-    minHeight: 26,
     fontSize: 11,
     color: uiTheme.colors.textPrimary,
     fontWeight: "600",

@@ -1,9 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image as ExpoImage } from "expo-image"
-import { memo, useCallback } from "react"
+import { memo, useCallback, useState } from "react"
 import {
   type AccessibilityActionEvent,
   type ImageSourcePropType,
+  type LayoutChangeEvent,
   StyleSheet,
   Text,
   View
@@ -18,6 +19,8 @@ import type { ShopCatalogItem } from "../shopCatalog"
 import { getShopCopy } from "../shopCopy"
 import { formatCoins } from "../shopFormatters"
 import { getShopProductPresentation } from "../shopProductPresentation"
+import { SHOP_ROOM_THUMBNAIL_BOUNDS } from "../shopRoomThumbnailBounds"
+import { getShopThumbnailLayout } from "../shopThumbnailLayout"
 import type { ShopCardRemoveAction } from "../shopCardRemoveModel"
 import { ShopCardRemoveButton } from "./ShopCardRemoveButton"
 import { ShopCardSelectionRing, ShopCardViewingBadge } from "./ShopCardSelection"
@@ -83,9 +86,6 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
     ? getShopProductThumbnailSource(product.sourceItemId)
       ?? getAvatarItemPreviewSource(product.avatarItem)
     : undefined
-  const roomPreviewSource = product.roomItem
-    ? product.roomItem.asset.source
-    : undefined
   const automationSlug = product.avatarItem
     ? getAvatarAutomationSlug(product.sourceItemId)
     : product.sourceItemId.replaceAll("_", "-")
@@ -131,19 +131,15 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
             selected={selected}
           />
         ) : product.roomItem ? (
-          <ExpoImage
-            source={roomPreviewSource}
-            contentFit="contain"
-            cachePolicy="memory-disk"
-            transition={0}
-            style={styles.productImage}
-          />
+          <RoomProductThumbnail asset={product.roomItem.asset} />
         ) : null}
         <ShopCardViewingBadge visible={selected} />
       </View>
-      <Text style={styles.productTitle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.88}>
-        {product.title}
-      </Text>
+      <View style={styles.productTitleSlot}>
+        <Text style={styles.productTitle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.88}>
+          {product.title}
+        </Text>
+      </View>
       <View
         testID={`shop-item-${automationSlug}-price`}
         style={[
@@ -171,6 +167,40 @@ export const ShopProductCard = memo(function ShopProductCard(props: {
     </PressableScale>
   )
 })
+
+/**
+ * A room piece's picture, framed on its drawing rather than its canvas: every room canvas leaves a
+ * different empty margin (room for its other rotations), so `contain` alone shrinks and shifts pieces unevenly.
+ */
+function RoomProductThumbnail({ asset }: { asset: NonNullable<ShopCatalogItem["roomItem"]>["asset"] }) {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout
+    setSize((current) => current?.width === width && current.height === height ? current : { width, height })
+  }, [])
+  const frame = size ? getShopThumbnailLayout(SHOP_ROOM_THUMBNAIL_BOUNDS[asset.key], size.width, size.height) : undefined
+  return (
+    <View style={StyleSheet.absoluteFill} onLayout={handleLayout}>
+      {frame ? (
+        <ExpoImage
+          source={asset.source}
+          contentFit="fill"
+          cachePolicy="memory-disk"
+          transition={0}
+          style={[styles.productRoomImage, frame]}
+        />
+      ) : size ? (
+        <ExpoImage
+          source={asset.source}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          transition={0}
+          style={styles.productImage}
+        />
+      ) : null}
+    </View>
+  )
+}
 
 function AvatarProductThumbnail(props: {
   item: NonNullable<ShopCatalogItem["avatarItem"]>
