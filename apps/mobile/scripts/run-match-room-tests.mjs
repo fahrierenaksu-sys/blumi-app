@@ -299,6 +299,8 @@ try {
       // A bed is sat on from its camera-facing long edge, facing us, in every rotation; a chair turned away is
       // sat on facing the way it is turned
       "src/features/roomV2/furniture/layeredEdgeSeats.test.ts",
+      // Per-piece seat fixes (the starter bed's foot posts, the blush armchair's soft cushion) keep every seat and id
+      "src/features/roomV2/furniture/layeredSeatTuning.test.ts",
       // The painter's order by floor boxes (nearer neighbour over farther, small rug over big) and wall pieces
       // never hung over each other
       "src/features/roomV2/roomV2FloorDrawOrder.test.ts",

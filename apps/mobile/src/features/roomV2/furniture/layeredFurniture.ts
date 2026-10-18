@@ -19,7 +19,8 @@ import {
   type RoomCalibration
 } from "../calibration/roomCalibration"
 import { getFloorBoxCellQuads } from "../calibration/roomCalibrationScene"
-import { withCameraSideEdgeSeats } from "./layeredEdgeSeats"
+import { withCameraSideEdgeSeats, type LayeredItemCamera } from "./layeredEdgeSeats"
+import { LAYERED_SEAT_TUNING, withTunedSeats } from "./layeredSeatTuning"
 import rawBlushChair from "./room_v2_chair_blush/item.json"
 import rawJaponArmchair from "./room_v3_armchair_japon_cream/item.json"
 import rawJaponBed from "./room_v3_bed_japon_sakura/item.json"
@@ -200,28 +201,34 @@ export function parseLayeredFurnitureSpec(raw: unknown): LayeredFurnitureSpec {
     if (new Set(ids).size !== ids.length) throw new Error(`rotations.${r}.seats ids must be unique`)
   }
   if (root.seat_access !== undefined && root.seat_access !== "any_side") throw new Error("seat_access must be any_side")
+  const cell = finite(footprint.cell, "footprint.cell")
+  const tuning = LAYERED_SEAT_TUNING[id]
   return {
     id,
     scale,
-    cell: finite(footprint.cell, "footprint.cell"),
-    rotations: cameraSideEdgeSeats(root, rotations),
+    cell,
+    rotations: cameraSideEdgeSeats(root, tuning ? withTunedSeats(rotations, tuning, itemCamera(root), cell) : rotations),
     ...(root.seat_access === "any_side" ? { seatAccess: "any_side" as const } : {})
   }
 }
 
-/** A bed (`sit_edge`) is sat on from whichever long edge faces the camera (layeredEdgeSeats). */
+/** A bed (`sit_edge`) is sat on from whichever long edge faces the camera (layeredEdgeSeats), its tuned seats too. */
 function cameraSideEdgeSeats(
   root: Record<string, unknown>,
   rotations: Record<LayeredRotationIndex, LayeredFurnitureRotation>
 ): Record<LayeredRotationIndex, LayeredFurnitureRotation> {
   const interactions = Array.isArray(root.interactions) ? root.interactions : []
   if (!interactions.includes("sit_edge")) return rotations
+  return withCameraSideEdgeSeats(rotations, itemCamera(root))
+}
+
+function itemCamera(root: Record<string, unknown>): LayeredItemCamera {
   const camera = record(root.camera, "camera")
-  return withCameraSideEdgeSeats(rotations, {
+  return {
     yawDeg: finite(camera.yaw_deg, "camera.yaw_deg"),
     pitchDeg: finite(camera.pitch_deg, "camera.pitch_deg"),
     pxPerWorldUnit: finite(root.px_per_world_unit, "px_per_world_unit")
-  })
+  }
 }
 
 function parseSeat(raw: unknown, path: string): LayeredFurnitureSeat {
