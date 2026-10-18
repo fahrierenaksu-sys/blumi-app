@@ -152,14 +152,20 @@ export const wardrobeV2Styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
   },
+  // Sits level with the zoom button; the padding lives inside the glass so the text never spills past it.
   savingPill: {
     position: "absolute",
     left: 20,
-    bottom: 16,
-    minHeight: 28,
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    borderRadius: 14,
+    bottom: 10,
+    height: 40,
+    borderRadius: 20,
+  },
+  savingPillContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingLeft: 12,
+    paddingRight: 14,
   },
   savingText: {
     color: wardrobeTheme.muted,

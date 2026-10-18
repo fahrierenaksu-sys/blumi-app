@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useEffect, useState } from "react"
-import { Pressable, Text, View } from "react-native"
+import { ActivityIndicator, Pressable, Text, View } from "react-native"
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -103,7 +103,13 @@ export function WardrobePreviewStage(props: {
         </>
       ) : null}
       {showSavingStatus ? (
-        <WardrobeGlass tone="control" radius={14} style={styles.savingPill}>
+        <WardrobeGlass
+          tone="control"
+          radius={20}
+          style={styles.savingPill}
+          contentStyle={styles.savingPillContent}
+        >
+          <ActivityIndicator size="small" color={wardrobeTheme.muted} />
           <Text
             testID="wardrobe-save-status"
             accessibilityRole="text"
