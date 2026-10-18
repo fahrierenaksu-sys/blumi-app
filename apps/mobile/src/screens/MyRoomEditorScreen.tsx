@@ -470,6 +470,7 @@ export function MyRoomEditorScreen(props: MyRoomEditorScreenProps & {
                   onBrowseShop={() => navigation.navigate("CosmeticShop", { initialShopMode: "home" })}
                   onTrayFeedback={selection.setPlacementFeedback}
                   onClearSelection={handleClearSelection}
+                  onRemoveFromRoom={itemActions.handleRemoveItemFromRoom}
                 />
               </WardrobeGlass>
             </Animated.View>

@@ -118,6 +118,8 @@ export function RoomEditorInventoryList(props: {
   /** Shows why a locked or already-placed card cannot be placed. */
   onTrayFeedback: (message: string) => void
   onClearSelection: () => void
+  /** Takes a placed piece back out of the room (the card's ✕). */
+  onRemoveFromRoom: (itemId: string) => void
 }) {
   const {
     copy,
@@ -134,7 +136,8 @@ export function RoomEditorInventoryList(props: {
     createInventoryItemDragGesture,
     onBrowseShop,
     onTrayFeedback,
-    onClearSelection
+    onClearSelection,
+    onRemoveFromRoom
   } = props
   const handleUnavailableItem = useCallback((reason: "locked" | "placed") => {
     hapticError()
@@ -173,6 +176,8 @@ export function RoomEditorInventoryList(props: {
             : getDefaultRoomV2FurnitureRotation(entry.item)}
           trayDragHint={copy.trayDragHint}
           previewLabel={copy.previewItem(getFurnitureDisplayName(entry.item, getAppLocale()))}
+          removeFromRoomLabel={copy.removeFromRoom(getFurnitureDisplayName(entry.item, getAppLocale()))}
+          onRemoveFromRoom={onRemoveFromRoom}
           onPreviewItem={setSelectedInventoryItemId}
           clearSelectionLabel={copy.clearSelection}
           onClearSelection={onClearSelection}
@@ -191,6 +196,7 @@ export function RoomEditorInventoryList(props: {
     selectedInventoryEntry?.item.id,
     selectedInventoryRotation,
     onClearSelection,
+    onRemoveFromRoom,
     setSelectedInventoryItemId
   ])
 

@@ -139,6 +139,7 @@ export interface MyRoomEditorCopy {
   chooseShell: (name: string) => string
   showCategory: (label: string) => string
   previewItem: (name: string) => string
+  removeFromRoom: (name: string) => string
   chooseRotation: (rotation: string, name: string) => string
   placeItem: (name: string) => string
   feedback: {
@@ -233,6 +234,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     chooseShell: (name) => `Choose ${name}`,
     showCategory: (label) => `Show ${label} room pieces`,
     previewItem: (name) => `${name} preview`,
+    removeFromRoom: (name) => `Remove ${name} from the room`,
     chooseRotation: (rotation, name) => `Choose ${rotation} view for ${name}`,
     placeItem: (name) => `Place ${name} in room`,
     feedback: {
@@ -325,6 +327,7 @@ const EDITOR_COPY: Record<AppLocale, MyRoomEditorCopy> = {
     chooseShell: (name) => `${name} odasını seç`,
     showCategory: (label) => `${label} eşyalarını göster`,
     previewItem: (name) => `${name} önizlemesi`,
+    removeFromRoom: (name) => `${name} eşyasını odadan kaldır`,
     chooseRotation: (rotation, name) => `${name} için ${rotation} yönünü seç`,
     placeItem: (name) => `${name} eşyasını odaya yerleştir`,
     feedback: {

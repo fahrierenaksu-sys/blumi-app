@@ -16,7 +16,9 @@ const SHAKE_STEP = { duration: 50, reduceMotion: ReduceMotion.Never }
 /**
  * One tray card: tap to preview, touch and hold then drag onto the stage to
  * place. A locked or already-placed card answers a tap with a short shake and
- * says why (ROOM-14) instead of being a dead touch.
+ * says why (ROOM-14) instead of being a dead touch. The state mark sits top
+ * left; the ✕ top right closes the selection or, on a placed piece, takes it
+ * back out of the room.
  */
 export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
   item: FurnitureItem
@@ -30,6 +32,8 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
   onPreviewItem: (itemId: string) => void
   clearSelectionLabel: string
   onClearSelection: () => void
+  removeFromRoomLabel: string
+  onRemoveFromRoom: (itemId: string) => void
   onUnavailableItem: (reason: "locked" | "placed") => void
   createDragGesture: (
     item: FurnitureItem,
@@ -50,6 +54,8 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
     onPreviewItem,
     clearSelectionLabel,
     onClearSelection,
+    removeFromRoomLabel,
+    onRemoveFromRoom,
     onUnavailableItem,
     createDragGesture
   } = props
@@ -112,15 +118,15 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
           ) : null}
         </Pressable>
       </GestureDetector>
-      {selected && owned ? (
+      {owned && (placed || selected) ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={clearSelectionLabel}
-          onPress={onClearSelection}
-          hitSlop={8}
+          accessibilityLabel={placed ? removeFromRoomLabel : clearSelectionLabel}
+          onPress={placed ? () => onRemoveFromRoom(item.id) : onClearSelection}
+          hitSlop={10}
           style={({ pressed }) => [styles.inventoryItemClose, pressed ? styles.selectionControlPressed : null]}
         >
-          <Ionicons name="close" size={15} color={roomEditorTheme.ink} />
+          <Ionicons name="close" size={13} color={roomEditorTheme.ink} />
         </Pressable>
       ) : null}
       <Text numberOfLines={1} maxFontSizeMultiplier={1.3} style={styles.inventoryItemName}>
@@ -140,6 +146,8 @@ export const InventoryCatalogCard = memo(function InventoryCatalogCard(props: {
   previous.onPreviewItem === next.onPreviewItem &&
   previous.clearSelectionLabel === next.clearSelectionLabel &&
   previous.onClearSelection === next.onClearSelection &&
+  previous.removeFromRoomLabel === next.removeFromRoomLabel &&
+  previous.onRemoveFromRoom === next.onRemoveFromRoom &&
   previous.onUnavailableItem === next.onUnavailableItem &&
   previous.createDragGesture === next.createDragGesture
 )

@@ -346,10 +346,10 @@ export const styles = StyleSheet.create({
   inventoryItemClose: {
     position: "absolute",
     top: 5,
-    left: 5,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    right: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: CONTROL_SURFACE,
@@ -590,7 +590,7 @@ export const styles = StyleSheet.create({
   },
   inventoryItemCheck: {
     position: "absolute",
-    right: 5,
+    left: 5,
     top: 5,
     width: 19,
     height: 19,

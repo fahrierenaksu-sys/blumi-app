@@ -232,6 +232,28 @@ export function useRoomEditorItemActions(input: {
     setPlacementPreview
   ])
 
+  /** The tray card's ✕ on a placed piece: every copy of it leaves the room. */
+  const handleRemoveItemFromRoom = useCallback((itemId: string) => {
+    const removedInstanceIds = draftDecor.placedItems
+      .filter((placedItem) => placedItem.itemId === itemId)
+      .map((placedItem) => placedItem.instanceId)
+    if (removedInstanceIds.length === 0) return
+    setDraftDecor((current) => removedInstanceIds.reduce(removeRoomV2PlacedItem, current))
+    if (selectedInstanceId && removedInstanceIds.includes(selectedInstanceId)) {
+      setSelectedInstanceId(undefined)
+      setPlacementPreview(undefined)
+    }
+    setPlacementFeedback(undefined)
+    hapticSuccess()
+  }, [
+    draftDecor.placedItems,
+    selectedInstanceId,
+    setDraftDecor,
+    setSelectedInstanceId,
+    setPlacementFeedback,
+    setPlacementPreview
+  ])
+
   const addDraftItem = useCallback((
     itemId: string,
     feedback: boolean,
@@ -309,6 +331,7 @@ export function useRoomEditorItemActions(input: {
     handleRotate,
     handleSelectInventoryRotation,
     handleRemoveItem,
+    handleRemoveItemFromRoom,
     addDraftItem,
     handleAddSelectedInventoryItem,
     handleSelectRoomShell
