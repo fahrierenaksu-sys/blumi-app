@@ -18,7 +18,7 @@ export const STREET_WINDOW = { width: 84, wideWidth: 96, glass: 68, bubble: 40, 
 /** From AX1 up the window grows and the name may wrap (spec §3). */
 const LARGE_TEXT_SCALE = 1.35
 /** A window shows the whole chibi standing in a fifth of their room, so a new rug or bed shows too (spec §1). */
-const ROOM_FRAMING = { chibiScale: 0.74, roomScale: 5.2 } as const
+const ROOM_FRAMING = { roomScale: 5.2 } as const
 const NIGHT_GLASS_OPACITY = 0.88
 const WAKE_STAGGER_MS = 110
 const WAKE_MAX_WINDOWS = 7
@@ -116,7 +116,6 @@ export const StreetWindowView = memo(function StreetWindowView(props: {
             width={glassSize}
             height={glassSize}
             roomWidth={glassSize * ROOM_FRAMING.roomScale}
-            chibiHeight={glassSize * ROOM_FRAMING.chibiScale}
             greet={Boolean(props.note) && !isSelf}
           />
         )}

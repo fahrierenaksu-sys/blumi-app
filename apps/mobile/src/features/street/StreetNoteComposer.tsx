@@ -24,13 +24,14 @@ export function StreetNoteComposer(props: {
   return (
     <Modal visible={visible} transparent animationType={motion.reduceMotion ? "fade" : "slide"} onRequestClose={props.onClose}>
       <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <Pressable style={StyleSheet.absoluteFill} accessibilityLabel={copy.cancel} onPress={props.onClose} />
+        <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={copy.cancel} onPress={props.onClose} />
         <View style={styles.card}>
           <Text accessibilityRole="header" style={styles.title}>{copy.leaveNote}</Text>
           <TextInput
             value={draft}
             onChangeText={setDraft}
             placeholder={copy.notePlaceholder}
+            accessibilityLabel={copy.leaveNote}
             placeholderTextColor={uiTheme.colors.textMuted}
             autoFocus
             maxLength={STREET_NOTE_MAX_LENGTH + 10}
@@ -42,16 +43,17 @@ export function StreetNoteComposer(props: {
           <Text style={styles.counter}>{streetNoteCharactersLeft(draft)}</Text>
           <View style={styles.actions}>
             {current ? (
-              <Pressable accessibilityRole="button" onPress={() => props.onSave(null)} style={styles.secondary}>
+              <Pressable accessibilityRole="button" accessibilityLabel={copy.removeNote} onPress={() => props.onSave(null)} style={styles.secondary}>
                 <Text style={styles.removeText}>{copy.removeNote}</Text>
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" onPress={props.onClose} style={styles.secondary}>
+              <Pressable accessibilityRole="button" accessibilityLabel={copy.cancel} onPress={props.onClose} style={styles.secondary}>
                 <Text style={styles.secondaryText}>{copy.cancel}</Text>
               </Pressable>
             )}
             <PressableScale
               accessibilityRole="button"
+              accessibilityLabel={copy.shareNote}
               accessibilityState={{ disabled: note === null }}
               disabled={note === null}
               onPress={() => props.onSave(note)}

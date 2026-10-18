@@ -15,7 +15,8 @@ export const NATIVE_SHEET_KINDS = [
   "discoverFilters",
   "report",
   "countryPicker",
-  "inboxConversationActions"
+  "inboxConversationActions",
+  "streetRoomPeek"
 ] as const
 
 export type NativeSheetKind = (typeof NATIVE_SHEET_KINDS)[number]
@@ -37,7 +38,22 @@ const SHEET_DETENTS: Record<NativeSheetKind, number[] | "fitToContents"> = {
   report: "fitToContents",
   // A long searchable list: opens at about two thirds, scrolling expands it.
   countryPicker: [0.66, 1],
-  inboxConversationActions: "fitToContents"
+  inboxConversationActions: "fitToContents",
+  streetRoomPeek: "fitToContents"
+}
+
+/** Sheets that let iOS 26 draw its Liquid Glass sheet material behind their content. */
+const GLASS_SHEETS: ReadonlySet<NativeSheetKind> = new Set<NativeSheetKind>(["streetRoomPeek"])
+const LIQUID_GLASS_IOS_MAJOR = 26
+
+/** iOS 26 and later draw form sheets in Liquid Glass; earlier systems and Android keep an opaque sheet. */
+export function supportsLiquidGlassSheets(platform: NativeSheetPlatform, version: string | number): boolean {
+  return platform === "ios" && Number.parseInt(String(version), 10) >= LIQUID_GLASS_IOS_MAJOR
+}
+
+/** The sheet's own background stays clear so the system glass shows through. */
+export function isGlassNativeSheet(kind: NativeSheetKind | undefined, glassSupported: boolean): boolean {
+  return glassSupported && kind !== undefined && GLASS_SHEETS.has(kind)
 }
 
 export interface NativeSheetScreenOptions {
@@ -58,6 +74,8 @@ export function getNativeSheetScreenOptions(input: {
   reduceMotion: boolean
   backgroundColor: string
   cornerRadius: number
+  /** iOS 26+: glass sheets keep a clear background (`supportsLiquidGlassSheets`). */
+  glassSupported?: boolean
 }): NativeSheetScreenOptions {
   const detents = input.kind ? SHEET_DETENTS[input.kind] : "fitToContents"
   return {
@@ -69,7 +87,9 @@ export function getNativeSheetScreenOptions(input: {
     sheetExpandsWhenScrolledToEdge: detents !== "fitToContents",
     animation: input.reduceMotion ? "fade" : "default",
     gestureEnabled: true,
-    contentStyle: { backgroundColor: input.backgroundColor }
+    contentStyle: {
+      backgroundColor: isGlassNativeSheet(input.kind, input.glassSupported ?? false) ? "transparent" : input.backgroundColor
+    }
   }
 }
 

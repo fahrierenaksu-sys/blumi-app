@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react"
-import { StyleSheet, useWindowDimensions, View } from "react-native"
+import { Platform, StyleSheet, useWindowDimensions, View } from "react-native"
 import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { DiscoverFiltersSheetContent } from "../../components/DiscoverFiltersBottomSheet"
 import { ReportSheetContent } from "../../components/ReportModal"
 import { CountryPickerSheetContent } from "../../components/CountryCallingCodePicker"
 import { InboxConversationActionsSheetContent } from "../../features/inbox/InboxConversationActionsSheet"
+import { StreetRoomPeekContent } from "../../features/street/StreetRoomPeek"
 import { SheetPresentationContext, type SheetPresentation } from "../../ui/sheetPresentation"
 import { uiTheme } from "../../ui/theme"
 import type { RootStackParamList } from "../RootNavigator"
-import { type NativeSheetKind } from "./nativeSheetModel"
+import { isGlassNativeSheet, supportsLiquidGlassSheets, type NativeSheetKind } from "./nativeSheetModel"
 import { nativeSheetRegistry, type NativeSheetSnapshot } from "./nativeSheetRegistry"
 import type { NativeSheetPropsByKind } from "./nativeSheetTypes"
 
 type NativeSheetRouteProps = NativeStackScreenProps<RootStackParamList, "NativeSheet">
+
+const GLASS_SUPPORTED = supportsLiquidGlassSheets(Platform.OS, Platform.Version)
 
 /** Largest share of the screen a content-sized sheet takes before it scrolls. */
 const FIT_SHEET_MAX_HEIGHT = 0.92
@@ -80,6 +83,8 @@ function renderNativeSheetContent(snapshot: NativeSheetSnapshot): ReactNode {
           {...(snapshot.props as NativeSheetPropsByKind["inboxConversationActions"])}
         />
       )
+    case "streetRoomPeek":
+      return <StreetRoomPeekContent {...(snapshot.props as NativeSheetPropsByKind["streetRoomPeek"])} />
     default:
       return null
   }
@@ -98,6 +103,7 @@ function NativeSheetBody({ kind, children }: { kind: NativeSheetKind; children: 
     <View
       style={[
         styles.body,
+        isGlassNativeSheet(kind, GLASS_SUPPORTED) ? styles.glass : null,
         fills ? styles.fill : { maxHeight: Math.round(height * FIT_SHEET_MAX_HEIGHT) },
         fills ? styles.fillPadding : null,
         { paddingBottom: Math.max(insets.bottom, uiTheme.spacing.md) }
@@ -113,6 +119,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingTop: uiTheme.spacing.md,
     backgroundColor: uiTheme.colors.background
+  },
+  glass: {
+    backgroundColor: "transparent"
   },
   fill: {
     flex: 1

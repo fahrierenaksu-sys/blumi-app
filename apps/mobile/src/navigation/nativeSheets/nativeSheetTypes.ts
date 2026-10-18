@@ -2,6 +2,7 @@ import type { DiscoverFiltersSheetContentProps } from "../../components/Discover
 import type { ReportSheetContentProps } from "../../components/ReportModal"
 import type { CountryPickerSheetContentProps } from "../../components/CountryCallingCodePicker"
 import type { InboxConversationActionsSheetContentProps } from "../../features/inbox/InboxConversationActionsSheet"
+import type { StreetRoomPeekContentProps } from "../../features/street/StreetRoomPeek"
 import type { NativeSheetKind } from "./nativeSheetModel"
 
 /** The in-memory props each sheet kind receives through the registry. */
@@ -10,6 +11,7 @@ export interface NativeSheetPropsByKind {
   report: ReportSheetContentProps
   countryPicker: CountryPickerSheetContentProps
   inboxConversationActions: InboxConversationActionsSheetContentProps
+  streetRoomPeek: StreetRoomPeekContentProps
 }
 
 // Compile-time proof that every sheet kind has a props entry.

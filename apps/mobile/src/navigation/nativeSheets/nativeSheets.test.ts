@@ -117,6 +117,17 @@ test("iOS presents form sheets; Reduce Motion crossfades them; Android keeps its
   }
 })
 
+test("from iOS 26 a glass sheet keeps a clear background so the system's Liquid Glass shows; others stay opaque", () => {
+  assert.equal(model.supportsLiquidGlassSheets("ios", "26.0"), true)
+  assert.equal(model.supportsLiquidGlassSheets("ios", "18.6"), false)
+  assert.equal(model.supportsLiquidGlassSheets("android", 36), false)
+  const options = (kind: (typeof model.NATIVE_SHEET_KINDS)[number], glassSupported: boolean) =>
+    model.getNativeSheetScreenOptions({ kind, reduceMotion: false, backgroundColor: "#fff", cornerRadius: 30, glassSupported })
+  assert.equal(options("streetRoomPeek", true).contentStyle.backgroundColor, "transparent")
+  assert.equal(options("streetRoomPeek", false).contentStyle.backgroundColor, "#fff")
+  assert.equal(options("report", true).contentStyle.backgroundColor, "#fff")
+})
+
 /* ── Opener hook and sheet route ───────────────────────────── */
 
 function loadSheetRuntime(platform: "ios" | "android") {
@@ -217,12 +228,18 @@ function loadSheetRoute(registry: NativeSheetRegistry, requestId: string) {
     NativeSheetRoute: (props: object) => unknown
   }>("navigation/nativeSheets/NativeSheetRoute.tsx", runtime, {
     modules: {
-      "react-native": { StyleSheet: { create: <T>(styles: T) => styles }, useWindowDimensions: () => ({ height: 800 }), View: "View" },
+      "react-native": {
+        Platform: { OS: "ios", Version: "26.0" },
+        StyleSheet: { create: <T>(styles: T) => styles },
+        useWindowDimensions: () => ({ height: 800 }),
+        View: "View"
+      },
       "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 34 }) },
       "../../components/DiscoverFiltersBottomSheet": content("DiscoverFiltersSheetContent"),
       "../../components/ReportModal": content("ReportSheetContent"),
       "../../components/CountryCallingCodePicker": content("CountryPickerSheetContent"),
       "../../features/inbox/InboxConversationActionsSheet": content("InboxConversationActionsSheetContent"),
+      "../../features/street/StreetRoomPeek": content("StreetRoomPeekContent"),
       "../../ui/sheetPresentation": presentationModule,
       "../../ui/theme": createInertModule("theme"),
       "./nativeSheetModel": model,

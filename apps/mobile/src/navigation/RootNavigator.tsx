@@ -6,7 +6,7 @@ import type {
 import { NavigationContainer } from "@react-navigation/native"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { StyleSheet, View } from "react-native"
+import { Platform, StyleSheet, View } from "react-native"
 import { MatchResultModal } from "../components/MatchResultModal"
 import type { CandidateAvatarSnapshot } from "../components/DiscoverCard"
 import {
@@ -108,6 +108,7 @@ import { withMainTabPagerRouter } from "./mainTabPager/mainTabPagerRouter"
 import { NativeSheetRoute } from "./nativeSheets/NativeSheetRoute"
 import {
   getNativeSheetScreenOptions,
+  supportsLiquidGlassSheets,
   type NativeSheetRouteParams
 } from "./nativeSheets/nativeSheetModel"
 import {
@@ -240,6 +241,7 @@ const IS_FULL_SHOP_CATALOG_QA_PREVIEW = isAvatarQaUnlockEnabled(
   __DEV__,
   BLUMI_QA_UNLOCK_AVATAR_ITEMS_FLAG
 )
+const NATIVE_SHEET_GLASS_SUPPORTED = supportsLiquidGlassSheets(Platform.OS, Platform.Version)
 function scheduleDeferredPreload(
   steps: readonly (() => unknown)[],
   isFocused: () => boolean,
@@ -297,7 +299,8 @@ export function RootNavigator() {
       kind: route.params?.sheet,
       reduceMotion,
       backgroundColor: uiTheme.colors.background,
-      cornerRadius: uiTheme.radius.xl
+      cornerRadius: uiTheme.radius.xl,
+      glassSupported: NATIVE_SHEET_GLASS_SUPPORTED
     }),
     [reduceMotion]
   )
